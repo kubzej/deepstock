@@ -193,6 +193,95 @@ class PortfolioService:
         
         return tx_response.data[0]
     
+    async def get_all_open_lots(self, portfolio_id: str) -> List[dict]:
+        """
+        Get all open lots across all holdings in a portfolio.
+        Returns BUY transactions with remaining shares, enriched with stock info.
+        """
+        # Get all BUY transactions for this portfolio
+        buy_response = supabase.table("transactions") \
+            .select("*, stocks(ticker, name, currency, price_scale)") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("type", "BUY") \
+            .order("executed_at", desc=False) \
+            .execute()
+        
+        buy_transactions = buy_response.data or []
+        
+        # Get all SELL transactions with source_transaction_id
+        sell_response = supabase.table("transactions") \
+            .select("source_transaction_id, shares") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("type", "SELL") \
+            .not_.is_("source_transaction_id", "null") \
+            .execute()
+        
+        sell_transactions = sell_response.data or []
+        
+        # Calculate sold quantities per lot
+        sold_per_lot: dict[str, float] = {}
+        for sell in sell_transactions:
+            if sell.get("source_transaction_id"):
+                lot_id = sell["source_transaction_id"]
+                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
+        
+        # Also handle FIFO sells (no source_transaction_id) per stock
+        fifo_sell_response = supabase.table("transactions") \
+            .select("stock_id, shares") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("type", "SELL") \
+            .is_("source_transaction_id", "null") \
+            .execute()
+        
+        fifo_sells_per_stock: dict[str, float] = {}
+        for sell in (fifo_sell_response.data or []):
+            stock_id = sell["stock_id"]
+            fifo_sells_per_stock[stock_id] = fifo_sells_per_stock.get(stock_id, 0) + float(sell["shares"])
+        
+        # Group buys by stock_id for FIFO processing
+        buys_by_stock: dict[str, list] = {}
+        for buy in buy_transactions:
+            stock_id = buy["stock_id"]
+            if stock_id not in buys_by_stock:
+                buys_by_stock[stock_id] = []
+            buys_by_stock[stock_id].append(buy)
+        
+        # Apply FIFO sells to lots
+        for stock_id, fifo_sold in fifo_sells_per_stock.items():
+            remaining_to_sell = fifo_sold
+            for buy in buys_by_stock.get(stock_id, []):
+                if remaining_to_sell <= 0:
+                    break
+                already_sold = sold_per_lot.get(buy["id"], 0)
+                available = float(buy["shares"]) - already_sold
+                if available > 0:
+                    sell_from_this = min(available, remaining_to_sell)
+                    sold_per_lot[buy["id"]] = already_sold + sell_from_this
+                    remaining_to_sell -= sell_from_this
+        
+        # Build open lots with remaining shares
+        open_lots = []
+        for buy in buy_transactions:
+            sold_from_lot = sold_per_lot.get(buy["id"], 0)
+            remaining = float(buy["shares"]) - sold_from_lot
+            
+            if remaining > 0.0001:  # Small threshold for floating point
+                stock_info = buy.get("stocks", {})
+                price_scale_raw = stock_info.get("price_scale")
+                price_scale = float(price_scale_raw) if price_scale_raw else 1.0
+                open_lots.append({
+                    "id": buy["id"],
+                    "ticker": stock_info.get("ticker", ""),
+                    "stockName": stock_info.get("name", ""),
+                    "date": buy["executed_at"][:10] if buy["executed_at"] else "",
+                    "shares": remaining,
+                    "buyPrice": float(buy["price_per_share"]),
+                    "currency": stock_info.get("currency") or buy.get("currency") or "USD",
+                    "priceScale": price_scale,
+                })
+        
+        return open_lots
+
     async def get_available_lots(self, portfolio_id: str, stock_ticker: str) -> List[AvailableLot]:
         """
         Get available lots for selling a specific stock in a portfolio.

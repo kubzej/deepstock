@@ -18,6 +18,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
   const {
     portfolio,
     holdings,
+    openLots,
     quotes,
     rates,
     loading,
@@ -90,10 +91,14 @@ export function Dashboard({ onStockClick }: DashboardProps) {
       ? (dailyChangeCzk / (totalValueCzk - dailyChangeCzk)) * 100
       : 0;
 
-  // TODO: fetch real open lots from API
+  // Enrich open lots with current prices
   const lotsWithPrices: OpenLot[] = useMemo(() => {
-    return [];
-  }, []);
+    return openLots.map((lot) => ({
+      ...lot,
+      currentPrice: quotes[lot.ticker]?.price ?? 0,
+      priceScale: lot.priceScale ?? 1,
+    }));
+  }, [openLots, quotes]);
 
   // Loading state
   if (loading) {
@@ -265,8 +270,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
             <OpenLotsRanking
               lots={lotsWithPrices}
               rates={rates}
-              maxItems={10}
-              onLotClick={(ticker) => console.log('Lot clicked:', ticker)}
+              onLotClick={onStockClick}
             />
           ) : (
             <div className="text-center py-12 text-muted-foreground">

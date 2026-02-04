@@ -27,6 +27,7 @@ export interface OpenLot {
   buyPrice: number;
   currentPrice: number;
   currency: string;
+  priceScale?: number;
 }
 
 type SortKey =
@@ -69,7 +70,7 @@ interface OpenLotsRankingProps {
 export function OpenLotsRanking({
   lots,
   rates,
-  maxItems = 10,
+  maxItems,
   onLotClick,
 }: OpenLotsRankingProps) {
   const [sortKey, setSortKey] = useState<SortKey>('plPercent');
@@ -79,8 +80,12 @@ export function OpenLotsRanking({
   const lotsWithPL = useMemo(
     () =>
       lots.map((lot) => {
+        const scale = lot.priceScale ?? 1;
+        // buyPrice is stored in actual currency (e.g., GBP for LSE stocks)
+        // currentPrice from quotes is in quoted units (e.g., pence) - needs scale
         const costBasis = lot.buyPrice * lot.shares;
-        const currentValue = lot.currentPrice * lot.shares;
+        const currentPriceScaled = lot.currentPrice * scale;
+        const currentValue = currentPriceScaled * lot.shares;
         const plAmount = currentValue - costBasis;
         const plPercent = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
 
@@ -88,7 +93,14 @@ export function OpenLotsRanking({
         const currentValueCzk = toCZK(currentValue, lot.currency, rates);
         const plCzk = currentValueCzk - costBasisCzk;
 
-        return { ...lot, plPercent, plCzk, costBasisCzk, currentValueCzk };
+        return {
+          ...lot,
+          plPercent,
+          plCzk,
+          costBasisCzk,
+          currentValueCzk,
+          currentPriceScaled,
+        };
       }),
     [lots, rates],
   );
@@ -117,8 +129,8 @@ export function OpenLotsRanking({
           bVal = b.buyPrice;
           break;
         case 'currentPrice':
-          aVal = a.currentPrice;
-          bVal = b.currentPrice;
+          aVal = a.currentPriceScaled;
+          bVal = b.currentPriceScaled;
           break;
         case 'plCzk':
           aVal = a.plCzk;
@@ -142,7 +154,7 @@ export function OpenLotsRanking({
     });
   }, [lotsWithPL, sortKey, sortDirection]);
 
-  const displayedLots = sortedLots.slice(0, maxItems);
+  const displayedLots = maxItems ? sortedLots.slice(0, maxItems) : sortedLots;
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -176,7 +188,7 @@ export function OpenLotsRanking({
   }
 
   return (
-    <div>
+    <div className="pb-12">
       {/* Desktop Table */}
       <div className="hidden md:block">
         <Table className="w-full">
@@ -219,10 +231,10 @@ export function OpenLotsRanking({
                     {lot.shares}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    ${formatPrice(lot.buyPrice)}
+                    {formatPrice(lot.buyPrice, lot.currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    ${formatPrice(lot.currentPrice)}
+                    {formatPrice(lot.currentPriceScaled, lot.currency)}
                   </TableCell>
                   <TableCell
                     className={`text-right font-mono-price ${isPositive ? 'text-positive' : 'text-negative'}`}
@@ -285,9 +297,11 @@ export function OpenLotsRanking({
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>
-                  {lot.shares} ks × ${formatPrice(lot.buyPrice)}
+                  {lot.shares} ks × {formatPrice(lot.buyPrice, lot.currency)}
                 </span>
-                <span>→ ${formatPrice(lot.currentPrice)}</span>
+                <span>
+                  → {formatPrice(lot.currentPriceScaled, lot.currency)}
+                </span>
               </div>
             </div>
           );

@@ -199,6 +199,36 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
   }));
 }
 
+export interface OpenLot {
+  id: string;
+  ticker: string;
+  stockName: string;
+  date: string;
+  shares: number;
+  buyPrice: number;
+  currency: string;
+  priceScale?: number;
+}
+
+export async function fetchOpenLots(portfolioId: string): Promise<OpenLot[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/open-lots`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch open lots');
+  }
+  
+  return response.json();
+}
+
 export async function fetchTransactions(portfolioId: string, limit: number = 50): Promise<Transaction[]> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/transactions?limit=${limit}`, {

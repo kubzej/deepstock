@@ -65,6 +65,15 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate):
     return await portfolio_service.add_transaction(portfolio_id, data)
 
 
+@router.get("/{portfolio_id}/open-lots")
+async def get_all_open_lots(portfolio_id: str):
+    """
+    Get all open lots across all holdings in the portfolio.
+    Returns BUY transactions with remaining shares, enriched with stock info.
+    """
+    return await portfolio_service.get_all_open_lots(portfolio_id)
+
+
 @router.get("/{portfolio_id}/available-lots/{stock_ticker}", response_model=List[AvailableLot])
 async def get_available_lots(portfolio_id: str, stock_ticker: str):
     """

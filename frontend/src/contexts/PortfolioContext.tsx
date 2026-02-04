@@ -11,11 +11,13 @@ import {
   createPortfolio,
   fetchQuotes,
   fetchExchangeRates,
+  fetchOpenLots,
   DEFAULT_RATES,
   type Portfolio,
   type Holding,
   type Quote,
   type ExchangeRates,
+  type OpenLot,
 } from '@/lib/api';
 import { useAuth } from './AuthContext';
 
@@ -33,6 +35,7 @@ interface PortfolioContextType {
   activePortfolio: Portfolio | null;
   portfolios: Portfolio[];
   holdings: HoldingWithPrice[];
+  openLots: OpenLot[];
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
 
@@ -60,6 +63,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [holdings, setHoldings] = useState<HoldingWithPrice[]>([]);
+  const [openLots, setOpenLots] = useState<OpenLot[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [rates, setRates] = useState<ExchangeRates>(DEFAULT_RATES);
   const [loading, setLoading] = useState(true);
@@ -99,8 +103,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         const activePortfolio = allPortfolios[0];
         setPortfolio(activePortfolio);
 
-        // 3. Get holdings for the portfolio
-        const holdingsData = await fetchHoldings(activePortfolio.id);
+        // 3. Get holdings and open lots for the portfolio
+        const [holdingsData, lotsData] = await Promise.all([
+          fetchHoldings(activePortfolio.id),
+          fetchOpenLots(activePortfolio.id),
+        ]);
+
+        setOpenLots(lotsData);
 
         // 4. Fetch quotes for all tickers
         let quotesData: Record<string, Quote> = {};
@@ -203,6 +212,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     activePortfolio: portfolio,
     portfolios,
     holdings,
+    openLots,
     quotes,
     rates,
     loading,
