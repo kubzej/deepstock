@@ -9,7 +9,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { StockCard } from '@/components/StockCard';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronRight,
+  ChevronDown,
+} from 'lucide-react';
 import type { Quote, ExchangeRates } from '@/lib/api';
 import {
   formatCurrency,
@@ -30,6 +36,22 @@ export interface Holding {
   priceScale?: number;
   totalInvestedCzk?: number;
   portfolioName?: string;
+}
+
+interface EnrichedHolding extends Holding {
+  quote?: Quote;
+  currentPrice: number;
+  currentValueCzk: number;
+  investedCzk: number;
+  plCzk: number;
+  plPercent: number;
+  weight: number;
+  volumeRatio: number;
+}
+
+interface AggregatedHolding extends EnrichedHolding {
+  portfolioHoldings: EnrichedHolding[];
+  portfolioCount: number;
 }
 
 type SortKey =
@@ -83,6 +105,9 @@ export function HoldingsTable({
 }: HoldingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [expandedTickers, setExpandedTickers] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Calculate enriched data for each holding
   const enrichedHoldings = useMemo(() => {
@@ -122,13 +147,89 @@ export function HoldingsTable({
         plPercent,
         weight,
         volumeRatio,
-      };
+      } as EnrichedHolding;
     });
   }, [holdings, quotes, rates]);
 
+  // Aggregate holdings by ticker when showing all portfolios
+  const aggregatedHoldings = useMemo(() => {
+    if (!showPortfolioColumn) {
+      // No aggregation needed - just return as-is with empty portfolioHoldings
+      return enrichedHoldings.map((h) => ({
+        ...h,
+        portfolioHoldings: [] as EnrichedHolding[],
+        portfolioCount: 1,
+      })) as AggregatedHolding[];
+    }
+
+    // Group by ticker
+    const byTicker = new Map<string, EnrichedHolding[]>();
+    for (const h of enrichedHoldings) {
+      const existing = byTicker.get(h.ticker) || [];
+      existing.push(h);
+      byTicker.set(h.ticker, existing);
+    }
+
+    // Create aggregated rows
+    const result: AggregatedHolding[] = [];
+    for (const [, tickerHoldings] of byTicker) {
+      if (tickerHoldings.length === 1) {
+        // Single portfolio - no aggregation needed
+        result.push({
+          ...tickerHoldings[0],
+          portfolioHoldings: [] as EnrichedHolding[],
+          portfolioCount: 1,
+        });
+      } else {
+        // Multiple portfolios - aggregate
+        const first = tickerHoldings[0];
+        const totalShares = tickerHoldings.reduce(
+          (sum, h) => sum + h.shares,
+          0,
+        );
+        const totalInvestedCzk = tickerHoldings.reduce(
+          (sum, h) => sum + h.investedCzk,
+          0,
+        );
+        const totalValueCzk = tickerHoldings.reduce(
+          (sum, h) => sum + h.currentValueCzk,
+          0,
+        );
+        const totalPlCzk = tickerHoldings.reduce((sum, h) => sum + h.plCzk, 0);
+        const totalWeight = tickerHoldings.reduce(
+          (sum, h) => sum + h.weight,
+          0,
+        );
+
+        // Weighted average cost (convert back from CZK)
+        const scale = first.priceScale ?? 1;
+        const avgCost =
+          totalShares > 0 ? totalInvestedCzk / totalShares / scale : 0;
+        const plPercent =
+          totalInvestedCzk > 0 ? (totalPlCzk / totalInvestedCzk) * 100 : 0;
+
+        result.push({
+          ...first,
+          shares: totalShares,
+          avgCost,
+          investedCzk: totalInvestedCzk,
+          currentValueCzk: totalValueCzk,
+          plCzk: totalPlCzk,
+          plPercent,
+          weight: totalWeight,
+          portfolioName: undefined, // Aggregated row has no single portfolio
+          portfolioHoldings: tickerHoldings,
+          portfolioCount: tickerHoldings.length,
+        });
+      }
+    }
+
+    return result;
+  }, [enrichedHoldings, showPortfolioColumn]);
+
   // Sort the holdings
   const sortedHoldings = useMemo(() => {
-    return [...enrichedHoldings].sort((a, b) => {
+    return [...aggregatedHoldings].sort((a, b) => {
       let aVal: number | string = 0;
       let bVal: number | string = 0;
 
@@ -189,7 +290,7 @@ export function HoldingsTable({
         ? (aVal as number) - (bVal as number)
         : (bVal as number) - (aVal as number);
     });
-  }, [enrichedHoldings, sortKey, sortDirection]);
+  }, [aggregatedHoldings, sortKey, sortDirection]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -198,6 +299,18 @@ export function HoldingsTable({
       setSortKey(key);
       setSortDirection(key === 'ticker' ? 'asc' : 'desc');
     }
+  };
+
+  const toggleExpand = (ticker: string) => {
+    setExpandedTickers((prev) => {
+      const next = new Set(prev);
+      if (next.has(ticker)) {
+        next.delete(ticker);
+      } else {
+        next.add(ticker);
+      }
+      return next;
+    });
   };
 
   // Render sortable header cell
@@ -226,12 +339,7 @@ export function HoldingsTable({
         <Table className="w-full">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Akcie', 'ticker', 'w-[140px]')}
-              {showPortfolioColumn && (
-                <TableHead className="text-muted-foreground w-[120px]">
-                  Portfolio
-                </TableHead>
-              )}
+              {renderSortableHeader('Akcie', 'ticker', 'w-[160px]')}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
               {renderSortableHeader('Cena', 'price', 'text-right w-[90px]')}
               {renderSortableHeader(
@@ -261,29 +369,52 @@ export function HoldingsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedHoldings.map((holding) => {
+            {sortedHoldings.flatMap((holding) => {
+              const isExpandable = holding.portfolioCount > 1;
+              const isExpanded = expandedTickers.has(holding.ticker);
               const isPositive = holding.plCzk >= 0;
               const isDayPositive = (holding.quote?.changePercent ?? 0) >= 0;
 
-              return (
+              const rows = [
                 <TableRow
-                  key={`${holding.ticker}-${holding.portfolioName || 'default'}`}
+                  key={holding.ticker}
                   className="cursor-pointer hover:bg-muted/50 border-border"
-                  onClick={() => onRowClick?.(holding.ticker)}
+                  onClick={() =>
+                    isExpandable
+                      ? toggleExpand(holding.ticker)
+                      : onRowClick?.(holding.ticker)
+                  }
                 >
                   <TableCell>
-                    <div>
-                      <span className="font-bold">{holding.ticker}</span>
-                      <p className="text-xs text-muted-foreground truncate max-w-[150px]">
-                        {holding.name}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      {isExpandable && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(holding.ticker);
+                          }}
+                          className="p-0.5 hover:bg-muted rounded"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      )}
+                      <div>
+                        <span className="font-bold">{holding.ticker}</span>
+                        {isExpandable && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            ({holding.portfolioCount})
+                          </span>
+                        )}
+                        <p className="text-xs text-muted-foreground truncate max-w-[150px]">
+                          {holding.name}
+                        </p>
+                      </div>
                     </div>
                   </TableCell>
-                  {showPortfolioColumn && (
-                    <TableCell className="text-muted-foreground text-sm truncate max-w-[120px]">
-                      {holding.portfolioName || '—'}
-                    </TableCell>
-                  )}
                   <TableCell className="text-right font-mono-price">
                     {formatNumber(holding.shares, 2)}
                   </TableCell>
@@ -335,8 +466,69 @@ export function HoldingsTable({
                   <TableCell className="text-muted-foreground text-sm truncate max-w-[180px]">
                     {holding.sector || '—'}
                   </TableCell>
-                </TableRow>
-              );
+                </TableRow>,
+              ];
+
+              // Add sub-rows for expanded holdings
+              if (isExpanded && holding.portfolioHoldings.length > 0) {
+                for (const subHolding of holding.portfolioHoldings) {
+                  const subIsPositive = subHolding.plCzk >= 0;
+                  rows.push(
+                    <TableRow
+                      key={`${subHolding.ticker}-${subHolding.portfolioName}`}
+                      className="cursor-pointer hover:bg-muted/50 border-border bg-muted/20"
+                      onClick={() => onRowClick?.(subHolding.ticker)}
+                    >
+                      <TableCell>
+                        <div className="pl-8 text-muted-foreground text-sm">
+                          {subHolding.portfolioName}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price">
+                        {formatNumber(subHolding.shares, 2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price text-muted-foreground">
+                        —
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        —
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        —
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price">
+                        {formatCurrency(subHolding.investedCzk)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price">
+                        {formatPrice(subHolding.avgCost, subHolding.currency)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price">
+                        {formatCurrency(subHolding.currentValueCzk)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div
+                          className={
+                            subIsPositive ? 'text-positive' : 'text-negative'
+                          }
+                        >
+                          <span className="font-mono-price font-medium">
+                            {formatPercent(subHolding.plPercent, 1, true)}
+                          </span>
+                          <p className="text-xs font-mono-price opacity-70">
+                            {formatCurrency(subHolding.plCzk)}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price text-muted-foreground">
+                        {formatPercent(subHolding.weight, 1)}
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>,
+                  );
+                }
+              }
+
+              return rows;
             })}
           </TableBody>
         </Table>
@@ -344,22 +536,68 @@ export function HoldingsTable({
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {sortedHoldings.map((holding) => (
-          <StockCard
-            key={`${holding.ticker}-${holding.portfolioName || 'default'}`}
-            ticker={holding.ticker}
-            name={holding.name}
-            quote={holding.quote ?? null}
-            shares={holding.shares}
-            avgCost={holding.avgCost}
-            valueCzk={holding.currentValueCzk}
-            investedCzk={holding.investedCzk}
-            portfolioName={
-              showPortfolioColumn ? holding.portfolioName : undefined
-            }
-            onClick={() => onRowClick?.(holding.ticker)}
-          />
-        ))}
+        {sortedHoldings.map((holding) => {
+          const isExpandable = holding.portfolioCount > 1;
+          const isExpanded = expandedTickers.has(holding.ticker);
+
+          return (
+            <div key={holding.ticker}>
+              <StockCard
+                ticker={holding.ticker}
+                name={holding.name}
+                quote={holding.quote ?? null}
+                shares={holding.shares}
+                avgCost={holding.avgCost}
+                valueCzk={holding.currentValueCzk}
+                investedCzk={holding.investedCzk}
+                portfolioCount={
+                  isExpandable ? holding.portfolioCount : undefined
+                }
+                onClick={() =>
+                  isExpandable
+                    ? toggleExpand(holding.ticker)
+                    : onRowClick?.(holding.ticker)
+                }
+              />
+              {/* Show sub-cards for multiple portfolios on mobile */}
+              {isExpanded && holding.portfolioHoldings.length > 0 && (
+                <div className="ml-4 mt-2 space-y-2 border-l-2 border-muted pl-3">
+                  {holding.portfolioHoldings.map((sub) => (
+                    <div
+                      key={`${sub.ticker}-${sub.portfolioName}`}
+                      className="p-2 bg-muted/30 rounded text-sm cursor-pointer hover:bg-muted/50"
+                      onClick={() => onRowClick?.(sub.ticker)}
+                    >
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          {sub.portfolioName}
+                        </span>
+                        <span className="font-mono-price">
+                          {formatNumber(sub.shares, 2)} ks
+                        </span>
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-muted-foreground">Hodnota</span>
+                        <span className="font-mono-price">
+                          {formatCurrency(sub.currentValueCzk)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-muted-foreground">P/L</span>
+                        <span
+                          className={`font-mono-price ${sub.plCzk >= 0 ? 'text-positive' : 'text-negative'}`}
+                        >
+                          {formatCurrency(sub.plCzk)} (
+                          {formatPercent(sub.plPercent, 1, true)})
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

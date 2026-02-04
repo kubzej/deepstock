@@ -198,11 +198,6 @@ export function OpenLotsRanking({
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
               {renderSortableHeader('Ticker', 'ticker', 'w-[20%]')}
-              {showPortfolioColumn && (
-                <TableHead className="text-muted-foreground w-[14%]">
-                  Portfolio
-                </TableHead>
-              )}
               {renderSortableHeader('Datum', 'date', 'w-[14%]')}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[10%]')}
               {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[14%]')}
@@ -230,13 +225,13 @@ export function OpenLotsRanking({
                       <p className="text-xs text-muted-foreground truncate max-w-[120px]">
                         {lot.stockName}
                       </p>
+                      {showPortfolioColumn && lot.portfolioName && (
+                        <p className="text-xs text-muted-foreground/70 truncate max-w-[120px]">
+                          {lot.portfolioName}
+                        </p>
+                      )}
                     </div>
                   </TableCell>
-                  {showPortfolioColumn && (
-                    <TableCell className="text-muted-foreground text-sm truncate max-w-[120px]">
-                      {lot.portfolioName || '—'}
-                    </TableCell>
-                  )}
                   <TableCell className="text-muted-foreground">
                     {formatDate(lot.date)}
                   </TableCell>

@@ -88,7 +88,6 @@ export function Sidebar({
             <LogOut className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">DeepStock v0.1.0</p>
       </div>
     </aside>
   );

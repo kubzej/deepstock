@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ChevronRight } from 'lucide-react';
 import type { Quote } from '@/lib/api';
 import { formatCurrency, formatPercent, formatPrice } from '@/lib/format';
 
@@ -11,7 +12,7 @@ interface StockCardProps {
   avgCost?: number;
   valueCzk?: number;
   investedCzk?: number;
-  portfolioName?: string;
+  portfolioCount?: number;
   onClick?: () => void;
 }
 
@@ -23,13 +24,14 @@ export function StockCard({
   avgCost,
   valueCzk,
   investedCzk,
-  portfolioName,
+  portfolioCount,
   onClick,
 }: StockCardProps) {
   const isDayPositive = quote && quote.changePercent >= 0;
   const plCzk = valueCzk && investedCzk ? valueCzk - investedCzk : 0;
   const plPercent = investedCzk ? (plCzk / investedCzk) * 100 : 0;
   const isPositive = plCzk >= 0;
+  const isExpandable = portfolioCount && portfolioCount > 1;
 
   return (
     <Card
@@ -44,15 +46,20 @@ export function StockCard({
               {ticker[0]}
             </div>
             <div>
-              <h3 className="font-bold text-base">{ticker}</h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-bold text-base">{ticker}</h3>
+                {isExpandable && (
+                  <>
+                    <span className="text-xs text-muted-foreground">
+                      ({portfolioCount})
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground truncate max-w-[120px]">
                 {name || ticker}
               </p>
-              {portfolioName && (
-                <p className="text-xs text-muted-foreground/70 truncate max-w-[120px]">
-                  {portfolioName}
-                </p>
-              )}
             </div>
           </div>
 
