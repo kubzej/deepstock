@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.portfolio import portfolio_service, PortfolioCreate, TransactionCreate
+from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate
 from app.core.auth import get_current_user_id
 from typing import List
 
@@ -16,6 +16,31 @@ async def get_portfolios(user_id: str = Depends(get_current_user_id)):
 async def create_portfolio(data: PortfolioCreate, user_id: str = Depends(get_current_user_id)):
     """Create a new portfolio for authenticated user."""
     return await portfolio_service.create_portfolio(user_id, data)
+
+
+@router.put("/{portfolio_id}")
+async def update_portfolio(
+    portfolio_id: str, 
+    data: PortfolioUpdate, 
+    user_id: str = Depends(get_current_user_id)
+):
+    """Update a portfolio."""
+    result = await portfolio_service.update_portfolio(portfolio_id, user_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    return result
+
+
+@router.delete("/{portfolio_id}")
+async def delete_portfolio(
+    portfolio_id: str, 
+    user_id: str = Depends(get_current_user_id)
+):
+    """Delete a portfolio and all related data."""
+    success = await portfolio_service.delete_portfolio(portfolio_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Portfolio not found")
+    return {"success": True}
 
 
 @router.get("/{portfolio_id}/holdings")

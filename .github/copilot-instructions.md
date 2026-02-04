@@ -117,6 +117,71 @@ const celkovaHodnota = 125000; // Spočítej celkovou hodnotu
 - Use `useQuery` for all server state.
 - Components should be small, functional, and composed.
 
+## UI Components - MANDATORY shadcn/ui Usage
+
+**CRITICAL: ALWAYS use shadcn/ui components. NEVER create custom components if shadcn has one.**
+
+### Available Components (use ONLY these):
+
+| Category       | Components                                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| **Layout**     | `Card`, `Separator`, `ScrollArea`, `Sheet`, `Dialog`                                         |
+| **Navigation** | `Tabs`, `DropdownMenu`, `Command` (for search)                                               |
+| **Forms**      | `Button`, `Input`, `Textarea`, `Label`, `Select`, `Checkbox`, `RadioGroup`, `Switch`, `Form` |
+| **Display**    | `Table`, `Badge`, `Avatar`, `Skeleton`, `Alert`, `Tooltip`                                   |
+| **Controls**   | `Toggle`, `ToggleGroup`, `Popover`                                                           |
+
+### Forbidden Patterns (NEVER do this):
+
+```tsx
+// ❌ WRONG - Custom elements
+<div className="rounded-lg border p-4">...</div>  // Use Card
+<div className="flex gap-2">                      // Use ToggleGroup for segmented controls
+  <button onClick={...}>Tab 1</button>
+  <button onClick={...}>Tab 2</button>
+</div>
+<input type="text" className="..." />             // Use Input
+<span className="text-xs bg-green-500 px-2 rounded">BUY</span>  // Use Badge
+
+// ✅ CORRECT - shadcn components
+<Card><CardContent>...</CardContent></Card>
+<ToggleGroup type="single" value={tab} onValueChange={setTab}>
+  <ToggleGroupItem value="tab1">Tab 1</ToggleGroupItem>
+  <ToggleGroupItem value="tab2">Tab 2</ToggleGroupItem>
+</ToggleGroup>
+<Input type="text" placeholder="..." />
+<Badge variant="default">BUY</Badge>
+```
+
+### Component Usage Rules:
+
+1. **Cards:** ALWAYS use `Card` + `CardHeader` + `CardContent` for any boxed content
+2. **Buttons:** ALWAYS use `Button` with proper `variant` (default, outline, ghost, destructive)
+3. **Forms:** ALWAYS use `Label` + `Input`/`Select`/`Textarea` combo
+4. **Tables:** ALWAYS use `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`
+5. **Tabs:** Use `Tabs` for page sections, `ToggleGroup` for inline segment controls
+6. **Modals:** Use `Dialog` for confirmations, `Sheet` for side panels/drawers
+7. **Loading:** Use `Skeleton` for loading states, never custom spinners
+8. **Tooltips:** Use `Tooltip` + `TooltipTrigger` + `TooltipContent`
+9. **Dropdowns:** Use `DropdownMenu` for menus, `Select` for form selects
+10. **Search:** Use `Command` (cmdk) for search/command palettes
+
+### Import Pattern:
+
+```tsx
+// Always import from @/components/ui/
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+```
+
+### Before Creating ANY UI:
+
+1. Check if shadcn has the component: https://ui.shadcn.com/docs/components
+2. If not installed, run: `npx shadcn@latest add <component-name>`
+3. Only create custom components for domain-specific things (e.g., `HoldingsTable`, `StockChart`)
+
 ## Project Structure
 
 - `/backend`: FastAPI application.

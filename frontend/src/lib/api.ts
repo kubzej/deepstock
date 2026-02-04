@@ -201,3 +201,51 @@ export async function addTransaction(
   
   return response.json();
 }
+
+export async function updatePortfolio(
+  portfolioId: string,
+  data: { name?: string; currency?: string; description?: string }
+): Promise<Portfolio> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Portfolio not found');
+    }
+    throw new Error('Failed to update portfolio');
+  }
+  
+  return response.json();
+}
+
+export async function deletePortfolio(portfolioId: string): Promise<void> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Portfolio not found');
+    }
+    throw new Error('Failed to delete portfolio');
+  }
+}

@@ -1,4 +1,3 @@
-import { useEffect, useState, useMemo } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,13 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  fetchQuotes,
-  fetchExchangeRates,
-  DEFAULT_RATES,
-  type Quote,
-  type ExchangeRates,
-} from '@/lib/api';
+import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   formatCurrency,
   formatPercent,
@@ -48,39 +41,50 @@ export interface OpenLot {
 
 interface StockDetailProps {
   ticker: string;
-  position: StockPosition;
-  lots: OpenLot[];
   onBack: () => void;
 }
 
-export function StockDetail({
-  ticker,
-  position,
-  lots,
-  onBack,
-}: StockDetailProps) {
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [rates, setRates] = useState<ExchangeRates>(DEFAULT_RATES);
-  const [loading, setLoading] = useState(true);
+export function StockDetail({ ticker, onBack }: StockDetailProps) {
+  const { getHoldingByTicker, quotes, rates, loading } = usePortfolio();
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [quotesData, ratesData] = await Promise.all([
-          fetchQuotes([ticker]),
-          fetchExchangeRates(),
-        ]);
-        setQuote(quotesData[ticker] || null);
-        setRates(ratesData);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const holding = getHoldingByTicker(ticker);
+  const quote = quotes[ticker];
 
-    loadData();
-  }, [ticker]);
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Načítání...</p>
+      </div>
+    );
+  }
+
+  // Not found state
+  if (!holding) {
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Zpět
+        </Button>
+        <p className="text-destructive">Pozice nenalezena</p>
+      </div>
+    );
+  }
+
+  // Transform to position format
+  const position: StockPosition = {
+    ticker: holding.ticker,
+    name: holding.name,
+    shares: holding.shares,
+    avgCost: holding.avg_cost,
+    currency: holding.currency,
+  };
 
   // Calculate position metrics
   const currentPrice = quote?.price ?? position.avgCost;
@@ -97,27 +101,15 @@ export function StockDetail({
   const totalCostCzk = toCZK(totalCostLocal, position.currency, rates);
   const unrealizedPnLCzk = totalValueCzk - totalCostCzk;
 
-  // Filter lots for this ticker and calculate P/L
-  const tickerLots = useMemo(() => {
-    return lots
-      .filter((lot) => lot.ticker === ticker)
-      .map((lot) => {
-        const costLocal = lot.buyPrice * lot.shares;
-        const valueLocal = currentPrice * lot.shares;
-        const pnlLocal = valueLocal - costLocal;
-        const pnlPercent = costLocal > 0 ? (pnlLocal / costLocal) * 100 : 0;
-        const pnlCzk = toCZK(pnlLocal, lot.currency, rates);
-
-        return {
-          ...lot,
-          currentPrice,
-          pnlLocal,
-          pnlPercent,
-          pnlCzk,
-        };
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [lots, ticker, currentPrice, rates]);
+  // TODO: Fetch real lots from API
+  const tickerLots: Array<
+    OpenLot & {
+      currentPrice: number;
+      pnlLocal: number;
+      pnlPercent: number;
+      pnlCzk: number;
+    }
+  > = [];
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 pb-24 md:pb-6">

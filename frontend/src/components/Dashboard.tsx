@@ -1,82 +1,22 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HoldingsTable, type Holding as HoldingView } from '@/components/HoldingsTable';
+import {
+  HoldingsTable,
+  type Holding as HoldingView,
+} from '@/components/HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from '@/components/OpenLotsRanking';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import {
-  fetchQuotes,
-  fetchExchangeRates,
-  fetchPortfolios,
-  fetchHoldings,
-  createPortfolio,
-  DEFAULT_RATES,
-  type Quote,
-  type ExchangeRates,
-  type Portfolio,
-  type Holding,
-} from '@/lib/api';
-import { formatCurrency, formatPercent } from '@/lib/format';
-import { toCZK } from '@/lib/format';
+import { usePortfolio } from '@/contexts/PortfolioContext';
+import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 
 interface DashboardProps {
   onStockClick?: (ticker: string) => void;
 }
 
 export function Dashboard({ onStockClick }: DashboardProps) {
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
-  const [rates, setRates] = useState<ExchangeRates>(DEFAULT_RATES);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadPortfolio = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 1. Get user's portfolios
-      let portfolios = await fetchPortfolios();
-
-      // 2. Create default portfolio if none exists
-      if (portfolios.length === 0) {
-        const newPortfolio = await createPortfolio('Hlavní portfolio', 'CZK');
-        portfolios = [newPortfolio];
-      }
-
-      const activePortfolio = portfolios[0];
-      setPortfolio(activePortfolio);
-
-      // 3. Get holdings for the portfolio
-      const holdingsData = await fetchHoldings(activePortfolio.id);
-      setHoldings(holdingsData);
-
-      // 4. Fetch quotes for all tickers
-      if (holdingsData.length > 0) {
-        const tickers = holdingsData.map((h) => h.ticker);
-        const [quotesData, ratesData] = await Promise.all([
-          fetchQuotes(tickers),
-          fetchExchangeRates(),
-        ]);
-        setQuotes(quotesData);
-        setRates(ratesData);
-      } else {
-        // Still fetch exchange rates even without holdings
-        const ratesData = await fetchExchangeRates();
-        setRates(ratesData);
-      }
-    } catch (err) {
-      console.error('Failed to load portfolio:', err);
-      setError(err instanceof Error ? err.message : 'Nepodařilo se načíst data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadPortfolio();
-  }, [loadPortfolio]);
+  const { portfolio, holdings, quotes, rates, loading, error, refresh } =
+    usePortfolio();
 
   // Transform holdings to HoldingsTable format
   const holdingsForTable: HoldingView[] = useMemo(() => {
@@ -133,7 +73,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={loadPortfolio} variant="outline">
+        <Button onClick={refresh} variant="outline">
           Zkusit znovu
         </Button>
       </div>
@@ -161,7 +101,8 @@ export function Dashboard({ onStockClick }: DashboardProps) {
           </div>
           <h2 className="text-xl font-semibold mb-2">Prázdné portfolio</h2>
           <p className="text-muted-foreground mb-6 max-w-md">
-            Zatím nemáte žádné pozice. Přidejte první transakci pro sledování vašeho portfolia.
+            Zatím nemáte žádné pozice. Přidejte první transakci pro sledování
+            vašeho portfolia.
           </p>
           <Button>
             <Plus className="h-4 w-4 mr-2" />

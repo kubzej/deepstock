@@ -11,6 +11,12 @@ class PortfolioCreate(BaseModel):
     description: Optional[str] = None
 
 
+class PortfolioUpdate(BaseModel):
+    name: Optional[str] = None
+    currency: Optional[str] = None
+    description: Optional[str] = None
+
+
 class TransactionCreate(BaseModel):
     stock_ticker: str
     stock_name: Optional[str] = None
@@ -44,6 +50,54 @@ class PortfolioService:
             }) \
             .execute()
         return response.data[0]
+    
+    async def update_portfolio(self, portfolio_id: str, user_id: str, data: 'PortfolioUpdate') -> dict:
+        """Update a portfolio. Verifies ownership."""
+        # Build update dict with only provided fields
+        update_data = {}
+        if data.name is not None:
+            update_data["name"] = data.name
+        if data.currency is not None:
+            update_data["currency"] = data.currency
+        if data.description is not None:
+            update_data["description"] = data.description
+        
+        if not update_data:
+            # Nothing to update, return existing
+            response = supabase.table("portfolios") \
+                .select("*") \
+                .eq("id", portfolio_id) \
+                .eq("user_id", user_id) \
+                .execute()
+            return response.data[0] if response.data else None
+        
+        response = supabase.table("portfolios") \
+            .update(update_data) \
+            .eq("id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        return response.data[0] if response.data else None
+    
+    async def delete_portfolio(self, portfolio_id: str, user_id: str) -> bool:
+        """Delete a portfolio and all related data. Verifies ownership."""
+        # First verify ownership
+        check = supabase.table("portfolios") \
+            .select("id") \
+            .eq("id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not check.data:
+            return False
+        
+        # Delete portfolio (cascade should handle holdings/transactions)
+        supabase.table("portfolios") \
+            .delete() \
+            .eq("id", portfolio_id) \
+            .execute()
+        
+        return True
     
     async def get_holdings(self, portfolio_id: str) -> List[dict]:
         """Get all holdings for a portfolio with stock info."""
