@@ -13,7 +13,7 @@ export function AppLayout({
   activeTab,
   onTabChange,
 }: AppLayoutProps) {
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [_showAddModal, setShowAddModal] = useState(false);
 
   const handleNewTransaction = () => {
     setShowAddModal(true);
