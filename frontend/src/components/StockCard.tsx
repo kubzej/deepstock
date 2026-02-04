@@ -1,108 +1,251 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import type { Quote } from '@/lib/api';
-import { formatCurrency, formatPercent, formatPrice } from '@/lib/format';
+import {
+  formatCurrency,
+  formatPercent,
+  formatPrice,
+  formatShares,
+} from '@/lib/format';
+
+interface PortfolioHolding {
+  ticker: string;
+  portfolioName?: string;
+  shares: number;
+  currentValueCzk: number;
+  plCzk: number;
+  plPercent: number;
+}
 
 interface StockCardProps {
   ticker: string;
   name?: string;
+  sector?: string;
+  currency?: string;
   quote: Quote | null;
   shares?: number;
   avgCost?: number;
   valueCzk?: number;
   investedCzk?: number;
+  weight?: number;
+  targetPrice?: number;
   portfolioCount?: number;
+  portfolioHoldings?: PortfolioHolding[];
   onClick?: () => void;
 }
 
 export function StockCard({
   ticker,
   name,
+  sector,
+  currency = 'USD',
   quote,
   shares,
   avgCost,
   valueCzk,
   investedCzk,
+  weight,
+  targetPrice,
   portfolioCount,
+  portfolioHoldings,
   onClick,
 }: StockCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const isDayPositive = quote && quote.changePercent >= 0;
   const plCzk = valueCzk && investedCzk ? valueCzk - investedCzk : 0;
   const plPercent = investedCzk ? (plCzk / investedCzk) * 100 : 0;
   const isPositive = plCzk >= 0;
   const isExpandable = portfolioCount && portfolioCount > 1;
+  const hasPortfolioBreakdown =
+    portfolioHoldings && portfolioHoldings.length > 1;
+
+  const handleClick = () => {
+    setExpanded(!expanded);
+  };
+
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.();
+  };
+
+  // Calculate target distance
+  const targetDistancePercent =
+    targetPrice && quote?.price
+      ? ((targetPrice - quote.price) / quote.price) * 100
+      : null;
 
   return (
-    <Card
-      className="border-border bg-card/50 hover:bg-card/80 transition-colors cursor-pointer"
-      onClick={onClick}
+    <div
+      className="bg-muted/30 rounded-xl cursor-pointer active:scale-[0.99] transition-transform"
+      onClick={handleClick}
     >
-      <CardContent className="p-4">
-        {/* Top Row: Main Info */}
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold text-sm">
-              {ticker[0]}
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-bold text-base">{ticker}</h3>
-                {isExpandable && (
-                  <>
-                    <span className="text-xs text-muted-foreground">
-                      ({portfolioCount})
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate max-w-[120px]">
-                {name || ticker}
-              </p>
+      {/* Main content */}
+      <div className="px-3 py-2.5">
+        {/* Header Row */}
+        <div className="flex items-center justify-between">
+          {/* Left: Ticker + Name */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-bold text-sm">{ticker}</span>
+              {isExpandable && (
+                <span className="text-[10px] text-muted-foreground">
+                  ×{portfolioCount}
+                </span>
+              )}
+              <span className="text-[11px] text-muted-foreground truncate">
+                {name}
+              </span>
             </div>
           </div>
 
-          <div className="text-right">
-            <div className="font-mono-price text-base font-medium">
-              ${formatPrice(quote?.price)}
-            </div>
-            <Badge
-              variant="outline"
-              className={
-                isDayPositive
-                  ? 'text-positive border-positive/20'
-                  : 'text-negative border-negative/20'
-              }
+          {/* Right: P/L */}
+          <div className="flex items-baseline gap-1.5 flex-shrink-0">
+            <span
+              className={`font-mono-price text-sm font-medium ${isPositive ? 'text-positive' : 'text-negative'}`}
             >
-              {formatPercent(quote?.changePercent, 2, true)}
-            </Badge>
+              {formatCurrency(plCzk)}
+            </span>
+            <span
+              className={`text-[10px] font-mono-price ${isPositive ? 'text-positive/60' : 'text-negative/60'}`}
+            >
+              {formatPercent(plPercent, 1, true)}
+            </span>
           </div>
         </div>
 
-        {/* Show position details if we have shares */}
-        {shares && valueCzk !== undefined && (
-          <>
-            <div className="h-px bg-border my-3" />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {shares} ks × ${formatPrice(avgCost)}
-              </span>
-              <span className="font-mono-price text-foreground">
-                {formatCurrency(valueCzk)}
-              </span>
+        {/* Subrow: Price + Daily */}
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-[11px] text-muted-foreground font-mono-price">
+            {formatPrice(quote?.price, currency)}
+          </span>
+          <span
+            className={`text-[10px] font-mono-price ${isDayPositive ? 'text-positive/70' : 'text-negative/70'}`}
+          >
+            dnes {formatPercent(quote?.changePercent, 1, true)}
+          </span>
+        </div>
+
+        {/* Expanded Details */}
+        <div
+          className={`grid transition-all duration-200 ease-out ${
+            expanded
+              ? 'grid-rows-[1fr] opacity-100 mt-3'
+              : 'grid-rows-[0fr] opacity-0'
+          }`}
+        >
+          <div className="overflow-hidden">
+            {sector && (
+              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide mb-2">
+                {sector}
+              </p>
+            )}
+
+            {/* Stats - 3 column compact */}
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground/70 block">Počet</span>
+                <span className="font-mono-price">
+                  {formatShares(shares)} ks
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground/70 block">Hodnota</span>
+                <span className="font-mono-price">
+                  {formatCurrency(valueCzk)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground/70 block">Váha</span>
+                <span className="font-mono-price">
+                  {formatPercent(weight, 1)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground/70 block">Průměrná</span>
+                <span className="font-mono-price">
+                  {formatPrice(avgCost, currency)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground/70 block">
+                  Investováno
+                </span>
+                <span className="font-mono-price">
+                  {formatCurrency(investedCzk)}
+                </span>
+              </div>
+              {targetPrice && (
+                <>
+                  <div>
+                    <span className="text-muted-foreground/70 block">
+                      Cílová
+                    </span>
+                    <span className="font-mono-price">
+                      {formatPrice(targetPrice, currency)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground/70 block">
+                      K cíli
+                    </span>
+                    <span
+                      className={`font-mono-price ${targetDistancePercent && targetDistancePercent >= 0 ? 'text-positive' : 'text-negative'}`}
+                    >
+                      {formatPercent(targetDistancePercent, 1, true)}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-            <div className="flex justify-between text-sm mt-1">
-              <span className="text-muted-foreground">Zisk/Ztráta</span>
-              <span
-                className={`font-mono-price ${isPositive ? 'text-positive' : 'text-negative'}`}
-              >
-                {formatCurrency(plCzk)} ({formatPercent(plPercent, 1, true)})
-              </span>
+
+            {/* Portfolio Breakdown (for "All portfolios" view) */}
+            {hasPortfolioBreakdown && (
+              <div className="mt-3 pt-3 border-t border-border/30">
+                <span className="text-[10px] text-muted-foreground/50 uppercase tracking-wide block mb-2">
+                  Portfolia
+                </span>
+                <div className="space-y-1.5">
+                  {portfolioHoldings.map((sub) => (
+                    <div
+                      key={`${sub.ticker}-${sub.portfolioName}`}
+                      className="flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">
+                          {sub.portfolioName}
+                        </span>
+                        <span className="font-mono-price text-muted-foreground/60">
+                          {formatShares(sub.shares)} ks
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span
+                          className={`font-mono-price ${sub.plCzk >= 0 ? 'text-positive' : 'text-negative'}`}
+                        >
+                          {formatCurrency(sub.plCzk)}
+                        </span>
+                        <span
+                          className={`font-mono-price text-[10px] ${sub.plCzk >= 0 ? 'text-positive/60' : 'text-negative/60'}`}
+                        >
+                          {formatPercent(sub.plPercent, 1, true)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Detail link */}
+            <div
+              onClick={handleNavigate}
+              className="mt-3 pt-2 border-t border-border/30 text-xs text-center text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Detail akcie
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

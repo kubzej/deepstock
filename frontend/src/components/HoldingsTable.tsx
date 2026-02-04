@@ -21,9 +21,10 @@ import {
   formatCurrency,
   formatPercent,
   formatPrice,
-  formatNumber,
+  formatShares,
   formatVolumeRatio,
   toCZK,
+  fromCZK,
 } from '@/lib/format';
 
 export interface Holding {
@@ -201,10 +202,15 @@ export function HoldingsTable({
           0,
         );
 
-        // Weighted average cost (convert back from CZK)
+        // Weighted average cost (convert back from CZK to original currency)
         const scale = first.priceScale ?? 1;
+        const totalInvestedOriginal = fromCZK(
+          totalInvestedCzk,
+          first.currency,
+          rates,
+        );
         const avgCost =
-          totalShares > 0 ? totalInvestedCzk / totalShares / scale : 0;
+          totalShares > 0 ? totalInvestedOriginal / totalShares / scale : 0;
         const plPercent =
           totalInvestedCzk > 0 ? (totalPlCzk / totalInvestedCzk) * 100 : 0;
 
@@ -416,7 +422,7 @@ export function HoldingsTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    {formatNumber(holding.shares, 2)}
+                    {formatShares(holding.shares)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
                     {formatPrice(holding.currentPrice, holding.currency)}
@@ -485,7 +491,7 @@ export function HoldingsTable({
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono-price">
-                        {formatNumber(subHolding.shares, 2)}
+                        {formatShares(subHolding.shares)}
                       </TableCell>
                       <TableCell className="text-right font-mono-price text-muted-foreground">
                         —
@@ -535,69 +541,68 @@ export function HoldingsTable({
       </div>
 
       {/* Mobile Cards */}
-      <div className="md:hidden space-y-3">
-        {sortedHoldings.map((holding) => {
-          const isExpandable = holding.portfolioCount > 1;
-          const isExpanded = expandedTickers.has(holding.ticker);
+      <div className="md:hidden">
+        {/* Mobile Sort Pills - edge to edge scroll */}
+        <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 scrollbar-hide">
+          {[
+            { key: 'pl' as SortKey, label: 'P/L' },
+            { key: 'plPercent' as SortKey, label: '%' },
+            { key: 'dailyChange' as SortKey, label: 'Dnes' },
+            { key: 'weight' as SortKey, label: 'Váha' },
+            { key: 'value' as SortKey, label: 'Hodn.' },
+            { key: 'ticker' as SortKey, label: 'A-Z' },
+          ].map((option) => {
+            const isActive = sortKey === option.key;
+            return (
+              <button
+                key={option.key}
+                onClick={() => handleSort(option.key)}
+                className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {option.label}
+                {isActive && (
+                  <span className="ml-0.5">
+                    {sortDirection === 'desc' ? '↓' : '↑'}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-          return (
-            <div key={holding.ticker}>
+        {/* Cards */}
+        <div className="space-y-1">
+          {sortedHoldings.map((holding) => {
+            const isExpandable = holding.portfolioCount > 1;
+
+            return (
               <StockCard
+                key={holding.ticker}
                 ticker={holding.ticker}
                 name={holding.name}
+                sector={holding.sector}
+                currency={holding.currency}
                 quote={holding.quote ?? null}
                 shares={holding.shares}
                 avgCost={holding.avgCost}
                 valueCzk={holding.currentValueCzk}
                 investedCzk={holding.investedCzk}
+                weight={holding.weight}
                 portfolioCount={
                   isExpandable ? holding.portfolioCount : undefined
                 }
-                onClick={() =>
-                  isExpandable
-                    ? toggleExpand(holding.ticker)
-                    : onRowClick?.(holding.ticker)
+                portfolioHoldings={
+                  isExpandable ? holding.portfolioHoldings : undefined
                 }
+                onClick={() => onRowClick?.(holding.ticker)}
               />
-              {/* Show sub-cards for multiple portfolios on mobile */}
-              {isExpanded && holding.portfolioHoldings.length > 0 && (
-                <div className="ml-4 mt-2 space-y-2 border-l-2 border-muted pl-3">
-                  {holding.portfolioHoldings.map((sub) => (
-                    <div
-                      key={`${sub.ticker}-${sub.portfolioName}`}
-                      className="p-2 bg-muted/30 rounded text-sm cursor-pointer hover:bg-muted/50"
-                      onClick={() => onRowClick?.(sub.ticker)}
-                    >
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          {sub.portfolioName}
-                        </span>
-                        <span className="font-mono-price">
-                          {formatNumber(sub.shares, 2)} ks
-                        </span>
-                      </div>
-                      <div className="flex justify-between mt-1">
-                        <span className="text-muted-foreground">Hodnota</span>
-                        <span className="font-mono-price">
-                          {formatCurrency(sub.currentValueCzk)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between mt-1">
-                        <span className="text-muted-foreground">P/L</span>
-                        <span
-                          className={`font-mono-price ${sub.plCzk >= 0 ? 'text-positive' : 'text-negative'}`}
-                        >
-                          {formatCurrency(sub.plCzk)} (
-                          {formatPercent(sub.plPercent, 1, true)})
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
