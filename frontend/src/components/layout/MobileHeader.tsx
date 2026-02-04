@@ -4,7 +4,7 @@ import {
   Database,
   LineChart,
   Eye,
-  Settings,
+  Search,
   Menu,
   Plus,
   LogOut,
@@ -40,7 +40,7 @@ export function MobileHeader({
     { id: 'stocks', icon: Database, label: 'Akcie' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
-    { id: 'settings', icon: Settings, label: 'Nastavení' },
+    { id: 'research', icon: Search, label: 'Průzkum akcie' },
   ];
 
   return (
@@ -68,11 +68,11 @@ export function MobileHeader({
           {/* Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-                <Menu className="w-6 h-6" />
+              <button className="p-2.5 text-muted-foreground hover:text-foreground transition-colors">
+                <Menu className="w-7 h-7" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-52">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -81,9 +81,9 @@ export function MobileHeader({
                   <DropdownMenuItem
                     key={item.id}
                     onClick={() => onTabChange(item.id)}
-                    className={isActive ? 'bg-primary/10 text-primary' : ''}
+                    className={`py-3 text-base ${isActive ? 'bg-primary/10 text-primary' : ''}`}
                   >
-                    <Icon className="w-4 h-4 mr-2" />
+                    <Icon className="w-5 h-5 mr-3" />
                     {item.label}
                   </DropdownMenuItem>
                 );
@@ -91,9 +91,9 @@ export function MobileHeader({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={signOut}
-                className="text-muted-foreground"
+                className="py-3 text-base text-muted-foreground"
               >
-                <LogOut className="w-4 h-4 mr-2" />
+                <LogOut className="w-5 h-5 mr-3" />
                 Odhlásit se
               </DropdownMenuItem>
             </DropdownMenuContent>
