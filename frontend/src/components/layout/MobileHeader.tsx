@@ -31,7 +31,7 @@ export function MobileHeader({
   onTabChange,
   onNewTransaction,
 }: MobileHeaderProps) {
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const { portfolio, isAllPortfolios } = usePortfolio();
 
   const menuItems = [
