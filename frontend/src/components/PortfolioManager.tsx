@@ -1,16 +1,8 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -35,15 +27,8 @@ import {
   type Portfolio,
 } from '@/lib/api';
 
-const CURRENCIES = [
-  { value: 'CZK', label: 'CZK - Česká koruna' },
-  { value: 'USD', label: 'USD - Americký dolar' },
-  { value: 'EUR', label: 'EUR - Euro' },
-];
-
 interface PortfolioFormData {
   name: string;
-  currency: string;
 }
 
 export function PortfolioManager() {
@@ -62,19 +47,18 @@ export function PortfolioManager() {
   // Form state
   const [formData, setFormData] = useState<PortfolioFormData>({
     name: '',
-    currency: 'CZK',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleOpenCreate = () => {
-    setFormData({ name: '', currency: 'CZK' });
+    setFormData({ name: '' });
     setError(null);
     setIsCreateOpen(true);
   };
 
   const handleOpenEdit = (p: Portfolio) => {
-    setFormData({ name: p.name, currency: p.currency });
+    setFormData({ name: p.name });
     setError(null);
     setEditingPortfolio(p);
   };
@@ -89,7 +73,7 @@ export function PortfolioManager() {
     setError(null);
 
     try {
-      await createPortfolio(formData.name.trim(), formData.currency);
+      await createPortfolio(formData.name.trim());
       await refresh();
       setIsCreateOpen(false);
     } catch (err) {
@@ -113,7 +97,6 @@ export function PortfolioManager() {
     try {
       await updatePortfolio(editingPortfolio.id, {
         name: formData.name.trim(),
-        currency: formData.currency,
       });
       await refresh();
       setEditingPortfolio(null);
@@ -168,66 +151,55 @@ export function PortfolioManager() {
 
       {/* Portfolio List */}
       {portfolios.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground mb-4">
-              Zatím nemáte žádné portfolio
-            </p>
-            <Button onClick={handleOpenCreate}>
-              <Plus className="h-4 w-4 mr-2" />
-              Vytvořit první portfolio
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="mb-4">Zatím nemáte žádné portfolio</p>
+          <Button onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Vytvořit první portfolio
+          </Button>
+        </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="divide-y divide-border rounded-lg border">
           {portfolios.map((p) => (
-            <Card
+            <div
               key={p.id}
-              className={`cursor-pointer transition-all hover:border-primary/50 ${p.id === portfolio?.id ? 'ring-2 ring-primary' : ''}`}
+              className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${p.id === portfolio?.id ? 'bg-muted/30' : ''}`}
               onClick={() => setActivePortfolio(p.id)}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium">{p.name}</CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleOpenEdit(p)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Upravit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setDeletingPortfolio(p)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Smazat
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Měna: {p.currency}
-                </div>
+              <div className="flex items-center gap-3">
+                <span className="font-medium">{p.name}</span>
                 {p.id === portfolio?.id && (
-                  <div className="mt-2">
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                      Aktivní
-                    </span>
-                  </div>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                    Aktivní
+                  </span>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleOpenEdit(p)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Upravit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDeletingPortfolio(p)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Smazat
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ))}
         </div>
       )}
@@ -261,27 +233,6 @@ export function PortfolioManager() {
                 }
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="currency">Měna</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, currency: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CURRENCIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           <DialogFooter>
@@ -303,9 +254,7 @@ export function PortfolioManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upravit portfolio</DialogTitle>
-            <DialogDescription>
-              Změňte název nebo měnu portfolia.
-            </DialogDescription>
+            <DialogDescription>Změňte název portfolia.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -325,27 +274,6 @@ export function PortfolioManager() {
                   setFormData({ ...formData, name: e.target.value })
                 }
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-currency">Měna</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, currency: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CURRENCIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

@@ -41,7 +41,6 @@ export interface Portfolio {
   id: string;
   user_id: string;
   name: string;
-  currency: string;
   created_at: string;
 }
 
@@ -146,7 +145,7 @@ export async function fetchPortfolios(): Promise<Portfolio[]> {
   return response.json();
 }
 
-export async function createPortfolio(name: string, currency: string = 'CZK'): Promise<Portfolio> {
+export async function createPortfolio(name: string): Promise<Portfolio> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/portfolio/`, {
     method: 'POST',
@@ -154,7 +153,7 @@ export async function createPortfolio(name: string, currency: string = 'CZK'): P
       'Content-Type': 'application/json',
       ...authHeader,
     },
-    body: JSON.stringify({ name, currency }),
+    body: JSON.stringify({ name }),
   });
   
   if (!response.ok) {
@@ -239,7 +238,7 @@ export async function addTransaction(
 
 export async function updatePortfolio(
   portfolioId: string,
-  data: { name?: string; currency?: string; description?: string }
+  data: { name?: string; description?: string }
 ): Promise<Portfolio> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}`, {

@@ -76,7 +76,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
       // 2. Create default portfolio if none exists
       if (allPortfolios.length === 0) {
-        const newPortfolio = await createPortfolio('Hlavní portfolio', 'CZK');
+        const newPortfolio = await createPortfolio('Hlavní portfolio');
         allPortfolios = [newPortfolio];
       }
 

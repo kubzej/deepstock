@@ -7,13 +7,11 @@ from decimal import Decimal
 
 class PortfolioCreate(BaseModel):
     name: str
-    currency: str = "USD"
     description: Optional[str] = None
 
 
 class PortfolioUpdate(BaseModel):
     name: Optional[str] = None
-    currency: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -58,7 +56,6 @@ class PortfolioService:
             .insert({
                 "user_id": user_id,
                 "name": data.name,
-                "currency": data.currency,
                 "description": data.description
             }) \
             .execute()
@@ -70,8 +67,6 @@ class PortfolioService:
         update_data = {}
         if data.name is not None:
             update_data["name"] = data.name
-        if data.currency is not None:
-            update_data["currency"] = data.currency
         if data.description is not None:
             update_data["description"] = data.description
         
