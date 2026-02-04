@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import type { Quote } from '@/lib/api';
 import {
   formatCurrency,
@@ -239,9 +240,10 @@ export function StockCard({
             {/* Detail link */}
             <div
               onClick={handleNavigate}
-              className="mt-3 pt-2 border-t border-border/30 text-xs text-center text-muted-foreground hover:text-foreground transition-colors"
+              className="mt-3 flex items-center justify-center gap-1 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             >
-              Detail akcie
+              <span>Zobrazit detail</span>
+              <ChevronRight className="w-3 h-3" />
             </div>
           </div>
         </div>
