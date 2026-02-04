@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePortfolio } from '@/contexts/PortfolioContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -23,6 +24,7 @@ export function Sidebar({
   onNewTransaction,
 }: SidebarProps) {
   const { signOut, user } = useAuth();
+  const { portfolio, isAllPortfolios } = usePortfolio();
 
   const menuItems = [
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
@@ -38,6 +40,9 @@ export function Sidebar({
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <h1 className="text-xl font-bold text-primary">DeepStock</h1>
+        <p className="text-xs text-muted-foreground mt-1 truncate">
+          {isAllPortfolios ? 'Všechna portfolia' : portfolio?.name || '—'}
+        </p>
       </div>
 
       {/* New Transaction Button */}
