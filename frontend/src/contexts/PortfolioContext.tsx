@@ -39,6 +39,7 @@ interface PortfolioContextType {
   // State
   loading: boolean;
   error: string | null;
+  lastFetched: Date | null;
 
   // Actions
   refresh: () => Promise<void>;
@@ -50,6 +51,9 @@ const PortfolioContext = createContext<PortfolioContextType | undefined>(
   undefined,
 );
 
+// Cache duration in milliseconds (5 minutes)
+const CACHE_DURATION = 5 * 60 * 1000;
+
 export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
@@ -60,68 +64,84 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [rates, setRates] = useState<ExchangeRates>(DEFAULT_RATES);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
-  const loadPortfolio = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 1. Get user's portfolios
-      let allPortfolios = await fetchPortfolios();
-
-      // 2. Create default portfolio if none exists
-      if (allPortfolios.length === 0) {
-        const newPortfolio = await createPortfolio('Hlavní portfolio');
-        allPortfolios = [newPortfolio];
+  const loadPortfolio = useCallback(
+    async (force = false) => {
+      if (!user) {
+        setLoading(false);
+        return;
       }
 
-      setPortfolios(allPortfolios);
-      const activePortfolio = allPortfolios[0];
-      setPortfolio(activePortfolio);
-
-      // 3. Get holdings for the portfolio
-      const holdingsData = await fetchHoldings(activePortfolio.id);
-
-      // 4. Fetch quotes for all tickers
-      let quotesData: Record<string, Quote> = {};
-      let ratesData = DEFAULT_RATES;
-
-      if (holdingsData.length > 0) {
-        const tickers = holdingsData.map((h) => h.ticker);
-        [quotesData, ratesData] = await Promise.all([
-          fetchQuotes(tickers),
-          fetchExchangeRates(),
-        ]);
-      } else {
-        ratesData = await fetchExchangeRates();
+      // Skip if data is fresh (unless force refresh)
+      if (
+        !force &&
+        lastFetched &&
+        Date.now() - lastFetched.getTime() < CACHE_DURATION
+      ) {
+        return;
       }
 
-      setQuotes(quotesData);
-      setRates(ratesData);
+      try {
+        setLoading(true);
+        setError(null);
 
-      // 5. Merge holdings with quote data
-      const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map((h) => ({
-        ...h,
-        currentPrice: quotesData[h.ticker]?.price,
-        dailyChange: quotesData[h.ticker]?.change,
-        dailyChangePercent: quotesData[h.ticker]?.changePercent,
-      }));
+        // 1. Get user's portfolios
+        let allPortfolios = await fetchPortfolios();
 
-      setHoldings(holdingsWithPrices);
-    } catch (err) {
-      console.error('Failed to load portfolio:', err);
-      setError(
-        err instanceof Error ? err.message : 'Nepodařilo se načíst data',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+        // 2. Create default portfolio if none exists
+        if (allPortfolios.length === 0) {
+          const newPortfolio = await createPortfolio('Hlavní portfolio');
+          allPortfolios = [newPortfolio];
+        }
+
+        setPortfolios(allPortfolios);
+        const activePortfolio = allPortfolios[0];
+        setPortfolio(activePortfolio);
+
+        // 3. Get holdings for the portfolio
+        const holdingsData = await fetchHoldings(activePortfolio.id);
+
+        // 4. Fetch quotes for all tickers
+        let quotesData: Record<string, Quote> = {};
+        let ratesData = DEFAULT_RATES;
+
+        if (holdingsData.length > 0) {
+          const tickers = holdingsData.map((h) => h.ticker);
+          [quotesData, ratesData] = await Promise.all([
+            fetchQuotes(tickers),
+            fetchExchangeRates(),
+          ]);
+        } else {
+          ratesData = await fetchExchangeRates();
+        }
+
+        setQuotes(quotesData);
+        setRates(ratesData);
+
+        // 5. Merge holdings with quote data
+        const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map(
+          (h) => ({
+            ...h,
+            currentPrice: quotesData[h.ticker]?.price,
+            dailyChange: quotesData[h.ticker]?.change,
+            dailyChangePercent: quotesData[h.ticker]?.changePercent,
+          }),
+        );
+
+        setHoldings(holdingsWithPrices);
+        setLastFetched(new Date());
+      } catch (err) {
+        console.error('Failed to load portfolio:', err);
+        setError(
+          err instanceof Error ? err.message : 'Nepodařilo se načíst data',
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, lastFetched],
+  );
 
   // Load on mount and when user changes
   useEffect(() => {
@@ -175,6 +195,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     [portfolios],
   );
 
+  // Force refresh function (ignores cache)
+  const forceRefresh = useCallback(() => loadPortfolio(true), [loadPortfolio]);
+
   const value: PortfolioContextType = {
     portfolio,
     activePortfolio: portfolio,
@@ -184,7 +207,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     rates,
     loading,
     error,
-    refresh: loadPortfolio,
+    lastFetched,
+    refresh: forceRefresh,
     setActivePortfolio,
     getHoldingByTicker,
   };

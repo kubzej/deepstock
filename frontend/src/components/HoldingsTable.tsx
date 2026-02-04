@@ -27,6 +27,8 @@ export interface Holding {
   avgCost: number;
   currency: string;
   sector?: string;
+  priceScale?: number;
+  totalInvestedCzk?: number;
 }
 
 type SortKey =
@@ -83,17 +85,24 @@ export function HoldingsTable({
   const enrichedHoldings = useMemo(() => {
     const totalValue = holdings.reduce((sum, h) => {
       const quote = quotes[h.ticker];
-      const currentValue = quote ? quote.price * h.shares : 0;
+      const scale = h.priceScale ?? 1;
+      // For LSE stocks, price is in pence - multiply by scale to get actual value
+      const currentValue = quote ? quote.price * scale * h.shares : 0;
       return sum + toCZK(currentValue, h.currency, rates);
     }, 0);
 
     return holdings.map((h) => {
       const quote = quotes[h.ticker];
+      const scale = h.priceScale ?? 1;
       const currentPrice = quote?.price ?? 0;
-      const currentValue = currentPrice * h.shares;
-      const invested = h.avgCost * h.shares;
+      // For LSE stocks, price is in pence - multiply by scale to get actual value
+      const currentValue = currentPrice * scale * h.shares;
       const currentValueCzk = toCZK(currentValue, h.currency, rates);
-      const investedCzk = toCZK(invested, h.currency, rates);
+
+      // Use historical invested CZK if available, otherwise calculate from current rate
+      const investedCzk =
+        h.totalInvestedCzk ?? toCZK(h.avgCost * h.shares, h.currency, rates);
+
       const plCzk = currentValueCzk - investedCzk;
       const plPercent = investedCzk > 0 ? (plCzk / investedCzk) * 100 : 0;
       const weight = totalValue > 0 ? (currentValueCzk / totalValue) * 100 : 0;
@@ -208,39 +217,39 @@ export function HoldingsTable({
   );
 
   return (
-    <div>
+    <div className="pb-12">
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
         <Table className="w-full">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Ticker', 'ticker', 'w-[140px]')}
+              {renderSortableHeader('Akcie', 'ticker', 'w-[140px]')}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
               {renderSortableHeader('Cena', 'price', 'text-right w-[90px]')}
               {renderSortableHeader(
                 'Denní %',
                 'dailyChange',
-                'text-right w-[90px]',
+                'text-right w-[80px]',
               )}
               {renderSortableHeader('Objem', 'volume', 'text-right w-[70px]')}
-              {renderSortableHeader(
-                'Prům. cena',
-                'avgCost',
-                'text-right w-[100px]',
-              )}
               {renderSortableHeader(
                 'Investováno',
                 'invested',
                 'text-right w-[110px]',
               )}
-              {renderSortableHeader('Hodnota', 'value', 'text-right w-[110px]')}
-              {renderSortableHeader('P/L', 'pl', 'text-right w-[100px]')}
               {renderSortableHeader(
-                'P/L %',
+                'Prům. cena',
+                'avgCost',
+                'text-right w-[90px]',
+              )}
+              {renderSortableHeader('Hodnota', 'value', 'text-right w-[110px]')}
+              {renderSortableHeader(
+                'P/L CZK',
                 'plPercent',
-                'text-right w-[85px]',
+                'text-right w-[100px]',
               )}
               {renderSortableHeader('Váha', 'weight', 'text-right w-[70px]')}
+              <TableHead className="text-muted-foreground">Sektor</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -266,7 +275,7 @@ export function HoldingsTable({
                     {formatNumber(holding.shares, 2)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    ${formatPrice(holding.currentPrice)}
+                    {formatPrice(holding.currentPrice, holding.currency)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Badge
@@ -287,33 +296,31 @@ export function HoldingsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    ${formatPrice(holding.avgCost)}
+                    {formatCurrency(holding.investedCzk)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    {formatCurrency(holding.investedCzk)}
+                    {formatPrice(holding.avgCost, holding.currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
                     {formatCurrency(holding.currentValueCzk)}
                   </TableCell>
-                  <TableCell
-                    className={`text-right font-mono-price ${isPositive ? 'text-positive' : 'text-negative'}`}
-                  >
-                    {formatCurrency(holding.plCzk)}
-                  </TableCell>
                   <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className={
-                        isPositive
-                          ? 'text-positive border-positive/20'
-                          : 'text-negative border-negative/20'
-                      }
+                    <div
+                      className={isPositive ? 'text-positive' : 'text-negative'}
                     >
-                      {formatPercent(holding.plPercent, 1, true)}
-                    </Badge>
+                      <span className="font-mono-price font-medium">
+                        {formatPercent(holding.plPercent, 1, true)}
+                      </span>
+                      <p className="text-xs font-mono-price opacity-70">
+                        {formatCurrency(holding.plCzk)}
+                      </p>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono-price text-muted-foreground">
                     {formatPercent(holding.weight, 1)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm truncate max-w-[180px]">
+                    {holding.sector || '—'}
                   </TableCell>
                 </TableRow>
               );

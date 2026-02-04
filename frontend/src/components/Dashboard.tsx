@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   HoldingsTable,
@@ -6,7 +6,7 @@ import {
 } from '@/components/HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from '@/components/OpenLotsRanking';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 
@@ -15,8 +15,34 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onStockClick }: DashboardProps) {
-  const { portfolio, holdings, quotes, rates, loading, error, refresh } =
-    usePortfolio();
+  const {
+    portfolio,
+    holdings,
+    quotes,
+    rates,
+    loading,
+    error,
+    refresh,
+    lastFetched,
+  } = usePortfolio();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Format last fetched time
+  const lastFetchedText = lastFetched
+    ? lastFetched.toLocaleTimeString('cs-CZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
   // Transform holdings to HoldingsTable format
   const holdingsForTable: HoldingView[] = useMemo(() => {
@@ -26,17 +52,26 @@ export function Dashboard({ onStockClick }: DashboardProps) {
       shares: h.shares,
       avgCost: h.avg_cost,
       currency: h.currency,
-      sector: '', // TODO: add sector to holdings API
+      sector: h.sector || '',
+      totalInvestedCzk: h.total_invested_czk,
+      priceScale: h.price_scale ?? 1,
     }));
   }, [holdings]);
 
   // Calculate totals in CZK
   const totalValueCzk = holdingsForTable.reduce((sum, h) => {
     const price = quotes[h.ticker]?.price ?? 0;
-    return sum + toCZK(price * h.shares, h.currency, rates);
+    const scale = h.priceScale ?? 1;
+    // For LSE stocks, price is in pence - multiply by scale to get actual value
+    return sum + toCZK(price * scale * h.shares, h.currency, rates);
   }, 0);
 
+  // Use historical invested CZK if available, otherwise calculate from current rate
   const totalCostCzk = holdingsForTable.reduce((sum, h) => {
+    if (h.totalInvestedCzk !== undefined && h.totalInvestedCzk !== null) {
+      return sum + h.totalInvestedCzk;
+    }
+    // Fallback to current rate calculation
     return sum + toCZK(h.avgCost * h.shares, h.currency, rates);
   }, 0);
 
@@ -46,7 +81,8 @@ export function Dashboard({ onStockClick }: DashboardProps) {
 
   const dailyChangeCzk = holdingsForTable.reduce((sum, h) => {
     const change = quotes[h.ticker]?.change ?? 0;
-    return sum + toCZK(change * h.shares, h.currency, rates);
+    const scale = h.priceScale ?? 1;
+    return sum + toCZK(change * scale * h.shares, h.currency, rates);
   }, 0);
 
   const dailyChangePercent =
@@ -113,9 +149,29 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="mb-8">
-        <p className="text-muted-foreground text-sm mb-1">
-          {portfolio?.name ?? 'Portfolio'}
-        </p>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-muted-foreground text-sm">
+            {portfolio?.name ?? 'Portfolio'}
+          </p>
+          <div className="flex items-center gap-2">
+            {lastFetchedText && (
+              <span className="text-xs text-muted-foreground">
+                {lastFetchedText}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              className="h-7 w-7"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+              />
+            </Button>
+          </div>
+        </div>
 
         {/* Main Value */}
         <h1 className="text-4xl md:text-5xl font-bold font-mono-price mb-4">

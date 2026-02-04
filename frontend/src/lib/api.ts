@@ -50,6 +50,9 @@ export interface Holding {
   shares: number;
   avg_cost: number;
   currency: string;
+  sector?: string;
+  price_scale?: number;
+  total_invested_czk?: number;
   current_price?: number;
   current_value?: number;
   unrealized_pnl?: number;
@@ -184,12 +187,15 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
   
   // Transform backend response (nested stocks) to flat Holding interface
   const data = await response.json();
-  return data.map((h: { stocks: { ticker: string; name: string; currency: string }; shares: number; avg_cost_per_share: number }) => ({
+  return data.map((h: { stocks: { ticker: string; name: string; currency: string; sector?: string; price_scale?: string | number }; shares: number; avg_cost_per_share: number; total_invested_czk?: number }) => ({
     ticker: h.stocks.ticker,
     name: h.stocks.name,
     shares: h.shares,
     avg_cost: h.avg_cost_per_share,
     currency: h.stocks.currency || 'USD',
+    sector: h.stocks.sector || '',
+    price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
+    total_invested_czk: h.total_invested_czk,
   }));
 }
 

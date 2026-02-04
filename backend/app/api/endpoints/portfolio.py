@@ -72,3 +72,21 @@ async def get_available_lots(portfolio_id: str, stock_ticker: str):
     Returns BUY transactions with remaining shares not yet sold.
     """
     return await portfolio_service.get_available_lots(portfolio_id, stock_ticker)
+
+
+@router.post("/{portfolio_id}/recalculate")
+async def recalculate_holdings(portfolio_id: str):
+    """
+    Recalculate all holdings for a portfolio.
+    Use this after migration to populate total_invested_czk.
+    """
+    return await portfolio_service.recalculate_all_holdings(portfolio_id)
+
+
+@router.post("/admin/recalculate-all")
+async def recalculate_all_portfolios():
+    """
+    Recalculate all holdings across ALL portfolios.
+    One-time use after migration.
+    """
+    return await portfolio_service.recalculate_all_portfolios()

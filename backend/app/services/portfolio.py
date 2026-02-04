@@ -110,11 +110,40 @@ class PortfolioService:
     async def get_holdings(self, portfolio_id: str) -> List[dict]:
         """Get all holdings for a portfolio with stock info."""
         response = supabase.table("holdings") \
-            .select("*, stocks(ticker, name, currency)") \
+            .select("*, stocks(ticker, name, currency, sector, price_scale)") \
             .eq("portfolio_id", portfolio_id) \
             .gt("shares", 0) \
             .execute()
         return response.data
+    
+    async def recalculate_all_holdings(self, portfolio_id: str) -> dict:
+        """Recalculate all holdings for a portfolio to populate total_invested_czk."""
+        # Get all unique stock_ids from holdings
+        holdings = supabase.table("holdings") \
+            .select("stock_id") \
+            .eq("portfolio_id", portfolio_id) \
+            .execute()
+        
+        count = 0
+        for h in holdings.data:
+            await self._recalculate_holding(portfolio_id, h["stock_id"])
+            count += 1
+        
+        return {"recalculated": count}
+    
+    async def recalculate_all_portfolios(self) -> dict:
+        """Recalculate all holdings across ALL portfolios."""
+        # Get all portfolios
+        portfolios = supabase.table("portfolios") \
+            .select("id") \
+            .execute()
+        
+        total = 0
+        for p in portfolios.data:
+            result = await self.recalculate_all_holdings(p["id"])
+            total += result["recalculated"]
+        
+        return {"portfolios": len(portfolios.data), "holdings_recalculated": total}
     
     async def get_transactions(self, portfolio_id: str, limit: int = 50) -> List[dict]:
         """Get recent transactions for a portfolio."""
@@ -250,7 +279,8 @@ class PortfolioService:
     async def _recalculate_holding(self, portfolio_id: str, stock_id: str):
         """
         Recalculate holding based on all transactions.
-        Uses FIFO for cost basis.
+        Uses FIFO for cost basis, unless source_transaction_id specifies a lot.
+        Calculates total_invested_czk using historical exchange rates.
         """
         # Get all transactions for this stock in this portfolio
         response = supabase.table("transactions") \
@@ -262,44 +292,74 @@ class PortfolioService:
         
         transactions = response.data
         
-        # Calculate position using FIFO
+        # Calculate position - respects source_transaction_id if specified
         shares = 0
         total_cost = 0
+        total_invested_czk = 0  # Sum of BUY amounts in CZK (historical rates)
         realized_pnl = 0
-        buy_lots = []  # List of (shares, price) tuples
+        # Track lots by transaction ID for specific lot selling
+        buy_lots = []  # List of {id, shares, price, amount_czk_per_share} dicts
         
         for tx in transactions:
             if tx["type"] == "BUY":
-                shares += float(tx["shares"])
+                tx_shares = float(tx["shares"])
+                tx_price = float(tx["price_per_share"])
+                tx_amount = float(tx["total_amount"])
+                tx_amount_czk = float(tx.get("total_amount_czk") or tx_amount)
+                
+                shares += tx_shares
+                total_cost += tx_amount
+                total_invested_czk += tx_amount_czk
+                
                 buy_lots.append({
-                    "shares": float(tx["shares"]),
-                    "price": float(tx["price_per_share"])
+                    "id": tx["id"],
+                    "shares": tx_shares,
+                    "price": tx_price,
+                    "amount_czk_per_share": tx_amount_czk / tx_shares if tx_shares > 0 else 0
                 })
-                total_cost += float(tx["total_amount"])
             elif tx["type"] == "SELL":
                 sell_shares = float(tx["shares"])
                 sell_price = float(tx["price_per_share"])
+                source_tx_id = tx.get("source_transaction_id")
                 shares -= sell_shares
                 
-                # FIFO: sell from oldest lots first
                 shares_to_sell = sell_shares
                 cost_of_sold = 0
+                cost_of_sold_czk = 0
                 
+                if source_tx_id:
+                    # Sell from specific lot
+                    for lot in buy_lots:
+                        if lot["id"] == source_tx_id:
+                            sell_from_lot = min(lot["shares"], shares_to_sell)
+                            cost_of_sold += sell_from_lot * lot["price"]
+                            cost_of_sold_czk += sell_from_lot * lot["amount_czk_per_share"]
+                            lot["shares"] -= sell_from_lot
+                            shares_to_sell -= sell_from_lot
+                            # Remove lot if empty
+                            if lot["shares"] <= 0:
+                                buy_lots.remove(lot)
+                            break
+                
+                # FIFO for remaining shares (if source lot didn't cover all, or no source specified)
                 while shares_to_sell > 0 and buy_lots:
                     lot = buy_lots[0]
                     if lot["shares"] <= shares_to_sell:
                         # Use entire lot
                         cost_of_sold += lot["shares"] * lot["price"]
+                        cost_of_sold_czk += lot["shares"] * lot["amount_czk_per_share"]
                         shares_to_sell -= lot["shares"]
                         buy_lots.pop(0)
                     else:
                         # Partial lot
                         cost_of_sold += shares_to_sell * lot["price"]
+                        cost_of_sold_czk += shares_to_sell * lot["amount_czk_per_share"]
                         lot["shares"] -= shares_to_sell
                         shares_to_sell = 0
                 
                 realized_pnl += (sell_shares * sell_price) - cost_of_sold
                 total_cost -= cost_of_sold
+                total_invested_czk -= cost_of_sold_czk
         
         avg_cost = total_cost / shares if shares > 0 else 0
         
@@ -311,6 +371,7 @@ class PortfolioService:
                 "shares": shares,
                 "avg_cost_per_share": round(avg_cost, 4),
                 "total_cost": round(total_cost, 4),
+                "total_invested_czk": round(total_invested_czk, 4),
                 "realized_pnl": round(realized_pnl, 4),
                 "updated_at": datetime.utcnow().isoformat()
             }, on_conflict="portfolio_id,stock_id") \
