@@ -29,6 +29,8 @@ export interface HoldingWithPrice extends Holding {
 interface PortfolioContextType {
   // Data
   portfolio: Portfolio | null;
+  /** Alias for portfolio */
+  activePortfolio: Portfolio | null;
   portfolios: Portfolio[];
   holdings: HoldingWithPrice[];
   quotes: Record<string, Quote>;
@@ -151,12 +153,14 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
         setQuotes(quotesData);
 
-        const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map((h) => ({
-          ...h,
-          currentPrice: quotesData[h.ticker]?.price,
-          dailyChange: quotesData[h.ticker]?.change,
-          dailyChangePercent: quotesData[h.ticker]?.changePercent,
-        }));
+        const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map(
+          (h) => ({
+            ...h,
+            currentPrice: quotesData[h.ticker]?.price,
+            dailyChange: quotesData[h.ticker]?.change,
+            dailyChangePercent: quotesData[h.ticker]?.changePercent,
+          }),
+        );
 
         setHoldings(holdingsWithPrices);
       } catch (err) {
@@ -173,6 +177,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   const value: PortfolioContextType = {
     portfolio,
+    activePortfolio: portfolio,
     portfolios,
     holdings,
     quotes,

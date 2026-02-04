@@ -24,9 +24,22 @@ class TransactionCreate(BaseModel):
     shares: float
     price_per_share: float
     currency: str = "USD"
+    exchange_rate_to_czk: Optional[float] = None
     fees: float = 0
     notes: Optional[str] = None
     executed_at: datetime
+    source_transaction_id: Optional[str] = None  # For SELL: which lot to sell from
+
+
+class AvailableLot(BaseModel):
+    """A BUY lot with remaining shares available for selling."""
+    id: str
+    date: str
+    quantity: float  # Original quantity
+    remaining_shares: float  # Shares not yet sold
+    price_per_share: float
+    currency: str
+    total_amount: float
 
 
 class PortfolioService:
@@ -122,31 +135,103 @@ class PortfolioService:
         """
         Add a transaction and update holdings.
         This is the core logic for portfolio management.
+        
+        For SELL transactions:
+        - If source_transaction_id is provided, sell from that specific lot
+        - Otherwise, use FIFO (oldest lots first)
         """
         # 1. Ensure stock exists in master table
         stock = await self._get_or_create_stock(data.stock_ticker, data.stock_name)
         
         # 2. Create transaction record
         total_amount = data.shares * data.price_per_share
+        tx_data = {
+            "portfolio_id": portfolio_id,
+            "stock_id": stock["id"],
+            "type": data.type.upper(),
+            "shares": data.shares,
+            "price_per_share": data.price_per_share,
+            "total_amount": total_amount,
+            "currency": data.currency,
+            "exchange_rate_to_czk": data.exchange_rate_to_czk,
+            "fees": data.fees,
+            "notes": data.notes,
+            "executed_at": data.executed_at.isoformat(),
+            "source_transaction_id": data.source_transaction_id,
+        }
+        
         tx_response = supabase.table("transactions") \
-            .insert({
-                "portfolio_id": portfolio_id,
-                "stock_id": stock["id"],
-                "type": data.type.upper(),
-                "shares": data.shares,
-                "price_per_share": data.price_per_share,
-                "total_amount": total_amount,
-                "currency": data.currency,
-                "fees": data.fees,
-                "notes": data.notes,
-                "executed_at": data.executed_at.isoformat()
-            }) \
+            .insert(tx_data) \
             .execute()
         
         # 3. Update holdings (recalculate position)
         await self._recalculate_holding(portfolio_id, stock["id"])
         
         return tx_response.data[0]
+    
+    async def get_available_lots(self, portfolio_id: str, stock_ticker: str) -> List[AvailableLot]:
+        """
+        Get available lots for selling a specific stock in a portfolio.
+        Returns BUY transactions with remaining shares (not fully sold yet).
+        """
+        # First get stock_id from ticker
+        stock_response = supabase.table("stocks") \
+            .select("id") \
+            .eq("ticker", stock_ticker.upper()) \
+            .execute()
+        
+        if not stock_response.data:
+            return []
+        
+        stock_id = stock_response.data[0]["id"]
+        
+        # Get all BUY transactions for this stock/portfolio
+        buy_response = supabase.table("transactions") \
+            .select("*") \
+            .eq("stock_id", stock_id) \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("type", "BUY") \
+            .order("executed_at", desc=False) \
+            .execute()
+        
+        buy_transactions = buy_response.data or []
+        
+        # Get all SELL transactions that reference specific lots
+        sell_response = supabase.table("transactions") \
+            .select("source_transaction_id, shares") \
+            .eq("stock_id", stock_id) \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("type", "SELL") \
+            .not_.is_("source_transaction_id", "null") \
+            .execute()
+        
+        sell_transactions = sell_response.data or []
+        
+        # Calculate sold quantities per lot
+        sold_per_lot: dict[str, float] = {}
+        for sell in sell_transactions:
+            if sell.get("source_transaction_id"):
+                lot_id = sell["source_transaction_id"]
+                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
+        
+        # Build available lots with remaining shares
+        available_lots: List[AvailableLot] = []
+        for buy in buy_transactions:
+            sold_from_lot = sold_per_lot.get(buy["id"], 0)
+            remaining = float(buy["shares"]) - sold_from_lot
+            
+            if remaining > 0:
+                available_lots.append(AvailableLot(
+                    id=buy["id"],
+                    date=buy["executed_at"][:10] if buy["executed_at"] else "",
+                    quantity=float(buy["shares"]),
+                    remaining_shares=remaining,
+                    price_per_share=float(buy["price_per_share"]),
+                    currency=buy["currency"] or "USD",
+                    total_amount=float(buy["total_amount"] or 0),
+                ))
+        
+        return available_lots
     
     async def _get_or_create_stock(self, ticker: str, name: Optional[str] = None) -> dict:
         """Get stock from master table or create if not exists."""

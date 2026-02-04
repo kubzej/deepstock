@@ -5,11 +5,14 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/components/Dashboard';
 import { StockDetail } from '@/components/StockDetail';
 import { PortfolioManager } from '@/components/PortfolioManager';
+import { TransactionModal } from '@/components/TransactionModal';
+import StocksManager from '@/components/StocksManager';
 
 function App() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [transactionModalOpen, setTransactionModalOpen] = useState(false);
 
   // Show loading while checking auth
   if (loading) {
@@ -33,10 +36,20 @@ function App() {
     setSelectedTicker(null);
   };
 
+  const handleTabChange = (tab: string) => {
+    // Special case: "add" opens transaction modal
+    if (tab === 'add') {
+      setTransactionModalOpen(true);
+      return;
+    }
+    setActiveTab(tab);
+    setSelectedTicker(null); // Reset stock detail when navigating via menu
+  };
+
   // If viewing stock detail
   if (selectedTicker) {
     return (
-      <AppLayout activeTab={activeTab} onTabChange={setActiveTab}>
+      <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
         <StockDetail ticker={selectedTicker} onBack={handleBackFromDetail} />
       </AppLayout>
     );
@@ -48,6 +61,8 @@ function App() {
         return <Dashboard onStockClick={handleStockClick} />;
       case 'portfolio':
         return <PortfolioManager />;
+      case 'stocks':
+        return <StocksManager onStockClick={handleStockClick} />;
       case 'research':
         return (
           <div className="p-4">
@@ -76,8 +91,14 @@ function App() {
   };
 
   return (
-    <AppLayout activeTab={activeTab} onTabChange={setActiveTab}>
+    <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
       {renderContent()}
+
+      {/* Transaction Modal */}
+      <TransactionModal
+        open={transactionModalOpen}
+        onOpenChange={setTransactionModalOpen}
+      />
     </AppLayout>
   );
 }

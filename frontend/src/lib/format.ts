@@ -109,6 +109,27 @@ export function formatVolumeRatio(
 }
 
 /**
+ * Format large numbers with K/M/B suffixes
+ */
+export function formatLargeNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  
+  const absValue = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  
+  if (absValue >= 1_000_000_000) {
+    return `${sign}${(absValue / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (absValue >= 1_000_000) {
+    return `${sign}${(absValue / 1_000_000).toFixed(2)}M`;
+  }
+  if (absValue >= 1_000) {
+    return `${sign}${(absValue / 1_000).toFixed(2)}K`;
+  }
+  return `${sign}${absValue.toFixed(0)}`;
+}
+
+/**
  * Convert amount to CZK using exchange rate
  */
 export function toCZK(

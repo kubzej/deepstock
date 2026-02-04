@@ -6,6 +6,7 @@ import {
   Plus,
   TrendingUp,
   LogOut,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +26,8 @@ export function Sidebar({
 
   const menuItems = [
     { id: 'home', icon: Home, label: 'Přehled' },
-    { id: 'portfolio', icon: Briefcase, label: 'Portfolio' },
+    { id: 'portfolio', icon: Briefcase, label: 'Portfolia' },
+    { id: 'stocks', icon: BarChart3, label: 'Akcie' },
     { id: 'research', icon: Search, label: 'Výzkum' },
     { id: 'watchlist', icon: TrendingUp, label: 'Watchlisty' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
@@ -42,7 +44,7 @@ export function Sidebar({
       <div className="p-4">
         <Button onClick={onNewTransaction} className="w-full gap-2">
           <Plus className="w-4 h-4" />
-          Nová transakce
+          Přidat transakci
         </Button>
       </div>
 

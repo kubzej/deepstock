@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 
@@ -13,12 +13,9 @@ export function AppLayout({
   activeTab,
   onTabChange,
 }: AppLayoutProps) {
-  const [_showAddModal, setShowAddModal] = useState(false);
-
   const handleNewTransaction = () => {
-    setShowAddModal(true);
-    // TODO: Open transaction modal/drawer
-    console.log('Open new transaction modal');
+    // Trigger 'add' tab which App.tsx handles to open TransactionModal
+    onTabChange('add');
   };
 
   return (

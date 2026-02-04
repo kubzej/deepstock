@@ -98,6 +98,33 @@ export async function fetchExchangeRates(): Promise<ExchangeRates> {
   return response.json();
 }
 
+// Price history for charts
+export interface PriceHistoryPoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export type ChartPeriod = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | 'max';
+
+export async function fetchPriceHistory(
+  ticker: string,
+  period: ChartPeriod = '1mo'
+): Promise<PriceHistoryPoint[]> {
+  const response = await fetch(
+    `${API_URL}/api/market/history/${encodeURIComponent(ticker)}?period=${period}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch price history');
+  }
+  
+  return response.json();
+}
+
 // ============ Portfolio Endpoints ============
 
 export async function fetchPortfolios(): Promise<Portfolio[]> {
@@ -156,7 +183,15 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
     throw new Error('Failed to fetch holdings');
   }
   
-  return response.json();
+  // Transform backend response (nested stocks) to flat Holding interface
+  const data = await response.json();
+  return data.map((h: { stocks: { ticker: string; name: string; currency: string }; shares: number; avg_cost_per_share: number }) => ({
+    ticker: h.stocks.ticker,
+    name: h.stocks.name,
+    shares: h.shares,
+    avg_cost: h.avg_cost_per_share,
+    currency: h.stocks.currency || 'USD',
+  }));
 }
 
 export async function fetchTransactions(portfolioId: string, limit: number = 50): Promise<Transaction[]> {
@@ -247,5 +282,165 @@ export async function deletePortfolio(portfolioId: string): Promise<void> {
       throw new Error('Portfolio not found');
     }
     throw new Error('Failed to delete portfolio');
+  }
+}
+
+// ============ Stocks Types ============
+
+export interface Stock {
+  id: string;
+  ticker: string;
+  name: string;
+  currency: string;
+  sector?: string;
+  exchange?: string;
+  country?: string;
+  price_scale?: number;
+  notes?: string;
+  created_at: string;
+}
+
+// ============ Stocks Endpoints ============
+
+export async function fetchStocks(limit: number = 100, offset: number = 0): Promise<Stock[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/?limit=${limit}&offset=${offset}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch stocks');
+  }
+  
+  return response.json();
+}
+
+export async function searchStocks(query: string, limit: number = 20): Promise<Stock[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to search stocks');
+  }
+  
+  return response.json();
+}
+
+export async function fetchStock(ticker: string): Promise<Stock> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/${encodeURIComponent(ticker)}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Stock not found');
+    }
+    throw new Error('Failed to fetch stock');
+  }
+  
+  return response.json();
+}
+
+export async function createStock(data: {
+  ticker: string;
+  name: string;
+  currency?: string;
+  sector?: string;
+  exchange?: string;
+  country?: string;
+  price_scale?: number;
+  notes?: string;
+}): Promise<Stock> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 400) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to create stock');
+    }
+    throw new Error('Failed to create stock');
+  }
+  
+  return response.json();
+}
+
+export async function updateStock(
+  stockId: string,
+  data: { name?: string; currency?: string; sector?: string; exchange?: string; country?: string; price_scale?: number; notes?: string }
+): Promise<Stock> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/${stockId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Stock not found');
+    }
+    throw new Error('Failed to update stock');
+  }
+  
+  return response.json();
+}
+
+export async function deleteStock(stockId: string): Promise<void> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/stocks/${stockId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 400) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Cannot delete stock with transactions');
+    }
+    throw new Error('Failed to delete stock');
   }
 }

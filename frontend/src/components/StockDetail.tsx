@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -11,6 +13,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePortfolio } from '@/contexts/PortfolioContext';
+import { fetchStock, fetchQuotes } from '@/lib/api';
+import type { Stock, Quote } from '@/lib/api';
 import {
   formatCurrency,
   formatPercent,
@@ -19,48 +23,103 @@ import {
   toCZK,
 } from '@/lib/format';
 
-// Types
-export interface StockPosition {
-  ticker: string;
-  name: string;
-  shares: number;
-  avgCost: number;
-  currency: string;
-  sector?: string;
-  targetPrice?: number;
-}
-
-export interface OpenLot {
-  id: string;
-  ticker: string;
-  date: string;
-  shares: number;
-  buyPrice: number;
-  currency: string;
-}
-
 interface StockDetailProps {
   ticker: string;
   onBack: () => void;
 }
 
 export function StockDetail({ ticker, onBack }: StockDetailProps) {
-  const { getHoldingByTicker, quotes, rates, loading } = usePortfolio();
+  const {
+    getHoldingByTicker,
+    quotes: portfolioQuotes,
+    rates,
+    loading: portfolioLoading,
+  } = usePortfolio();
 
+  // Stock master data from API
+  const [stock, setStock] = useState<Stock | null>(null);
+  const [stockLoading, setStockLoading] = useState(true);
+  const [stockError, setStockError] = useState<string | null>(null);
+
+  // Local quote if not in portfolio
+  const [localQuote, setLocalQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Load stock from API
+  useEffect(() => {
+    const loadStock = async () => {
+      try {
+        setStockLoading(true);
+        setStockError(null);
+        const data = await fetchStock(ticker);
+        setStock(data);
+      } catch (err) {
+        setStockError(
+          err instanceof Error ? err.message : 'Nepodařilo se načíst akcii',
+        );
+      } finally {
+        setStockLoading(false);
+      }
+    };
+    loadStock();
+  }, [ticker]);
+
+  // Load quote if not available from portfolio context
+  useEffect(() => {
+    const loadQuote = async () => {
+      // If quote already exists in portfolio context, skip
+      if (portfolioQuotes[ticker]) {
+        return;
+      }
+
+      try {
+        setQuoteLoading(true);
+        const quotes = await fetchQuotes([ticker]);
+        if (quotes[ticker]) {
+          setLocalQuote(quotes[ticker]);
+        }
+      } catch (err) {
+        console.error('Failed to load quote:', err);
+        // Non-critical error, just show no price
+      } finally {
+        setQuoteLoading(false);
+      }
+    };
+    loadQuote();
+  }, [ticker, portfolioQuotes]);
+
+  // Get optional holding (position) from portfolio
   const holding = getHoldingByTicker(ticker);
-  const quote = quotes[ticker];
+  // Use portfolio quote if available, otherwise local quote
+  const quote = portfolioQuotes[ticker] || localQuote;
+
+  const isLoading = stockLoading || portfolioLoading || quoteLoading;
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Načítání...</p>
+      <div className="min-h-screen bg-background p-4 md:p-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Zpět
+        </Button>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-12 w-40" />
+          <Skeleton className="h-48 w-full" />
+        </div>
       </div>
     );
   }
 
-  // Not found state
-  if (!holding) {
+  // Error state
+  if (stockError || !stock) {
     return (
       <div className="min-h-screen bg-background p-4">
         <Button
@@ -72,44 +131,59 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
           <ArrowLeft className="w-4 h-4 mr-1" />
           Zpět
         </Button>
-        <p className="text-destructive">Pozice nenalezena</p>
+        <p className="text-destructive">{stockError || 'Akcie nenalezena'}</p>
       </div>
     );
   }
 
-  // Transform to position format
-  const position: StockPosition = {
-    ticker: holding.ticker,
-    name: holding.name,
-    shares: holding.shares,
-    avgCost: holding.avg_cost,
-    currency: holding.currency,
-  };
+  // Stock info from master data
+  const stockName = stock.name;
+  const stockCurrency = stock.currency || 'USD';
+  const stockSector = stock.sector;
 
-  // Calculate position metrics
-  const currentPrice = quote?.price ?? position.avgCost;
+  // Price info from quotes
+  const currentPrice = quote?.price ?? 0;
   const dailyChange = quote?.change ?? 0;
   const dailyChangePercent = quote?.changePercent ?? 0;
 
-  const totalValueLocal = currentPrice * position.shares;
-  const totalCostLocal = position.avgCost * position.shares;
-  const unrealizedPnLLocal = totalValueLocal - totalCostLocal;
-  const unrealizedPnLPercent =
-    totalCostLocal > 0 ? (unrealizedPnLLocal / totalCostLocal) * 100 : 0;
+  // Position metrics (only if holding exists)
+  const hasPosition = !!holding && holding.shares > 0;
+  const position = hasPosition
+    ? {
+        shares: holding.shares,
+        avgCost: holding.avg_cost,
+        totalCost: holding.avg_cost * holding.shares,
+        totalValue: currentPrice * holding.shares,
+        unrealizedPnL:
+          currentPrice * holding.shares - holding.avg_cost * holding.shares,
+        unrealizedPnLPercent:
+          holding.avg_cost > 0
+            ? ((currentPrice - holding.avg_cost) / holding.avg_cost) * 100
+            : 0,
+      }
+    : null;
 
-  const totalValueCzk = toCZK(totalValueLocal, position.currency, rates);
-  const totalCostCzk = toCZK(totalCostLocal, position.currency, rates);
-  const unrealizedPnLCzk = totalValueCzk - totalCostCzk;
+  // CZK conversions for position
+  const positionCzk = position
+    ? {
+        totalCost: toCZK(position.totalCost, stockCurrency, rates),
+        totalValue: toCZK(position.totalValue, stockCurrency, rates),
+        unrealizedPnL: toCZK(position.unrealizedPnL, stockCurrency, rates),
+      }
+    : null;
 
   // TODO: Fetch real lots from API
-  const tickerLots: Array<
-    OpenLot & {
-      currentPrice: number;
-      pnlLocal: number;
-      pnlPercent: number;
-      pnlCzk: number;
-    }
-  > = [];
+  const tickerLots: Array<{
+    id: string;
+    date: string;
+    shares: number;
+    buyPrice: number;
+    currency: string;
+    currentPrice: number;
+    pnlLocal: number;
+    pnlPercent: number;
+    pnlCzk: number;
+  }> = [];
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 pb-24 md:pb-6">
@@ -128,145 +202,132 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
       <div className="mb-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{position.ticker}</h1>
-            <p className="text-muted-foreground">{position.name}</p>
+            <h1 className="text-2xl font-bold">{ticker}</h1>
+            <p className="text-muted-foreground">{stockName}</p>
           </div>
-          {position.sector && (
+          {stockSector && (
             <Badge variant="outline" className="text-xs">
-              {position.sector}
+              {stockSector}
             </Badge>
           )}
         </div>
 
         {/* Price Header */}
         <div className="mt-4">
-          <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-bold font-mono-price">
-              {formatPrice(currentPrice, position.currency)}
-            </span>
-            <div
-              className={`flex items-center gap-1 ${
-                dailyChange >= 0 ? 'text-positive' : 'text-negative'
-              }`}
-            >
-              {dailyChange >= 0 ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : (
-                <TrendingDown className="w-4 h-4" />
-              )}
-              <span className="font-mono-price">
-                {formatPrice(Math.abs(dailyChange), position.currency)} (
-                {formatPercent(dailyChangePercent, 2, true)})
+          {currentPrice > 0 ? (
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-bold font-mono-price">
+                {formatPrice(currentPrice, stockCurrency)}
               </span>
+              <div
+                className={`flex items-center gap-1 ${
+                  dailyChange >= 0 ? 'text-positive' : 'text-negative'
+                }`}
+              >
+                {dailyChange >= 0 ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )}
+                <span className="font-mono-price">
+                  {formatPrice(Math.abs(dailyChange), stockCurrency)} (
+                  {formatPercent(dailyChangePercent, 2, true)})
+                </span>
+              </div>
             </div>
-          </div>
-          {loading && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Načítání ceny...
-            </p>
+          ) : (
+            <p className="text-muted-foreground">Cena není k dispozici</p>
           )}
         </div>
       </div>
 
-      {/* Chart Placeholder */}
-      <Card className="mb-6 border-dashed">
-        <CardContent className="flex items-center justify-center h-48 text-muted-foreground">
-          Graf bude přidán později (Recharts)
-        </CardContent>
-      </Card>
+      {/* Company Description */}
+      {stock?.notes && (
+        <div className="mb-6">
+          <h3 className="text-base font-medium mb-2">O společnosti</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {stock.notes}
+          </p>
+        </div>
+      )}
 
-      {/* Position Card */}
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">Vaše pozice</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Počet akcií</p>
-              <p className="text-lg font-mono-price font-semibold">
-                {position.shares}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Průměrná cena</p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatPrice(position.avgCost, position.currency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Investováno</p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatCurrency(totalCostCzk)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Aktuální hodnota</p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatCurrency(totalValueCzk)}
-              </p>
-            </div>
-          </div>
-
-          {/* P/L Row */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center justify-between">
+      {/* Position Card - only if has position */}
+      {position && positionCzk && (
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">Vaše pozice</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">
-                  Nerealizovaný zisk/ztráta
-                </p>
-                <p
-                  className={`text-xl font-mono-price font-bold ${
-                    unrealizedPnLCzk >= 0 ? 'text-positive' : 'text-negative'
-                  }`}
-                >
-                  {formatCurrency(unrealizedPnLCzk)}
+                <p className="text-sm text-muted-foreground">Počet akcií</p>
+                <p className="text-lg font-mono-price font-semibold">
+                  {position.shares}
                 </p>
               </div>
-              <Badge
-                variant="outline"
-                className={
-                  unrealizedPnLPercent >= 0
-                    ? 'text-positive border-positive/20'
-                    : 'text-negative border-negative/20'
-                }
-              >
-                {formatPercent(unrealizedPnLPercent, 2, true)}
-              </Badge>
+              <div>
+                <p className="text-sm text-muted-foreground">Průměrná cena</p>
+                <p className="text-lg font-mono-price font-semibold">
+                  {formatPrice(position.avgCost, stockCurrency)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Investováno</p>
+                <p className="text-lg font-mono-price font-semibold">
+                  {formatCurrency(positionCzk.totalCost)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Aktuální hodnota
+                </p>
+                <p className="text-lg font-mono-price font-semibold">
+                  {formatCurrency(positionCzk.totalValue)}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Target Price */}
-          {position.targetPrice && (
+            {/* P/L Row */}
             <div className="mt-4 pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Cílová cena</p>
-                  <p className="text-lg font-mono-price font-semibold">
-                    {formatPrice(position.targetPrice, position.currency)}
+                  <p className="text-sm text-muted-foreground">
+                    Nerealizovaný zisk/ztráta
+                  </p>
+                  <p
+                    className={`text-xl font-mono-price font-bold ${
+                      positionCzk.unrealizedPnL >= 0
+                        ? 'text-positive'
+                        : 'text-negative'
+                    }`}
+                  >
+                    {formatCurrency(positionCzk.unrealizedPnL)}
                   </p>
                 </div>
                 <Badge
                   variant="outline"
                   className={
-                    position.targetPrice > currentPrice
+                    position.unrealizedPnLPercent >= 0
                       ? 'text-positive border-positive/20'
                       : 'text-negative border-negative/20'
                   }
                 >
-                  {formatPercent(
-                    ((position.targetPrice - currentPrice) / currentPrice) *
-                      100,
-                    1,
-                    true,
-                  )}{' '}
-                  k cíli
+                  {formatPercent(position.unrealizedPnLPercent, 2, true)}
                 </Badge>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No position info */}
+      {!hasPosition && (
+        <Card className="mb-6 border-dashed">
+          <CardContent className="py-6 text-center text-muted-foreground">
+            Nemáte otevřenou pozici v této akcii
+          </CardContent>
+        </Card>
+      )}
 
       {/* Open Lots */}
       {tickerLots.length > 0 && (
@@ -340,38 +401,6 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
           </CardContent>
         </Card>
       )}
-
-      {/* Key Stats */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">Statistiky</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Denní objem</p>
-              <p className="font-mono-price font-medium">
-                {quote?.volume ? quote.volume.toLocaleString('cs-CZ') : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Prům. objem</p>
-              <p className="font-mono-price font-medium">
-                {quote?.avgVolume
-                  ? quote.avgVolume.toLocaleString('cs-CZ')
-                  : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Měna</p>
-              <p className="font-mono-price font-medium">{position.currency}</p>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Více statistik bude přidáno později (Market Cap, P/E, Yield...)
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

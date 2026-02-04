@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate
+from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, AvailableLot
 from app.core.auth import get_current_user_id
 from typing import List
 
@@ -60,5 +60,15 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate):
     """
     Add a new transaction (BUY or SELL).
     Automatically updates holdings with FIFO cost basis.
+    For SELL: use source_transaction_id to sell from a specific lot.
     """
     return await portfolio_service.add_transaction(portfolio_id, data)
+
+
+@router.get("/{portfolio_id}/available-lots/{stock_ticker}", response_model=List[AvailableLot])
+async def get_available_lots(portfolio_id: str, stock_ticker: str):
+    """
+    Get available lots for selling a specific stock.
+    Returns BUY transactions with remaining shares not yet sold.
+    """
+    return await portfolio_service.get_available_lots(portfolio_id, stock_ticker)

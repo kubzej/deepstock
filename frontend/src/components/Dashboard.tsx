@@ -100,14 +100,10 @@ export function Dashboard({ onStockClick }: DashboardProps) {
             <Plus className="h-8 w-8 text-muted-foreground" />
           </div>
           <h2 className="text-xl font-semibold mb-2">Prázdné portfolio</h2>
-          <p className="text-muted-foreground mb-6 max-w-md">
+          <p className="text-muted-foreground max-w-md">
             Zatím nemáte žádné pozice. Přidejte první transakci pro sledování
             vašeho portfolia.
           </p>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Přidat transakci
-          </Button>
         </div>
       </div>
     );

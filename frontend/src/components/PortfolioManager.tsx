@@ -47,7 +47,8 @@ interface PortfolioFormData {
 }
 
 export function PortfolioManager() {
-  const { portfolios, portfolio, loading, refresh, setActivePortfolio } = usePortfolio();
+  const { portfolios, portfolio, loading, refresh, setActivePortfolio } =
+    usePortfolio();
 
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -161,7 +162,7 @@ export function PortfolioManager() {
         <h1 className="text-2xl font-bold">Portfolia</h1>
         <Button onClick={handleOpenCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          Nové portfolio
+          Přidat portfolio
         </Button>
       </div>
 
@@ -190,9 +191,9 @@ export function PortfolioManager() {
                 <CardTitle className="text-lg font-medium">{p.name}</CardTitle>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="h-8 w-8 p-0"
                       onClick={(e) => e.stopPropagation()}
                     >

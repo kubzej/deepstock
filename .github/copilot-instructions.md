@@ -69,6 +69,13 @@ const celkovaHodnota = 125000; // Spočítej celkovou hodnotu
   - Standard: `text-zinc-100` (primary), `text-zinc-400` (muted).
   - Sentiment: `text-emerald-500` (positive), `text-rose-500` (negative).
 
+**IMPORTANT - No Cards on Desktop:**
+
+- Do NOT wrap content sections in `Card` components for desktop web views.
+- Use simple `div` with headings and proper spacing instead.
+- Cards are acceptable ONLY for mobile-specific card layouts or truly isolated widgets.
+- Prefer flat, clean layouts with clear visual hierarchy using typography and spacing.
+
 **Navigation Structure:**
 
 - **Mobile:** Bottom Navigation Bar.
