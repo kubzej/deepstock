@@ -179,16 +179,16 @@ export function OpenLotsRanking({
     <div>
       {/* Desktop Table */}
       <div className="hidden md:block">
-        <Table>
+        <Table className="w-auto">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Ticker', 'ticker')}
-              {renderSortableHeader('Datum', 'date')}
-              {renderSortableHeader('Počet', 'shares', 'text-right')}
-              {renderSortableHeader('Nákup', 'buyPrice', 'text-right')}
-              {renderSortableHeader('Aktuální', 'currentPrice', 'text-right')}
-              {renderSortableHeader('P/L', 'plCzk', 'text-right')}
-              {renderSortableHeader('P/L %', 'plPercent', 'text-right')}
+              {renderSortableHeader('Ticker', 'ticker', 'w-[140px]')}
+              {renderSortableHeader('Datum', 'date', 'w-[100px]')}
+              {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
+              {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[100px]')}
+              {renderSortableHeader('Aktuální', 'currentPrice', 'text-right w-[100px]')}
+              {renderSortableHeader('P/L', 'plCzk', 'text-right w-[110px]')}
+              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[90px]')}
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -210,21 +210,21 @@ export function HoldingsTable({
   return (
     <div>
       {/* Desktop Table */}
-      <div className="hidden md:block">
-        <Table>
+      <div className="hidden md:block overflow-x-auto">
+        <Table className="w-full">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Ticker', 'ticker')}
-              {renderSortableHeader('Počet', 'shares', 'text-right')}
-              {renderSortableHeader('Cena', 'price', 'text-right')}
-              {renderSortableHeader('Denní %', 'dailyChange', 'text-right')}
-              {renderSortableHeader('Objem', 'volume', 'text-right')}
-              {renderSortableHeader('Prům. cena', 'avgCost', 'text-right')}
-              {renderSortableHeader('Investováno', 'invested', 'text-right')}
-              {renderSortableHeader('Hodnota', 'value', 'text-right')}
-              {renderSortableHeader('P/L', 'pl', 'text-right')}
-              {renderSortableHeader('P/L %', 'plPercent', 'text-right')}
-              {renderSortableHeader('Váha', 'weight', 'text-right')}
+              {renderSortableHeader('Ticker', 'ticker', 'w-[140px]')}
+              {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
+              {renderSortableHeader('Cena', 'price', 'text-right w-[90px]')}
+              {renderSortableHeader('Denní %', 'dailyChange', 'text-right w-[90px]')}
+              {renderSortableHeader('Objem', 'volume', 'text-right w-[70px]')}
+              {renderSortableHeader('Prům. cena', 'avgCost', 'text-right w-[100px]')}
+              {renderSortableHeader('Investováno', 'invested', 'text-right w-[110px]')}
+              {renderSortableHeader('Hodnota', 'value', 'text-right w-[110px]')}
+              {renderSortableHeader('P/L', 'pl', 'text-right w-[100px]')}
+              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[85px]')}
+              {renderSortableHeader('Váha', 'weight', 'text-right w-[70px]')}
             </TableRow>
           </TableHeader>
           <TableBody>
