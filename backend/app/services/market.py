@@ -14,7 +14,7 @@ class MarketDataService:
         """
         Smart fetcher with cache.
         1. Check Redis for each ticker.
-        2. Bulk fetch missing from yfinance.
+        2. BATCH fetch missing from yfinance (single call).
         3. Cache new results.
         """
         results = {}
@@ -28,43 +28,52 @@ class MarketDataService:
             else:
                 missing.append(t)
 
-        # 2. Fetch Missing from Yahoo using fast_info (real-time prices)
+        # 2. BATCH Fetch Missing from Yahoo
         if missing:
-            for t in missing:
-                try:
-                    ticker = yf.Ticker(t)
-                    info = ticker.fast_info
-                    
-                    price = info.last_price
-                    prev_close = info.previous_close
-                    
-                    if price is None:
-                        continue
-                    
-                    change = price - prev_close if prev_close else 0
-                    change_percent = (change / prev_close) * 100 if prev_close else 0
-                    
-                    volume = int(info.last_volume) if info.last_volume else 0
-                    avg_volume = int(info.ten_day_average_volume) if info.ten_day_average_volume else 0
+            try:
+                # Single batch call for all missing tickers
+                batch = yf.Tickers(" ".join(missing))
+                
+                for t in missing:
+                    try:
+                        ticker_obj = batch.tickers.get(t)
+                        if not ticker_obj:
+                            continue
+                            
+                        info = ticker_obj.fast_info
+                        price = info.last_price
+                        prev_close = info.previous_close
+                        
+                        if price is None:
+                            continue
+                        
+                        change = price - prev_close if prev_close else 0
+                        change_percent = (change / prev_close) * 100 if prev_close else 0
+                        
+                        volume = int(info.last_volume) if info.last_volume else 0
+                        avg_volume = int(info.ten_day_average_volume) if info.ten_day_average_volume else 0
 
-                    quote = {
-                        "symbol": t,
-                        "price": round(price, 2),
-                        "change": round(change, 2),
-                        "changePercent": round(change_percent, 2),
-                        "volume": volume,
-                        "avgVolume": avg_volume,
-                        "lastUpdated": str(pd.Timestamp.now())
-                    }
+                        quote = {
+                            "symbol": t,
+                            "price": round(price, 2),
+                            "change": round(change, 2),
+                            "changePercent": round(change_percent, 2),
+                            "volume": volume,
+                            "avgVolume": avg_volume,
+                            "lastUpdated": str(pd.Timestamp.now())
+                        }
 
-                    results[t] = quote
-                    
-                    # 3. Cache (TTL 60s for prices)
-                    await self.redis.set(f"quote:{t}", json.dumps(quote), ex=60)
+                        results[t] = quote
+                        
+                        # 3. Cache (TTL 60s for prices)
+                        await self.redis.set(f"quote:{t}", json.dumps(quote), ex=60)
 
-                except Exception as e:
-                    print(f"Error fetching {t}: {e}")
-                    results[t] = None
+                    except Exception as e:
+                        print(f"Error processing {t}: {e}")
+                        results[t] = None
+                        
+            except Exception as e:
+                print(f"Error in batch fetch: {e}")
         
         return results
 

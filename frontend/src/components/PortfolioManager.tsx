@@ -159,7 +159,7 @@ export function PortfolioManager() {
           </Button>
         </div>
       ) : (
-        <div className="divide-y divide-border rounded-lg border">
+        <div className="divide-y divide-border rounded-lg border mb-8">
           {portfolios.map((p) => (
             <div
               key={p.id}
