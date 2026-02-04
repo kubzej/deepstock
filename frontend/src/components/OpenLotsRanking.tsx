@@ -179,16 +179,20 @@ export function OpenLotsRanking({
     <div>
       {/* Desktop Table */}
       <div className="hidden md:block">
-        <Table className="w-auto">
+        <Table className="w-full">
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Ticker', 'ticker', 'w-[140px]')}
-              {renderSortableHeader('Datum', 'date', 'w-[100px]')}
-              {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
-              {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[100px]')}
-              {renderSortableHeader('Aktuální', 'currentPrice', 'text-right w-[100px]')}
-              {renderSortableHeader('P/L', 'plCzk', 'text-right w-[110px]')}
-              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[90px]')}
+              {renderSortableHeader('Ticker', 'ticker', 'w-[20%]')}
+              {renderSortableHeader('Datum', 'date', 'w-[14%]')}
+              {renderSortableHeader('Počet', 'shares', 'text-right w-[10%]')}
+              {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[14%]')}
+              {renderSortableHeader(
+                'Aktuální',
+                'currentPrice',
+                'text-right w-[14%]',
+              )}
+              {renderSortableHeader('P/L', 'plCzk', 'text-right w-[14%]')}
+              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[14%]')}
             </TableRow>
           </TableHeader>
           <TableBody>

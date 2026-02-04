@@ -1,161 +1,102 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HoldingsTable, type Holding } from '@/components/HoldingsTable';
+import { HoldingsTable, type Holding as HoldingView } from '@/components/HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from '@/components/OpenLotsRanking';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 import {
   fetchQuotes,
   fetchExchangeRates,
+  fetchPortfolios,
+  fetchHoldings,
+  createPortfolio,
   DEFAULT_RATES,
   type Quote,
   type ExchangeRates,
+  type Portfolio,
+  type Holding,
 } from '@/lib/api';
 import { formatCurrency, formatPercent } from '@/lib/format';
 import { toCZK } from '@/lib/format';
-
-// Mock portfolio data (later from Supabase)
-const MOCK_HOLDINGS: Holding[] = [
-  {
-    ticker: 'AAPL',
-    name: 'Apple Inc.',
-    shares: 15,
-    avgCost: 185.5,
-    currency: 'USD',
-    sector: 'Technology',
-  },
-  {
-    ticker: 'MSFT',
-    name: 'Microsoft Corp.',
-    shares: 10,
-    avgCost: 380.0,
-    currency: 'USD',
-    sector: 'Technology',
-  },
-  {
-    ticker: 'TSLA',
-    name: 'Tesla Inc.',
-    shares: 5,
-    avgCost: 245.0,
-    currency: 'USD',
-    sector: 'Consumer Cyclical',
-  },
-  {
-    ticker: 'NVDA',
-    name: 'NVIDIA Corp.',
-    shares: 8,
-    avgCost: 450.0,
-    currency: 'USD',
-    sector: 'Technology',
-  },
-  {
-    ticker: 'GOOGL',
-    name: 'Alphabet Inc.',
-    shares: 12,
-    avgCost: 140.0,
-    currency: 'USD',
-    sector: 'Communication Services',
-  },
-];
-
-// Mock open lots (individual purchases)
-const MOCK_LOTS: OpenLot[] = [
-  {
-    id: '1',
-    ticker: 'AAPL',
-    stockName: 'Apple Inc.',
-    date: '2024-03-15',
-    shares: 10,
-    buyPrice: 175.0,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-  {
-    id: '2',
-    ticker: 'AAPL',
-    stockName: 'Apple Inc.',
-    date: '2024-08-20',
-    shares: 5,
-    buyPrice: 206.5,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-  {
-    id: '3',
-    ticker: 'MSFT',
-    stockName: 'Microsoft Corp.',
-    date: '2024-01-10',
-    shares: 10,
-    buyPrice: 380.0,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-  {
-    id: '4',
-    ticker: 'TSLA',
-    stockName: 'Tesla Inc.',
-    date: '2024-06-01',
-    shares: 5,
-    buyPrice: 245.0,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-  {
-    id: '5',
-    ticker: 'NVDA',
-    stockName: 'NVIDIA Corp.',
-    date: '2023-11-15',
-    shares: 8,
-    buyPrice: 450.0,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-  {
-    id: '6',
-    ticker: 'GOOGL',
-    stockName: 'Alphabet Inc.',
-    date: '2024-02-28',
-    shares: 12,
-    buyPrice: 140.0,
-    currentPrice: 0,
-    currency: 'USD',
-  },
-];
 
 interface DashboardProps {
   onStockClick?: (ticker: string) => void;
 }
 
 export function Dashboard({ onStockClick }: DashboardProps) {
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [rates, setRates] = useState<ExchangeRates>(DEFAULT_RATES);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const tickers = MOCK_HOLDINGS.map((h) => h.ticker);
+  const loadPortfolio = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 1. Get user's portfolios
+      let portfolios = await fetchPortfolios();
+
+      // 2. Create default portfolio if none exists
+      if (portfolios.length === 0) {
+        const newPortfolio = await createPortfolio('Hlavní portfolio', 'CZK');
+        portfolios = [newPortfolio];
+      }
+
+      const activePortfolio = portfolios[0];
+      setPortfolio(activePortfolio);
+
+      // 3. Get holdings for the portfolio
+      const holdingsData = await fetchHoldings(activePortfolio.id);
+      setHoldings(holdingsData);
+
+      // 4. Fetch quotes for all tickers
+      if (holdingsData.length > 0) {
+        const tickers = holdingsData.map((h) => h.ticker);
         const [quotesData, ratesData] = await Promise.all([
           fetchQuotes(tickers),
           fetchExchangeRates(),
         ]);
         setQuotes(quotesData);
         setRates(ratesData);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
+      } else {
+        // Still fetch exchange rates even without holdings
+        const ratesData = await fetchExchangeRates();
+        setRates(ratesData);
       }
-    };
-
-    loadData();
+    } catch (err) {
+      console.error('Failed to load portfolio:', err);
+      setError(err instanceof Error ? err.message : 'Nepodařilo se načíst data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadPortfolio();
+  }, [loadPortfolio]);
+
+  // Transform holdings to HoldingsTable format
+  const holdingsForTable: HoldingView[] = useMemo(() => {
+    return holdings.map((h) => ({
+      ticker: h.ticker,
+      name: h.name,
+      shares: h.shares,
+      avgCost: h.avg_cost,
+      currency: h.currency,
+      sector: '', // TODO: add sector to holdings API
+    }));
+  }, [holdings]);
+
   // Calculate totals in CZK
-  const totalValueCzk = MOCK_HOLDINGS.reduce((sum, h) => {
+  const totalValueCzk = holdingsForTable.reduce((sum, h) => {
     const price = quotes[h.ticker]?.price ?? 0;
     return sum + toCZK(price * h.shares, h.currency, rates);
   }, 0);
 
-  const totalCostCzk = MOCK_HOLDINGS.reduce((sum, h) => {
+  const totalCostCzk = holdingsForTable.reduce((sum, h) => {
     return sum + toCZK(h.avgCost * h.shares, h.currency, rates);
   }, 0);
 
@@ -163,7 +104,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
   const totalPnLPercent =
     totalCostCzk > 0 ? (totalPnLCzk / totalCostCzk) * 100 : 0;
 
-  const dailyChangeCzk = MOCK_HOLDINGS.reduce((sum, h) => {
+  const dailyChangeCzk = holdingsForTable.reduce((sum, h) => {
     const change = quotes[h.ticker]?.change ?? 0;
     return sum + toCZK(change * h.shares, h.currency, rates);
   }, 0);
@@ -173,19 +114,71 @@ export function Dashboard({ onStockClick }: DashboardProps) {
       ? (dailyChangeCzk / (totalValueCzk - dailyChangeCzk)) * 100
       : 0;
 
-  // Open lots with current prices
-  const lotsWithPrices = useMemo(() => {
-    return MOCK_LOTS.map((lot) => ({
-      ...lot,
-      currentPrice: quotes[lot.ticker]?.price ?? lot.buyPrice,
-    }));
-  }, [quotes]);
+  // TODO: fetch real open lots from API
+  const lotsWithPrices: OpenLot[] = useMemo(() => {
+    return [];
+  }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Načítání portfolia...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <p className="text-destructive">{error}</p>
+        <Button onClick={loadPortfolio} variant="outline">
+          Zkusit znovu
+        </Button>
+      </div>
+    );
+  }
+
+  // Empty portfolio state
+  if (holdings.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="mb-8">
+          <p className="text-muted-foreground text-sm mb-1">
+            {portfolio?.name ?? 'Portfolio'}
+          </p>
+          <h1 className="text-4xl md:text-5xl font-bold font-mono-price mb-4">
+            {formatCurrency(0)}
+          </h1>
+        </div>
+
+        {/* Empty state */}
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="rounded-full bg-muted p-6 mb-4">
+            <Plus className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Prázdné portfolio</h2>
+          <p className="text-muted-foreground mb-6 max-w-md">
+            Zatím nemáte žádné pozice. Přidejte první transakci pro sledování vašeho portfolia.
+          </p>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Přidat transakci
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6 pb-24 md:pb-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="mb-8">
-        <p className="text-muted-foreground text-sm mb-1">Portfolio</p>
+        <p className="text-muted-foreground text-sm mb-1">
+          {portfolio?.name ?? 'Portfolio'}
+        </p>
 
         {/* Main Value */}
         <h1 className="text-4xl md:text-5xl font-bold font-mono-price mb-4">
@@ -252,41 +245,43 @@ export function Dashboard({ onStockClick }: DashboardProps) {
               Pozice
             </span>
             <span className="text-lg font-mono-price font-semibold">
-              {MOCK_HOLDINGS.length}
+              {holdings.length}
             </span>
           </div>
         </div>
       </div>
 
       {/* Content with Tabs */}
-      {loading ? (
-        <p className="text-muted-foreground">Načítání...</p>
-      ) : (
-        <Tabs defaultValue="holdings" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="holdings">Držené pozice</TabsTrigger>
-            <TabsTrigger value="lots">Otevřené loty</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="holdings" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="holdings">Držené pozice</TabsTrigger>
+          <TabsTrigger value="lots">Otevřené loty</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="holdings">
-            <HoldingsTable
-              holdings={MOCK_HOLDINGS}
-              quotes={quotes}
-              rates={rates}
-              onRowClick={onStockClick}
-            />
-          </TabsContent>
+        <TabsContent value="holdings">
+          <HoldingsTable
+            holdings={holdingsForTable}
+            quotes={quotes}
+            rates={rates}
+            onRowClick={onStockClick}
+          />
+        </TabsContent>
 
-          <TabsContent value="lots">
+        <TabsContent value="lots">
+          {lotsWithPrices.length > 0 ? (
             <OpenLotsRanking
               lots={lotsWithPrices}
               rates={rates}
               maxItems={10}
               onLotClick={(ticker) => console.log('Lot clicked:', ticker)}
             />
-          </TabsContent>
-        </Tabs>
-      )}
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              Žádné otevřené loty
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Login } from '@/components/Login';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/components/Dashboard';
 import {
@@ -103,8 +105,23 @@ const MOCK_LOTS: OpenLot[] = [
 ];
 
 function App() {
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Načítání...</p>
+      </div>
+    );
+  }
+
+  // Not logged in - show login
+  if (!user) {
+    return <Login />;
+  }
 
   const handleStockClick = (ticker: string) => {
     setSelectedTicker(ticker);

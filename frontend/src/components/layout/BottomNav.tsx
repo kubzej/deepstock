@@ -13,10 +13,10 @@ export function BottomNav({
   onFabClick,
 }: BottomNavProps) {
   const tabs = [
-    { id: 'home', icon: Home, label: 'Home' },
+    { id: 'home', icon: Home, label: 'Přehled' },
     { id: 'portfolio', icon: Briefcase, label: 'Portfolio' },
-    { id: 'fab', icon: Plus, label: 'Add', isFab: true },
-    { id: 'research', icon: Search, label: 'Research' },
+    { id: 'fab', icon: Plus, label: 'Přidat', isFab: true },
+    { id: 'research', icon: Search, label: 'Výzkum' },
     { id: 'menu', icon: Menu, label: 'Menu' },
   ];
 

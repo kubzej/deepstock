@@ -1,19 +1,20 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.services.portfolio import portfolio_service, PortfolioCreate, TransactionCreate
+from app.core.auth import get_current_user_id
 from typing import List
 
 router = APIRouter()
 
 
-@router.get("/{user_id}")
-async def get_portfolios(user_id: str):
-    """Get all portfolios for a user."""
+@router.get("/")
+async def get_portfolios(user_id: str = Depends(get_current_user_id)):
+    """Get all portfolios for authenticated user."""
     return await portfolio_service.get_user_portfolios(user_id)
 
 
-@router.post("/{user_id}")
-async def create_portfolio(user_id: str, data: PortfolioCreate):
-    """Create a new portfolio."""
+@router.post("/")
+async def create_portfolio(data: PortfolioCreate, user_id: str = Depends(get_current_user_id)):
+    """Create a new portfolio for authenticated user."""
     return await portfolio_service.create_portfolio(user_id, data)
 
 

@@ -217,13 +217,29 @@ export function HoldingsTable({
               {renderSortableHeader('Ticker', 'ticker', 'w-[140px]')}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
               {renderSortableHeader('Cena', 'price', 'text-right w-[90px]')}
-              {renderSortableHeader('Denní %', 'dailyChange', 'text-right w-[90px]')}
+              {renderSortableHeader(
+                'Denní %',
+                'dailyChange',
+                'text-right w-[90px]',
+              )}
               {renderSortableHeader('Objem', 'volume', 'text-right w-[70px]')}
-              {renderSortableHeader('Prům. cena', 'avgCost', 'text-right w-[100px]')}
-              {renderSortableHeader('Investováno', 'invested', 'text-right w-[110px]')}
+              {renderSortableHeader(
+                'Prům. cena',
+                'avgCost',
+                'text-right w-[100px]',
+              )}
+              {renderSortableHeader(
+                'Investováno',
+                'invested',
+                'text-right w-[110px]',
+              )}
               {renderSortableHeader('Hodnota', 'value', 'text-right w-[110px]')}
               {renderSortableHeader('P/L', 'pl', 'text-right w-[100px]')}
-              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[85px]')}
+              {renderSortableHeader(
+                'P/L %',
+                'plPercent',
+                'text-right w-[85px]',
+              )}
               {renderSortableHeader('Váha', 'weight', 'text-right w-[70px]')}
             </TableRow>
           </TableHeader>
