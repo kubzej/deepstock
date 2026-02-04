@@ -1,4 +1,4 @@
-import { Home, Briefcase, Search, Menu, Plus } from 'lucide-react';
+import { LayoutDashboard, Wallet, LineChart, Menu, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
@@ -13,10 +13,10 @@ export function BottomNav({
   onFabClick,
 }: BottomNavProps) {
   const tabs = [
-    { id: 'home', icon: Home, label: 'Přehled' },
-    { id: 'portfolio', icon: Briefcase, label: 'Portfolio' },
+    { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
+    { id: 'portfolio', icon: Wallet, label: 'Portfolio' },
     { id: 'fab', icon: Plus, label: 'Přidat', isFab: true },
-    { id: 'research', icon: Search, label: 'Výzkum' },
+    { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'menu', icon: Menu, label: 'Menu' },
   ];
 

@@ -145,14 +145,19 @@ class PortfolioService:
         
         return {"portfolios": len(portfolios.data), "holdings_recalculated": total}
     
-    async def get_transactions(self, portfolio_id: str, limit: int = 50) -> List[dict]:
-        """Get recent transactions for a portfolio."""
-        response = supabase.table("transactions") \
-            .select("*, stocks(ticker, name)") \
+    async def get_transactions(self, portfolio_id: str, limit: int = 50, stock_id: str = None) -> List[dict]:
+        """Get recent transactions for a portfolio, optionally filtered by stock."""
+        # Include source_transaction for SELL transactions (to show lot info and P/L)
+        query = supabase.table("transactions") \
+            .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \
             .eq("portfolio_id", portfolio_id) \
             .order("executed_at", desc=True) \
-            .limit(limit) \
-            .execute()
+            .limit(limit)
+        
+        if stock_id:
+            query = query.eq("stock_id", stock_id)
+            
+        response = query.execute()
         return response.data
     
     async def add_transaction(self, portfolio_id: str, data: TransactionCreate) -> dict:

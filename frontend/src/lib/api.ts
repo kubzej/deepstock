@@ -59,17 +59,60 @@ export interface Holding {
   unrealized_pnl_pct?: number;
 }
 
+// Raw transaction from API
+interface TransactionRaw {
+  id: string;
+  portfolio_id: string;
+  stock_id: string;
+  type: 'BUY' | 'SELL';
+  shares: number;
+  price_per_share: number;
+  total_amount: number;
+  total_amount_czk: number;
+  currency: string;
+  executed_at: string;
+  notes?: string;
+  source_transaction_id?: string;
+  stocks: {
+    ticker: string;
+    name: string;
+  };
+  // Source transaction for SELL (joined from backend)
+  source_transaction?: {
+    id: string;
+    executed_at: string;
+    price_per_share: number;
+    currency: string;
+    shares: number;
+  };
+}
+
+// Source lot info for SELL transactions
+export interface SourceTransaction {
+  id: string;
+  date: string;
+  price: number;
+  currency: string;
+  shares: number;
+}
+
+// Transformed transaction for frontend
 export interface Transaction {
   id: string;
   portfolio_id: string;
   ticker: string;
+  stockName: string;
   type: 'BUY' | 'SELL';
   shares: number;
   price: number;
   total: number;
+  totalCzk: number;
   currency: string;
   date: string;
   notes?: string;
+  // For SELL: source lot transaction ID and full object
+  sourceTransactionId?: string;
+  sourceTransaction?: SourceTransaction;
 }
 
 // ============ Market Endpoints ============
@@ -245,7 +288,31 @@ export async function fetchTransactions(portfolioId: string, limit: number = 50)
     throw new Error('Failed to fetch transactions');
   }
   
-  return response.json();
+  const raw: TransactionRaw[] = await response.json();
+  
+  // Transform to frontend format
+  return raw.map((tx) => ({
+    id: tx.id,
+    portfolio_id: tx.portfolio_id,
+    ticker: tx.stocks?.ticker || 'UNKNOWN',
+    stockName: tx.stocks?.name || '',
+    type: tx.type,
+    shares: tx.shares,
+    price: tx.price_per_share,
+    total: tx.total_amount,
+    totalCzk: tx.total_amount_czk || 0,
+    currency: tx.currency,
+    date: tx.executed_at,
+    notes: tx.notes,
+    sourceTransactionId: tx.source_transaction_id,
+    sourceTransaction: tx.source_transaction ? {
+      id: tx.source_transaction.id,
+      date: tx.source_transaction.executed_at,
+      price: tx.source_transaction.price_per_share,
+      currency: tx.source_transaction.currency,
+      shares: tx.source_transaction.shares,
+    } : undefined,
+  }));
 }
 
 export async function addTransaction(

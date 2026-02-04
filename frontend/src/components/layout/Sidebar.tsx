@@ -1,12 +1,12 @@
 import {
-  Home,
-  Briefcase,
-  Search,
+  LayoutDashboard,
+  Wallet,
+  Database,
+  LineChart,
+  Eye,
   Settings,
   Plus,
-  TrendingUp,
   LogOut,
-  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,11 +25,11 @@ export function Sidebar({
   const { signOut, user } = useAuth();
 
   const menuItems = [
-    { id: 'home', icon: Home, label: 'Přehled' },
-    { id: 'portfolio', icon: Briefcase, label: 'Portfolia' },
-    { id: 'stocks', icon: BarChart3, label: 'Akcie' },
-    { id: 'research', icon: Search, label: 'Výzkum' },
-    { id: 'watchlist', icon: TrendingUp, label: 'Watchlisty' },
+    { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
+    { id: 'portfolio', icon: Wallet, label: 'Portfolia' },
+    { id: 'stocks', icon: Database, label: 'Akcie' },
+    { id: 'analysis', icon: LineChart, label: 'Analýza' },
+    { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 

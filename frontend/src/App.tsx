@@ -63,10 +63,10 @@ function App() {
         return <PortfolioManager />;
       case 'stocks':
         return <StocksManager onStockClick={handleStockClick} />;
-      case 'research':
+      case 'analysis':
         return (
           <div className="p-4">
-            <h1 className="text-2xl font-bold">Výzkum</h1>
+            <h1 className="text-2xl font-bold">Analýza</h1>
             <p className="text-muted-foreground mt-2">Připravuje se...</p>
           </div>
         );

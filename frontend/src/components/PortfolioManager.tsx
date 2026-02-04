@@ -185,13 +185,24 @@ export function PortfolioManager() {
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleOpenEdit(p)}>
+                <DropdownMenuContent
+                  align="end"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEdit(p);
+                    }}
+                  >
                     <Pencil className="h-4 w-4 mr-2" />
                     Upravit
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => setDeletingPortfolio(p)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingPortfolio(p);
+                    }}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />

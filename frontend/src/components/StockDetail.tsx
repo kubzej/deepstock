@@ -1,8 +1,13 @@
-import { useState, useEffect } from 'react';
-import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -13,8 +18,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { fetchStock, fetchQuotes } from '@/lib/api';
-import type { Stock, Quote } from '@/lib/api';
+import { fetchStock, fetchQuotes, fetchTransactions } from '@/lib/api';
+import type { Stock, Quote, Transaction } from '@/lib/api';
 import {
   formatCurrency,
   formatPercent,
@@ -30,6 +35,7 @@ interface StockDetailProps {
 
 export function StockDetail({ ticker, onBack }: StockDetailProps) {
   const {
+    portfolio,
     getHoldingByTicker,
     quotes: portfolioQuotes,
     rates,
@@ -40,6 +46,10 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
   const [stock, setStock] = useState<Stock | null>(null);
   const [stockLoading, setStockLoading] = useState(true);
   const [stockError, setStockError] = useState<string | null>(null);
+
+  // Transactions
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
 
   // Local quote if not in portfolio
   const [localQuote, setLocalQuote] = useState<Quote | null>(null);
@@ -63,6 +73,25 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
     };
     loadStock();
   }, [ticker]);
+
+  // Load transactions
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (!portfolio?.id) return;
+      try {
+        setTransactionsLoading(true);
+        const data = await fetchTransactions(portfolio.id, 100);
+        // Filter transactions for this ticker
+        const tickerTransactions = data.filter((t) => t.ticker === ticker);
+        setTransactions(tickerTransactions);
+      } catch (err) {
+        console.error('Failed to load transactions:', err);
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+    loadTransactions();
+  }, [portfolio?.id, ticker]);
 
   // Load quote if not available from portfolio context
   useEffect(() => {
@@ -92,6 +121,28 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
   const holding = getHoldingByTicker(ticker);
   // Use portfolio quote if available, otherwise local quote
   const quote = portfolioQuotes[ticker] || localQuote;
+
+  // Calculate sold shares per lot (for BUY transaction status)
+  const soldPerLot = useMemo(() => {
+    const map = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.type === 'SELL' && tx.sourceTransactionId) {
+        const current = map.get(tx.sourceTransactionId) || 0;
+        map.set(tx.sourceTransactionId, current + tx.shares);
+      }
+    });
+    return map;
+  }, [transactions]);
+
+  // Helper to get lot status for BUY transactions
+  const getLotStatus = (txId: string, totalShares: number) => {
+    const sold = soldPerLot.get(txId) || 0;
+    return {
+      sold,
+      remaining: totalShares - sold,
+      isFullySold: sold >= totalShares,
+    };
+  };
 
   const isLoading = stockLoading || portfolioLoading || quoteLoading;
 
@@ -172,235 +223,314 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
       }
     : null;
 
-  // TODO: Fetch real lots from API
-  const tickerLots: Array<{
-    id: string;
-    date: string;
-    shares: number;
-    buyPrice: number;
-    currency: string;
-    currentPrice: number;
-    pnlLocal: number;
-    pnlPercent: number;
-    pnlCzk: number;
-  }> = [];
-
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6 pb-24 md:pb-6">
-      {/* Back Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onBack}
-        className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="w-4 h-4 mr-1" />
-        Zpět
-      </Button>
-
-      {/* Stock Header */}
-      <div className="mb-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{ticker}</h1>
-            <p className="text-muted-foreground">{stockName}</p>
-          </div>
-          {stockSector && (
-            <Badge variant="outline" className="text-xs">
-              {stockSector}
-            </Badge>
-          )}
-        </div>
-
-        {/* Price Header */}
-        <div className="mt-4">
-          {currentPrice > 0 ? (
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-bold font-mono-price">
-                {formatPrice(currentPrice, stockCurrency)}
-              </span>
-              <div
-                className={`flex items-center gap-1 ${
-                  dailyChange >= 0 ? 'text-positive' : 'text-negative'
-                }`}
-              >
-                {dailyChange >= 0 ? (
-                  <TrendingUp className="w-4 h-4" />
-                ) : (
-                  <TrendingDown className="w-4 h-4" />
-                )}
-                <span className="font-mono-price">
-                  {formatPrice(Math.abs(dailyChange), stockCurrency)} (
-                  {formatPercent(dailyChangePercent, 2, true)})
-                </span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">Cena není k dispozici</p>
-          )}
+    <div className="min-h-screen bg-background pb-24 md:pb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Zpět
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm">
+            <Pencil className="w-4 h-4 mr-1" />
+            Upravit
+          </Button>
+          <Button variant="destructive" size="sm">
+            <Trash2 className="w-4 h-4 mr-1" />
+            Smazat
+          </Button>
         </div>
       </div>
 
-      {/* Company Description */}
+      {/* Stock Title */}
+      <div className="mb-6">
+        <div className="flex items-baseline gap-3 mb-2">
+          <span className="text-2xl font-bold uppercase tracking-wide">
+            {ticker}
+          </span>
+          <span className="text-muted-foreground">{stockName}</span>
+        </div>
+
+        {/* Price */}
+        {currentPrice > 0 ? (
+          <div className="flex items-baseline gap-3 mb-4">
+            <span className="text-3xl font-bold font-mono-price">
+              {formatPrice(currentPrice, stockCurrency)}
+            </span>
+            <span
+              className={`flex items-center gap-1 font-mono-price ${
+                dailyChange >= 0 ? 'text-positive' : 'text-negative'
+              }`}
+            >
+              {dailyChange >= 0 ? (
+                <TrendingUp className="w-4 h-4" />
+              ) : (
+                <TrendingDown className="w-4 h-4" />
+              )}
+              {formatPrice(Math.abs(dailyChange), stockCurrency)} (
+              {formatPercent(dailyChangePercent, 2, true)})
+            </span>
+          </div>
+        ) : (
+          <p className="text-muted-foreground mb-4">Cena není k dispozici</p>
+        )}
+
+        {/* Meta Row */}
+        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+          <div>
+            <span className="text-muted-foreground">Sektor: </span>
+            <span>{stockSector || '—'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Burza: </span>
+            <span>{stock.exchange || '—'}</span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Měna: </span>
+            <span>{stockCurrency}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Notes */}
       {stock?.notes && (
-        <div className="mb-6">
-          <h3 className="text-base font-medium mb-2">O společnosti</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {stock.notes}
+        <div className="mb-6 p-4 rounded-lg border border-border bg-muted/30">
+          <p className="text-xs uppercase text-muted-foreground mb-2">
+            Poznámky
           </p>
+          <p className="text-sm leading-relaxed">{stock.notes}</p>
         </div>
       )}
 
-      {/* Position Card - only if has position */}
+      {/* Position Stats */}
       {position && positionCzk && (
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">Vaše pozice</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Počet akcií</p>
-                <p className="text-lg font-mono-price font-semibold">
-                  {position.shares}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Průměrná cena</p>
-                <p className="text-lg font-mono-price font-semibold">
-                  {formatPrice(position.avgCost, stockCurrency)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Investováno</p>
-                <p className="text-lg font-mono-price font-semibold">
-                  {formatCurrency(positionCzk.totalCost)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Aktuální hodnota
-                </p>
-                <p className="text-lg font-mono-price font-semibold">
-                  {formatCurrency(positionCzk.totalValue)}
-                </p>
-              </div>
+        <div className="mb-8">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">
+            Vaše pozice
+          </h2>
+          <div className="flex flex-wrap gap-x-8 gap-y-4">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+                Počet akcií
+              </p>
+              <p className="text-lg font-mono-price font-semibold">
+                {position.shares}
+              </p>
             </div>
-
-            {/* P/L Row */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">
-                    Nerealizovaný zisk/ztráta
-                  </p>
-                  <p
-                    className={`text-xl font-mono-price font-bold ${
-                      positionCzk.unrealizedPnL >= 0
-                        ? 'text-positive'
-                        : 'text-negative'
-                    }`}
-                  >
-                    {formatCurrency(positionCzk.unrealizedPnL)}
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={
-                    position.unrealizedPnLPercent >= 0
-                      ? 'text-positive border-positive/20'
-                      : 'text-negative border-negative/20'
-                  }
-                >
-                  {formatPercent(position.unrealizedPnLPercent, 2, true)}
-                </Badge>
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+                Průměrná cena
+              </p>
+              <p className="text-lg font-mono-price font-semibold">
+                {formatPrice(position.avgCost, stockCurrency)}
+              </p>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+                Investováno
+              </p>
+              <p className="text-lg font-mono-price font-semibold">
+                {formatCurrency(positionCzk.totalCost)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+                Aktuální hodnota
+              </p>
+              <p className="text-lg font-mono-price font-semibold">
+                {formatCurrency(positionCzk.totalValue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+                P/L
+              </p>
+              <p
+                className={`text-lg font-mono-price font-semibold ${
+                  positionCzk.unrealizedPnL >= 0
+                    ? 'text-positive'
+                    : 'text-negative'
+                }`}
+              >
+                {formatCurrency(positionCzk.unrealizedPnL)}
+                <span className="text-sm ml-2">
+                  ({formatPercent(position.unrealizedPnLPercent, 2, true)})
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* No position info */}
+      {/* No position */}
       {!hasPosition && (
-        <Card className="mb-6 border-dashed">
-          <CardContent className="py-6 text-center text-muted-foreground">
-            Nemáte otevřenou pozici v této akcii
-          </CardContent>
-        </Card>
+        <div className="mb-8 py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+          Nemáte otevřenou pozici v této akcii
+        </div>
       )}
 
-      {/* Open Lots */}
-      {tickerLots.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium">
-              Otevřené loty ({tickerLots.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs uppercase text-muted-foreground">
-                      Datum
-                    </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                      Počet
-                    </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                      Nákup
-                    </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                      Aktuální
-                    </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                      P/L (CZK)
-                    </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                      P/L %
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tickerLots.map((lot) => (
-                    <TableRow key={lot.id} className="hover:bg-muted/50">
+      {/* Transactions */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+            Transakce ({transactions.length})
+          </h2>
+        </div>
+
+        {transactionsLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : transactions.length === 0 ? (
+          <p className="text-muted-foreground text-sm">Žádné transakce</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-xs uppercase text-muted-foreground">
+                    Datum
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground">
+                    Typ
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground">
+                    Lot
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    P/L {stockCurrency}
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    Množství
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    Cena
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    Celkem CZK
+                  </TableHead>
+                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    Akce
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((tx) => {
+                  // Calculate P/L for BUY transactions (unrealized) or SELL (realized)
+                  const isBuy = tx.type === 'BUY';
+                  const lotStatus = isBuy
+                    ? getLotStatus(tx.id, tx.shares)
+                    : null;
+                  const isSold = lotStatus?.isFullySold ?? false;
+
+                  let pnl: number | null = null;
+                  let pnlPercent: number | null = null;
+                  let sourceLotPrice: number | null = null;
+
+                  if (isBuy && !isSold && currentPrice > 0) {
+                    // Unrealized P/L for open BUY lots
+                    const remaining = lotStatus?.remaining ?? tx.shares;
+                    pnl = (currentPrice - tx.price) * remaining;
+                    pnlPercent = ((currentPrice - tx.price) / tx.price) * 100;
+                  } else if (!isBuy && tx.sourceTransaction) {
+                    // Realized P/L for SELL - use source transaction object
+                    sourceLotPrice = tx.sourceTransaction.price;
+                    pnl = (tx.price - sourceLotPrice) * tx.shares;
+                    pnlPercent =
+                      ((tx.price - sourceLotPrice) / sourceLotPrice) * 100;
+                  }
+
+                  // Lot info for BUY transactions
+                  let lotInfo = '—';
+
+                  if (tx.type === 'SELL' && sourceLotPrice !== null) {
+                    // SELL: Show source lot buy price
+                    lotInfo = `@ ${formatPrice(sourceLotPrice, tx.currency)}`;
+                  } else if (isBuy && lotStatus) {
+                    // BUY: Show sold status
+                    if (lotStatus.isFullySold) {
+                      // Fully sold
+                      lotInfo = 'Prodáno';
+                    } else if (lotStatus.sold > 0) {
+                      // Partially sold
+                      lotInfo = `Prodáno ${lotStatus.sold}/${tx.shares}`;
+                    }
+                    // else: not sold at all, keep '—'
+                  }
+
+                  return (
+                    <TableRow key={tx.id} className="hover:bg-muted/50">
                       <TableCell className="font-mono-price text-sm">
-                        {formatDate(lot.date)}
+                        {formatDate(tx.date)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${
+                            isBuy
+                              ? 'border-rose-600/50 text-rose-500 bg-rose-500/10'
+                              : 'border-emerald-600/50 text-emerald-500 bg-emerald-500/10'
+                          }`}
+                        >
+                          {isBuy ? 'BUY' : 'SELL'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {lotInfo}
                       </TableCell>
                       <TableCell className="font-mono-price text-sm text-right">
-                        {lot.shares}
+                        {pnl !== null ? (
+                          <span
+                            className={
+                              pnl >= 0 ? 'text-positive' : 'text-negative'
+                            }
+                          >
+                            {formatPrice(pnl, tx.currency)}
+                            <span className="block text-xs">
+                              ({formatPercent(pnlPercent!, 1, true)})
+                            </span>
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </TableCell>
                       <TableCell className="font-mono-price text-sm text-right">
-                        {formatPrice(lot.buyPrice, lot.currency)}
+                        {tx.shares}
                       </TableCell>
                       <TableCell className="font-mono-price text-sm text-right">
-                        {formatPrice(lot.currentPrice, lot.currency)}
+                        {formatPrice(tx.price, tx.currency)}
                       </TableCell>
-                      <TableCell
-                        className={`font-mono-price text-sm text-right font-medium ${
-                          lot.pnlCzk >= 0 ? 'text-positive' : 'text-negative'
-                        }`}
-                      >
-                        {formatCurrency(lot.pnlCzk)}
+                      <TableCell className="font-mono-price text-sm text-right font-medium">
+                        {formatCurrency(tx.totalCzk)}
                       </TableCell>
-                      <TableCell
-                        className={`font-mono-price text-sm text-right font-medium ${
-                          lot.pnlPercent >= 0
-                            ? 'text-positive'
-                            : 'text-negative'
-                        }`}
-                      >
-                        {formatPercent(lot.pnlPercent, 1, true)}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
