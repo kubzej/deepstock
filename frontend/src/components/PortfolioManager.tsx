@@ -25,11 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
@@ -51,15 +47,22 @@ interface PortfolioFormData {
 }
 
 export function PortfolioManager() {
-  const { portfolios, portfolio, loading, refresh } = usePortfolio();
-  
+  const { portfolios, portfolio, loading, refresh, setActivePortfolio } = usePortfolio();
+
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
-  const [deletingPortfolio, setDeletingPortfolio] = useState<Portfolio | null>(null);
-  
+  const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(
+    null,
+  );
+  const [deletingPortfolio, setDeletingPortfolio] = useState<Portfolio | null>(
+    null,
+  );
+
   // Form state
-  const [formData, setFormData] = useState<PortfolioFormData>({ name: '', currency: 'CZK' });
+  const [formData, setFormData] = useState<PortfolioFormData>({
+    name: '',
+    currency: 'CZK',
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,16 +83,18 @@ export function PortfolioManager() {
       setError('Název je povinný');
       return;
     }
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       await createPortfolio(formData.name.trim(), formData.currency);
       await refresh();
       setIsCreateOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se vytvořit portfolio');
+      setError(
+        err instanceof Error ? err.message : 'Nepodařilo se vytvořit portfolio',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -100,10 +105,10 @@ export function PortfolioManager() {
       setError('Název je povinný');
       return;
     }
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       await updatePortfolio(editingPortfolio.id, {
         name: formData.name.trim(),
@@ -112,7 +117,9 @@ export function PortfolioManager() {
       await refresh();
       setEditingPortfolio(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se upravit portfolio');
+      setError(
+        err instanceof Error ? err.message : 'Nepodařilo se upravit portfolio',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -120,16 +127,18 @@ export function PortfolioManager() {
 
   const handleDelete = async () => {
     if (!deletingPortfolio) return;
-    
+
     setIsSubmitting(true);
     setError(null);
-    
+
     try {
       await deletePortfolio(deletingPortfolio.id);
       await refresh();
       setDeletingPortfolio(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nepodařilo se smazat portfolio');
+      setError(
+        err instanceof Error ? err.message : 'Nepodařilo se smazat portfolio',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -172,17 +181,21 @@ export function PortfolioManager() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {portfolios.map((p) => (
-            <Card 
-              key={p.id} 
-              className={p.id === portfolio?.id ? 'ring-2 ring-primary' : ''}
+            <Card
+              key={p.id}
+              className={`cursor-pointer transition-all hover:border-primary/50 ${p.id === portfolio?.id ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setActivePortfolio(p.id)}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium">
-                  {p.name}
-                </CardTitle>
+                <CardTitle className="text-lg font-medium">{p.name}</CardTitle>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -191,7 +204,7 @@ export function PortfolioManager() {
                       <Pencil className="h-4 w-4 mr-2" />
                       Upravit
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => setDeletingPortfolio(p)}
                       className="text-destructive focus:text-destructive"
                     >
@@ -227,7 +240,7 @@ export function PortfolioManager() {
               Vytvořte nové portfolio pro sledování vašich investic.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             {error && (
               <Alert variant="destructive">
@@ -235,22 +248,26 @@ export function PortfolioManager() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="name">Název</Label>
               <Input
                 id="name"
                 placeholder="Např. Hlavní portfolio"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="currency">Měna</Label>
               <Select
                 value={formData.currency}
-                onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, currency: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -265,7 +282,7 @@ export function PortfolioManager() {
               </Select>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
               Zrušit
@@ -278,7 +295,10 @@ export function PortfolioManager() {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingPortfolio} onOpenChange={() => setEditingPortfolio(null)}>
+      <Dialog
+        open={!!editingPortfolio}
+        onOpenChange={() => setEditingPortfolio(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upravit portfolio</DialogTitle>
@@ -286,7 +306,7 @@ export function PortfolioManager() {
               Změňte název nebo měnu portfolia.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 py-4">
             {error && (
               <Alert variant="destructive">
@@ -294,21 +314,25 @@ export function PortfolioManager() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="edit-name">Název</Label>
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="edit-currency">Měna</Label>
               <Select
                 value={formData.currency}
-                onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, currency: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -323,7 +347,7 @@ export function PortfolioManager() {
               </Select>
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingPortfolio(null)}>
               Zrušit
@@ -336,30 +360,37 @@ export function PortfolioManager() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deletingPortfolio} onOpenChange={() => setDeletingPortfolio(null)}>
+      <Dialog
+        open={!!deletingPortfolio}
+        onOpenChange={() => setDeletingPortfolio(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Smazat portfolio</DialogTitle>
             <DialogDescription>
-              Opravdu chcete smazat portfolio "{deletingPortfolio?.name}"? 
-              Tato akce je nevratná a smaže všechny transakce a pozice v tomto portfoliu.
+              Opravdu chcete smazat portfolio "{deletingPortfolio?.name}"? Tato
+              akce je nevratná a smaže všechny transakce a pozice v tomto
+              portfoliu.
             </DialogDescription>
           </DialogHeader>
-          
+
           {error && (
             <Alert variant="destructive">
               <AlertTitle>Chyba</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingPortfolio(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingPortfolio(null)}
+            >
               Zrušit
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete} 
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Mažu...' : 'Smazat'}

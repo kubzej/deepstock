@@ -40,6 +40,7 @@ interface PortfolioContextType {
 
   // Actions
   refresh: () => Promise<void>;
+  setActivePortfolio: (portfolioId: string) => Promise<void>;
   getHoldingByTicker: (ticker: string) => HoldingWithPrice | undefined;
 }
 
@@ -130,6 +131,46 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     [holdings],
   );
 
+  const setActivePortfolio = useCallback(
+    async (portfolioId: string) => {
+      const selected = portfolios.find((p) => p.id === portfolioId);
+      if (!selected) return;
+
+      setPortfolio(selected);
+      setLoading(true);
+
+      try {
+        // Fetch holdings for the selected portfolio
+        const holdingsData = await fetchHoldings(portfolioId);
+
+        let quotesData: Record<string, Quote> = {};
+        if (holdingsData.length > 0) {
+          const tickers = holdingsData.map((h) => h.ticker);
+          quotesData = await fetchQuotes(tickers);
+        }
+
+        setQuotes(quotesData);
+
+        const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map((h) => ({
+          ...h,
+          currentPrice: quotesData[h.ticker]?.price,
+          dailyChange: quotesData[h.ticker]?.change,
+          dailyChangePercent: quotesData[h.ticker]?.changePercent,
+        }));
+
+        setHoldings(holdingsWithPrices);
+      } catch (err) {
+        console.error('Failed to load portfolio:', err);
+        setError(
+          err instanceof Error ? err.message : 'Nepodařilo se načíst data',
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [portfolios],
+  );
+
   const value: PortfolioContextType = {
     portfolio,
     portfolios,
@@ -139,6 +180,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     refresh: loadPortfolio,
+    setActivePortfolio,
     getHoldingByTicker,
   };
 
