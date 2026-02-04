@@ -17,12 +17,21 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   fetchStock,
   fetchQuotes,
   fetchTransactions,
   fetchAllTransactions,
+  deleteTransaction,
 } from '@/lib/api';
 import type { Stock, Quote, Transaction } from '@/lib/api';
 import {
@@ -32,6 +41,7 @@ import {
   formatDate,
   toCZK,
 } from '@/lib/format';
+import { TransactionModal } from './TransactionModal';
 
 interface StockDetailProps {
   ticker: string;
@@ -67,6 +77,14 @@ export function StockDetail({
   // Local quote if not in portfolio
   const [localQuote, setLocalQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Transaction edit/delete state
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] =
+    useState<Transaction | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load stock from API
   useEffect(() => {
@@ -161,6 +179,47 @@ export function StockDetail({
       remaining: totalShares - sold,
       isFullySold: sold >= totalShares,
     };
+  };
+
+  // Reload transactions after edit/delete
+  const reloadTransactions = async () => {
+    try {
+      let data;
+      if (isAllPortfolios) {
+        data = await fetchAllTransactions(100);
+      } else if (portfolio?.id) {
+        data = await fetchTransactions(portfolio.id, 100);
+      } else {
+        return;
+      }
+      const tickerTransactions = data.filter((t) => t.ticker === ticker);
+      setTransactions(tickerTransactions);
+    } catch (err) {
+      console.error('Failed to reload transactions:', err);
+    }
+  };
+
+  // Handle transaction delete
+  const handleDeleteTransaction = async () => {
+    if (!deletingTransaction) return;
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      await deleteTransaction(
+        deletingTransaction.portfolioId,
+        deletingTransaction.id,
+      );
+      setDeletingTransaction(null);
+      await reloadTransactions();
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : 'Nepodařilo se smazat transakci',
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   const isLoading = stockLoading || portfolioLoading || quoteLoading;
@@ -412,159 +471,352 @@ export function StockDetail({
         ) : transactions.length === 0 ? (
           <p className="text-muted-foreground text-sm">Žádné transakce</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs uppercase text-muted-foreground">
-                    Datum
-                  </TableHead>
-                  {isAllPortfolios && (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead className="text-xs uppercase text-muted-foreground">
-                      Portfolio
+                      Datum
                     </TableHead>
-                  )}
-                  <TableHead className="text-xs uppercase text-muted-foreground">
-                    Typ
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground">
-                    Lot
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                    P/L {stockCurrency}
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                    Množství
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                    Cena
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                    Celkem CZK
-                  </TableHead>
-                  <TableHead className="text-xs uppercase text-muted-foreground text-right">
-                    Akce
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((tx) => {
-                  // Calculate P/L for BUY transactions (unrealized) or SELL (realized)
-                  const isBuy = tx.type === 'BUY';
-                  const lotStatus = isBuy
-                    ? getLotStatus(tx.id, tx.shares)
-                    : null;
-                  const isSold = lotStatus?.isFullySold ?? false;
+                    {isAllPortfolios && (
+                      <TableHead className="text-xs uppercase text-muted-foreground">
+                        Portfolio
+                      </TableHead>
+                    )}
+                    <TableHead className="text-xs uppercase text-muted-foreground">
+                      Typ
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground">
+                      Lot
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                      P/L {stockCurrency}
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                      Množství
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                      Cena
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                      Celkem CZK
+                    </TableHead>
+                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                      Akce
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((tx) => {
+                    // Calculate P/L for BUY transactions (unrealized) or SELL (realized)
+                    const isBuy = tx.type === 'BUY';
+                    const lotStatus = isBuy
+                      ? getLotStatus(tx.id, tx.shares)
+                      : null;
+                    const isSold = lotStatus?.isFullySold ?? false;
 
-                  let pnl: number | null = null;
-                  let pnlPercent: number | null = null;
-                  let sourceLotPrice: number | null = null;
+                    let pnl: number | null = null;
+                    let pnlPercent: number | null = null;
+                    let sourceLotPrice: number | null = null;
 
-                  if (isBuy && !isSold && currentPrice > 0) {
-                    // Unrealized P/L for open BUY lots
-                    const remaining = lotStatus?.remaining ?? tx.shares;
-                    pnl = (currentPrice - tx.price) * remaining;
-                    pnlPercent = ((currentPrice - tx.price) / tx.price) * 100;
-                  } else if (!isBuy && tx.sourceTransaction) {
-                    // Realized P/L for SELL - use source transaction object
-                    sourceLotPrice = tx.sourceTransaction.price;
-                    pnl = (tx.price - sourceLotPrice) * tx.shares;
-                    pnlPercent =
-                      ((tx.price - sourceLotPrice) / sourceLotPrice) * 100;
-                  }
-
-                  // Lot info for BUY transactions
-                  let lotInfo = '—';
-
-                  if (tx.type === 'SELL' && sourceLotPrice !== null) {
-                    // SELL: Show source lot buy price
-                    lotInfo = `@ ${formatPrice(sourceLotPrice, tx.currency)}`;
-                  } else if (isBuy && lotStatus) {
-                    // BUY: Show sold status
-                    if (lotStatus.isFullySold) {
-                      // Fully sold
-                      lotInfo = 'Prodáno';
-                    } else if (lotStatus.sold > 0) {
-                      // Partially sold
-                      lotInfo = `Prodáno ${lotStatus.sold}/${tx.shares}`;
+                    if (isBuy && !isSold && currentPrice > 0) {
+                      // Unrealized P/L for open BUY lots
+                      const remaining = lotStatus?.remaining ?? tx.shares;
+                      pnl = (currentPrice - tx.price) * remaining;
+                      pnlPercent = ((currentPrice - tx.price) / tx.price) * 100;
+                    } else if (!isBuy && tx.sourceTransaction) {
+                      // Realized P/L for SELL - use source transaction object
+                      sourceLotPrice = tx.sourceTransaction.price;
+                      pnl = (tx.price - sourceLotPrice) * tx.shares;
+                      pnlPercent =
+                        ((tx.price - sourceLotPrice) / sourceLotPrice) * 100;
                     }
-                    // else: not sold at all, keep '—'
-                  }
 
-                  return (
-                    <TableRow key={tx.id} className="hover:bg-muted/50">
-                      <TableCell className="font-mono-price text-sm">
-                        {formatDate(tx.date)}
-                      </TableCell>
-                      {isAllPortfolios && (
-                        <TableCell className="text-sm">
-                          <Badge
-                            variant="outline"
-                            className="text-xs font-normal"
-                          >
-                            {tx.portfolioName}
-                          </Badge>
+                    // Lot info for BUY transactions
+                    let lotInfo = '—';
+
+                    if (tx.type === 'SELL' && sourceLotPrice !== null) {
+                      // SELL: Show source lot buy price
+                      lotInfo = `@ ${formatPrice(sourceLotPrice, tx.currency)}`;
+                    } else if (isBuy && lotStatus) {
+                      // BUY: Show sold status
+                      if (lotStatus.isFullySold) {
+                        // Fully sold
+                        lotInfo = 'prodáno';
+                      } else if (lotStatus.sold > 0) {
+                        // Partially sold
+                        lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
+                      }
+                      // else: not sold at all, keep '—'
+                    }
+
+                    return (
+                      <TableRow key={tx.id} className="hover:bg-muted/50">
+                        <TableCell className="font-mono-price text-sm">
+                          {formatDate(tx.date)}
                         </TableCell>
-                      )}
-                      <TableCell>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+                        {isAllPortfolios && (
+                          <TableCell className="text-sm">
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-normal"
+                            >
+                              {tx.portfolioName}
+                            </Badge>
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+                            {isBuy ? 'BUY' : 'SELL'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {lotInfo}
+                        </TableCell>
+                        <TableCell className="font-mono-price text-sm text-right">
+                          {pnl !== null ? (
+                            <span
+                              className={
+                                pnl >= 0 ? 'text-positive' : 'text-negative'
+                              }
+                            >
+                              {formatPrice(pnl, tx.currency)}
+                              <span className="block text-xs">
+                                ({formatPercent(pnlPercent!, 1, true)})
+                              </span>
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono-price text-sm text-right">
+                          {tx.shares}
+                        </TableCell>
+                        <TableCell className="font-mono-price text-sm text-right">
+                          {formatPrice(tx.price, tx.currency)}
+                        </TableCell>
+                        <TableCell className="font-mono-price text-sm text-right font-medium">
+                          {formatCurrency(tx.totalCzk)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setEditingTransaction(tx)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingTransaction(tx)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-2">
+              {transactions.map((tx) => {
+                const isBuy = tx.type === 'BUY';
+                const lotStatus = isBuy ? getLotStatus(tx.id, tx.shares) : null;
+                const isSold = lotStatus?.isFullySold ?? false;
+
+                let pnl: number | null = null;
+                let pnlPercent: number | null = null;
+                let sourceLotPrice: number | null = null;
+
+                if (isBuy && !isSold && currentPrice > 0) {
+                  const remaining = lotStatus?.remaining ?? tx.shares;
+                  pnl = (currentPrice - tx.price) * remaining;
+                  pnlPercent = ((currentPrice - tx.price) / tx.price) * 100;
+                } else if (!isBuy && tx.sourceTransaction) {
+                  sourceLotPrice = tx.sourceTransaction.price;
+                  pnl = (tx.price - sourceLotPrice) * tx.shares;
+                  pnlPercent =
+                    ((tx.price - sourceLotPrice) / sourceLotPrice) * 100;
+                }
+
+                // Lot status text
+                let lotStatusText = '';
+                if (isBuy && lotStatus) {
+                  if (lotStatus.isFullySold) {
+                    lotStatusText = ' · prodáno';
+                  } else if (lotStatus.sold > 0) {
+                    lotStatusText = ` · prodáno ${lotStatus.sold}/${tx.shares}`;
+                  }
+                }
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="py-3 border-b border-border/50 last:border-0"
+                  >
+                    {/* Row 1: Type + Date | P/L */}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-700/60 text-zinc-300">
                           {isBuy ? 'BUY' : 'SELL'}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {lotInfo}
-                      </TableCell>
-                      <TableCell className="font-mono-price text-sm text-right">
+                        <span className="text-sm text-muted-foreground">
+                          {formatDate(tx.date)}
+                        </span>
+                        {isAllPortfolios && tx.portfolioName && (
+                          <span className="text-xs text-muted-foreground/60">
+                            · {tx.portfolioName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
                         {pnl !== null ? (
                           <span
-                            className={
+                            className={`font-mono-price text-sm font-medium ${
                               pnl >= 0 ? 'text-positive' : 'text-negative'
-                            }
+                            }`}
                           >
                             {formatPrice(pnl, tx.currency)}
-                            <span className="block text-xs">
-                              ({formatPercent(pnlPercent!, 1, true)})
-                            </span>
                           </span>
                         ) : (
-                          '—'
+                          <span className="text-muted-foreground">—</span>
                         )}
-                      </TableCell>
-                      <TableCell className="font-mono-price text-sm text-right">
-                        {tx.shares}
-                      </TableCell>
-                      <TableCell className="font-mono-price text-sm text-right">
-                        {formatPrice(tx.price, tx.currency)}
-                      </TableCell>
-                      <TableCell className="font-mono-price text-sm text-right font-medium">
-                        {formatCurrency(tx.totalCzk)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
+                      </div>
+                    </div>
+
+                    {/* Row 2: Shares × Price | P/L % */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="text-muted-foreground">
+                        <span className="font-mono-price">
+                          {tx.shares} ks × {formatPrice(tx.price, tx.currency)}
+                        </span>
+                        {/* SELL: show source lot buy price */}
+                        {!isBuy && sourceLotPrice !== null && (
+                          <span className="text-muted-foreground/60">
+                            {' '}
+                            · nákup @ {formatPrice(sourceLotPrice, tx.currency)}
+                          </span>
+                        )}
+                        {/* BUY: show sold status */}
+                        {lotStatusText && (
+                          <span className="text-muted-foreground/60">
+                            {lotStatusText}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        {pnlPercent !== null ? (
+                          <span
+                            className={`font-mono-price ${
+                              pnlPercent >= 0
+                                ? 'text-positive'
+                                : 'text-negative'
+                            }`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                            ({formatPercent(pnlPercent, 1, true)})
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Row 3: Total CZK | Actions */}
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        Celkem:{' '}
+                        <span className="font-mono-price font-medium text-foreground">
+                          {formatCurrency(tx.totalCzk)}
+                        </span>
+                      </span>
+                      <div className="flex gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setEditingTransaction(tx)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive"
+                          onClick={() => setDeletingTransaction(tx)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
+
+      {/* Transaction Edit Modal */}
+      <TransactionModal
+        open={!!editingTransaction}
+        onOpenChange={(open) => !open && setEditingTransaction(null)}
+        editTransaction={editingTransaction}
+        onSuccess={reloadTransactions}
+      />
+
+      {/* Transaction Delete Confirmation */}
+      <Dialog
+        open={!!deletingTransaction}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingTransaction(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Smazat transakci?</DialogTitle>
+            <DialogDescription>
+              Opravdu chcete smazat{' '}
+              {deletingTransaction?.type === 'BUY' ? 'nákup' : 'prodej'}{' '}
+              {deletingTransaction?.shares} ks {deletingTransaction?.ticker} ze
+              dne {deletingTransaction && formatDate(deletingTransaction.date)}?
+            </DialogDescription>
+          </DialogHeader>
+
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingTransaction(null)}
+              disabled={deleteLoading}
+            >
+              Zrušit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTransaction}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? 'Mažu...' : 'Smazat'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

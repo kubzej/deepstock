@@ -73,6 +73,8 @@ interface TransactionRaw {
   total_amount: number;
   total_amount_czk: number;
   currency: string;
+  exchange_rate_to_czk?: number;
+  fees?: number;
   executed_at: string;
   notes?: string;
   source_transaction_id?: string;
@@ -102,7 +104,7 @@ export interface SourceTransaction {
 // Transformed transaction for frontend
 export interface Transaction {
   id: string;
-  portfolio_id: string;
+  portfolioId: string;
   ticker: string;
   stockName: string;
   type: 'BUY' | 'SELL';
@@ -111,6 +113,8 @@ export interface Transaction {
   total: number;
   totalCzk: number;
   currency: string;
+  exchangeRate?: number;
+  fees?: number;
   date: string;
   notes?: string;
   // For SELL: source lot transaction ID and full object
@@ -318,7 +322,7 @@ export async function fetchTransactions(portfolioId: string, limit: number = 50)
   // Transform to frontend format
   return raw.map((tx) => ({
     id: tx.id,
-    portfolio_id: tx.portfolio_id,
+    portfolioId: tx.portfolio_id,
     ticker: tx.stocks?.ticker || 'UNKNOWN',
     stockName: tx.stocks?.name || '',
     type: tx.type,
@@ -327,6 +331,8 @@ export async function fetchTransactions(portfolioId: string, limit: number = 50)
     total: tx.total_amount,
     totalCzk: tx.total_amount_czk || 0,
     currency: tx.currency,
+    exchangeRate: tx.exchange_rate_to_czk,
+    fees: tx.fees,
     date: tx.executed_at,
     notes: tx.notes,
     sourceTransactionId: tx.source_transaction_id,
@@ -412,7 +418,7 @@ export async function fetchAllTransactions(limit: number = 100): Promise<Transac
   
   return raw.map((tx) => ({
     id: tx.id,
-    portfolio_id: tx.portfolio_id,
+    portfolioId: tx.portfolio_id,
     ticker: tx.stocks?.ticker || 'UNKNOWN',
     stockName: tx.stocks?.name || '',
     type: tx.type,
@@ -421,6 +427,8 @@ export async function fetchAllTransactions(limit: number = 100): Promise<Transac
     total: tx.total_amount,
     totalCzk: tx.total_amount_czk || 0,
     currency: tx.currency,
+    exchangeRate: tx.exchange_rate_to_czk,
+    fees: tx.fees,
     date: tx.executed_at,
     notes: tx.notes,
     sourceTransactionId: tx.source_transaction_id,
@@ -664,5 +672,89 @@ export async function deleteStock(stockId: string): Promise<void> {
       throw new Error(error.detail || 'Cannot delete stock with transactions');
     }
     throw new Error('Failed to delete stock');
+  }
+}
+
+// ============ Transaction Update/Delete ============
+
+export interface TransactionUpdateData {
+  shares?: number;
+  price_per_share?: number;
+  currency?: string;
+  exchange_rate_to_czk?: number;
+  fees?: number;
+  notes?: string;
+  executed_at?: string;
+}
+
+export async function updateTransaction(
+  portfolioId: string,
+  transactionId: string,
+  data: TransactionUpdateData
+): Promise<Transaction> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/transactions/${transactionId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Transakce nenalezena');
+    }
+    throw new Error('Nepodařilo se upravit transakci');
+  }
+  
+  const raw = await response.json();
+  return {
+    id: raw.id,
+    portfolioId: raw.portfolio_id,
+    ticker: raw.stocks?.ticker || '',
+    stockName: raw.stocks?.name || '',
+    type: raw.type,
+    shares: raw.shares,
+    price: raw.price_per_share,
+    total: raw.total_amount,
+    totalCzk: raw.total_amount * (raw.exchange_rate_to_czk || 1),
+    currency: raw.currency,
+    exchangeRate: raw.exchange_rate_to_czk,
+    fees: raw.fees,
+    date: raw.executed_at,
+    notes: raw.notes,
+  };
+}
+
+export async function deleteTransaction(
+  portfolioId: string,
+  transactionId: string
+): Promise<void> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/transactions/${transactionId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Transakce nenalezena');
+    }
+    if (response.status === 400) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Nelze smazat transakci');
+    }
+    throw new Error('Nepodařilo se smazat transakci');
   }
 }

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, AvailableLot
+from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot
 from app.core.auth import get_current_user_id
 from typing import List
 
@@ -121,3 +121,34 @@ async def recalculate_holdings(portfolio_id: str):
     Use this after migration to populate total_invested_czk.
     """
     return await portfolio_service.recalculate_all_holdings(portfolio_id)
+
+
+@router.put("/{portfolio_id}/transactions/{transaction_id}")
+async def update_transaction(
+    portfolio_id: str,
+    transaction_id: str,
+    data: TransactionUpdate
+):
+    """
+    Update an existing transaction.
+    Only certain fields can be updated: shares, price, currency, fees, notes, date.
+    """
+    result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    return result
+
+
+@router.delete("/{portfolio_id}/transactions/{transaction_id}")
+async def delete_transaction(portfolio_id: str, transaction_id: str):
+    """
+    Delete a transaction.
+    Warning: Cannot delete a BUY if shares from it have been sold.
+    """
+    try:
+        success = await portfolio_service.delete_transaction(portfolio_id, transaction_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Transakce nenalezena")
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -617,5 +617,108 @@ class PortfolioService:
             }, on_conflict="portfolio_id,stock_id") \
             .execute()
 
+    async def update_transaction(self, portfolio_id: str, transaction_id: str, data: 'TransactionUpdate') -> Optional[dict]:
+        """
+        Update a transaction. Only allows updating certain fields.
+        Recalculates holding after update.
+        """
+        # First get existing transaction to verify portfolio and get stock_id
+        existing = supabase.table("transactions") \
+            .select("*") \
+            .eq("id", transaction_id) \
+            .eq("portfolio_id", portfolio_id) \
+            .execute()
+        
+        if not existing.data:
+            return None
+        
+        tx = existing.data[0]
+        stock_id = tx["stock_id"]
+        
+        # Build update dict
+        update_data = {}
+        if data.shares is not None:
+            update_data["shares"] = data.shares
+            update_data["total_amount"] = data.shares * (data.price_per_share if data.price_per_share is not None else tx["price_per_share"])
+        if data.price_per_share is not None:
+            update_data["price_per_share"] = data.price_per_share
+            shares = data.shares if data.shares is not None else tx["shares"]
+            update_data["total_amount"] = shares * data.price_per_share
+        if data.currency is not None:
+            update_data["currency"] = data.currency
+        if data.exchange_rate_to_czk is not None:
+            update_data["exchange_rate_to_czk"] = data.exchange_rate_to_czk
+        if data.fees is not None:
+            update_data["fees"] = data.fees
+        if data.notes is not None:
+            update_data["notes"] = data.notes
+        if data.executed_at is not None:
+            update_data["executed_at"] = data.executed_at.isoformat()
+        
+        if not update_data:
+            return tx
+        
+        update_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        response = supabase.table("transactions") \
+            .update(update_data) \
+            .eq("id", transaction_id) \
+            .execute()
+        
+        # Recalculate holding
+        await self._recalculate_holding(portfolio_id, stock_id)
+        
+        return response.data[0] if response.data else None
+
+    async def delete_transaction(self, portfolio_id: str, transaction_id: str) -> bool:
+        """
+        Delete a transaction. Recalculates holding after deletion.
+        Warning: Deleting a BUY that has been sold from will cause issues.
+        """
+        # First get existing transaction to verify portfolio and get stock_id
+        existing = supabase.table("transactions") \
+            .select("*") \
+            .eq("id", transaction_id) \
+            .eq("portfolio_id", portfolio_id) \
+            .execute()
+        
+        if not existing.data:
+            return False
+        
+        tx = existing.data[0]
+        stock_id = tx["stock_id"]
+        
+        # Check if this is a BUY that has sells pointing to it
+        if tx["type"] == "BUY":
+            sells_from_lot = supabase.table("transactions") \
+                .select("id") \
+                .eq("source_transaction_id", transaction_id) \
+                .execute()
+            
+            if sells_from_lot.data:
+                raise ValueError("Nelze smazat nákup, ze kterého už byly prodány akcie")
+        
+        # Delete transaction
+        supabase.table("transactions") \
+            .delete() \
+            .eq("id", transaction_id) \
+            .execute()
+        
+        # Recalculate holding
+        await self._recalculate_holding(portfolio_id, stock_id)
+        
+        return True
+
+
+class TransactionUpdate(BaseModel):
+    """Update model for transactions - all fields optional."""
+    shares: Optional[float] = None
+    price_per_share: Optional[float] = None
+    currency: Optional[str] = None
+    exchange_rate_to_czk: Optional[float] = None
+    fees: Optional[float] = None
+    notes: Optional[str] = None
+    executed_at: Optional[datetime] = None
+
 
 portfolio_service = PortfolioService()

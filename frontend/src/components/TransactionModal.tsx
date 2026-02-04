@@ -18,7 +18,12 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { fetchStocks, type Stock } from '@/lib/api';
+import {
+  fetchStocks,
+  updateTransaction,
+  type Stock,
+  type Transaction,
+} from '@/lib/api';
 import { formatPrice, formatDate, formatNumber } from '@/lib/format';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -87,6 +92,8 @@ interface TransactionModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   preselectedTicker?: string;
+  /** Transaction to edit - if provided, modal is in edit mode */
+  editTransaction?: Transaction | null;
 }
 
 export function TransactionModal({
@@ -94,6 +101,7 @@ export function TransactionModal({
   onOpenChange,
   onSuccess,
   preselectedTicker,
+  editTransaction,
 }: TransactionModalProps) {
   const { activePortfolio, refresh } = usePortfolio();
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -107,7 +115,10 @@ export function TransactionModal({
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
   const [lotsLoading, setLotsLoading] = useState(false);
 
-  // Load stocks on open
+  // Check if we're in edit mode
+  const isEditMode = !!editTransaction;
+
+  // Load stocks on open or initialize edit form
   useEffect(() => {
     if (open) {
       loadStocks();
@@ -116,7 +127,22 @@ export function TransactionModal({
       setSellMode('entire');
       setSelectedLotId(null);
 
-      if (preselectedTicker) {
+      if (editTransaction) {
+        // Edit mode - populate form from transaction
+        setFormData({
+          stockTicker: editTransaction.ticker,
+          stockName: editTransaction.stockName,
+          type: editTransaction.type,
+          shares: editTransaction.shares,
+          pricePerShare: editTransaction.price,
+          currency: editTransaction.currency,
+          exchangeRateToCzk: editTransaction.exchangeRate || null,
+          fees: editTransaction.fees || 0,
+          notes: editTransaction.notes || '',
+          date: editTransaction.date.split('T')[0],
+          sourceTransactionId: editTransaction.sourceTransactionId || null,
+        });
+      } else if (preselectedTicker) {
         setFormData(() => ({
           ...EMPTY_FORM,
           stockTicker: preselectedTicker,
@@ -125,7 +151,7 @@ export function TransactionModal({
         setFormData(EMPTY_FORM);
       }
     }
-  }, [open, preselectedTicker]);
+  }, [open, preselectedTicker, editTransaction]);
 
   // Update currency when stock changes
   useEffect(() => {
@@ -258,7 +284,8 @@ export function TransactionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!activePortfolio) {
+    // Edit mode doesn't need portfolio (it's already set on the transaction)
+    if (!isEditMode && !activePortfolio) {
       setError('Vyberte portfolio');
       return;
     }
@@ -278,7 +305,12 @@ export function TransactionModal({
       return;
     }
 
-    if (formData.type === 'SELL' && formData.shares > maxSellQuantity) {
+    // Skip max quantity check in edit mode
+    if (
+      !isEditMode &&
+      formData.type === 'SELL' &&
+      formData.shares > maxSellQuantity
+    ) {
       setError(
         `Nemůžete prodat více akcií než máte k dispozici (${formatNumber(maxSellQuantity)})`,
       );
@@ -289,8 +321,24 @@ export function TransactionModal({
     setError(null);
 
     try {
-      // For "entire position" SELL, create separate transactions for each lot (FIFO)
-      if (
+      // EDIT MODE
+      if (isEditMode && editTransaction) {
+        await updateTransaction(
+          editTransaction.portfolioId,
+          editTransaction.id,
+          {
+            shares: formData.shares,
+            price_per_share: formData.pricePerShare,
+            currency: formData.currency,
+            exchange_rate_to_czk: formData.exchangeRateToCzk || undefined,
+            fees: formData.fees,
+            notes: formData.notes || undefined,
+            executed_at: new Date(formData.date).toISOString(),
+          },
+        );
+      }
+      // CREATE MODE - For "entire position" SELL, create separate transactions for each lot (FIFO)
+      else if (
         formData.type === 'SELL' &&
         sellMode === 'entire' &&
         availableLots.length > 0
@@ -388,7 +436,11 @@ export function TransactionModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Přidat transakci</DialogTitle>
+          <DialogTitle>
+            {isEditMode
+              ? `Upravit ${editTransaction?.type === 'BUY' ? 'nákup' : 'prodej'} ${editTransaction?.ticker}`
+              : 'Přidat transakci'}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -398,29 +450,40 @@ export function TransactionModal({
             </div>
           )}
 
-          {/* Transaction Type Toggle */}
-          <ToggleGroup
-            type="single"
-            value={formData.type}
-            onValueChange={(v) => v && handleTypeChange(v as TransactionType)}
-            className="w-full"
-          >
-            <ToggleGroupItem
-              value="BUY"
-              className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+          {/* Transaction Type Toggle - disabled in edit mode */}
+          {isEditMode ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+                {formData.type === 'BUY' ? 'BUY' : 'SELL'}
+              </span>
+              <span>{formData.stockTicker}</span>
+              <span className="text-muted-foreground/60">·</span>
+              <span>{formData.stockName}</span>
+            </div>
+          ) : (
+            <ToggleGroup
+              type="single"
+              value={formData.type}
+              onValueChange={(v) => v && handleTypeChange(v as TransactionType)}
+              className="w-full"
             >
-              NÁKUP
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="SELL"
-              className="flex-1 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
-            >
-              PRODEJ
-            </ToggleGroupItem>
-          </ToggleGroup>
+              <ToggleGroupItem
+                value="BUY"
+                className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+              >
+                NÁKUP
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="SELL"
+                className="flex-1 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
+              >
+                PRODEJ
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
 
-          {/* Portfolio info */}
-          {activePortfolio && (
+          {/* Portfolio info - only in create mode */}
+          {!isEditMode && activePortfolio && (
             <div className="text-sm text-muted-foreground">
               Portfolio:{' '}
               <span className="text-foreground font-medium">
@@ -429,27 +492,29 @@ export function TransactionModal({
             </div>
           )}
 
-          {/* Stock Select */}
-          <div className="space-y-2">
-            <Label>Akcie *</Label>
-            <Select
-              value={formData.stockTicker}
-              onValueChange={(v) =>
-                setFormData((prev) => ({ ...prev, stockTicker: v }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Vyberte akcii..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                {stockOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Stock Select - only in create mode */}
+          {!isEditMode && (
+            <div className="space-y-2">
+              <Label>Akcie *</Label>
+              <Select
+                value={formData.stockTicker}
+                onValueChange={(v) =>
+                  setFormData((prev) => ({ ...prev, stockTicker: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Vyberte akcii..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {stockOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* SELL Mode Selection */}
           {formData.type === 'SELL' && formData.stockTicker && (
@@ -714,12 +779,18 @@ export function TransactionModal({
               type="submit"
               disabled={
                 loading ||
-                (formData.type === 'SELL' && availableLots.length === 0)
+                (!isEditMode &&
+                  formData.type === 'SELL' &&
+                  availableLots.length === 0)
               }
             >
               {loading
-                ? 'Přidávám...'
-                : `Přidat ${formData.type === 'BUY' ? 'nákup' : 'prodej'}`}
+                ? isEditMode
+                  ? 'Ukládám...'
+                  : 'Přidávám...'
+                : isEditMode
+                  ? 'Uložit změny'
+                  : `Přidat ${formData.type === 'BUY' ? 'nákup' : 'prodej'}`}
             </Button>
           </div>
         </form>
