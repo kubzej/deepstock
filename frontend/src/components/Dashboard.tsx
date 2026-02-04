@@ -191,7 +191,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {/* Daily Change */}
           <div>
-            <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-0.5">
+            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
               Dnes
             </span>
             <span
@@ -212,7 +212,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
 
           {/* Total P/L */}
           <div>
-            <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-0.5">
+            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
               Celkem P/L
             </span>
             <span
@@ -233,7 +233,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
 
           {/* Invested */}
           <div>
-            <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-0.5">
+            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
               Investováno
             </span>
             <span className="text-lg font-mono-price font-semibold">
@@ -243,7 +243,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
 
           {/* Positions */}
           <div>
-            <span className="text-xs text-muted-foreground uppercase tracking-wide block mb-0.5">
+            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
               Pozice
             </span>
             <span className="text-lg font-mono-price font-semibold">

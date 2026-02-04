@@ -338,7 +338,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
         />
       </div>
 
-      {/* Stocks Table */}
+      {/* Stocks List */}
       <div>
         <h2 className="text-lg font-semibold mb-4">
           Seznam akcií ({stocks.length})
@@ -357,83 +357,154 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
               : 'Zatím nemáte žádné akcie'}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ticker</TableHead>
-                <TableHead>Název</TableHead>
-                <TableHead>Měna</TableHead>
-                <TableHead>Burza</TableHead>
-                <TableHead>Sektor</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* Desktop Table */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ticker</TableHead>
+                    <TableHead>Název</TableHead>
+                    <TableHead>Měna</TableHead>
+                    <TableHead>Burza</TableHead>
+                    <TableHead>Sektor</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stocks.map((stock) => (
+                    <TableRow
+                      key={stock.id}
+                      className={onStockClick ? 'cursor-pointer' : ''}
+                      onClick={() => onStockClick?.(stock.ticker)}
+                    >
+                      <TableCell className="font-mono font-medium">
+                        {stock.ticker}
+                      </TableCell>
+                      <TableCell>{stock.name}</TableCell>
+                      <TableCell>{stock.currency}</TableCell>
+                      <TableCell
+                        className={
+                          !stock.exchange ? 'text-muted-foreground' : ''
+                        }
+                      >
+                        {stock.exchange || '—'}
+                      </TableCell>
+                      <TableCell
+                        className={!stock.sector ? 'text-muted-foreground' : ''}
+                      >
+                        {stock.sector || '—'}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(stock);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Upravit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDeleteDialog(stock);
+                              }}
+                              className="text-rose-500"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Smazat
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile List */}
+            <div className="md:hidden space-y-1">
               {stocks.map((stock) => (
-                <TableRow
+                <div
                   key={stock.id}
-                  className={onStockClick ? 'cursor-pointer' : ''}
-                  onClick={() => onStockClick?.(stock.ticker)}
+                  className="flex items-center justify-between py-2.5 px-3 bg-muted/30 rounded-lg"
                 >
-                  <TableCell className="font-mono font-medium">
-                    {stock.ticker}
-                  </TableCell>
-                  <TableCell>{stock.name}</TableCell>
-                  <TableCell>{stock.currency}</TableCell>
-                  <TableCell
-                    className={!stock.exchange ? 'text-muted-foreground' : ''}
+                  {/* Left: Stock info */}
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer overflow-hidden"
+                    onClick={() => onStockClick?.(stock.ticker)}
                   >
-                    {stock.exchange || '—'}
-                  </TableCell>
-                  <TableCell
-                    className={!stock.sector ? 'text-muted-foreground' : ''}
-                  >
-                    {stock.sector || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(stock);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Upravit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteDialog(stock);
-                          }}
-                          className="text-rose-500"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Smazat
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono font-bold text-sm flex-shrink-0">
+                        {stock.ticker}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {stock.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground/60 truncate">
+                      <span className="flex-shrink-0">{stock.currency}</span>
+                      {stock.exchange && (
+                        <span className="flex-shrink-0">
+                          • {stock.exchange}
+                        </span>
+                      )}
+                      {stock.sector && (
+                        <span className="truncate text-muted-foreground/40">
+                          • {stock.sector}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditDialog(stock);
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-rose-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeleteDialog(stock);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
       </div>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
           </DialogHeader>
@@ -446,7 +517,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             )}
 
             {/* Row 1: Ticker + Name */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="ticker">Ticker *</Label>
                 <Input
@@ -474,7 +545,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             </div>
 
             {/* Row 2: Sector + Exchange */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="sector">Sektor</Label>
                 <Input
@@ -509,7 +580,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             </div>
 
             {/* Row 3: Currency + Country */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Měna</Label>
                 <Select
@@ -542,7 +613,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             </div>
 
             {/* Row 4: Price Scale */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price_scale">Cenový poměr</Label>
                 <Input

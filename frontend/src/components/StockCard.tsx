@@ -136,7 +136,7 @@ export function StockCard({
         >
           <div className="overflow-hidden">
             {sector && (
-              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide mb-2">
+              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wide mb-2">
                 {sector}
               </p>
             )}
@@ -202,7 +202,7 @@ export function StockCard({
             {/* Portfolio Breakdown (for "All portfolios" view) */}
             {hasPortfolioBreakdown && (
               <div className="mt-3 pt-3 border-t border-border/30">
-                <span className="text-[10px] text-muted-foreground/50 uppercase tracking-wide block mb-2">
+                <span className="text-[11px] text-muted-foreground/60 uppercase tracking-wide block mb-2">
                   Portfolia
                 </span>
                 <div className="space-y-1.5">

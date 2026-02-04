@@ -36,9 +36,16 @@ import {
 interface StockDetailProps {
   ticker: string;
   onBack: () => void;
+  onEdit?: (stock: Stock) => void;
+  onDelete?: (stock: Stock) => void;
 }
 
-export function StockDetail({ ticker, onBack }: StockDetailProps) {
+export function StockDetail({
+  ticker,
+  onBack,
+  onEdit,
+  onDelete,
+}: StockDetailProps) {
   const {
     portfolio,
     getHoldingByTicker,
@@ -161,7 +168,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-4 md:p-6">
+      <div className="pb-24 md:pb-6">
         <Button
           variant="ghost"
           size="sm"
@@ -184,7 +191,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
   // Error state
   if (stockError || !stock) {
     return (
-      <div className="min-h-screen bg-background p-4">
+      <div className="pb-24 md:pb-6">
         <Button
           variant="ghost"
           size="sm"
@@ -236,19 +243,29 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
     : null;
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-6">
+    <div className="pb-24 md:pb-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
           <ArrowLeft className="w-4 h-4 mr-1" />
           Zpět
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => stock && onEdit?.(stock)}
+            disabled={!onEdit}
+          >
             <Pencil className="w-4 h-4 mr-1" />
             Upravit
           </Button>
-          <Button variant="destructive" size="sm">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => stock && onDelete?.(stock)}
+            disabled={!onDelete}
+          >
             <Trash2 className="w-4 h-4 mr-1" />
             Smazat
           </Button>
@@ -307,23 +324,20 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
 
       {/* Notes */}
       {stock?.notes && (
-        <div className="mb-6 p-4 rounded-lg border border-border bg-muted/30">
-          <p className="text-xs uppercase text-muted-foreground mb-2">
-            Poznámky
-          </p>
-          <p className="text-sm leading-relaxed">{stock.notes}</p>
-        </div>
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+          {stock.notes}
+        </p>
       )}
 
       {/* Position Stats */}
       {position && positionCzk && (
         <div className="mb-8">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-4">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Vaše pozice
           </h2>
           <div className="flex flex-wrap gap-x-8 gap-y-4">
             <div>
-              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                 Počet akcií
               </p>
               <p className="text-lg font-mono-price font-semibold">
@@ -331,7 +345,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                 Průměrná cena
               </p>
               <p className="text-lg font-mono-price font-semibold">
@@ -339,7 +353,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                 Investováno
               </p>
               <p className="text-lg font-mono-price font-semibold">
@@ -347,7 +361,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                 Aktuální hodnota
               </p>
               <p className="text-lg font-mono-price font-semibold">
@@ -355,7 +369,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground uppercase mb-0.5">
+              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
                 P/L
               </p>
               <p
@@ -384,8 +398,8 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
 
       {/* Transactions */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Transakce ({transactions.length})
           </h2>
         </div>
@@ -493,16 +507,9 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
                         </TableCell>
                       )}
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            isBuy
-                              ? 'border-rose-600/50 text-rose-500 bg-rose-500/10'
-                              : 'border-emerald-600/50 text-emerald-500 bg-emerald-500/10'
-                          }`}
-                        >
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
                           {isBuy ? 'BUY' : 'SELL'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {lotInfo}

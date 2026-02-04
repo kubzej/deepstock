@@ -151,7 +151,7 @@ function LotCard({
         >
           <div className="overflow-hidden">
             {showPortfolio && lot.portfolioName && (
-              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wide mb-2">
+              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wide mb-2">
                 {lot.portfolioName}
               </p>
             )}
@@ -308,7 +308,7 @@ export function OpenLotsRanking({
     className = '',
   ) => (
     <TableHead
-      className={`text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none ${className}`}
+      className={`text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none ${className}`}
       onClick={() => handleSort(columnKey)}
     >
       {label}

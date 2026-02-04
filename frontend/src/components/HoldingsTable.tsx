@@ -326,7 +326,7 @@ export function HoldingsTable({
     className = '',
   ) => (
     <TableHead
-      className={`text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none ${className}`}
+      className={`text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none ${className}`}
       onClick={() => handleSort(columnKey)}
     >
       {label}
@@ -371,7 +371,9 @@ export function HoldingsTable({
                 'text-right w-[100px]',
               )}
               {renderSortableHeader('Váha', 'weight', 'text-right w-[70px]')}
-              <TableHead className="text-muted-foreground">Sektor</TableHead>
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                Sektor
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

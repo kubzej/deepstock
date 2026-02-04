@@ -6,13 +6,30 @@ import { Dashboard } from '@/components/Dashboard';
 import { StockDetail } from '@/components/StockDetail';
 import { PortfolioManager } from '@/components/PortfolioManager';
 import { TransactionModal } from '@/components/TransactionModal';
+import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
+import { deleteStock } from '@/lib/api';
+import type { Stock } from '@/lib/api';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 function App() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+
+  // Stock edit/delete state
+  const [editStock, setEditStock] = useState<Stock | null>(null);
+  const [deleteStockData, setDeleteStockData] = useState<Stock | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   // Show loading while checking auth
   if (loading) {
@@ -46,11 +63,90 @@ function App() {
     setSelectedTicker(null); // Reset stock detail when navigating via menu
   };
 
+  // Stock edit handlers
+  const handleEditStock = (stock: Stock) => {
+    setEditStock(stock);
+  };
+
+  const handleEditSuccess = () => {
+    // Refresh the page to show updated data
+    const ticker = editStock?.ticker;
+    setEditStock(null);
+    if (ticker) {
+      setSelectedTicker(null);
+      setTimeout(() => setSelectedTicker(ticker), 100);
+    }
+  };
+
+  // Stock delete handlers
+  const handleDeleteStock = (stock: Stock) => {
+    setDeleteStockData(stock);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteStockData) return;
+    setDeleteSaving(true);
+    try {
+      await deleteStock(deleteStockData.id);
+      setDeleteStockData(null);
+      setSelectedTicker(null);
+      setActiveTab('stocks');
+    } catch (err) {
+      console.error('Delete failed:', err);
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
   // If viewing stock detail
   if (selectedTicker) {
     return (
       <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
-        <StockDetail ticker={selectedTicker} onBack={handleBackFromDetail} />
+        <StockDetail
+          ticker={selectedTicker}
+          onBack={handleBackFromDetail}
+          onEdit={handleEditStock}
+          onDelete={handleDeleteStock}
+        />
+
+        {/* Edit Stock Dialog */}
+        <StockFormDialog
+          stock={editStock}
+          open={!!editStock}
+          onOpenChange={(open) => !open && setEditStock(null)}
+          onSuccess={handleEditSuccess}
+        />
+
+        {/* Delete Stock Dialog */}
+        <Dialog
+          open={!!deleteStockData}
+          onOpenChange={(open) => !open && setDeleteStockData(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Smazat {deleteStockData?.ticker}?</DialogTitle>
+              <DialogDescription>
+                Tato akce je nevratná. Smazáním akcie smažete i všechny
+                transakce a holdings s ní spojené.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteStockData(null)}
+              >
+                Zrušit
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleteSaving}
+              >
+                {deleteSaving ? 'Mažu...' : 'Smazat'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </AppLayout>
     );
   }
