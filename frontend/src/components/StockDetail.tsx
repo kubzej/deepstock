@@ -18,7 +18,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { fetchStock, fetchQuotes, fetchTransactions } from '@/lib/api';
+import {
+  fetchStock,
+  fetchQuotes,
+  fetchTransactions,
+  fetchAllTransactions,
+} from '@/lib/api';
 import type { Stock, Quote, Transaction } from '@/lib/api';
 import {
   formatCurrency,
@@ -40,6 +45,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
     quotes: portfolioQuotes,
     rates,
     loading: portfolioLoading,
+    isAllPortfolios,
   } = usePortfolio();
 
   // Stock master data from API
@@ -77,10 +83,16 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
   // Load transactions
   useEffect(() => {
     const loadTransactions = async () => {
-      if (!portfolio?.id) return;
+      // Need either specific portfolio or "all portfolios" mode
+      if (!portfolio?.id && !isAllPortfolios) return;
       try {
         setTransactionsLoading(true);
-        const data = await fetchTransactions(portfolio.id, 100);
+        let data;
+        if (isAllPortfolios) {
+          data = await fetchAllTransactions(100);
+        } else {
+          data = await fetchTransactions(portfolio!.id, 100);
+        }
         // Filter transactions for this ticker
         const tickerTransactions = data.filter((t) => t.ticker === ticker);
         setTransactions(tickerTransactions);
@@ -91,7 +103,7 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
       }
     };
     loadTransactions();
-  }, [portfolio?.id, ticker]);
+  }, [portfolio?.id, ticker, isAllPortfolios]);
 
   // Load quote if not available from portfolio context
   useEffect(() => {
@@ -393,6 +405,11 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
                   <TableHead className="text-xs uppercase text-muted-foreground">
                     Datum
                   </TableHead>
+                  {isAllPortfolios && (
+                    <TableHead className="text-xs uppercase text-muted-foreground">
+                      Portfolio
+                    </TableHead>
+                  )}
                   <TableHead className="text-xs uppercase text-muted-foreground">
                     Typ
                   </TableHead>
@@ -465,6 +482,16 @@ export function StockDetail({ ticker, onBack }: StockDetailProps) {
                       <TableCell className="font-mono-price text-sm">
                         {formatDate(tx.date)}
                       </TableCell>
+                      {isAllPortfolios && (
+                        <TableCell className="text-sm">
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-normal"
+                          >
+                            {tx.portfolioName}
+                          </Badge>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Badge
                           variant="outline"

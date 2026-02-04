@@ -25,6 +25,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     error,
     refresh,
     lastFetched,
+    isAllPortfolios,
   } = usePortfolio();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -56,6 +57,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
       sector: h.sector || '',
       totalInvestedCzk: h.total_invested_czk,
       priceScale: h.price_scale ?? 1,
+      portfolioName: h.portfolio_name,
     }));
   }, [holdings]);
 
@@ -156,7 +158,9 @@ export function Dashboard({ onStockClick }: DashboardProps) {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-1">
           <p className="text-muted-foreground text-sm">
-            {portfolio?.name ?? 'Portfolio'}
+            {isAllPortfolios
+              ? 'Všechna portfolia'
+              : (portfolio?.name ?? 'Portfolio')}
           </p>
           <div className="flex items-center gap-2">
             {lastFetchedText && (
@@ -262,6 +266,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
             quotes={quotes}
             rates={rates}
             onRowClick={onStockClick}
+            showPortfolioColumn={isAllPortfolios}
           />
         </TabsContent>
 
@@ -271,6 +276,7 @@ export function Dashboard({ onStockClick }: DashboardProps) {
               lots={lotsWithPrices}
               rates={rates}
               onLotClick={onStockClick}
+              showPortfolioColumn={isAllPortfolios}
             />
           ) : (
             <div className="text-center py-12 text-muted-foreground">

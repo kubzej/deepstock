@@ -18,6 +18,37 @@ async def create_portfolio(data: PortfolioCreate, user_id: str = Depends(get_cur
     return await portfolio_service.create_portfolio(user_id, data)
 
 
+# ============ "All portfolios" endpoints - MUST be before /{portfolio_id}/* routes ============
+
+@router.get("/all/holdings")
+async def get_all_holdings(user_id: str = Depends(get_current_user_id)):
+    """Get all holdings across all user's portfolios."""
+    return await portfolio_service.get_all_holdings(user_id)
+
+
+@router.get("/all/transactions")
+async def get_all_transactions(user_id: str = Depends(get_current_user_id), limit: int = 100):
+    """Get transactions across all user's portfolios."""
+    return await portfolio_service.get_all_transactions(user_id, limit)
+
+
+@router.get("/all/open-lots")
+async def get_all_open_lots_for_user(user_id: str = Depends(get_current_user_id)):
+    """Get all open lots across all user's portfolios."""
+    return await portfolio_service.get_all_open_lots_for_user(user_id)
+
+
+@router.post("/admin/recalculate-all")
+async def recalculate_all_portfolios():
+    """
+    Recalculate all holdings across ALL portfolios.
+    One-time use after migration.
+    """
+    return await portfolio_service.recalculate_all_portfolios()
+
+
+# ============ Single portfolio endpoints ============
+
 @router.put("/{portfolio_id}")
 async def update_portfolio(
     portfolio_id: str, 
@@ -90,12 +121,3 @@ async def recalculate_holdings(portfolio_id: str):
     Use this after migration to populate total_invested_czk.
     """
     return await portfolio_service.recalculate_all_holdings(portfolio_id)
-
-
-@router.post("/admin/recalculate-all")
-async def recalculate_all_portfolios():
-    """
-    Recalculate all holdings across ALL portfolios.
-    One-time use after migration.
-    """
-    return await portfolio_service.recalculate_all_portfolios()

@@ -8,10 +8,12 @@ import {
 import {
   fetchPortfolios,
   fetchHoldings,
+  fetchAllHoldings,
   createPortfolio,
   fetchQuotes,
   fetchExchangeRates,
   fetchOpenLots,
+  fetchAllOpenLots,
   DEFAULT_RATES,
   type Portfolio,
   type Holding,
@@ -43,10 +45,13 @@ interface PortfolioContextType {
   loading: boolean;
   error: string | null;
   lastFetched: Date | null;
+  /** True when viewing all portfolios combined */
+  isAllPortfolios: boolean;
 
   // Actions
   refresh: () => Promise<void>;
-  setActivePortfolio: (portfolioId: string) => Promise<void>;
+  /** Set active portfolio. Use null for "All portfolios" */
+  setActivePortfolio: (portfolioId: string | null) => Promise<void>;
   getHoldingByTicker: (ticker: string) => HoldingWithPrice | undefined;
 }
 
@@ -69,6 +74,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [isAllPortfolios, setIsAllPortfolios] = useState(false);
 
   const loadPortfolio = useCallback(
     async (force = false) => {
@@ -158,40 +164,109 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   }, [loadPortfolio]);
 
   const getHoldingByTicker = useCallback(
-    (ticker: string) => holdings.find((h) => h.ticker === ticker),
+    (ticker: string): HoldingWithPrice | undefined => {
+      const matchingHoldings = holdings.filter((h) => h.ticker === ticker);
+
+      if (matchingHoldings.length === 0) return undefined;
+      if (matchingHoldings.length === 1) return matchingHoldings[0];
+
+      // Aggregate multiple holdings (same ticker from different portfolios)
+      const first = matchingHoldings[0];
+      const totalShares = matchingHoldings.reduce(
+        (sum, h) => sum + h.shares,
+        0,
+      );
+      const totalInvested = matchingHoldings.reduce(
+        (sum, h) => sum + h.avg_cost * h.shares,
+        0,
+      );
+
+      return {
+        ...first,
+        shares: totalShares,
+        avg_cost: totalShares > 0 ? totalInvested / totalShares : 0,
+        total_invested_czk: matchingHoldings.reduce(
+          (sum, h) => sum + (h.total_invested_czk || 0),
+          0,
+        ),
+        // Keep portfolio info undefined for aggregated holdings
+        portfolio_id: undefined,
+        portfolio_name: undefined,
+      };
+    },
     [holdings],
   );
 
   const setActivePortfolio = useCallback(
-    async (portfolioId: string) => {
-      const selected = portfolios.find((p) => p.id === portfolioId);
-      if (!selected) return;
-
-      setPortfolio(selected);
+    async (portfolioId: string | null) => {
       setLoading(true);
 
       try {
-        // Fetch holdings for the selected portfolio
-        const holdingsData = await fetchHoldings(portfolioId);
+        if (portfolioId === null) {
+          // "All portfolios" mode
+          setIsAllPortfolios(true);
+          setPortfolio(null);
 
-        let quotesData: Record<string, Quote> = {};
-        if (holdingsData.length > 0) {
-          const tickers = holdingsData.map((h) => h.ticker);
-          quotesData = await fetchQuotes(tickers);
+          // Fetch holdings and open lots from all portfolios
+          const [holdingsData, lotsData] = await Promise.all([
+            fetchAllHoldings(),
+            fetchAllOpenLots(),
+          ]);
+
+          let quotesData: Record<string, Quote> = {};
+          if (holdingsData.length > 0) {
+            const tickers = [...new Set(holdingsData.map((h) => h.ticker))];
+            quotesData = await fetchQuotes(tickers);
+          }
+
+          setQuotes(quotesData);
+
+          const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map(
+            (h) => ({
+              ...h,
+              currentPrice: quotesData[h.ticker]?.price,
+              dailyChange: quotesData[h.ticker]?.change,
+              dailyChangePercent: quotesData[h.ticker]?.changePercent,
+            }),
+          );
+
+          setHoldings(holdingsWithPrices);
+          setOpenLots(lotsData);
+        } else {
+          // Single portfolio mode
+          const selected = portfolios.find((p) => p.id === portfolioId);
+          if (!selected) return;
+
+          setIsAllPortfolios(false);
+          setPortfolio(selected);
+
+          // Fetch holdings for the selected portfolio
+          const [holdingsData, lotsData] = await Promise.all([
+            fetchHoldings(portfolioId),
+            fetchOpenLots(portfolioId),
+          ]);
+
+          setOpenLots(lotsData);
+
+          let quotesData: Record<string, Quote> = {};
+          if (holdingsData.length > 0) {
+            const tickers = holdingsData.map((h) => h.ticker);
+            quotesData = await fetchQuotes(tickers);
+          }
+
+          setQuotes(quotesData);
+
+          const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map(
+            (h) => ({
+              ...h,
+              currentPrice: quotesData[h.ticker]?.price,
+              dailyChange: quotesData[h.ticker]?.change,
+              dailyChangePercent: quotesData[h.ticker]?.changePercent,
+            }),
+          );
+
+          setHoldings(holdingsWithPrices);
         }
-
-        setQuotes(quotesData);
-
-        const holdingsWithPrices: HoldingWithPrice[] = holdingsData.map(
-          (h) => ({
-            ...h,
-            currentPrice: quotesData[h.ticker]?.price,
-            dailyChange: quotesData[h.ticker]?.change,
-            dailyChangePercent: quotesData[h.ticker]?.changePercent,
-          }),
-        );
-
-        setHoldings(holdingsWithPrices);
       } catch (err) {
         console.error('Failed to load portfolio:', err);
         setError(
@@ -218,6 +293,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     loading,
     error,
     lastFetched,
+    isAllPortfolios,
     refresh: forceRefresh,
     setActivePortfolio,
     getHoldingByTicker,

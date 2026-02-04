@@ -29,6 +29,7 @@ export interface Holding {
   sector?: string;
   priceScale?: number;
   totalInvestedCzk?: number;
+  portfolioName?: string;
 }
 
 type SortKey =
@@ -70,6 +71,7 @@ interface HoldingsTableProps {
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
   onRowClick?: (ticker: string) => void;
+  showPortfolioColumn?: boolean;
 }
 
 export function HoldingsTable({
@@ -77,6 +79,7 @@ export function HoldingsTable({
   quotes,
   rates,
   onRowClick,
+  showPortfolioColumn = false,
 }: HoldingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -224,6 +227,11 @@ export function HoldingsTable({
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
               {renderSortableHeader('Akcie', 'ticker', 'w-[140px]')}
+              {showPortfolioColumn && (
+                <TableHead className="text-muted-foreground w-[120px]">
+                  Portfolio
+                </TableHead>
+              )}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[70px]')}
               {renderSortableHeader('Cena', 'price', 'text-right w-[90px]')}
               {renderSortableHeader(
@@ -259,7 +267,7 @@ export function HoldingsTable({
 
               return (
                 <TableRow
-                  key={holding.ticker}
+                  key={`${holding.ticker}-${holding.portfolioName || 'default'}`}
                   className="cursor-pointer hover:bg-muted/50 border-border"
                   onClick={() => onRowClick?.(holding.ticker)}
                 >
@@ -271,6 +279,11 @@ export function HoldingsTable({
                       </p>
                     </div>
                   </TableCell>
+                  {showPortfolioColumn && (
+                    <TableCell className="text-muted-foreground text-sm truncate max-w-[120px]">
+                      {holding.portfolioName || '—'}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right font-mono-price">
                     {formatNumber(holding.shares, 2)}
                   </TableCell>
@@ -333,7 +346,7 @@ export function HoldingsTable({
       <div className="md:hidden space-y-3">
         {sortedHoldings.map((holding) => (
           <StockCard
-            key={holding.ticker}
+            key={`${holding.ticker}-${holding.portfolioName || 'default'}`}
             ticker={holding.ticker}
             name={holding.name}
             quote={holding.quote ?? null}
@@ -341,6 +354,9 @@ export function HoldingsTable({
             avgCost={holding.avgCost}
             valueCzk={holding.currentValueCzk}
             investedCzk={holding.investedCzk}
+            portfolioName={
+              showPortfolioColumn ? holding.portfolioName : undefined
+            }
             onClick={() => onRowClick?.(holding.ticker)}
           />
         ))}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { Plus, Pencil, Trash2, MoreHorizontal, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,8 +32,14 @@ interface PortfolioFormData {
 }
 
 export function PortfolioManager() {
-  const { portfolios, portfolio, loading, refresh, setActivePortfolio } =
-    usePortfolio();
+  const {
+    portfolios,
+    portfolio,
+    loading,
+    refresh,
+    setActivePortfolio,
+    isAllPortfolios,
+  } = usePortfolio();
 
   // Dialog states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -160,15 +166,31 @@ export function PortfolioManager() {
         </div>
       ) : (
         <div className="divide-y divide-border rounded-lg border mb-8">
+          {/* All portfolios option */}
+          <div
+            className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${isAllPortfolios ? 'bg-muted/30' : ''}`}
+            onClick={() => setActivePortfolio(null)}
+          >
+            <div className="flex items-center gap-3">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Všechna portfolia</span>
+              {isAllPortfolios && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
+                  Aktivní
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Individual portfolios */}
           {portfolios.map((p) => (
             <div
               key={p.id}
-              className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${p.id === portfolio?.id ? 'bg-muted/30' : ''}`}
+              className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${!isAllPortfolios && p.id === portfolio?.id ? 'bg-muted/30' : ''}`}
               onClick={() => setActivePortfolio(p.id)}
             >
               <div className="flex items-center gap-3">
                 <span className="font-medium">{p.name}</span>
-                {p.id === portfolio?.id && (
+                {!isAllPortfolios && p.id === portfolio?.id && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">
                     Aktivní
                   </span>

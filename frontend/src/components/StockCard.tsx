@@ -11,6 +11,7 @@ interface StockCardProps {
   avgCost?: number;
   valueCzk?: number;
   investedCzk?: number;
+  portfolioName?: string;
   onClick?: () => void;
 }
 
@@ -22,6 +23,7 @@ export function StockCard({
   avgCost,
   valueCzk,
   investedCzk,
+  portfolioName,
   onClick,
 }: StockCardProps) {
   const isDayPositive = quote && quote.changePercent >= 0;
@@ -46,6 +48,11 @@ export function StockCard({
               <p className="text-xs text-muted-foreground truncate max-w-[120px]">
                 {name || ticker}
               </p>
+              {portfolioName && (
+                <p className="text-xs text-muted-foreground/70 truncate max-w-[120px]">
+                  {portfolioName}
+                </p>
+              )}
             </div>
           </div>
 

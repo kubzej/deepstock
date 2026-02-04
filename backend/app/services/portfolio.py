@@ -145,6 +145,152 @@ class PortfolioService:
         
         return {"portfolios": len(portfolios.data), "holdings_recalculated": total}
     
+    async def get_all_holdings(self, user_id: str) -> List[dict]:
+        """Get all holdings across all user's portfolios with portfolio info."""
+        # First get user's portfolio IDs
+        portfolios = await self.get_user_portfolios(user_id)
+        if not portfolios:
+            return []
+        
+        portfolio_ids = [p["id"] for p in portfolios]
+        portfolio_names = {p["id"]: p["name"] for p in portfolios}
+        
+        # Get holdings for all portfolios
+        response = supabase.table("holdings") \
+            .select("*, stocks(ticker, name, currency, sector, price_scale), portfolios(name)") \
+            .in_("portfolio_id", portfolio_ids) \
+            .gt("shares", 0) \
+            .execute()
+        
+        # Add portfolio_name to each holding
+        for h in response.data:
+            h["portfolio_name"] = portfolio_names.get(h["portfolio_id"], "")
+        
+        return response.data
+    
+    async def get_all_transactions(self, user_id: str, limit: int = 100) -> List[dict]:
+        """Get transactions across all user's portfolios."""
+        # First get user's portfolio IDs
+        portfolios = await self.get_user_portfolios(user_id)
+        if not portfolios:
+            return []
+        
+        portfolio_ids = [p["id"] for p in portfolios]
+        portfolio_names = {p["id"]: p["name"] for p in portfolios}
+        
+        # Get transactions with portfolio info
+        response = supabase.table("transactions") \
+            .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares), portfolios(name)") \
+            .in_("portfolio_id", portfolio_ids) \
+            .order("executed_at", desc=True) \
+            .limit(limit) \
+            .execute()
+        
+        # Add portfolio_name to each transaction
+        for tx in response.data:
+            tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
+        
+        return response.data
+    
+    async def get_all_open_lots_for_user(self, user_id: str) -> List[dict]:
+        """
+        Get all open lots across ALL user's portfolios.
+        Returns BUY transactions with remaining shares, enriched with stock info and portfolio name.
+        """
+        # Get user's portfolios
+        portfolios = await self.get_user_portfolios(user_id)
+        if not portfolios:
+            return []
+        
+        portfolio_ids = [p["id"] for p in portfolios]
+        portfolio_names = {p["id"]: p["name"] for p in portfolios}
+        
+        # Get all BUY transactions across all portfolios
+        buy_response = supabase.table("transactions") \
+            .select("*, stocks(ticker, name, currency, price_scale)") \
+            .in_("portfolio_id", portfolio_ids) \
+            .eq("type", "BUY") \
+            .order("executed_at", desc=False) \
+            .execute()
+        
+        buy_transactions = buy_response.data or []
+        
+        # Get all SELL transactions with source_transaction_id
+        sell_response = supabase.table("transactions") \
+            .select("source_transaction_id, shares") \
+            .in_("portfolio_id", portfolio_ids) \
+            .eq("type", "SELL") \
+            .not_.is_("source_transaction_id", "null") \
+            .execute()
+        
+        sell_transactions = sell_response.data or []
+        
+        # Calculate sold quantities per lot
+        sold_per_lot: dict[str, float] = {}
+        for sell in sell_transactions:
+            if sell.get("source_transaction_id"):
+                lot_id = sell["source_transaction_id"]
+                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
+        
+        # Handle FIFO sells per stock per portfolio
+        fifo_sell_response = supabase.table("transactions") \
+            .select("stock_id, portfolio_id, shares") \
+            .in_("portfolio_id", portfolio_ids) \
+            .eq("type", "SELL") \
+            .is_("source_transaction_id", "null") \
+            .execute()
+        
+        # Key: (stock_id, portfolio_id) -> sold amount
+        fifo_sells_per_stock: dict[tuple, float] = {}
+        for sell in (fifo_sell_response.data or []):
+            key = (sell["stock_id"], sell["portfolio_id"])
+            fifo_sells_per_stock[key] = fifo_sells_per_stock.get(key, 0) + float(sell["shares"])
+        
+        # Group buys by (stock_id, portfolio_id) for FIFO processing
+        buys_by_key: dict[tuple, list] = {}
+        for buy in buy_transactions:
+            key = (buy["stock_id"], buy["portfolio_id"])
+            if key not in buys_by_key:
+                buys_by_key[key] = []
+            buys_by_key[key].append(buy)
+        
+        # Apply FIFO sells to lots
+        for key, fifo_sold in fifo_sells_per_stock.items():
+            remaining_to_sell = fifo_sold
+            for buy in buys_by_key.get(key, []):
+                if remaining_to_sell <= 0:
+                    break
+                already_sold = sold_per_lot.get(buy["id"], 0)
+                available = float(buy["shares"]) - already_sold
+                if available > 0:
+                    sell_from_this = min(available, remaining_to_sell)
+                    sold_per_lot[buy["id"]] = already_sold + sell_from_this
+                    remaining_to_sell -= sell_from_this
+        
+        # Build open lots with remaining shares
+        open_lots = []
+        for buy in buy_transactions:
+            sold_from_lot = sold_per_lot.get(buy["id"], 0)
+            remaining = float(buy["shares"]) - sold_from_lot
+            
+            if remaining > 0.0001:  # Small threshold for floating point
+                stock_info = buy.get("stocks", {})
+                price_scale_raw = stock_info.get("price_scale")
+                price_scale = float(price_scale_raw) if price_scale_raw else 1.0
+                open_lots.append({
+                    "id": buy["id"],
+                    "ticker": stock_info.get("ticker", ""),
+                    "stockName": stock_info.get("name", ""),
+                    "date": buy["executed_at"][:10] if buy["executed_at"] else "",
+                    "shares": remaining,
+                    "buyPrice": float(buy["price_per_share"]),
+                    "currency": stock_info.get("currency") or buy.get("currency") or "USD",
+                    "priceScale": price_scale,
+                    "portfolioName": portfolio_names.get(buy["portfolio_id"], ""),
+                })
+        
+        return open_lots
+
     async def get_transactions(self, portfolio_id: str, limit: int = 50, stock_id: str = None) -> List[dict]:
         """Get recent transactions for a portfolio, optionally filtered by stock."""
         # Include source_transaction for SELL transactions (to show lot info and P/L)

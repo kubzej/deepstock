@@ -57,6 +57,9 @@ export interface Holding {
   current_value?: number;
   unrealized_pnl?: number;
   unrealized_pnl_pct?: number;
+  // For "All portfolios" view
+  portfolio_id?: string;
+  portfolio_name?: string;
 }
 
 // Raw transaction from API
@@ -113,6 +116,8 @@ export interface Transaction {
   // For SELL: source lot transaction ID and full object
   sourceTransactionId?: string;
   sourceTransaction?: SourceTransaction;
+  // For "All portfolios" view
+  portfolioName?: string;
 }
 
 // ============ Market Endpoints ============
@@ -251,6 +256,7 @@ export interface OpenLot {
   buyPrice: number;
   currency: string;
   priceScale?: number;
+  portfolioName?: string;
 }
 
 export async function fetchOpenLots(portfolioId: string): Promise<OpenLot[]> {
@@ -267,6 +273,25 @@ export async function fetchOpenLots(portfolioId: string): Promise<OpenLot[]> {
       throw new Error('Unauthorized');
     }
     throw new Error('Failed to fetch open lots');
+  }
+  
+  return response.json();
+}
+
+export async function fetchAllOpenLots(): Promise<OpenLot[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/all/open-lots`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch all open lots');
   }
   
   return response.json();
@@ -312,6 +337,101 @@ export async function fetchTransactions(portfolioId: string, limit: number = 50)
       currency: tx.source_transaction.currency,
       shares: tx.source_transaction.shares,
     } : undefined,
+  }));
+}
+
+// ============ All Portfolios API ============
+
+interface AllHoldingsRaw {
+  stocks: { 
+    ticker: string; 
+    name: string; 
+    currency: string; 
+    sector?: string; 
+    price_scale?: string | number;
+  };
+  shares: number;
+  avg_cost_per_share: number;
+  total_invested_czk?: number;
+  portfolio_id: string;
+  portfolio_name: string;
+}
+
+export async function fetchAllHoldings(): Promise<Holding[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/all/holdings`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch all holdings');
+  }
+  
+  const data: AllHoldingsRaw[] = await response.json();
+  return data.map((h) => ({
+    ticker: h.stocks.ticker,
+    name: h.stocks.name,
+    shares: h.shares,
+    avg_cost: h.avg_cost_per_share,
+    currency: h.stocks.currency || 'USD',
+    sector: h.stocks.sector || '',
+    price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
+    total_invested_czk: h.total_invested_czk,
+    portfolio_id: h.portfolio_id,
+    portfolio_name: h.portfolio_name,
+  }));
+}
+
+interface AllTransactionsRaw extends TransactionRaw {
+  portfolio_name: string;
+}
+
+export async function fetchAllTransactions(limit: number = 100): Promise<Transaction[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/all/transactions?limit=${limit}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Failed to fetch all transactions');
+  }
+  
+  const raw: AllTransactionsRaw[] = await response.json();
+  
+  return raw.map((tx) => ({
+    id: tx.id,
+    portfolio_id: tx.portfolio_id,
+    ticker: tx.stocks?.ticker || 'UNKNOWN',
+    stockName: tx.stocks?.name || '',
+    type: tx.type,
+    shares: tx.shares,
+    price: tx.price_per_share,
+    total: tx.total_amount,
+    totalCzk: tx.total_amount_czk || 0,
+    currency: tx.currency,
+    date: tx.executed_at,
+    notes: tx.notes,
+    sourceTransactionId: tx.source_transaction_id,
+    sourceTransaction: tx.source_transaction ? {
+      id: tx.source_transaction.id,
+      date: tx.source_transaction.executed_at,
+      price: tx.source_transaction.price_per_share,
+      currency: tx.source_transaction.currency,
+      shares: tx.source_transaction.shares,
+    } : undefined,
+    portfolioName: tx.portfolio_name,
   }));
 }
 

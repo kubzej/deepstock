@@ -28,6 +28,7 @@ export interface OpenLot {
   currentPrice: number;
   currency: string;
   priceScale?: number;
+  portfolioName?: string;
 }
 
 type SortKey =
@@ -65,6 +66,7 @@ interface OpenLotsRankingProps {
   rates: ExchangeRates;
   maxItems?: number;
   onLotClick?: (ticker: string) => void;
+  showPortfolioColumn?: boolean;
 }
 
 export function OpenLotsRanking({
@@ -72,6 +74,7 @@ export function OpenLotsRanking({
   rates,
   maxItems,
   onLotClick,
+  showPortfolioColumn = false,
 }: OpenLotsRankingProps) {
   const [sortKey, setSortKey] = useState<SortKey>('plPercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -195,6 +198,11 @@ export function OpenLotsRanking({
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
               {renderSortableHeader('Ticker', 'ticker', 'w-[20%]')}
+              {showPortfolioColumn && (
+                <TableHead className="text-muted-foreground w-[14%]">
+                  Portfolio
+                </TableHead>
+              )}
               {renderSortableHeader('Datum', 'date', 'w-[14%]')}
               {renderSortableHeader('Počet', 'shares', 'text-right w-[10%]')}
               {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[14%]')}
@@ -224,6 +232,11 @@ export function OpenLotsRanking({
                       </p>
                     </div>
                   </TableCell>
+                  {showPortfolioColumn && (
+                    <TableCell className="text-muted-foreground text-sm truncate max-w-[120px]">
+                      {lot.portfolioName || '—'}
+                    </TableCell>
+                  )}
                   <TableCell className="text-muted-foreground">
                     {formatDate(lot.date)}
                   </TableCell>
@@ -276,6 +289,11 @@ export function OpenLotsRanking({
                   <p className="text-xs text-muted-foreground">
                     {formatDate(lot.date)}
                   </p>
+                  {showPortfolioColumn && lot.portfolioName && (
+                    <p className="text-xs text-muted-foreground/70">
+                      {lot.portfolioName}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <div
