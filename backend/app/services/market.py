@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import redis.asyncio as redis
 from typing import List, Dict, Optional
+from app.core.config import get_settings
 
 class MarketDataService:
     def __init__(self, redis_url: str = "redis://redis:6379/0"):
@@ -105,4 +106,5 @@ class MarketDataService:
         return []
 
 # Singleton instance
-market_service = MarketDataService()
+settings = get_settings()
+market_service = MarketDataService(redis_url=settings.redis_url)

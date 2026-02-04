@@ -2,6 +2,7 @@ import yfinance as yf
 import redis.asyncio as redis
 import json
 from typing import Dict
+from app.core.config import get_settings
 
 class ExchangeRateService:
     """Service for fetching and caching exchange rates to CZK."""
@@ -66,4 +67,5 @@ class ExchangeRateService:
         return round(amount * rate, 2)
 
 
-exchange_service = ExchangeRateService()
+settings = get_settings()
+exchange_service = ExchangeRateService(redis_url=settings.redis_url)
