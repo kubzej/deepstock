@@ -509,47 +509,47 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                   </div>
 
                   {/* Desktop: Table */}
-                  <div className="hidden md:block border rounded-lg overflow-hidden">
-                    <Table>
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table className="w-full">
                       <TableHeader>
                         <TableRow>
                           <TableHead
-                            className="cursor-pointer select-none"
+                            className="text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
                             onClick={() => handleSort('ticker')}
                           >
                             Ticker <SortIcon columnKey="ticker" />
                           </TableHead>
                           <TableHead
-                            className="text-right cursor-pointer select-none"
+                            className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
                             onClick={() => handleSort('price')}
                           >
                             Cena <SortIcon columnKey="price" />
                           </TableHead>
                           <TableHead
-                            className="text-right cursor-pointer select-none"
+                            className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
                             onClick={() => handleSort('change')}
                           >
                             Změna <SortIcon columnKey="change" />
                           </TableHead>
                           <TableHead
-                            className="text-right cursor-pointer select-none"
+                            className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
                             onClick={() => handleSort('buyTarget')}
                           >
                             Nákup <SortIcon columnKey="buyTarget" />
                           </TableHead>
                           <TableHead
-                            className="text-right cursor-pointer select-none"
+                            className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
                             onClick={() => handleSort('sellTarget')}
                           >
                             Prodej <SortIcon columnKey="sellTarget" />
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer select-none hidden md:table-cell"
+                            className="text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none hidden md:table-cell"
                             onClick={() => handleSort('sector')}
                           >
                             Sektor <SortIcon columnKey="sector" />
                           </TableHead>
-                          <TableHead className="hidden lg:table-cell">
+                          <TableHead className="text-xs uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
                             Poznámka
                           </TableHead>
                           <TableHead className="w-10" />
@@ -599,7 +599,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">
                                       <span
-                                        className={`font-mono font-semibold ${
+                                        className={`font-bold ${
                                           atBuy
                                             ? 'text-emerald-500'
                                             : atSell
@@ -639,7 +639,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right font-mono">
+                              <TableCell className="text-right font-mono-price">
                                 {quote
                                   ? formatPrice(
                                       quote.price,
@@ -648,7 +648,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                   : '—'}
                               </TableCell>
                               <TableCell
-                                className={`text-right font-mono ${
+                                className={`text-right font-mono-price ${
                                   quote && quote.changePercent > 0
                                     ? 'text-emerald-500'
                                     : quote && quote.changePercent < 0
@@ -661,7 +661,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                   : '—'}
                               </TableCell>
                               <TableCell
-                                className={`text-right font-mono ${
+                                className={`text-right font-mono-price ${
                                   atBuy
                                     ? 'text-emerald-500 font-semibold'
                                     : 'text-muted-foreground'
@@ -675,7 +675,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                   : '—'}
                               </TableCell>
                               <TableCell
-                                className={`text-right font-mono ${
+                                className={`text-right font-mono-price ${
                                   atSell
                                     ? 'text-amber-500 font-semibold'
                                     : 'text-muted-foreground'
@@ -688,10 +688,10 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                     )
                                   : '—'}
                               </TableCell>
-                              <TableCell className="text-muted-foreground hidden md:table-cell">
+                              <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                                 {item.sector || item.stocks.sector || '—'}
                               </TableCell>
-                              <TableCell className="hidden lg:table-cell max-w-[150px]">
+                              <TableCell className="text-sm hidden lg:table-cell max-w-[150px]">
                                 {item.notes ? (
                                   <Tooltip>
                                     <TooltipTrigger asChild>

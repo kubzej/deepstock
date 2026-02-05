@@ -394,33 +394,33 @@ export function StockDetail({
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs uppercase text-muted-foreground">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
                       Datum
                     </TableHead>
                     {isAllPortfolios && (
-                      <TableHead className="text-xs uppercase text-muted-foreground">
+                      <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
                         Portfolio
                       </TableHead>
                     )}
-                    <TableHead className="text-xs uppercase text-muted-foreground">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
                       Typ
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
                       Lot
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
                       P/L {stockCurrency}
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
                       Množství
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
                       Cena
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
                       Celkem CZK
                     </TableHead>
-                    <TableHead className="text-xs uppercase text-muted-foreground text-right">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
                       Akce
                     </TableHead>
                   </TableRow>

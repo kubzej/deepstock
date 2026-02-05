@@ -48,7 +48,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 
@@ -373,32 +373,22 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             className="pl-10"
           />
         </div>
-        <ToggleGroup
-          type="single"
+        <Tabs
           value={completenessFilter}
           onValueChange={(value) =>
-            value && setCompletenessFilter(value as CompletenessFilter)
+            setCompletenessFilter(value as CompletenessFilter)
           }
-          className="w-full"
         >
-          <ToggleGroupItem value="all" className="flex-1 text-xs">
-            Vše
-          </ToggleGroupItem>
-          <ToggleGroupItem value="complete" className="flex-1 text-xs">
-            Kompletní
-          </ToggleGroupItem>
-          <ToggleGroupItem value="incomplete" className="flex-1 text-xs">
-            Nekompletní
-          </ToggleGroupItem>
-        </ToggleGroup>
+          <TabsList>
+            <TabsTrigger value="all">Vše</TabsTrigger>
+            <TabsTrigger value="complete">Kompletní</TabsTrigger>
+            <TabsTrigger value="incomplete">Nekompletní</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Stocks List */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">
-          Seznam akcií ({stocks.length})
-        </h2>
-
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
@@ -417,12 +407,25 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             <div className="hidden md:block">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticker</TableHead>
-                    <TableHead>Název</TableHead>
-                    <TableHead>Měna</TableHead>
-                    <TableHead>Burza</TableHead>
-                    <TableHead>Sektor</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Ticker
+                    </TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Název
+                    </TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Měna
+                    </TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Burza
+                    </TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Sektor
+                    </TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Země
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -430,10 +433,10 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                   {stocks.map((stock) => (
                     <TableRow
                       key={stock.id}
-                      className={onStockClick ? 'cursor-pointer' : ''}
+                      className={`hover:bg-muted/50 border-border ${onStockClick ? 'cursor-pointer' : ''}`}
                       onClick={() => onStockClick?.(stock.ticker)}
                     >
-                      <TableCell className="font-mono font-medium">
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           {(() => {
                             const { isComplete, missing } =
@@ -457,22 +460,29 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                               </Tooltip>
                             );
                           })()}
-                          {stock.ticker}
+                          <span className="font-bold">{stock.ticker}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{stock.name}</TableCell>
-                      <TableCell>{stock.currency}</TableCell>
+                      <TableCell className="text-sm">{stock.name}</TableCell>
+                      <TableCell className="text-sm">
+                        {stock.currency}
+                      </TableCell>
                       <TableCell
-                        className={
+                        className={`text-sm ${
                           !stock.exchange ? 'text-muted-foreground' : ''
-                        }
+                        }`}
                       >
                         {stock.exchange || '—'}
                       </TableCell>
                       <TableCell
-                        className={!stock.sector ? 'text-muted-foreground' : ''}
+                        className={`text-sm truncate max-w-[200px] ${!stock.sector ? 'text-muted-foreground' : ''}`}
                       >
                         {stock.sector || '—'}
+                      </TableCell>
+                      <TableCell
+                        className={`text-sm ${!stock.country ? 'text-muted-foreground' : ''}`}
+                      >
+                        {stock.country || '—'}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
