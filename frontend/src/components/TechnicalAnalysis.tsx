@@ -1,7 +1,12 @@
 /**
  * TechnicalAnalysis - Technical indicators
  */
-import { MovingAveragesChart, RSIChart, MACDChart } from '@/components/charts';
+import {
+  MovingAveragesChart,
+  RSIChart,
+  MACDChart,
+  BollingerBandsChart,
+} from '@/components/charts';
 
 // ============================================================
 // TYPES
@@ -26,6 +31,9 @@ export function TechnicalAnalysis({ ticker }: TechnicalAnalysisProps) {
 
       {/* MACD */}
       <MACDChart ticker={ticker} />
+
+      {/* Bollinger Bands */}
+      <BollingerBandsChart ticker={ticker} />
     </div>
   );
 }
