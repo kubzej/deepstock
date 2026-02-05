@@ -18,7 +18,7 @@ const stocksKey = ['stocks'] as const;
 export function useStocks() {
   return useQuery({
     queryKey: stocksKey,
-    queryFn: () => fetchStocks(),
+    queryFn: () => fetchStocks(500),
     staleTime: 10 * 60 * 1000, // 10 minutes - stocks rarely change
   });
 }

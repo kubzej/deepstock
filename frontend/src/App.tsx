@@ -11,6 +11,7 @@ import { WatchlistsPage } from '@/components/WatchlistsPage';
 import { SettingsPage } from '@/components/SettingsPage';
 import { OptionsPage, OptionTransactionModal } from '@/components/options';
 import { TransactionHistoryPage } from '@/components/TransactionHistoryPage';
+import { AnalysisPage } from '@/components/AnalysisPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -170,12 +171,7 @@ function App() {
       case 'history':
         return <TransactionHistoryPage />;
       case 'analysis':
-        return (
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Analýza</h1>
-            <p className="text-muted-foreground mt-2">Připravuje se...</p>
-          </div>
-        );
+        return <AnalysisPage />;
       case 'watchlist':
         return <WatchlistsPage onStockClick={handleStockClick} />;
       case 'settings':
