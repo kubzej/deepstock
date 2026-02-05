@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Wallet,
   Database,
   LineChart,
   Eye,
@@ -18,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePortfolio } from '@/contexts/PortfolioContext';
+import { PortfolioSelector } from '@/components/PortfolioSelector';
 
 interface MobileHeaderProps {
   activeTab: string;
@@ -32,26 +31,29 @@ export function MobileHeader({
   onNewTransaction,
 }: MobileHeaderProps) {
   const { signOut } = useAuth();
-  const { portfolio, isAllPortfolios } = usePortfolio();
 
   const menuItems = [
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
-    { id: 'portfolio', icon: Wallet, label: 'Portfolia' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
   ];
 
+  const handleSettingsClick = () => {
+    onTabChange('settings:portfolios');
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-sm md:hidden z-50">
       <div className="flex items-center justify-between h-full px-4">
-        {/* Logo + Portfolio */}
+        {/* Logo + Portfolio Selector */}
         <div className="flex flex-col">
           <span className="text-lg font-bold text-primary">DeepStock</span>
-          <span className="text-xs text-muted-foreground -mt-0.5">
-            {isAllPortfolios ? 'Všechna portfolia' : portfolio?.name || '—'}
-          </span>
+          <PortfolioSelector
+            variant="mobile"
+            onSettingsClick={handleSettingsClick}
+          />
         </div>
 
         <div className="flex items-center gap-2">

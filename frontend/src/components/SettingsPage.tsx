@@ -6,8 +6,13 @@ import { PortfolioSettings } from '@/components/settings/PortfolioSettings';
 
 type SettingsSection = 'menu' | 'portfolios' | 'watchlists' | 'watchlist-tags';
 
-export function SettingsPage() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('menu');
+interface SettingsPageProps {
+  initialSection?: SettingsSection;
+}
+
+export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
+  const [activeSection, setActiveSection] =
+    useState<SettingsSection>(initialSection);
 
   // Render section content
   if (activeSection === 'portfolios') {

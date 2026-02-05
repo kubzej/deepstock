@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Wallet,
   Database,
   LineChart,
   Eye,
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePortfolio } from '@/contexts/PortfolioContext';
+import { PortfolioSelector } from '@/components/PortfolioSelector';
 
 interface SidebarProps {
   activeTab: string;
@@ -24,25 +23,28 @@ export function Sidebar({
   onNewTransaction,
 }: SidebarProps) {
   const { signOut, user } = useAuth();
-  const { portfolio, isAllPortfolios } = usePortfolio();
 
   const menuItems = [
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
-    { id: 'portfolio', icon: Wallet, label: 'Portfolia' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 
+  const handleSettingsClick = () => {
+    onTabChange('settings:portfolios');
+  };
+
   return (
     <aside className="hidden md:flex flex-col w-64 h-screen bg-card border-r border-border fixed left-0 top-0">
-      {/* Logo */}
-      <div className="p-6 border-b border-border">
-        <h1 className="text-xl font-bold text-primary">DeepStock</h1>
-        <p className="text-xs text-muted-foreground mt-1 truncate">
-          {isAllPortfolios ? 'Všechna portfolia' : portfolio?.name || '—'}
-        </p>
+      {/* Logo + Portfolio Selector */}
+      <div className="p-4 border-b border-border">
+        <h1 className="text-xl font-bold text-primary mb-3">DeepStock</h1>
+        <PortfolioSelector
+          variant="desktop"
+          onSettingsClick={handleSettingsClick}
+        />
       </div>
 
       {/* New Transaction Button */}

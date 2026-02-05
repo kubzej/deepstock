@@ -4,7 +4,6 @@ import { Login } from '@/components/Login';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/components/Dashboard';
 import { StockDetail } from '@/components/StockDetail';
-import { PortfolioManager } from '@/components/PortfolioManager';
 import { TransactionModal } from '@/components/TransactionModal';
 import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
@@ -157,8 +156,6 @@ function App() {
     switch (activeTab) {
       case 'home':
         return <Dashboard onStockClick={handleStockClick} />;
-      case 'portfolio':
-        return <PortfolioManager />;
       case 'stocks':
         return <StocksManager onStockClick={handleStockClick} />;
       case 'analysis':
@@ -174,6 +171,14 @@ function App() {
       case 'menu':
         return <SettingsPage />;
       default:
+        // Handle settings:section format
+        if (activeTab.startsWith('settings:')) {
+          const section = activeTab.split(':')[1] as
+            | 'portfolios'
+            | 'watchlists'
+            | 'watchlist-tags';
+          return <SettingsPage initialSection={section} />;
+        }
         return <Dashboard onStockClick={handleStockClick} />;
     }
   };
