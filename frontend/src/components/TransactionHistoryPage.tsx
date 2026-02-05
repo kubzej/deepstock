@@ -327,7 +327,10 @@ export function TransactionHistoryPage() {
                         {tx.shares} × {formatPrice(tx.price, tx.currency)}
                       </span>
                       <span className="font-mono-price font-medium">
-                        {formatPrice(tx.totalCzk, 'CZK')}
+                        {formatPrice(
+                          tx.type === 'BUY' ? -tx.totalCzk : tx.totalCzk,
+                          'CZK',
+                        )}
                       </span>
                     </div>
                   </div>
@@ -396,7 +399,10 @@ export function TransactionHistoryPage() {
                           {tx.fees ? formatPrice(tx.fees, 'CZK') : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono-price">
-                          {formatPrice(tx.totalCzk, 'CZK')}
+                          {formatPrice(
+                            tx.type === 'BUY' ? -tx.totalCzk : tx.totalCzk,
+                            'CZK',
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
