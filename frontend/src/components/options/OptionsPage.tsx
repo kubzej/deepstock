@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { AlertCircle } from 'lucide-react';
 import { OptionsTrades } from './OptionsTrades';
+import { OptionsCalculator } from './OptionsCalculator';
 import {
   OptionTransactionModal,
   type ModalMode,
@@ -172,9 +173,7 @@ export function OptionsPage() {
         </TabsContent>
 
         <TabsContent value="calculator" className="mt-4">
-          <div className="text-center text-muted-foreground py-12">
-            Kalkulačka - připravuje se...
-          </div>
+          <OptionsCalculator />
         </TabsContent>
 
         <TabsContent value="greeks" className="mt-4">
