@@ -10,41 +10,35 @@ interface OptionPerformanceProps {
 
 export function OptionPerformance({ data }: OptionPerformanceProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Open Positions */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-medium">Otevřené pozice</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-          <Metric
-            label="Vybrané prémie"
-            value={data.open.premiumReceived}
-            colored={false}
-          />
-          <Metric
-            label="Zaplacené prémie"
-            value={data.open.premiumPaid}
-            colored={false}
-          />
-          <Metric label="Čisté prémie" value={data.open.netPremium} />
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+        <Metric
+          label="Vybrané prémie (otevřené)"
+          value={data.open.premiumReceived}
+          colored={false}
+        />
+        <Metric
+          label="Zaplacené prémie (otevřené)"
+          value={data.open.premiumPaid}
+          colored={false}
+        />
+        <Metric label="Čisté prémie (otevřené)" value={data.open.netPremium} />
+        <Metric label="Realizovaný P/L" value={data.closed.realizedPL} />
       </div>
 
       {/* Closed Positions */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-medium">Zavřené pozice</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-          <Metric
-            label="Přijaté prémie"
-            value={data.closed.premiumReceived}
-            colored={false}
-          />
-          <Metric
-            label="Zaplacené prémie"
-            value={data.closed.premiumPaid}
-            colored={false}
-          />
-          <Metric label="Realizovaný P/L" value={data.closed.realizedPL} />
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+        <Metric
+          label="Přijaté prémie (zavřené)"
+          value={data.closed.premiumReceived}
+          colored={false}
+        />
+        <Metric
+          label="Zaplacené prémie (zavřené)"
+          value={data.closed.premiumPaid}
+          colored={false}
+        />
       </div>
 
       <p className="text-sm text-muted-foreground">
