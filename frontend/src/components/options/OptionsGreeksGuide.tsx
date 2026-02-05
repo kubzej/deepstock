@@ -156,7 +156,7 @@ export function OptionsGreeksGuide() {
   return (
     <div className="space-y-4">
       {/* Section Selector - Pills */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {sections.map((section) => {
           const isActive = activeSection === section.key;
           return (
@@ -164,7 +164,7 @@ export function OptionsGreeksGuide() {
               key={section.key}
               onClick={() => setActiveSection(section.key)}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-full transition-all',
+                'flex items-center gap-1.5 px-3 py-2 rounded-full transition-all shrink-0',
                 'text-sm font-medium',
                 isActive
                   ? 'bg-foreground text-background'
@@ -214,7 +214,7 @@ export function OptionsGreeksGuide() {
           </div>
 
           {/* Impact Grid */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div className="p-3 rounded-lg bg-background/40">
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -251,7 +251,7 @@ export function OptionsGreeksGuide() {
             vyvarovat.
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {strategies.map((strategy) => (
               <div
                 key={strategy.name}
