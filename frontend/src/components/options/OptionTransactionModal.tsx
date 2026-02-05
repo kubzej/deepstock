@@ -50,20 +50,20 @@ interface OptionTransactionModalProps {
 // ============ Constants ============
 
 const OPEN_ACTIONS: { value: OptionAction; label: string }[] = [
-  { value: 'BTO', label: 'Buy to Open (koupit)' },
-  { value: 'STO', label: 'Sell to Open (prodat)' },
+  { value: 'BTO', label: 'Buy to Open' },
+  { value: 'STO', label: 'Sell to Open' },
 ];
 
 const LONG_CLOSE_ACTIONS: { value: OptionAction; label: string }[] = [
-  { value: 'STC', label: 'Sell to Close (prodat)' },
-  { value: 'EXPIRATION', label: 'Expirace (bezcenná)' },
-  { value: 'EXERCISE', label: 'Exercise (uplatnění)' },
+  { value: 'STC', label: 'Sell to Close' },
+  { value: 'EXPIRATION', label: 'Expirace' },
+  { value: 'EXERCISE', label: 'Exercise' },
 ];
 
 const SHORT_CLOSE_ACTIONS: { value: OptionAction; label: string }[] = [
-  { value: 'BTC', label: 'Buy to Close (odkoupit)' },
-  { value: 'EXPIRATION', label: 'Expirace (bezcenná)' },
-  { value: 'ASSIGNMENT', label: 'Assignment (přiřazení)' },
+  { value: 'BTC', label: 'Buy to Close' },
+  { value: 'EXPIRATION', label: 'Expirace' },
+  { value: 'ASSIGNMENT', label: 'Assignment' },
 ];
 
 // ============ Helpers ============
@@ -276,12 +276,12 @@ export function OptionTransactionModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[85vh] overflow-y-auto overflow-x-hidden sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>{getModalTitle(mode)}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
