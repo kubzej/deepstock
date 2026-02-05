@@ -247,7 +247,7 @@ export function OptionsTrades({
                 </div>
                 <div className="text-[10px] text-muted-foreground">
                   {formatDate(h.expiration_date)}
-                  {h.totalDays > 0 && <span> · z {h.totalDays}</span>}
+                  {h.totalDays > 0 && <span> · z {h.totalDays} dní</span>}
                 </div>
               </div>
 
