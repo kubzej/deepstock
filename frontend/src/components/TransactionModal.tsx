@@ -18,12 +18,8 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import {
-  fetchStocks,
-  updateTransaction,
-  type Stock,
-  type Transaction,
-} from '@/lib/api';
+import { useStocks } from '@/hooks/useStocks';
+import { updateTransaction, type Transaction } from '@/lib/api';
 import { formatPrice, formatDate, formatNumber } from '@/lib/format';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -104,7 +100,7 @@ export function TransactionModal({
   editTransaction,
 }: TransactionModalProps) {
   const { activePortfolio, refresh } = usePortfolio();
-  const [stocks, setStocks] = useState<Stock[]>([]);
+  const { data: stocks = [] } = useStocks();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<TransactionFormData>(EMPTY_FORM);
@@ -121,7 +117,6 @@ export function TransactionModal({
   // Load stocks on open or initialize edit form
   useEffect(() => {
     if (open) {
-      loadStocks();
       setError(null);
       setAvailableLots([]);
       setSellMode('entire');
@@ -171,15 +166,6 @@ export function TransactionModal({
       loadAvailableLots();
     }
   }, [formData.type, formData.stockTicker, activePortfolio?.id]);
-
-  const loadStocks = async () => {
-    try {
-      const data = await fetchStocks(500, 0);
-      setStocks(data);
-    } catch (err) {
-      console.error('Failed to load stocks:', err);
-    }
-  };
 
   const loadAvailableLots = async () => {
     if (!formData.stockTicker || !activePortfolio) return;

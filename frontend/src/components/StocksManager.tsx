@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import {
-  fetchStocks,
-  searchStocks,
-  createStock,
-  updateStock,
-  deleteStock,
-} from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { searchStocks } from '@/lib/api';
 import type { Stock } from '@/lib/api';
+import {
+  useStocks,
+  useCreateStock,
+  useUpdateStock,
+  useDeleteStock,
+} from '@/hooks/useStocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 
 // Options from portfolio-tracker
@@ -111,10 +113,21 @@ interface StocksManagerProps {
 }
 
 export default function StocksManager({ onStockClick }: StocksManagerProps) {
-  const [stocks, setStocks] = useState<Stock[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // React Query hooks
+  const {
+    data: allStocks = [],
+    isLoading: stocksLoading,
+    error: stocksError,
+  } = useStocks();
+  const createStockMutation = useCreateStock();
+  const updateStockMutation = useUpdateStock();
+  const deleteStockMutation = useDeleteStock();
+
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Stock[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -125,45 +138,32 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   // Form state
   const [formData, setFormData] = useState<StockFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  // Load stocks
-  const loadStocks = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchStocks();
-      setStocks(data);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Nepodařilo se načíst akcie',
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Derived state
+  const stocks = searchResults ?? allStocks;
+  const loading = stocksLoading || searching;
+  const error = stocksError?.message ?? null;
+  const saving =
+    createStockMutation.isPending ||
+    updateStockMutation.isPending ||
+    deleteStockMutation.isPending;
 
   // Search stocks
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      loadStocks();
+      setSearchResults(null);
       return;
     }
     try {
-      setLoading(true);
-      setError(null);
+      setSearching(true);
       const data = await searchStocks(searchQuery);
-      setStocks(data);
+      setSearchResults(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Chyba při vyhledávání');
+      console.error('Search error:', err);
     } finally {
-      setLoading(false);
+      setSearching(false);
     }
   };
-
-  useEffect(() => {
-    loadStocks();
-  }, []);
 
   // Debounced search
   useEffect(() => {
@@ -243,7 +243,6 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
     }
 
     try {
-      setSaving(true);
       setFormError(null);
 
       const payload = {
@@ -258,21 +257,21 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
       };
 
       if (isEditMode && selectedStock) {
-        await updateStock(selectedStock.id, payload);
+        await updateStockMutation.mutateAsync({
+          id: selectedStock.id,
+          data: payload,
+        });
       } else {
-        await createStock(payload);
+        await createStockMutation.mutateAsync(payload as any);
       }
 
       setDialogOpen(false);
-      loadStocks();
     } catch (err) {
       setFormError(
         err instanceof Error
           ? err.message
           : `Nepodařilo se ${isEditMode ? 'upravit' : 'vytvořit'} akcii`,
       );
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -280,17 +279,13 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   const handleDelete = async () => {
     if (!selectedStock) return;
     try {
-      setSaving(true);
       setFormError(null);
-      await deleteStock(selectedStock.id);
+      await deleteStockMutation.mutateAsync(selectedStock.id);
       setDeleteDialogOpen(false);
-      loadStocks();
     } catch (err) {
       setFormError(
         err instanceof Error ? err.message : 'Nepodařilo se smazat akcii',
       );
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -309,7 +304,12 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={loadStocks} className="mt-4">
+        <Button
+          onClick={() =>
+            queryClient.invalidateQueries({ queryKey: ['stocks'] })
+          }
+          className="mt-4"
+        >
           Zkusit znovu
         </Button>
       </div>
@@ -319,13 +319,19 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Akcie</h1>
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          Přidat akcii
-        </Button>
-      </div>
+      <PageHeader
+        title="Akcie"
+        onRefresh={() =>
+          queryClient.invalidateQueries({ queryKey: ['stocks'] })
+        }
+        isRefreshing={stocksLoading}
+        actions={
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-2 h-4 w-4" />
+            Přidat akcii
+          </Button>
+        }
+      />
 
       {/* Search */}
       <div className="relative">

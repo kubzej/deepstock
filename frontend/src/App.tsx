@@ -8,6 +8,7 @@ import { PortfolioManager } from '@/components/PortfolioManager';
 import { TransactionModal } from '@/components/TransactionModal';
 import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
+import { WatchlistsPage } from '@/components/WatchlistsPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -167,12 +168,7 @@ function App() {
           </div>
         );
       case 'watchlist':
-        return (
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Watchlisty</h1>
-            <p className="text-muted-foreground mt-2">Připravuje se...</p>
-          </div>
-        );
+        return <WatchlistsPage onStockClick={handleStockClick} />;
       case 'settings':
       case 'menu':
         return (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   ArrowLeft,
   TrendingUp,
@@ -26,14 +26,13 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
+import { useStock } from '@/hooks/useStocks';
 import {
-  fetchStock,
-  fetchQuotes,
-  fetchTransactions,
-  fetchAllTransactions,
-  deleteTransaction,
-} from '@/lib/api';
-import type { Stock, Quote, Transaction } from '@/lib/api';
+  useTickerTransactions,
+  useDeleteTransaction,
+} from '@/hooks/useTransactions';
+import { useQuotes } from '@/hooks/useQuotes';
+import type { Stock, Transaction } from '@/lib/api';
 import {
   formatCurrency,
   formatPercent,
@@ -65,99 +64,36 @@ export function StockDetail({
     isAllPortfolios,
   } = usePortfolio();
 
-  // Stock master data from API
-  const [stock, setStock] = useState<Stock | null>(null);
-  const [stockLoading, setStockLoading] = useState(true);
-  const [stockError, setStockError] = useState<string | null>(null);
+  // Stock master data from API (React Query)
+  const {
+    data: stock,
+    isLoading: stockLoading,
+    error: stockError,
+  } = useStock(ticker);
 
-  // Transactions
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  // Transactions (React Query)
+  const { data: transactions = [], isLoading: transactionsLoading } =
+    useTickerTransactions(portfolio?.id ?? null, ticker, isAllPortfolios);
 
-  // Local quote if not in portfolio
-  const [localQuote, setLocalQuote] = useState<Quote | null>(null);
-  const [quoteLoading, setQuoteLoading] = useState(false);
+  // Quote from React Query (if not in portfolio context)
+  const tickersToFetch = portfolioQuotes[ticker] ? [] : [ticker];
+  const { data: fetchedQuotes = {}, isLoading: quoteLoading } =
+    useQuotes(tickersToFetch);
+
+  // Transaction delete mutation
+  const deleteTransactionMutation = useDeleteTransaction();
 
   // Transaction edit/delete state
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] =
     useState<Transaction | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Load stock from API
-  useEffect(() => {
-    const loadStock = async () => {
-      try {
-        setStockLoading(true);
-        setStockError(null);
-        const data = await fetchStock(ticker);
-        setStock(data);
-      } catch (err) {
-        setStockError(
-          err instanceof Error ? err.message : 'Nepodařilo se načíst akcii',
-        );
-      } finally {
-        setStockLoading(false);
-      }
-    };
-    loadStock();
-  }, [ticker]);
-
-  // Load transactions
-  useEffect(() => {
-    const loadTransactions = async () => {
-      // Need either specific portfolio or "all portfolios" mode
-      if (!portfolio?.id && !isAllPortfolios) return;
-      try {
-        setTransactionsLoading(true);
-        let data;
-        if (isAllPortfolios) {
-          data = await fetchAllTransactions(100);
-        } else {
-          data = await fetchTransactions(portfolio!.id, 100);
-        }
-        // Filter transactions for this ticker
-        const tickerTransactions = data.filter((t) => t.ticker === ticker);
-        setTransactions(tickerTransactions);
-      } catch (err) {
-        console.error('Failed to load transactions:', err);
-      } finally {
-        setTransactionsLoading(false);
-      }
-    };
-    loadTransactions();
-  }, [portfolio?.id, ticker, isAllPortfolios]);
-
-  // Load quote if not available from portfolio context
-  useEffect(() => {
-    const loadQuote = async () => {
-      // If quote already exists in portfolio context, skip
-      if (portfolioQuotes[ticker]) {
-        return;
-      }
-
-      try {
-        setQuoteLoading(true);
-        const quotes = await fetchQuotes([ticker]);
-        if (quotes[ticker]) {
-          setLocalQuote(quotes[ticker]);
-        }
-      } catch (err) {
-        console.error('Failed to load quote:', err);
-        // Non-critical error, just show no price
-      } finally {
-        setQuoteLoading(false);
-      }
-    };
-    loadQuote();
-  }, [ticker, portfolioQuotes]);
 
   // Get optional holding (position) from portfolio
   const holding = getHoldingByTicker(ticker);
-  // Use portfolio quote if available, otherwise local quote
-  const quote = portfolioQuotes[ticker] || localQuote;
+  // Use portfolio quote if available, otherwise fetched quote
+  const quote = portfolioQuotes[ticker] || fetchedQuotes[ticker];
 
   // Calculate sold shares per lot (for BUY transaction status)
   const soldPerLot = useMemo(() => {
@@ -181,48 +117,27 @@ export function StockDetail({
     };
   };
 
-  // Reload transactions after edit/delete
-  const reloadTransactions = async () => {
-    try {
-      let data;
-      if (isAllPortfolios) {
-        data = await fetchAllTransactions(100);
-      } else if (portfolio?.id) {
-        data = await fetchTransactions(portfolio.id, 100);
-      } else {
-        return;
-      }
-      const tickerTransactions = data.filter((t) => t.ticker === ticker);
-      setTransactions(tickerTransactions);
-    } catch (err) {
-      console.error('Failed to reload transactions:', err);
-    }
-  };
-
   // Handle transaction delete
   const handleDeleteTransaction = async () => {
     if (!deletingTransaction) return;
 
-    setDeleteLoading(true);
     setDeleteError(null);
 
     try {
-      await deleteTransaction(
-        deletingTransaction.portfolioId,
-        deletingTransaction.id,
-      );
+      await deleteTransactionMutation.mutateAsync({
+        portfolioId: deletingTransaction.portfolioId,
+        transactionId: deletingTransaction.id,
+      });
       setDeletingTransaction(null);
-      await reloadTransactions();
     } catch (err) {
       setDeleteError(
         err instanceof Error ? err.message : 'Nepodařilo se smazat transakci',
       );
-    } finally {
-      setDeleteLoading(false);
     }
   };
 
   const isLoading = stockLoading || portfolioLoading || quoteLoading;
+  const deleteLoading = deleteTransactionMutation.isPending;
 
   // Loading state
   if (isLoading) {
@@ -260,7 +175,9 @@ export function StockDetail({
           <ArrowLeft className="w-4 h-4 mr-1" />
           Zpět
         </Button>
-        <p className="text-destructive">{stockError || 'Akcie nenalezena'}</p>
+        <p className="text-destructive">
+          {stockError?.message || 'Akcie nenalezena'}
+        </p>
       </div>
     );
   }
@@ -769,7 +686,6 @@ export function StockDetail({
         open={!!editingTransaction}
         onOpenChange={(open) => !open && setEditingTransaction(null)}
         editTransaction={editingTransaction}
-        onSuccess={reloadTransactions}
       />
 
       {/* Transaction Delete Confirmation */}

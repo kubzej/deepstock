@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from app.api.endpoints import market, portfolio, stocks
+from app.api.endpoints import market, portfolio, stocks, watchlists
 
 app = FastAPI(title="DeepStock API")
 
@@ -32,3 +32,4 @@ def health_check():
 app.include_router(market.router, prefix="/api/market", tags=["Market Data"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["Portfolio"])
 app.include_router(stocks.router, prefix="/api", tags=["Stocks"])
+app.include_router(watchlists.router, prefix="/api/watchlists", tags=["Watchlists"])

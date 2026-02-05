@@ -217,3 +217,228 @@ import { Label } from '@/components/ui/label';
 
 - **Backend:** Unit tests for all scoring algorithms and API endpoints using `pytest`.
 - **Frontend:** Component tests for critical UI elements using `vitest`.
+
+## Data Fetching & Caching (React Query)
+
+**CRITICAL: All server state MUST use React Query (TanStack Query). NEVER use useState + useEffect for data fetching.**
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      React Components                        │
+│  (Dashboard, StockDetail, WatchlistsPage, StocksManager)    │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ uses hooks
+┌─────────────────────────▼───────────────────────────────────┐
+│                    Custom React Query Hooks                  │
+│  useQuotes, useHoldings, useStocks, useWatchlists, etc.     │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ uses
+┌─────────────────────────▼───────────────────────────────────┐
+│                   QueryClient (shared cache)                 │
+│  staleTime: 5min, gcTime: 30min, refetchOnWindowFocus: false│
+└─────────────────────────┬───────────────────────────────────┘
+                          │ calls
+┌─────────────────────────▼───────────────────────────────────┐
+│                      API Functions                           │
+│  fetchQuotes, fetchHoldings, fetchStocks (in lib/api.ts)    │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP
+┌─────────────────────────▼───────────────────────────────────┐
+│                    FastAPI Backend                           │
+│  /api/market/batch-quotes, /api/portfolio/:id/holdings      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Query Client Configuration (`lib/queryClient.ts`)
+
+```typescript
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh
+      gcTime: 30 * 60 * 1000, // 30 minutes - cache retention
+      refetchOnWindowFocus: false, // No annoying refetches
+      retry: 1, // Retry once on failure
+      placeholderData: (prev) => prev, // Keep previous data while fetching
+    },
+  },
+});
+```
+
+### Query Keys Factory (`queryKeys` object)
+
+**ALWAYS use `queryKeys` for consistent cache keys:**
+
+```typescript
+import { queryKeys } from '@/lib/queryClient';
+
+// Examples:
+queryKeys.quotes(['AAPL', 'MSFT']); // ['quotes', 'AAPL,MSFT']
+queryKeys.holdings('portfolio-uuid'); // ['holdings', 'portfolio-uuid']
+queryKeys.watchlists(); // ['watchlists']
+queryKeys.stock('AAPL'); // ['stock', 'AAPL']
+```
+
+### Available Hooks (`/frontend/src/hooks/`)
+
+| Hook                           | Purpose                   | Stale Time |
+| ------------------------------ | ------------------------- | ---------- |
+| `useQuotes(tickers[])`         | Batch fetch stock quotes  | 1 min      |
+| `useHoldings(portfolioId)`     | Portfolio holdings        | 2 min      |
+| `useOpenLots(portfolioId)`     | Open lots for a portfolio | 2 min      |
+| `usePortfolios()`              | User's portfolios list    | 10 min     |
+| `useStocks()`                  | All stocks (master data)  | 10 min     |
+| `useStock(ticker)`             | Single stock details      | 10 min     |
+| `useTransactions(portfolioId)` | Transaction history       | 2 min      |
+| `useWatchlists()`              | Watchlist list            | 5 min      |
+| `useWatchlistItems(id)`        | Items in a watchlist      | 5 min      |
+| `useExchangeRates()`           | Currency exchange rates   | 30 min     |
+
+### Mutation Hooks (for CRUD operations)
+
+```typescript
+// Each resource has mutation hooks:
+const createMutation = useCreateStock();
+const updateMutation = useUpdateStock();
+const deleteMutation = useDeleteStock();
+
+// Usage:
+await createMutation.mutateAsync(data);
+await updateMutation.mutateAsync({ id, data });
+await deleteMutation.mutateAsync(id);
+```
+
+**Mutations automatically invalidate related queries** - no manual refresh needed after create/update/delete.
+
+### Pattern: Component Data Fetching
+
+```tsx
+// ✅ CORRECT - Use React Query hooks
+function StockDetail({ ticker }: { ticker: string }) {
+  const { data: stock, isLoading, error } = useStock(ticker);
+  const { data: quotes = {} } = useQuotes([ticker]);
+
+  if (isLoading) return <Skeleton />;
+  if (error) return <ErrorMessage error={error} />;
+
+  return (
+    <div>
+      {stock.name}: {quotes[ticker]?.price}
+    </div>
+  );
+}
+
+// ❌ WRONG - Never use useState + useEffect for server data
+function StockDetail({ ticker }: { ticker: string }) {
+  const [stock, setStock] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStock(ticker)
+      .then(setStock)
+      .finally(() => setLoading(false));
+  }, [ticker]);
+  // DON'T DO THIS!
+}
+```
+
+### Pattern: Manual Refresh
+
+```tsx
+import { useQueryClient } from '@tanstack/react-query';
+
+function MyComponent() {
+  const queryClient = useQueryClient();
+
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['stocks'] });
+    queryClient.invalidateQueries({ queryKey: ['quotes'] });
+  };
+
+  return <Button onClick={handleRefresh}>Obnovit</Button>;
+}
+```
+
+### PortfolioContext Integration
+
+`PortfolioContext` internally uses React Query hooks but exposes a simple API for backward compatibility:
+
+```tsx
+const { holdings, quotes, rates, loading, refresh } = usePortfolio();
+```
+
+The `refresh()` function invalidates all portfolio-related queries.
+
+## Shared UI Components
+
+### PageHeader Component (`/components/shared/PageHeader.tsx`)
+
+**ALWAYS use `PageHeader` for page titles with refresh functionality.**
+
+```tsx
+import { PageHeader } from '@/components/shared/PageHeader';
+
+function MyPage() {
+  const queryClient = useQueryClient();
+  const { isLoading } = useMyData();
+
+  return (
+    <div className="space-y-6 pb-12">
+      <PageHeader
+        title="Název stránky"
+        subtitle="Volitelný podtitulek"
+        onRefresh={() =>
+          queryClient.invalidateQueries({ queryKey: ['myData'] })
+        }
+        isRefreshing={isLoading}
+        actions={
+          <Button onClick={openDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Přidat
+          </Button>
+        }
+      />
+
+      {/* Page content */}
+    </div>
+  );
+}
+```
+
+**Props:**
+
+- `title` (required): Page heading (h1)
+- `subtitle`: Optional secondary text
+- `onRefresh`: Callback for refresh button (shows RefreshCw icon)
+- `isRefreshing`: Shows spinning animation on refresh icon
+- `lastUpdated`: Timestamp text (hidden on mobile)
+- `actions`: Custom buttons/actions on the right side
+
+### Page Layout Pattern
+
+**All pages MUST follow this layout structure:**
+
+```tsx
+return (
+  <div className="space-y-6 pb-12">
+    <PageHeader title="..." onRefresh={...} actions={...} />
+
+    {/* Loading state */}
+    {isLoading && <Skeleton />}
+
+    {/* Error state */}
+    {error && <Alert variant="destructive">...</Alert>}
+
+    {/* Content */}
+    {data && <Content data={data} />}
+  </div>
+);
+```
+
+**Key CSS classes:**
+
+- `space-y-6` - Consistent vertical spacing between sections
+- `pb-12` - Bottom padding for mobile navigation bar
+- NO `p-4 md:p-6` on page wrappers (AppLayout handles padding)

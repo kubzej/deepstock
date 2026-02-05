@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   createPortfolio,
@@ -147,13 +148,17 @@ export function PortfolioManager() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Portfolia</h1>
-        <Button onClick={handleOpenCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Přidat portfolio
-        </Button>
-      </div>
+      <PageHeader
+        title="Portfolia"
+        onRefresh={refresh}
+        isRefreshing={loading}
+        actions={
+          <Button onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Přidat portfolio
+          </Button>
+        }
+      />
 
       {/* Portfolio List */}
       {portfolios.length === 0 ? (
