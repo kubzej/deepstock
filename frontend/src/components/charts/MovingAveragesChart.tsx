@@ -128,20 +128,20 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 shadow-xl">
-      <p className="text-xs text-zinc-400 mb-2">{label}</p>
+    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
+      <p className="text-xs text-zinc-500 mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-400">
+          <span className="text-zinc-600">
             {entry.dataKey === 'price' && 'Cena'}
             {entry.dataKey === 'sma50' && 'SMA 50'}
             {entry.dataKey === 'sma200' && 'SMA 200'}:
           </span>
-          <span className="font-mono text-white">
+          <span className="font-mono text-zinc-800">
             {entry.value?.toFixed(2) ?? '—'}
           </span>
         </div>

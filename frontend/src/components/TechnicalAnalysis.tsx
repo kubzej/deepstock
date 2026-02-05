@@ -6,6 +6,12 @@ import {
   RSIChart,
   MACDChart,
   BollingerBandsChart,
+  StochasticChart,
+  VolumeChart,
+  ATRChart,
+  OBVChart,
+  ADXChart,
+  FibonacciChart,
 } from '@/components/charts';
 
 // ============================================================
@@ -34,6 +40,24 @@ export function TechnicalAnalysis({ ticker }: TechnicalAnalysisProps) {
 
       {/* Bollinger Bands */}
       <BollingerBandsChart ticker={ticker} />
+
+      {/* Stochastic */}
+      <StochasticChart ticker={ticker} />
+
+      {/* Volume */}
+      <VolumeChart ticker={ticker} />
+
+      {/* ATR */}
+      <ATRChart ticker={ticker} />
+
+      {/* OBV */}
+      <OBVChart ticker={ticker} />
+
+      {/* ADX */}
+      <ADXChart ticker={ticker} />
+
+      {/* Fibonacci Retracement */}
+      <FibonacciChart ticker={ticker} />
     </div>
   );
 }

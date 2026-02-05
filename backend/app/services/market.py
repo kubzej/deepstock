@@ -1229,6 +1229,61 @@ class MarketDataService:
                 })
             
             # ============================================================
+            # FIBONACCI RETRACEMENT
+            # ============================================================
+            
+            period_high = df_filtered['high'].max()
+            period_low = df_filtered['low'].min()
+            fib_range = period_high - period_low
+            
+            # Standard Fibonacci levels
+            fib_levels = {
+                "0": safe_float(period_low),
+                "236": safe_float(period_low + fib_range * 0.236),
+                "382": safe_float(period_low + fib_range * 0.382),
+                "500": safe_float(period_low + fib_range * 0.5),
+                "618": safe_float(period_low + fib_range * 0.618),
+                "786": safe_float(period_low + fib_range * 0.786),
+                "1000": safe_float(period_high),
+            }
+            
+            # Current price position relative to Fibonacci
+            if fib_range > 0 and current_price:
+                fib_position = ((current_price - period_low) / fib_range) * 100
+            else:
+                fib_position = 50
+            
+            # Determine nearest Fibonacci level
+            fib_level_values = [
+                (0, fib_levels["0"]),
+                (23.6, fib_levels["236"]),
+                (38.2, fib_levels["382"]),
+                (50, fib_levels["500"]),
+                (61.8, fib_levels["618"]),
+                (78.6, fib_levels["786"]),
+                (100, fib_levels["1000"]),
+            ]
+            
+            nearest_fib = None
+            nearest_distance = float('inf')
+            for level_pct, level_price in fib_level_values:
+                if level_price and current_price:
+                    distance = abs(current_price - level_price)
+                    if distance < nearest_distance:
+                        nearest_distance = distance
+                        nearest_fib = level_pct
+            
+            # Fibonacci history (price with levels for chart)
+            fibonacci_history = []
+            for _, row in df_filtered.iterrows():
+                fibonacci_history.append({
+                    "date": format_date(row['date']),
+                    "price": safe_float(row['close']),
+                    "high": safe_float(row['high']),
+                    "low": safe_float(row['low']),
+                })
+            
+            # ============================================================
             # BUILD RESULT
             # ============================================================
             
@@ -1243,6 +1298,12 @@ class MarketDataService:
                 "atrHistory": atr_history,
                 "obvHistory": obv_history,
                 "adxHistory": adx_history,
+                "fibonacciLevels": fib_levels,
+                "fibonacciPosition": safe_float(fib_position),
+                "nearestFibLevel": nearest_fib,
+                "periodHigh": safe_float(period_high),
+                "periodLow": safe_float(period_low),
+                "fibonacciHistory": fibonacci_history,
                 "lastUpdated": str(pd.Timestamp.now()),
             }
             

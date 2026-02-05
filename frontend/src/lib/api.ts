@@ -367,6 +367,23 @@ export interface ADXHistoryPoint {
   minusDI: number | null;
 }
 
+export interface FibonacciLevels {
+  '0': number | null;
+  '236': number | null;
+  '382': number | null;
+  '500': number | null;
+  '618': number | null;
+  '786': number | null;
+  '1000': number | null;
+}
+
+export interface FibonacciHistoryPoint {
+  date: string;
+  price: number | null;
+  high: number | null;
+  low: number | null;
+}
+
 export interface TechnicalData {
   ticker: string;
   
@@ -427,6 +444,14 @@ export interface TechnicalData {
   atrHistory: ATRHistoryPoint[];
   obvHistory: OBVHistoryPoint[];
   adxHistory: ADXHistoryPoint[];
+  
+  // Fibonacci Retracement
+  fibonacciLevels: FibonacciLevels | null;
+  fibonacciPosition: number | null;
+  nearestFibLevel: number | null;
+  periodHigh: number | null;
+  periodLow: number | null;
+  fibonacciHistory: FibonacciHistoryPoint[];
   
   lastUpdated: string;
 }
