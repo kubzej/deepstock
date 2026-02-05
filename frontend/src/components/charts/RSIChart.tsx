@@ -2,14 +2,18 @@
  * RSIChart - Relative Strength Index gauge meter
  * Shows overbought/oversold conditions with visual indicator
  */
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
+import { fetchTechnicalIndicators, type TechnicalPeriod } from '@/lib/api';
 
 // ============================================================
 // TYPES
 // ============================================================
 
 interface RSIChartProps {
-  currentRsi: number | null;
+  ticker: string;
 }
 
 // ============================================================
@@ -51,13 +55,6 @@ function getEvaluation(rsi: number | null): string {
     return `RSI na ${rsi.toFixed(1)} - neutrální s býčím nádechem. Momentum je mírně pozitivní.`;
   }
   return `RSI na ${rsi.toFixed(1)} - neutrální s medvědím nádechem. Momentum je mírně negativní.`;
-}
-
-function getRsiLabel(rsi: number | null): string {
-  if (rsi === null) return '—';
-  if (rsi >= RSI_OVERBOUGHT) return 'Překoupeno';
-  if (rsi <= RSI_OVERSOLD) return 'Přeprodáno';
-  return 'Neutrální';
 }
 
 // ============================================================
@@ -161,7 +158,29 @@ function RSIGauge({ value }: { value: number | null }) {
 // MAIN COMPONENT
 // ============================================================
 
-export function RSIChart({ currentRsi }: RSIChartProps) {
+export function RSIChart({ ticker }: RSIChartProps) {
+  const [period, setPeriod] = useState<TechnicalPeriod>('3mo');
+
+  const { data: technicalData, isLoading } = useQuery({
+    queryKey: ['technical', ticker, period],
+    queryFn: () => fetchTechnicalIndicators(ticker, period),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading || !technicalData) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  const currentRsi = technicalData.rsi14;
   const signal = getSignalType(currentRsi);
   const evaluation = getEvaluation(currentRsi);
 
@@ -171,6 +190,8 @@ export function RSIChart({ currentRsi }: RSIChartProps) {
       tooltipContent={tooltipExplanation}
       signal={signal}
       evaluation={evaluation}
+      period={period}
+      onPeriodChange={setPeriod}
     >
       <div className="bg-white rounded-lg p-6">
         <RSIGauge value={currentRsi} />

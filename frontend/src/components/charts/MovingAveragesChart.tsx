@@ -2,6 +2,8 @@
  * MovingAveragesChart - Price with SMA 50 and SMA 200
  * Shows trend direction based on moving average crossovers
  */
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   ComposedChart,
   Line,
@@ -11,18 +13,20 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
-import type { PriceHistoryPointWithSMA, TrendSignalType } from '@/lib/api';
+import {
+  fetchTechnicalIndicators,
+  type TrendSignalType,
+  type TechnicalPeriod,
+} from '@/lib/api';
 
 // ============================================================
 // TYPES
 // ============================================================
 
 interface MovingAveragesChartProps {
-  data: PriceHistoryPointWithSMA[];
-  trendSignal: TrendSignalType;
-  priceVsSma50: number | null;
-  priceVsSma200: number | null;
+  ticker: string;
 }
 
 // ============================================================
@@ -160,17 +164,36 @@ const COLORS = {
   grid: 'rgba(63, 63, 70, 0.5)',
 };
 
-export function MovingAveragesChart({
-  data,
-  trendSignal,
-  priceVsSma50,
-  priceVsSma200,
-}: MovingAveragesChartProps) {
+export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {
+  const [period, setPeriod] = useState<TechnicalPeriod>('3mo');
+
+  const { data: technicalData, isLoading } = useQuery({
+    queryKey: ['technical', ticker, period],
+    queryFn: () => fetchTechnicalIndicators(ticker, period),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading || !technicalData) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-5 w-32" />
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  const { priceHistory, trendSignal, priceVsSma50, priceVsSma200 } =
+    technicalData;
+
   const signal = getSignalType(trendSignal);
   const evaluation = getEvaluation(trendSignal, priceVsSma50, priceVsSma200);
 
   // Filter out null values for domain calculation
-  const prices = data
+  const prices = priceHistory
     .map((d) => [d.price, d.sma50, d.sma200])
     .flat()
     .filter((v): v is number => v !== null);
@@ -179,7 +202,7 @@ export function MovingAveragesChart({
   const maxPrice = Math.max(...prices) * 1.02;
 
   // Format data for display
-  const chartData = data.map((d) => ({
+  const chartData = priceHistory.map((d) => ({
     ...d,
     dateFormatted: formatDate(d.date),
   }));
@@ -190,6 +213,8 @@ export function MovingAveragesChart({
       tooltipContent={tooltipExplanation}
       signal={signal}
       evaluation={evaluation}
+      period={period}
+      onPeriodChange={setPeriod}
     >
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">

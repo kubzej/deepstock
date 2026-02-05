@@ -11,7 +11,7 @@ interface PillButtonProps {
   onClick: () => void;
   children: React.ReactNode;
   className?: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
 }
 
 export function PillButton({
@@ -27,6 +27,7 @@ export function PillButton({
       className={cn(
         'inline-flex items-center justify-center rounded-md font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        size === 'xs' && 'h-5 px-1.5 text-[10px]',
         size === 'sm' && 'h-7 px-3 text-xs',
         size === 'md' && 'h-8 px-4 text-sm',
         active
