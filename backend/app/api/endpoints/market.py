@@ -26,3 +26,12 @@ async def get_exchange_rates():
     """
     return await exchange_service.get_rates()
 
+
+@router.get("/history/{ticker}")
+async def get_price_history(ticker: str, period: str = "1mo"):
+    """
+    Get historical price data for charting.
+    Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
+    """
+    return await market_service.get_price_history(ticker.upper(), period)
+

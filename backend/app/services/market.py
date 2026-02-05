@@ -14,7 +14,7 @@ class MarketDataService:
         """
         Smart fetcher with cache.
         1. Check Redis for each ticker.
-        2. Bulk fetch missing from yfinance.
+        2. BATCH fetch missing from yfinance (single call).
         3. Cache new results.
         """
         results = {}
@@ -28,38 +28,30 @@ class MarketDataService:
             else:
                 missing.append(t)
 
-        # 2. Fetch Missing from Yahoo
+        # 2. BATCH Fetch Missing from Yahoo
         if missing:
             try:
-                # yfinance batch download
-                # We use download for price history to get correct "change" data
-                # period="5d" acts as a buffer for weekends/holidays
-                tickers_str = " ".join(missing)
-                data = yf.download(tickers_str, period="5d", progress=False, group_by='ticker')
-                
-                # Handling single vs multiple tickers structure in yfinance
-                # If only 1 ticker, structure is different (DataFrame directly), so we normalize
-                is_single = len(missing) == 1
+                # Single batch call for all missing tickers
+                batch = yf.Tickers(" ".join(missing))
                 
                 for t in missing:
                     try:
-                        df = data if is_single else data[t]
-                        
-                        if df.empty:
+                        ticker_obj = batch.tickers.get(t)
+                        if not ticker_obj:
                             continue
-
-                        # Extract latest valid close
-                        last_row = df.iloc[-1]
-                        prev_row = df.iloc[-2] if len(df) > 1 else last_row
+                            
+                        info = ticker_obj.fast_info
+                        price = info.last_price
+                        prev_close = info.previous_close
                         
-                        price = float(last_row['Close'])
-                        prev_close = float(prev_row['Close'])
-                        change = price - prev_close
+                        if price is None:
+                            continue
+                        
+                        change = price - prev_close if prev_close else 0
                         change_percent = (change / prev_close) * 100 if prev_close else 0
                         
-                        # Volume data
-                        volume = int(last_row['Volume']) if pd.notna(last_row['Volume']) else 0
-                        avg_volume = int(df['Volume'].mean()) if not df['Volume'].isna().all() else 0
+                        volume = int(info.last_volume) if info.last_volume else 0
+                        avg_volume = int(info.ten_day_average_volume) if info.ten_day_average_volume else 0
 
                         quote = {
                             "symbol": t,
@@ -68,7 +60,7 @@ class MarketDataService:
                             "changePercent": round(change_percent, 2),
                             "volume": volume,
                             "avgVolume": avg_volume,
-                            "lastUpdated": str(last_row.name)
+                            "lastUpdated": str(pd.Timestamp.now())
                         }
 
                         results[t] = quote
@@ -77,11 +69,11 @@ class MarketDataService:
                         await self.redis.set(f"quote:{t}", json.dumps(quote), ex=60)
 
                     except Exception as e:
-                        print(f"Error parse {t}: {e}")
+                        print(f"Error processing {t}: {e}")
                         results[t] = None
-
+                        
             except Exception as e:
-                print(f"Batch fetch error: {e}")
+                print(f"Error in batch fetch: {e}")
         
         return results
 
@@ -104,6 +96,61 @@ class MarketDataService:
         except Exception:
             pass
         return []
+
+    async def get_price_history(self, ticker: str, period: str = "1mo") -> List[dict]:
+        """
+        Get historical price data for charting.
+        Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
+        """
+        cache_key = f"history:{ticker}:{period}"
+        cached = await self.redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
+        try:
+            t = yf.Ticker(ticker)
+            
+            # Determine interval based on period
+            interval = "1d"
+            if period in ["1d", "5d"]:
+                interval = "15m" if period == "1d" else "30m"
+            elif period in ["1mo", "3mo"]:
+                interval = "1d"
+            else:
+                interval = "1wk"
+            
+            hist = t.history(period=period, interval=interval)
+            
+            if hist.empty:
+                return []
+            
+            # Convert to list of dicts for JSON
+            result = []
+            for idx, row in hist.iterrows():
+                result.append({
+                    "date": idx.isoformat(),
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2),
+                    "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else 0
+                })
+            
+            # Cache based on period (shorter periods = shorter TTL)
+            ttl = 300  # 5 min default
+            if period in ["1d", "5d"]:
+                ttl = 60  # 1 min for intraday
+            elif period in ["1mo", "3mo"]:
+                ttl = 3600  # 1 hour
+            else:
+                ttl = 86400  # 1 day for longer periods
+            
+            await self.redis.set(cache_key, json.dumps(result), ex=ttl)
+            return result
+            
+        except Exception as e:
+            print(f"Error fetching history for {ticker}: {e}")
+            return []
 
 # Singleton instance
 settings = get_settings()
