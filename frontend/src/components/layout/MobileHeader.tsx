@@ -10,6 +10,7 @@ import {
   Target,
   Banknote,
   History,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +46,7 @@ export function MobileHeader({
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
+    { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 
   const handleSettingsClick = () => {

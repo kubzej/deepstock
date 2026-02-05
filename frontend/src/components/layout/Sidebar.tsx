@@ -8,6 +8,7 @@ import {
   LogOut,
   Target,
   History,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +36,7 @@ export function Sidebar({
     { id: 'history', icon: History, label: 'Historie' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
+    { id: 'research', icon: Search, label: 'Průzkum akcie' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 
