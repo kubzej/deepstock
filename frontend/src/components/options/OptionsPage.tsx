@@ -33,6 +33,7 @@ import {
 import { AlertCircle } from 'lucide-react';
 import { OptionsTrades } from './OptionsTrades';
 import { OptionsCalculator } from './OptionsCalculator';
+import { OptionsGreeksGuide } from './OptionsGreeksGuide';
 import {
   OptionTransactionModal,
   type ModalMode,
@@ -177,9 +178,7 @@ export function OptionsPage() {
         </TabsContent>
 
         <TabsContent value="greeks" className="mt-4">
-          <div className="text-center text-muted-foreground py-12">
-            Greeks průvodce - připravuje se...
-          </div>
+          <OptionsGreeksGuide />
         </TabsContent>
       </Tabs>
 
