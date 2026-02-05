@@ -56,13 +56,14 @@ async def get_option_transactions(
     portfolio_id: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
     option_symbol: Optional[str] = Query(None),
-    limit: int = Query(100, le=500)
+    limit: int = Query(100, le=500),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
-    Get option transactions.
+    Get option transactions for authenticated user.
     Optionally filter by portfolio_id, underlying symbol, or OCC option_symbol.
     """
-    return await options_service.get_transactions(portfolio_id, symbol, option_symbol, limit)
+    return await options_service.get_transactions(user_id, portfolio_id, symbol, option_symbol, limit)
 
 
 @router.get("/transactions/{transaction_id}")

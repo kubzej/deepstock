@@ -10,6 +10,7 @@ import StocksManager from '@/components/StocksManager';
 import { WatchlistsPage } from '@/components/WatchlistsPage';
 import { SettingsPage } from '@/components/SettingsPage';
 import { OptionsPage, OptionTransactionModal } from '@/components/options';
+import { TransactionHistoryPage } from '@/components/TransactionHistoryPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -166,6 +167,8 @@ function App() {
         return <StocksManager onStockClick={handleStockClick} />;
       case 'opce':
         return <OptionsPage />;
+      case 'history':
+        return <TransactionHistoryPage />;
       case 'analysis':
         return (
           <div className="p-4">

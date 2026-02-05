@@ -105,21 +105,37 @@ class OptionsService:
     
     async def get_transactions(
         self, 
+        user_id: str,
         portfolio_id: Optional[str] = None,
         symbol: Optional[str] = None,
         option_symbol: Optional[str] = None,
         limit: int = 100
     ) -> List[dict]:
         """
-        Get option transactions.
+        Get option transactions for a user.
         Optionally filter by portfolio_id, underlying symbol, or OCC option_symbol.
         """
+        # First get user's portfolio IDs
+        portfolios_response = supabase.table("portfolios") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        user_portfolio_ids = [p["id"] for p in portfolios_response.data]
+        
+        if not user_portfolio_ids:
+            return []
+        
         query = supabase.table("option_transactions") \
-            .select("*") \
+            .select("*, portfolios(name)") \
+            .in_("portfolio_id", user_portfolio_ids) \
             .order("date", desc=True) \
             .limit(limit)
         
         if portfolio_id:
+            # Additional filter if specific portfolio requested
+            if portfolio_id not in user_portfolio_ids:
+                return []  # User doesn't own this portfolio
             query = query.eq("portfolio_id", portfolio_id)
         
         if symbol:
@@ -129,7 +145,15 @@ class OptionsService:
             query = query.eq("option_symbol", option_symbol)
         
         response = query.execute()
-        return response.data
+        
+        # Add portfolio_name to each transaction
+        result = []
+        for tx in response.data:
+            tx["portfolio_name"] = tx.get("portfolios", {}).get("name", "") if tx.get("portfolios") else ""
+            del tx["portfolios"]  # Remove nested object
+            result.append(tx)
+        
+        return result
     
     async def get_transaction_by_id(self, transaction_id: str) -> Optional[dict]:
         """Get a single transaction by ID."""

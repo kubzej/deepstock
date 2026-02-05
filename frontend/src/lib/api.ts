@@ -1203,6 +1203,7 @@ export type Moneyness = 'ITM' | 'ATM' | 'OTM';
 export interface OptionTransaction {
   id: string;
   portfolio_id: string;
+  portfolio_name?: string;
   symbol: string;
   option_symbol: string;
   option_type: OptionType;
@@ -1322,6 +1323,7 @@ export async function fetchOptionTransactions(
   optionSymbol?: string,
   limit: number = 100
 ): Promise<OptionTransaction[]> {
+  const authHeader = await getAuthHeader();
   const params = new URLSearchParams();
   if (portfolioId) params.append('portfolio_id', portfolioId);
   if (symbol) params.append('symbol', symbol);
@@ -1331,10 +1333,14 @@ export async function fetchOptionTransactions(
   const response = await fetch(`${API_URL}/api/options/transactions?${params}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeader,
     },
   });
   
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
     throw new Error('Nepodařilo se načíst opční transakce');
   }
   
