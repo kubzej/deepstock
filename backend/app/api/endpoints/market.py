@@ -48,3 +48,15 @@ async def get_price_history(ticker: str, period: str = "1mo"):
     """
     return await market_service.get_price_history(ticker.upper(), period)
 
+
+@router.get("/stock-info/{ticker}")
+async def get_stock_info(ticker: str):
+    """
+    Get detailed stock info including fundamentals and valuation.
+    Returns price, valuation ratios, margins, growth metrics, analyst targets.
+    """
+    result = await market_service.get_stock_info(ticker.upper())
+    if result is None:
+        return {"error": "Ticker not found"}
+    return result
+

@@ -212,6 +212,94 @@ export async function fetchPriceHistory(
   return response.json();
 }
 
+// Stock info (fundamentals + valuation)
+export interface StockInfo {
+  symbol: string;
+  name: string | null;
+  sector: string | null;
+  industry: string | null;
+  country: string | null;
+  exchange: string | null;
+  currency: string | null;
+  description: string | null;
+  
+  // Price
+  price: number | null;
+  previousClose: number | null;
+  change: number | null;
+  changePercent: number | null;
+  dayHigh: number | null;
+  dayLow: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  volume: number | null;
+  avgVolume: number | null;
+  
+  // Valuation
+  marketCap: number | null;
+  enterpriseValue: number | null;
+  trailingPE: number | null;
+  forwardPE: number | null;
+  pegRatio: number | null;
+  priceToBook: number | null;
+  priceToSales: number | null;
+  enterpriseToRevenue: number | null;
+  enterpriseToEbitda: number | null;
+  
+  // Fundamentals
+  revenue: number | null;
+  revenueGrowth: number | null;
+  grossMargin: number | null;
+  operatingMargin: number | null;
+  profitMargin: number | null;
+  eps: number | null;
+  forwardEps: number | null;
+  roe: number | null;
+  roa: number | null;
+  debtToEquity: number | null;
+  currentRatio: number | null;
+  quickRatio: number | null;
+  freeCashflow: number | null;
+  
+  // Dividends
+  dividendYield: number | null;
+  dividendRate: number | null;
+  payoutRatio: number | null;
+  
+  // Analyst
+  targetHighPrice: number | null;
+  targetLowPrice: number | null;
+  targetMeanPrice: number | null;
+  recommendationKey: string | null;
+  numberOfAnalystOpinions: number | null;
+  
+  // Insights (from backend analysis)
+  insights?: Array<{
+    type: 'positive' | 'warning' | 'info';
+    title: string;
+    description: string;
+  }>;
+  
+  lastUpdated: string;
+}
+
+export async function fetchStockInfo(ticker: string): Promise<StockInfo | null> {
+  const response = await fetch(
+    `${API_URL}/api/market/stock-info/${encodeURIComponent(ticker.toUpperCase())}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch stock info');
+  }
+  
+  const data = await response.json();
+  if (data.error) {
+    return null;
+  }
+  
+  return data;
+}
+
 // ============ Portfolio Endpoints ============
 
 export async function fetchPortfolios(): Promise<Portfolio[]> {
