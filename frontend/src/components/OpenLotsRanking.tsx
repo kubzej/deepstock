@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   formatCurrency,
@@ -415,14 +416,11 @@ export function OpenLotsRanking({
           ].map((option) => {
             const isActive = sortKey === option.key;
             return (
-              <button
+              <PillButton
                 key={option.key}
+                active={isActive}
                 onClick={() => handleSort(option.key)}
-                className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                }`}
+                size="sm"
               >
                 {option.label}
                 {isActive && (
@@ -430,7 +428,7 @@ export function OpenLotsRanking({
                     {sortDirection === 'desc' ? '↓' : '↑'}
                   </span>
                 )}
-              </button>
+              </PillButton>
             );
           })}
         </div>

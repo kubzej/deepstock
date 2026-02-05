@@ -21,6 +21,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { fetchStockInfo, type StockInfo } from '@/lib/api';
+import { PriceChart } from './PriceChart';
 
 // Format large numbers (market cap, revenue)
 function formatLargeNumber(value: number | null): string {
@@ -367,10 +368,10 @@ function InsightsPanel({ insights }: { insights: Insight[] }) {
               <button
                 key={badge.type}
                 onClick={() => setExpanded(isActive ? null : badge.type)}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`inline-flex items-center gap-2 h-8 px-4 rounded-md text-sm font-medium transition-colors ${
                   isActive
-                    ? badge.bgClass + ' ' + badge.colorClass
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    ? 'bg-primary text-primary-foreground shadow'
+                    : 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
                 {badge.count} {badge.label}
@@ -617,16 +618,25 @@ function AnalystSection({ data }: { data: StockInfo }) {
   );
 }
 
-// Technical section placeholder
-function TechnicalSection() {
+// Technical section with price chart
+function TechnicalSection({
+  ticker,
+  currency,
+}: {
+  ticker: string;
+  currency: string;
+}) {
   return (
-    <div className="p-8 bg-muted/50 rounded-lg text-center">
-      <p className="text-muted-foreground">
-        Technická analýza bude přidána později
-      </p>
-      <p className="text-sm text-muted-foreground mt-2">
-        RSI, MACD, Bollinger Bands, Support/Resistance...
-      </p>
+    <div className="space-y-6">
+      <PriceChart ticker={ticker} currency={currency} height={350} />
+
+      {/* Placeholder for indicators */}
+      <div className="p-6 bg-muted/30 rounded-lg text-center">
+        <p className="text-muted-foreground text-sm">
+          Technické indikátory (RSI, MACD, Bollinger Bands) budou přidány
+          později
+        </p>
+      </div>
     </div>
   );
 }
@@ -748,7 +758,10 @@ export function ResearchPage() {
               </TabsContent>
 
               <TabsContent value="technical" className="mt-6">
-                <TechnicalSection />
+                <TechnicalSection
+                  ticker={data.symbol}
+                  currency={data.currency ?? 'USD'}
+                />
               </TabsContent>
             </Tabs>
           </div>

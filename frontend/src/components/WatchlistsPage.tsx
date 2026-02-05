@@ -33,6 +33,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import {
   Plus,
   MoreHorizontal,
@@ -462,35 +463,29 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                   {/* Mobile: Sort pills + Cards */}
                   <div className="md:hidden">
                     {/* Sort pills */}
-                    <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-1 px-1">
+                    <PillGroup className="pb-3 mb-2">
                       {[
                         { key: 'ticker' as SortKey, label: 'A-Z' },
                         { key: 'price' as SortKey, label: 'Cena' },
                         { key: 'change' as SortKey, label: 'Změna' },
                         { key: 'buyTarget' as SortKey, label: 'Nákup' },
                         { key: 'sellTarget' as SortKey, label: 'Prodej' },
-                      ].map((option) => {
-                        const isActive = sortKey === option.key;
-                        return (
-                          <button
-                            key={option.key}
-                            onClick={() => handleSort(option.key)}
-                            className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
-                              isActive
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                            }`}
-                          >
-                            {option.label}
-                            {isActive && (
-                              <span className="ml-0.5">
-                                {sortDir === 'desc' ? '↓' : '↑'}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                      ].map((option) => (
+                        <PillButton
+                          key={option.key}
+                          active={sortKey === option.key}
+                          onClick={() => handleSort(option.key)}
+                          size="sm"
+                        >
+                          {option.label}
+                          {sortKey === option.key && (
+                            <span className="ml-0.5">
+                              {sortDir === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </PillButton>
+                      ))}
+                    </PillGroup>
 
                     {/* Cards */}
                     <div className="space-y-1.5">

@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { getDateRange, DATE_PRESETS, type DateRangePreset } from './utils';
 
 interface DateRangeFilterProps {
@@ -28,24 +29,17 @@ export function DateRangeFilter({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
+      <PillGroup>
         {DATE_PRESETS.map((p) => (
-          <button
+          <PillButton
             key={p.value}
+            active={preset === p.value}
             onClick={() => onPresetChange(p.value)}
-            className={`
-              h-8 px-4 text-sm rounded-full border transition-colors
-              ${
-                preset === p.value
-                  ? 'bg-foreground text-background border-foreground font-medium'
-                  : 'bg-background text-muted-foreground border-border hover:border-foreground hover:text-foreground'
-              }
-            `}
           >
             {p.label}
-          </button>
+          </PillButton>
         ))}
-      </div>
+      </PillGroup>
 
       {preset === 'CUSTOM' && (
         <div className="flex items-center gap-4">
