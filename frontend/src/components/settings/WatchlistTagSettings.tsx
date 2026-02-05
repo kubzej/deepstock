@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,15 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { Plus, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 import { type WatchlistTag } from '@/lib/api';
 import {
@@ -30,17 +20,50 @@ import {
   useDeleteWatchlistTag,
 } from '@/hooks/useWatchlistTags';
 
-// Predefined colors for tags
+// Predefined colors for tags - expanded palette
 const TAG_COLORS = [
+  // Neutrals
   '#6b7280', // gray
+  '#374151', // dark gray
+  // Reds
   '#ef4444', // red
+  '#dc2626', // dark red
+  '#f87171', // light red
+  // Oranges
   '#f97316', // orange
+  '#ea580c', // dark orange
+  '#fb923c', // light orange
+  // Yellows
   '#eab308', // yellow
+  '#ca8a04', // dark yellow
+  '#fde047', // light yellow
+  // Greens
   '#22c55e', // green
+  '#16a34a', // dark green
+  '#4ade80', // light green
+  '#10b981', // emerald
+  // Teals/Cyans
   '#14b8a6', // teal
+  '#06b6d4', // cyan
+  '#0891b2', // dark cyan
+  // Blues
   '#3b82f6', // blue
+  '#2563eb', // dark blue
+  '#60a5fa', // light blue
+  '#0ea5e9', // sky
+  // Purples
   '#8b5cf6', // violet
+  '#7c3aed', // dark violet
+  '#a855f7', // purple
+  '#c084fc', // light purple
+  // Pinks
   '#ec4899', // pink
+  '#db2777', // dark pink
+  '#f472b6', // light pink
+  // Special
+  '#f43f5e', // rose
+  '#84cc16', // lime
+  '#a3e635', // light lime
 ];
 
 interface WatchlistTagSettingsProps {
@@ -48,8 +71,6 @@ interface WatchlistTagSettingsProps {
 }
 
 export function WatchlistTagSettings({ onBack }: WatchlistTagSettingsProps) {
-  const queryClient = useQueryClient();
-
   const { data: tags = [], isLoading } = useWatchlistTags();
   const createMutation = useCreateWatchlistTag();
   const updateMutation = useUpdateWatchlistTag();
@@ -111,28 +132,26 @@ export function WatchlistTagSettings({ onBack }: WatchlistTagSettingsProps) {
     }
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['watchlistTags'] });
-  };
-
   return (
     <div className="space-y-6 pb-12">
-      <PageHeader
-        title="Watchlist tagy"
-        onRefresh={handleRefresh}
-        isRefreshing={isLoading}
-        actions={
-          <>
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Button onClick={openCreate} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nový tag
-            </Button>
-          </>
-        }
-      />
+      {/* Header with back button */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Zpět
+        </Button>
+        <Button onClick={openCreate} size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          Nový tag
+        </Button>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-bold">Watchlist tagy</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Tagy pro organizaci položek
+        </p>
+      </div>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -150,47 +169,37 @@ export function WatchlistTagSettings({ onBack }: WatchlistTagSettingsProps) {
           </Button>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[60px]">Barva</TableHead>
-              <TableHead>Název</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tags.map((tag) => (
-              <TableRow key={tag.id}>
-                <TableCell>
-                  <div
-                    className="h-5 w-5 rounded-full"
-                    style={{ backgroundColor: tag.color || TAG_COLORS[0] }}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{tag.name}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEdit(tag)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setDeleteData(tag)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="space-y-2">
+          {tags.map((tag) => (
+            <div
+              key={tag.id}
+              className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 rounded-lg"
+            >
+              <div
+                className="h-4 w-4 rounded-full flex-shrink-0"
+                style={{ backgroundColor: tag.color || TAG_COLORS[0] }}
+              />
+              <div className="flex-1 text-sm">{tag.name}</div>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openEdit(tag)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeleteData(tag)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Create/Edit Dialog */}

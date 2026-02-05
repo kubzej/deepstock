@@ -951,7 +951,6 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                           : `${tag.color}20`,
                         color: isSelected ? '#fff' : tag.color,
                         borderColor: tag.color,
-                        ringColor: tag.color,
                       }}
                     >
                       {tag.name}

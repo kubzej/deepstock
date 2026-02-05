@@ -43,8 +43,16 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+
+type CompletenessFilter = 'all' | 'complete' | 'incomplete';
 
 // Options from portfolio-tracker
 const EXCHANGE_OPTIONS = [
@@ -108,6 +116,20 @@ const EMPTY_FORM: StockFormData = {
   notes: '',
 };
 
+// Check if stock has all important fields filled
+function getStockCompleteness(stock: Stock): {
+  isComplete: boolean;
+  missing: string[];
+} {
+  const missing: string[] = [];
+  if (!stock.sector) missing.push('Sektor');
+  if (!stock.exchange) missing.push('Burza');
+  return {
+    isComplete: missing.length === 0,
+    missing,
+  };
+}
+
 interface StocksManagerProps {
   onStockClick?: (ticker: string) => void;
 }
@@ -128,6 +150,8 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Stock[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [completenessFilter, setCompletenessFilter] =
+    useState<CompletenessFilter>('all');
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -139,8 +163,13 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   const [formData, setFormData] = useState<StockFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Derived state
-  const stocks = searchResults ?? allStocks;
+  // Derived state - apply completeness filter
+  const baseStocks = searchResults ?? allStocks;
+  const stocks = baseStocks.filter((stock) => {
+    if (completenessFilter === 'all') return true;
+    const { isComplete } = getStockCompleteness(stock);
+    return completenessFilter === 'complete' ? isComplete : !isComplete;
+  });
   const loading = stocksLoading || searching;
   const error = stocksError?.message ?? null;
   const saving =
@@ -333,15 +362,35 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
         }
       />
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Hledat podle tickeru nebo názvu..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search + Filter */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Hledat podle tickeru nebo názvu..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <ToggleGroup
+          type="single"
+          value={completenessFilter}
+          onValueChange={(value) =>
+            value && setCompletenessFilter(value as CompletenessFilter)
+          }
+          className="w-full"
+        >
+          <ToggleGroupItem value="all" className="flex-1 text-xs">
+            Vše
+          </ToggleGroupItem>
+          <ToggleGroupItem value="complete" className="flex-1 text-xs">
+            Kompletní
+          </ToggleGroupItem>
+          <ToggleGroupItem value="incomplete" className="flex-1 text-xs">
+            Nekompletní
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {/* Stocks List */}
@@ -385,7 +434,31 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                       onClick={() => onStockClick?.(stock.ticker)}
                     >
                       <TableCell className="font-mono font-medium">
-                        {stock.ticker}
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const { isComplete, missing } =
+                              getStockCompleteness(stock);
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                      isComplete
+                                        ? 'bg-emerald-500'
+                                        : 'bg-amber-500'
+                                    }`}
+                                  />
+                                </TooltipTrigger>
+                                <TooltipContent side="right">
+                                  {isComplete
+                                    ? 'Kompletní údaje'
+                                    : `Chybí: ${missing.join(', ')}`}
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })()}
+                          {stock.ticker}
+                        </div>
                       </TableCell>
                       <TableCell>{stock.name}</TableCell>
                       <TableCell>{stock.currency}</TableCell>
@@ -453,7 +526,27 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                     className="flex-1 min-w-0 cursor-pointer overflow-hidden"
                     onClick={() => onStockClick?.(stock.ticker)}
                   >
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const { isComplete, missing } =
+                          getStockCompleteness(stock);
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                  isComplete ? 'bg-emerald-500' : 'bg-amber-500'
+                                }`}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {isComplete
+                                ? 'Kompletní údaje'
+                                : `Chybí: ${missing.join(', ')}`}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })()}
                       <span className="font-mono font-bold text-sm flex-shrink-0">
                         {stock.ticker}
                       </span>

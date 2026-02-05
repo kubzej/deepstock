@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Pencil, Trash2, Tag, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, Tag, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Quote, WatchlistItem, WatchlistTag } from '@/lib/api';
+import type { Quote, WatchlistItem } from '@/lib/api';
 import { formatPrice, formatPercent } from '@/lib/format';
 
 interface WatchlistItemCardProps {

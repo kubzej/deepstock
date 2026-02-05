@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   closestCenter,
@@ -30,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { Plus, Pencil, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
 import { type Watchlist } from '@/lib/api';
 import {
@@ -71,7 +69,7 @@ function SortableRow({ watchlist, onEdit, onDelete }: SortableRowProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-3 py-3 border-b last:border-b-0 ${
+      className={`flex items-center gap-3 px-4 py-3 bg-muted/30 rounded-lg ${
         isDragging ? 'opacity-50 bg-muted' : ''
       }`}
     >
@@ -111,8 +109,6 @@ function SortableRow({ watchlist, onEdit, onDelete }: SortableRowProps) {
 }
 
 export function WatchlistSettings({ onBack }: WatchlistSettingsProps) {
-  const queryClient = useQueryClient();
-
   const { data: watchlists = [], isLoading } = useWatchlists();
   const createMutation = useCreateWatchlist();
   const updateMutation = useUpdateWatchlist();
@@ -197,29 +193,26 @@ export function WatchlistSettings({ onBack }: WatchlistSettingsProps) {
     }
   };
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['watchlists'] });
-  };
-
   return (
     <div className="space-y-6 pb-12">
-      <PageHeader
-        title="Watchlisty"
-        subtitle="Přetažením změníte pořadí"
-        onRefresh={handleRefresh}
-        isRefreshing={isLoading}
-        actions={
-          <>
-            <Button variant="ghost" size="icon" onClick={onBack}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <Button onClick={openCreate} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Nový watchlist
-            </Button>
-          </>
-        }
-      />
+      {/* Header with back button */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Zpět
+        </Button>
+        <Button onClick={openCreate} size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          Nový watchlist
+        </Button>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-bold">Watchlisty</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Přetažením změníte pořadí
+        </p>
+      </div>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -236,7 +229,7 @@ export function WatchlistSettings({ onBack }: WatchlistSettingsProps) {
           </Button>
         </div>
       ) : (
-        <div className="border rounded-lg">
+        <div className="space-y-2">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
