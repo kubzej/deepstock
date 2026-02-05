@@ -27,14 +27,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -48,7 +40,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 
@@ -373,32 +365,22 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
             className="pl-10"
           />
         </div>
-        <ToggleGroup
-          type="single"
+        <Tabs
           value={completenessFilter}
           onValueChange={(value) =>
-            value && setCompletenessFilter(value as CompletenessFilter)
+            setCompletenessFilter(value as CompletenessFilter)
           }
-          className="w-full"
         >
-          <ToggleGroupItem value="all" className="flex-1 text-xs">
-            Vše
-          </ToggleGroupItem>
-          <ToggleGroupItem value="complete" className="flex-1 text-xs">
-            Kompletní
-          </ToggleGroupItem>
-          <ToggleGroupItem value="incomplete" className="flex-1 text-xs">
-            Nekompletní
-          </ToggleGroupItem>
-        </ToggleGroup>
+          <TabsList>
+            <TabsTrigger value="all">Vše</TabsTrigger>
+            <TabsTrigger value="complete">Kompletní</TabsTrigger>
+            <TabsTrigger value="incomplete">Nekompletní</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Stocks List */}
       <div>
-        <h2 className="text-lg font-semibold mb-4">
-          Seznam akcií ({stocks.length})
-        </h2>
-
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
@@ -413,105 +395,97 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
           </p>
         ) : (
           <>
-            {/* Desktop Table */}
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ticker</TableHead>
-                    <TableHead>Název</TableHead>
-                    <TableHead>Měna</TableHead>
-                    <TableHead>Burza</TableHead>
-                    <TableHead>Sektor</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stocks.map((stock) => (
-                    <TableRow
-                      key={stock.id}
-                      className={onStockClick ? 'cursor-pointer' : ''}
-                      onClick={() => onStockClick?.(stock.ticker)}
-                    >
-                      <TableCell className="font-mono font-medium">
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const { isComplete, missing } =
-                              getStockCompleteness(stock);
-                            return (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                      isComplete
-                                        ? 'bg-emerald-500'
-                                        : 'bg-amber-500'
-                                    }`}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent side="right">
-                                  {isComplete
-                                    ? 'Kompletní údaje'
-                                    : `Chybí: ${missing.join(', ')}`}
-                                </TooltipContent>
-                              </Tooltip>
-                            );
-                          })()}
-                          {stock.ticker}
-                        </div>
-                      </TableCell>
-                      <TableCell>{stock.name}</TableCell>
-                      <TableCell>{stock.currency}</TableCell>
-                      <TableCell
-                        className={
-                          !stock.exchange ? 'text-muted-foreground' : ''
-                        }
-                      >
-                        {stock.exchange || '—'}
-                      </TableCell>
-                      <TableCell
-                        className={!stock.sector ? 'text-muted-foreground' : ''}
-                      >
-                        {stock.sector || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => e.stopPropagation()}
+            {/* Desktop - Multi-column (flows down then right) */}
+            <div className="hidden md:block md:columns-2 xl:columns-3 gap-8">
+              {stocks.map((stock) => {
+                const { isComplete, missing } = getStockCompleteness(stock);
+                return (
+                  <div
+                    key={stock.id}
+                    className={`flex items-start gap-2 py-2 px-2 rounded hover:bg-muted/50 group break-inside-avoid ${onStockClick ? 'cursor-pointer' : ''}`}
+                    onClick={() => onStockClick?.(stock.ticker)}
+                  >
+                    {/* Stock info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={`font-bold text-sm ${isComplete ? '' : 'text-amber-500'}`}
                             >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditDialog(stock);
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Upravit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(stock);
-                              }}
-                              className="text-rose-500"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Smazat
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                              {stock.ticker}
+                            </span>
+                          </TooltipTrigger>
+                          {!isComplete && (
+                            <TooltipContent side="top">
+                              Chybí: {missing.join(', ')}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {stock.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 truncate">
+                        <span>{stock.currency}</span>
+                        {stock.exchange && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span>{stock.exchange}</span>
+                          </>
+                        )}
+                        {stock.country && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span>{stock.country}</span>
+                          </>
+                        )}
+                        {stock.sector && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span className="truncate">{stock.sector}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(stock);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Upravit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteDialog(stock);
+                          }}
+                          className="text-rose-500"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Smazat
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Mobile List */}

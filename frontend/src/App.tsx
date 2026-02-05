@@ -9,6 +9,10 @@ import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
 import { WatchlistsPage } from '@/components/WatchlistsPage';
 import { SettingsPage } from '@/components/SettingsPage';
+import { OptionsPage, OptionTransactionModal } from '@/components/options';
+import { TransactionHistoryPage } from '@/components/TransactionHistoryPage';
+import { AnalysisPage } from '@/components/AnalysisPage';
+import { ResearchPage } from '@/components/ResearchPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -26,6 +30,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [optionModalOpen, setOptionModalOpen] = useState(false);
 
   // Stock edit/delete state
   const [editStock, setEditStock] = useState<Stock | null>(null);
@@ -102,7 +107,11 @@ function App() {
   // If viewing stock detail
   if (selectedTicker) {
     return (
-      <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+      <AppLayout
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onNewOptionTransaction={() => setOptionModalOpen(true)}
+      >
         <StockDetail
           ticker={selectedTicker}
           onBack={handleBackFromDetail}
@@ -158,13 +167,14 @@ function App() {
         return <Dashboard onStockClick={handleStockClick} />;
       case 'stocks':
         return <StocksManager onStockClick={handleStockClick} />;
+      case 'opce':
+        return <OptionsPage />;
+      case 'history':
+        return <TransactionHistoryPage />;
       case 'analysis':
-        return (
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Analýza</h1>
-            <p className="text-muted-foreground mt-2">Připravuje se...</p>
-          </div>
-        );
+        return <AnalysisPage />;
+      case 'research':
+        return <ResearchPage />;
       case 'watchlist':
         return <WatchlistsPage onStockClick={handleStockClick} />;
       case 'settings':
@@ -184,13 +194,23 @@ function App() {
   };
 
   return (
-    <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+    <AppLayout
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      onNewOptionTransaction={() => setOptionModalOpen(true)}
+    >
       {renderContent()}
 
       {/* Transaction Modal */}
       <TransactionModal
         open={transactionModalOpen}
         onOpenChange={setTransactionModalOpen}
+      />
+
+      {/* Option Transaction Modal */}
+      <OptionTransactionModal
+        open={optionModalOpen}
+        onOpenChange={setOptionModalOpen}
       />
     </AppLayout>
   );

@@ -6,12 +6,14 @@ interface AppLayoutProps {
   children: ReactNode;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onNewOptionTransaction?: () => void;
 }
 
 export function AppLayout({
   children,
   activeTab,
   onTabChange,
+  onNewOptionTransaction,
 }: AppLayoutProps) {
   const handleNewTransaction = () => {
     // Trigger 'add' tab which App.tsx handles to open TransactionModal
@@ -25,6 +27,7 @@ export function AppLayout({
         activeTab={activeTab}
         onTabChange={onTabChange}
         onNewTransaction={handleNewTransaction}
+        onNewOptionTransaction={onNewOptionTransaction}
       />
 
       {/* Mobile Header */}
@@ -32,6 +35,7 @@ export function AppLayout({
         activeTab={activeTab}
         onTabChange={onTabChange}
         onNewTransaction={handleNewTransaction}
+        onNewOptionTransaction={onNewOptionTransaction}
       />
 
       {/* Main Content */}

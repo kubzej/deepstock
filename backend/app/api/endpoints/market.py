@@ -9,6 +9,9 @@ router = APIRouter()
 class TickerRequest(BaseModel):
     tickers: List[str]
 
+class OptionSymbolsRequest(BaseModel):
+    symbols: List[str]
+
 @router.post("/batch-quotes")
 async def get_quotes(payload: TickerRequest):
     """
@@ -16,6 +19,16 @@ async def get_quotes(payload: TickerRequest):
     Uses Redis caching + yfinance batch download.
     """
     return await market_service.get_quotes(payload.tickers)
+
+
+@router.post("/option-quotes")
+async def get_option_quotes(payload: OptionSymbolsRequest):
+    """
+    Fetch price and Greeks for option OCC symbols.
+    Uses Redis caching + yfinance.
+    Example symbols: AAPL250117C00150000, SOFI260320P00028000
+    """
+    return await market_service.get_option_quotes(payload.symbols)
 
 
 @router.get("/exchange-rates")
@@ -34,4 +47,39 @@ async def get_price_history(ticker: str, period: str = "1mo"):
     Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
     """
     return await market_service.get_price_history(ticker.upper(), period)
+
+
+@router.get("/stock-info/{ticker}")
+async def get_stock_info(ticker: str):
+    """
+    Get detailed stock info including fundamentals and valuation.
+    Returns price, valuation ratios, margins, growth metrics, analyst targets.
+    """
+    result = await market_service.get_stock_info(ticker.upper())
+    if result is None:
+        return {"error": "Ticker not found"}
+    return result
+
+
+@router.get("/technical/{ticker}")
+async def get_technical_indicators(ticker: str, period: str = "1y"):
+    """
+    Get technical analysis indicators for a stock.
+    
+    Periods: 1w, 1mo, 3mo, 6mo, 1y, 2y
+    
+    Returns current values and historical data for:
+    - SMA (50, 200)
+    - RSI (14)
+    - MACD (12, 26, 9)
+    - Bollinger Bands (20, 2)
+    - Stochastic (14, 3, 3)
+    - ATR (14)
+    - OBV
+    - ADX (14)
+    """
+    result = await market_service.get_technical_indicators(ticker.upper(), period)
+    if result is None:
+        return {"error": "Unable to calculate technical indicators for this ticker"}
+    return result
 

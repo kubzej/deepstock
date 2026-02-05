@@ -7,6 +7,10 @@ import {
   Menu,
   Plus,
   LogOut,
+  Target,
+  Banknote,
+  History,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,21 +27,26 @@ interface MobileHeaderProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onNewTransaction: () => void;
+  onNewOptionTransaction?: () => void;
 }
 
 export function MobileHeader({
   activeTab,
   onTabChange,
   onNewTransaction,
+  onNewOptionTransaction,
 }: MobileHeaderProps) {
   const { signOut } = useAuth();
 
   const menuItems = [
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
+    { id: 'opce', icon: Target, label: 'Opce' },
+    { id: 'history', icon: History, label: 'Historie' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
+    { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 
   const handleSettingsClick = () => {
@@ -57,15 +66,28 @@ export function MobileHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Quick Add Button */}
-          <Button
-            onClick={onNewTransaction}
-            size="sm"
-            className="h-8 px-3 gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="sr-only sm:not-sr-only">Přidat</span>
-          </Button>
+          {/* Quick Add Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="h-8 px-3 gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span className="sr-only sm:not-sr-only">Přidat</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={onNewTransaction} className="py-3">
+                <Banknote className="w-5 h-5 mr-3" />
+                Akciová transakce
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onNewOptionTransaction}
+                className="py-3"
+              >
+                <Target className="w-5 h-5 mr-3" />
+                Opční transakce
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Dropdown Menu */}
           <DropdownMenu>

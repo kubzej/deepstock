@@ -151,9 +151,39 @@ body {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
   }
+  /* Remove outline from all recharts elements */
+  .recharts-wrapper *,
+  .recharts-surface * {
+    outline: none !important;
+  }
+}
+
+/* Remove Recharts default borders */
+.recharts-wrapper,
+.recharts-surface {
+  outline: none !important;
+  border: none !important;
+}
+
+.recharts-cartesian-grid line {
+  stroke: transparent !important;
+}
+
+/* Remove focus/active state borders on chart elements */
+.recharts-area-area,
+.recharts-area-curve,
+.recharts-surface:focus,
+.recharts-surface:active,
+.recharts-wrapper:focus,
+.recharts-wrapper:active,
+path.recharts-curve,
+path.recharts-area-area {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
