@@ -1,9 +1,9 @@
 import yfinance as yf
-import redis.asyncio as redis
 import json
 import math
 from typing import Dict
 from app.core.config import get_settings
+from app.core.redis import get_redis
 
 class ExchangeRateService:
     """Service for fetching and caching exchange rates to CZK."""
@@ -27,8 +27,8 @@ class ExchangeRateService:
         'SGD': 17.5, 'TWD': 0.73, 'KRW': 0.017,
     }
     
-    def __init__(self, redis_url: str = "redis://redis:6379/0"):
-        self.redis = redis.from_url(redis_url)
+    def __init__(self):
+        self.redis = get_redis()  # Uses shared connection pool
     
     async def get_rates(self) -> Dict[str, float]:
         """
@@ -110,5 +110,5 @@ class ExchangeRateService:
         return round(amount * rate, 2)
 
 
-settings = get_settings()
-exchange_service = ExchangeRateService(redis_url=settings.redis_url)
+# Singleton instance using shared Redis pool
+exchange_service = ExchangeRateService()

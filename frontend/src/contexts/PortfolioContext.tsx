@@ -21,6 +21,7 @@ import { useHoldings } from '@/hooks/useHoldings';
 import { useOpenLots } from '@/hooks/useOpenLots';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useQuotes } from '@/hooks/useQuotes';
+import { useAllWatchlistTickers } from '@/hooks/useWatchlists';
 
 // Extended holding with current price data
 export interface HoldingWithPrice extends Holding {
@@ -104,12 +105,17 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   // Fetch exchange rates
   const { data: ratesData = DEFAULT_RATES } = useExchangeRates();
 
-  // Get unique tickers for quotes
-  const tickers = useMemo(() => {
-    return [...new Set(holdingsData.map((h) => h.ticker))];
-  }, [holdingsData]);
+  // Prefetch: Get all watchlist tickers for background prefetching
+  const { data: watchlistTickers = [] } = useAllWatchlistTickers();
 
-  // Fetch quotes for holdings
+  // Get unique tickers for quotes (holdings + watchlist for prefetch)
+  const tickers = useMemo(() => {
+    const holdingTickers = holdingsData.map((h) => h.ticker);
+    // Combine with watchlist tickers for prefetching
+    return [...new Set([...holdingTickers, ...watchlistTickers])];
+  }, [holdingsData, watchlistTickers]);
+
+  // Fetch quotes for holdings + watchlist tickers (single batch)
   const { data: quotesData = {}, isLoading: quotesLoading } =
     useQuotes(tickers);
 

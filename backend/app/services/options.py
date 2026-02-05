@@ -331,44 +331,86 @@ class OptionsService:
         
         return response.data
     
-    async def fetch_live_prices(self, option_symbols: List[str]) -> List[dict]:
+    def _fetch_option_prices_batch(self, option_symbols: List[str]) -> List[dict]:
         """
-        Fetch live option prices from Yahoo Finance via yfinance.
-        Updates the option_prices cache and returns the results.
+        Fetch multiple option prices using yf.Tickers batch object.
+        This shares the HTTP session across all tickers for better performance.
         """
         import yfinance as yf
         
         results = []
-        for occ_symbol in option_symbols:
-            try:
-                # yfinance accepts OCC symbols directly
-                ticker = yf.Ticker(occ_symbol)
-                info = ticker.info
-                
-                if not info or info.get("regularMarketPrice") is None:
+        
+        if not option_symbols:
+            return results
+        
+        try:
+            # Create batch ticker object - shares HTTP session
+            batch = yf.Tickers(" ".join(option_symbols))
+            
+            for occ_symbol in option_symbols:
+                try:
+                    ticker_obj = batch.tickers.get(occ_symbol)
+                    if not ticker_obj:
+                        continue
+                    
+                    info = ticker_obj.info
+                    
+                    if not info or info.get("regularMarketPrice") is None:
+                        continue
+                    
+                    results.append({
+                        "option_symbol": occ_symbol,
+                        "price": info.get("regularMarketPrice"),
+                        "bid": info.get("bid"),
+                        "ask": info.get("ask"),
+                        "volume": info.get("volume"),
+                        "open_interest": info.get("openInterest"),
+                        "implied_volatility": info.get("impliedVolatility"),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    })
+                    
+                except Exception as e:
+                    print(f"Failed to fetch price for {occ_symbol}: {e}")
                     continue
-                
-                price_data = {
-                    "option_symbol": occ_symbol,
-                    "price": info.get("regularMarketPrice"),
-                    "bid": info.get("bid"),
-                    "ask": info.get("ask"),
-                    "volume": info.get("volume"),
-                    "open_interest": info.get("openInterest"),
-                    "implied_volatility": info.get("impliedVolatility"),
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-                
-                # Upsert to cache
+                    
+        except Exception as e:
+            print(f"Error creating batch tickers: {e}")
+        
+        return results
+
+    async def fetch_live_prices(self, option_symbols: List[str]) -> List[dict]:
+        """
+        Fetch live option prices from Yahoo Finance via yfinance.
+        Updates the option_prices cache and returns the results.
+        
+        Optimization: Uses yf.Tickers batch object for shared HTTP session.
+        """
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        if not option_symbols:
+            return []
+        
+        # Batch fetch using shared session in thread pool
+        loop = asyncio.get_event_loop()
+        
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            fetched_results = await loop.run_in_executor(
+                executor, 
+                self._fetch_option_prices_batch, 
+                option_symbols
+            )
+        
+        # Upsert to cache
+        results = []
+        for result in fetched_results:
+            try:
                 supabase.table("option_prices") \
-                    .upsert(price_data, on_conflict="option_symbol") \
+                    .upsert(result, on_conflict="option_symbol") \
                     .execute()
-                
-                results.append(price_data)
-                
+                results.append(result)
             except Exception as e:
-                print(f"Failed to fetch price for {occ_symbol}: {e}")
-                continue
+                print(f"Failed to upsert price: {e}")
         
         return results
     

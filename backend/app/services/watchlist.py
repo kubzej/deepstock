@@ -135,6 +135,36 @@ class WatchlistService:
                 .execute()
         return True
     
+    async def get_all_tickers(self, user_id: str) -> List[str]:
+        """
+        Get all unique tickers from all user's watchlists.
+        Used for prefetching quotes on app load.
+        """
+        # First get user's watchlist IDs
+        watchlist_response = supabase.table("watchlists") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        watchlist_ids = [w["id"] for w in watchlist_response.data]
+        
+        if not watchlist_ids:
+            return []
+        
+        # Get all items from these watchlists with stock ticker
+        items_response = supabase.table("watchlist_items") \
+            .select("stocks(ticker)") \
+            .in_("watchlist_id", watchlist_ids) \
+            .execute()
+        
+        # Extract unique tickers
+        tickers = set()
+        for item in items_response.data:
+            if item.get("stocks") and item["stocks"].get("ticker"):
+                tickers.add(item["stocks"]["ticker"])
+        
+        return sorted(list(tickers))
+    
     # ==========================================
     # WATCHLIST ITEMS
     # ==========================================

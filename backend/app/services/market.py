@@ -2,13 +2,13 @@
 import yfinance as yf
 import pandas as pd
 import json
-import redis.asyncio as redis
 from typing import List, Dict, Optional
 from app.core.config import get_settings
+from app.core.redis import get_redis
 
 class MarketDataService:
-    def __init__(self, redis_url: str = "redis://redis:6379/0"):
-        self.redis = redis.from_url(redis_url)
+    def __init__(self):
+        self.redis = get_redis()  # Uses shared connection pool
 
     async def get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
         """
@@ -152,29 +152,32 @@ class MarketDataService:
             print(f"Error fetching history for {ticker}: {e}")
             return []
 
-    async def get_option_quotes(self, occ_symbols: List[str]) -> Dict[str, dict]:
+    def _fetch_option_quotes_batch(self, occ_symbols: List[str]) -> Dict[str, Optional[dict]]:
         """
-        Fetch option quotes for OCC symbols.
-        Uses same pattern as stock quotes - cache first, batch fetch missing.
+        Fetch multiple option quotes using yf.Tickers batch object.
+        This shares the HTTP session across all tickers for better performance.
+        
+        Note: yfinance doesn't have true batch .info, but yf.Tickers shares session
+        which reduces connection overhead.
         """
         results = {}
-        missing = []
-
-        # 1. Try Cache
-        for occ in occ_symbols:
-            cached = await self.redis.get(f"option_quote:{occ}")
-            if cached:
-                results[occ] = json.loads(cached)
-            else:
-                missing.append(occ)
-
-        # 2. Fetch missing from Yahoo
-        if missing:
-            for occ in missing:
+        
+        if not occ_symbols:
+            return results
+        
+        try:
+            # Create batch ticker object - shares HTTP session
+            batch = yf.Tickers(" ".join(occ_symbols))
+            
+            for occ in occ_symbols:
                 try:
-                    t = yf.Ticker(occ)
-                    # For options, we need to use .info as .fast_info doesn't work
-                    info = t.info
+                    ticker_obj = batch.tickers.get(occ)
+                    if not ticker_obj:
+                        results[occ] = None
+                        continue
+                    
+                    # .info is still per-ticker, but session is shared
+                    info = ticker_obj.info
                     
                     if not info or info.get("regularMarketPrice") is None:
                         results[occ] = None
@@ -204,12 +207,57 @@ class MarketDataService:
                     
                     results[occ] = quote
                     
-                    # Cache (60s TTL for option prices)
-                    await self.redis.set(f"option_quote:{occ}", json.dumps(quote), ex=60)
-                    
                 except Exception as e:
                     print(f"Error fetching option quote for {occ}: {e}")
                     results[occ] = None
+                    
+        except Exception as e:
+            print(f"Error creating batch tickers: {e}")
+            # Fallback: return empty dict, will be handled by caller
+        
+        return results
+
+    async def get_option_quotes(self, occ_symbols: List[str]) -> Dict[str, dict]:
+        """
+        Fetch option quotes for OCC symbols.
+        Uses cache first, then batch fetches missing via yf.Tickers (shared session).
+        
+        Optimization: Uses yf.Tickers batch object which shares HTTP session,
+        plus ThreadPoolExecutor for non-blocking async execution.
+        """
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        results = {}
+        missing = []
+
+        # 1. Try Cache
+        for occ in occ_symbols:
+            cached = await self.redis.get(f"option_quote:{occ}")
+            if cached:
+                results[occ] = json.loads(cached)
+            else:
+                missing.append(occ)
+
+        # 2. Batch fetch missing from Yahoo using shared session
+        if missing:
+            loop = asyncio.get_event_loop()
+            
+            # Run batch fetch in thread pool (non-blocking)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                fetched = await loop.run_in_executor(
+                    executor, 
+                    self._fetch_option_quotes_batch, 
+                    missing
+                )
+            
+            # Process results and cache
+            for occ, quote in fetched.items():
+                results[occ] = quote
+                
+                # Cache successful fetches (60s TTL for option prices)
+                if quote is not None:
+                    await self.redis.set(f"option_quote:{occ}", json.dumps(quote), ex=60)
         
         return results
 
@@ -1483,6 +1531,5 @@ class MarketDataService:
         return signals
 
 
-# Singleton instance
-settings = get_settings()
-market_service = MarketDataService(redis_url=settings.redis_url)
+# Singleton instance using shared Redis pool
+market_service = MarketDataService()

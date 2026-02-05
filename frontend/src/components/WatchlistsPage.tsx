@@ -43,7 +43,6 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  RefreshCw,
   Eye,
   Target,
   Tag,
@@ -424,9 +423,6 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                 </Button>
               ))}
             </div>
-            {quotesLoading && (
-              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
-            )}
             <div className="flex-1" />
             <Button
               size="sm"

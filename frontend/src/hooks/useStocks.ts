@@ -7,19 +7,21 @@ import {
   deleteStock,
   type Stock,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 // Query key for all stocks
 const stocksKey = ['stocks'] as const;
 
 /**
  * Hook for fetching all stocks (master data).
+ * Long stale time - master data rarely changes.
  */
 export function useStocks() {
   return useQuery({
     queryKey: stocksKey,
     queryFn: () => fetchStocks(500),
-    staleTime: 10 * 60 * 1000, // 10 minutes - stocks rarely change
+    staleTime: STALE_TIMES.stocks,
+    gcTime: GC_TIMES.long,
   });
 }
 
@@ -31,7 +33,8 @@ export function useStock(ticker: string) {
     queryKey: queryKeys.stock(ticker),
     queryFn: () => fetchStock(ticker),
     enabled: !!ticker,
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIMES.stocks,
+    gcTime: GC_TIMES.long,
   });
 }
 

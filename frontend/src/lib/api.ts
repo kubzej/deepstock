@@ -1116,6 +1116,27 @@ export async function fetchWatchlists(): Promise<Watchlist[]> {
   return response.json();
 }
 
+/**
+ * Fetch all unique tickers from all user's watchlists.
+ * Used for prefetching quotes on app load.
+ */
+export async function fetchAllWatchlistTickers(): Promise<string[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/watchlists/tickers`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) return []; // Silent fail for prefetch
+    return [];
+  }
+  
+  return response.json();
+}
+
 export async function fetchWatchlist(watchlistId: string): Promise<Watchlist> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/watchlists/${watchlistId}`, {

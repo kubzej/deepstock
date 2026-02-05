@@ -1,9 +1,21 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import os
 from app.api.endpoints import market, portfolio, stocks, watchlists, options
+from app.core.redis import close_redis_pool
 
-app = FastAPI(title="DeepStock API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan - startup and shutdown events."""
+    # Startup
+    yield
+    # Shutdown - close Redis connection pool
+    await close_redis_pool()
+
+
+app = FastAPI(title="DeepStock API", lifespan=lifespan)
 
 # CORS setup - allow frontend origins
 allowed_origins = [

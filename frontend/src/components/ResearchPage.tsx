@@ -1,7 +1,7 @@
 /**
  * Research Page - Stock lookup with fundamentals & valuation
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -22,7 +22,13 @@ import {
 } from '@/components/ui/tooltip';
 import { fetchStockInfo, type StockInfo } from '@/lib/api';
 import { PriceChart } from './PriceChart';
-import { TechnicalAnalysis } from './TechnicalAnalysis';
+
+// Lazy load TechnicalAnalysis - heavy component with indicators
+const TechnicalAnalysis = lazy(() =>
+  import('./TechnicalAnalysis').then((mod) => ({
+    default: mod.TechnicalAnalysis,
+  })),
+);
 
 // Format large numbers (market cap, revenue)
 function formatLargeNumber(value: number | null): string {
@@ -632,8 +638,21 @@ function TechnicalSection({
       {/* Price Chart */}
       <PriceChart ticker={ticker} currency={currency} height={350} />
 
-      {/* Technical Indicators */}
-      <TechnicalAnalysis ticker={ticker} />
+      {/* Technical Indicators - lazy loaded */}
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-48" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} className="h-20" />
+              ))}
+            </div>
+          </div>
+        }
+      >
+        <TechnicalAnalysis ticker={ticker} />
+      </Suspense>
     </div>
   );
 }

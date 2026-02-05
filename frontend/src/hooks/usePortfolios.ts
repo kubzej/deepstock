@@ -4,16 +4,18 @@ import {
   createPortfolio,
   type Portfolio,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Hook for fetching portfolios list.
+ * Long stale time - portfolios rarely change.
  */
 export function usePortfolios() {
   return useQuery({
     queryKey: queryKeys.portfolios(),
     queryFn: fetchPortfolios,
-    staleTime: 10 * 60 * 1000, // 10 minutes - portfolios rarely change
+    staleTime: STALE_TIMES.portfolios,
+    gcTime: GC_TIMES.long,
   });
 }
 
