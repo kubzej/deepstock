@@ -403,125 +403,97 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
           </p>
         ) : (
           <>
-            {/* Desktop Table */}
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Ticker
-                    </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Název
-                    </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Měna
-                    </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Burza
-                    </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Sektor
-                    </TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Země
-                    </TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stocks.map((stock) => (
-                    <TableRow
-                      key={stock.id}
-                      className={`hover:bg-muted/50 border-border ${onStockClick ? 'cursor-pointer' : ''}`}
-                      onClick={() => onStockClick?.(stock.ticker)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const { isComplete, missing } =
-                              getStockCompleteness(stock);
-                            return (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                      isComplete
-                                        ? 'bg-emerald-500'
-                                        : 'bg-amber-500'
-                                    }`}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent side="right">
-                                  {isComplete
-                                    ? 'Kompletní údaje'
-                                    : `Chybí: ${missing.join(', ')}`}
-                                </TooltipContent>
-                              </Tooltip>
-                            );
-                          })()}
-                          <span className="font-bold">{stock.ticker}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{stock.name}</TableCell>
-                      <TableCell className="text-sm">
-                        {stock.currency}
-                      </TableCell>
-                      <TableCell
-                        className={`text-sm ${
-                          !stock.exchange ? 'text-muted-foreground' : ''
-                        }`}
-                      >
-                        {stock.exchange || '—'}
-                      </TableCell>
-                      <TableCell
-                        className={`text-sm truncate max-w-[200px] ${!stock.sector ? 'text-muted-foreground' : ''}`}
-                      >
-                        {stock.sector || '—'}
-                      </TableCell>
-                      <TableCell
-                        className={`text-sm ${!stock.country ? 'text-muted-foreground' : ''}`}
-                      >
-                        {stock.country || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => e.stopPropagation()}
+            {/* Desktop - Multi-column (flows down then right) */}
+            <div className="hidden md:block md:columns-2 xl:columns-3 gap-8">
+              {stocks.map((stock) => {
+                const { isComplete, missing } = getStockCompleteness(stock);
+                return (
+                  <div
+                    key={stock.id}
+                    className={`flex items-start gap-2 py-2 px-2 rounded hover:bg-muted/50 group break-inside-avoid ${onStockClick ? 'cursor-pointer' : ''}`}
+                    onClick={() => onStockClick?.(stock.ticker)}
+                  >
+                    {/* Stock info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={`font-bold text-sm ${isComplete ? '' : 'text-amber-500'}`}
                             >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditDialog(stock);
-                              }}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Upravit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openDeleteDialog(stock);
-                              }}
-                              className="text-rose-500"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Smazat
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                              {stock.ticker}
+                            </span>
+                          </TooltipTrigger>
+                          {!isComplete && (
+                            <TooltipContent side="top">
+                              Chybí: {missing.join(', ')}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {stock.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 truncate">
+                        <span>{stock.currency}</span>
+                        {stock.exchange && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span>{stock.exchange}</span>
+                          </>
+                        )}
+                        {stock.country && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span>{stock.country}</span>
+                          </>
+                        )}
+                        {stock.sector && (
+                          <>
+                            <span className="opacity-40">/</span>
+                            <span className="truncate">{stock.sector}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(stock);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Upravit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteDialog(stock);
+                          }}
+                          className="text-rose-500"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Smazat
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Mobile List */}
