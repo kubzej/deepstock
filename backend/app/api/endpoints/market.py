@@ -60,3 +60,26 @@ async def get_stock_info(ticker: str):
         return {"error": "Ticker not found"}
     return result
 
+
+@router.get("/technical/{ticker}")
+async def get_technical_indicators(ticker: str, period: str = "1y"):
+    """
+    Get technical analysis indicators for a stock.
+    
+    Periods: 1mo, 3mo, 6mo, 1y, 2y
+    
+    Returns current values and historical data for:
+    - SMA (50, 200)
+    - RSI (14)
+    - MACD (12, 26, 9)
+    - Bollinger Bands (20, 2)
+    - Stochastic (14, 3, 3)
+    - ATR (14)
+    - OBV
+    - ADX (14)
+    """
+    result = await market_service.get_technical_indicators(ticker.upper(), period)
+    if result is None:
+        return {"error": "Unable to calculate technical indicators for this ticker"}
+    return result
+

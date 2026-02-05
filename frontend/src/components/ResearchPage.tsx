@@ -358,7 +358,7 @@ function InsightsPanel({ insights }: { insights: Insight[] }) {
       {/* Summary badges row */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
-          Analýza
+          Smart analýza
         </span>
         {badges
           .filter((b) => b.count > 0)
