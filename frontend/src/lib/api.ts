@@ -300,6 +300,157 @@ export async function fetchStockInfo(ticker: string): Promise<StockInfo | null> 
   return data;
 }
 
+// ============ Technical Indicators ============
+
+export type TechnicalPeriod = '1w' | '1mo' | '3mo' | '6mo' | '1y' | '2y';
+
+export type TrendSignalType = 'strong_bullish' | 'bullish' | 'mixed' | 'bearish' | 'strong_bearish' | null;
+export type IndicatorSignalType = 'bullish' | 'bearish' | 'neutral' | 'overbought' | 'oversold' | 'high' | 'low' | 'normal' | 'strong' | 'moderate' | 'weak' | 'no-trend' | null;
+
+// History point types for charts
+export interface PriceHistoryPointWithSMA {
+  date: string;
+  price: number | null;
+  sma50: number | null;
+  sma200: number | null;
+}
+
+export interface MACDHistoryPoint {
+  date: string;
+  macd: number | null;
+  signal: number | null;
+  histogram: number | null;
+}
+
+export interface BollingerHistoryPoint {
+  date: string;
+  price: number | null;
+  upper: number | null;
+  middle: number | null;
+  lower: number | null;
+}
+
+export interface StochasticHistoryPoint {
+  date: string;
+  k: number | null;
+  d: number | null;
+}
+
+export interface RSIHistoryPoint {
+  date: string;
+  rsi: number | null;
+}
+
+export interface VolumeHistoryPoint {
+  date: string;
+  volume: number;
+  avgVolume: number | null;
+  isAboveAvg: boolean;
+}
+
+export interface ATRHistoryPoint {
+  date: string;
+  atr: number | null;
+  atrPercent: number | null;
+}
+
+export interface OBVHistoryPoint {
+  date: string;
+  obv: number | null;
+  obvSma: number | null;
+}
+
+export interface ADXHistoryPoint {
+  date: string;
+  adx: number | null;
+  plusDI: number | null;
+  minusDI: number | null;
+}
+
+export interface TechnicalData {
+  ticker: string;
+  
+  // Current values
+  currentPrice: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  priceVsSma50: number | null;
+  priceVsSma200: number | null;
+  
+  rsi14: number | null;
+  
+  macd: number | null;
+  macdSignal: number | null;
+  macdHistogram: number | null;
+  
+  bollingerUpper: number | null;
+  bollingerMiddle: number | null;
+  bollingerLower: number | null;
+  bollingerPosition: number | null;
+  
+  stochasticK: number | null;
+  stochasticD: number | null;
+  
+  atr14: number | null;
+  atrPercent: number | null;
+  
+  obv: number | null;
+  
+  adx: number | null;
+  plusDI: number | null;
+  minusDI: number | null;
+  
+  currentVolume: number | null;
+  avgVolume20: number | null;
+  volumeChange: number | null;
+  
+  // Signals
+  trendSignal: TrendSignalType;
+  trendDescription: string | null;
+  macdTrend: IndicatorSignalType;
+  bollingerSignal: IndicatorSignalType;
+  stochasticSignal: IndicatorSignalType;
+  volumeSignal: IndicatorSignalType;
+  atrSignal: IndicatorSignalType;
+  obvTrend: IndicatorSignalType;
+  obvDivergence: IndicatorSignalType;
+  adxSignal: IndicatorSignalType;
+  adxTrend: IndicatorSignalType;
+  
+  // History arrays for charts
+  priceHistory: PriceHistoryPointWithSMA[];
+  macdHistory: MACDHistoryPoint[];
+  bollingerHistory: BollingerHistoryPoint[];
+  stochasticHistory: StochasticHistoryPoint[];
+  rsiHistory: RSIHistoryPoint[];
+  volumeHistory: VolumeHistoryPoint[];
+  atrHistory: ATRHistoryPoint[];
+  obvHistory: OBVHistoryPoint[];
+  adxHistory: ADXHistoryPoint[];
+  
+  lastUpdated: string;
+}
+
+export async function fetchTechnicalIndicators(
+  ticker: string,
+  period: TechnicalPeriod = '1y'
+): Promise<TechnicalData | null> {
+  const response = await fetch(
+    `${API_URL}/api/market/technical/${encodeURIComponent(ticker.toUpperCase())}?period=${period}`
+  );
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch technical indicators');
+  }
+  
+  const data = await response.json();
+  if (data.error) {
+    return null;
+  }
+  
+  return data;
+}
+
 // ============ Portfolio Endpoints ============
 
 export async function fetchPortfolios(): Promise<Portfolio[]> {

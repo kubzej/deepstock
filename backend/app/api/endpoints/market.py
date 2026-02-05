@@ -66,7 +66,7 @@ async def get_technical_indicators(ticker: str, period: str = "1y"):
     """
     Get technical analysis indicators for a stock.
     
-    Periods: 1mo, 3mo, 6mo, 1y, 2y
+    Periods: 1w, 1mo, 3mo, 6mo, 1y, 2y
     
     Returns current values and historical data for:
     - SMA (50, 200)

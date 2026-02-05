@@ -35,7 +35,7 @@ import {
   useAllOptionTransactions,
 } from '@/hooks/useTransactionHistory';
 import { formatPrice } from '@/lib/format';
-import { cn } from '@/lib/utils';
+
 import type { Transaction, OptionTransaction } from '@/lib/api';
 
 type TabType = 'stocks' | 'options';

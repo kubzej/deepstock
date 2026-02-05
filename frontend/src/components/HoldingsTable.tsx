@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { StockCard } from '@/components/StockCard';
-import { PillButton, PillGroup } from '@/components/shared/PillButton';
+import { PillButton } from '@/components/shared/PillButton';
 import {
   ArrowUpDown,
   ArrowUp,

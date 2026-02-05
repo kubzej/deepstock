@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import { fetchStockInfo, type StockInfo } from '@/lib/api';
 import { PriceChart } from './PriceChart';
+import { TechnicalAnalysis } from './TechnicalAnalysis';
 
 // Format large numbers (market cap, revenue)
 function formatLargeNumber(value: number | null): string {
@@ -618,7 +619,7 @@ function AnalystSection({ data }: { data: StockInfo }) {
   );
 }
 
-// Technical section with price chart
+// Technical section with price chart and indicators
 function TechnicalSection({
   ticker,
   currency,
@@ -627,16 +628,12 @@ function TechnicalSection({
   currency: string;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Price Chart */}
       <PriceChart ticker={ticker} currency={currency} height={350} />
 
-      {/* Placeholder for indicators */}
-      <div className="p-6 bg-muted/30 rounded-lg text-center">
-        <p className="text-muted-foreground text-sm">
-          Technické indikátory (RSI, MACD, Bollinger Bands) budou přidány
-          později
-        </p>
-      </div>
+      {/* Technical Indicators */}
+      <TechnicalAnalysis ticker={ticker} />
     </div>
   );
 }

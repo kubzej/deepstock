@@ -21,7 +21,6 @@ import {
   DistributionList,
   StockPerformance,
   OptionPerformance,
-  Metric,
   calculateStockPerformance,
   calculateOptionPerformance,
   SECTOR_COLORS,
