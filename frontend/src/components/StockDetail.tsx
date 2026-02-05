@@ -210,12 +210,20 @@ export function StockDetail({
     : null;
 
   // CZK conversions for position
+  // Use historical total_invested_czk for cost basis (preserves historical exchange rate)
+  // Fall back to current rate conversion if not available
   const positionCzk = position
-    ? {
-        totalCost: toCZK(position.totalCost, stockCurrency, rates),
-        totalValue: toCZK(position.totalValue, stockCurrency, rates),
-        unrealizedPnL: toCZK(position.unrealizedPnL, stockCurrency, rates),
-      }
+    ? (() => {
+        const totalCost =
+          holding?.total_invested_czk ??
+          toCZK(position.totalCost, stockCurrency, rates);
+        const totalValue = toCZK(position.totalValue, stockCurrency, rates);
+        return {
+          totalCost,
+          totalValue,
+          unrealizedPnL: totalValue - totalCost,
+        };
+      })()
     : null;
 
   return (
@@ -357,7 +365,16 @@ export function StockDetail({
               >
                 {formatCurrency(positionCzk.unrealizedPnL)}
                 <span className="text-sm ml-2">
-                  ({formatPercent(position.unrealizedPnLPercent, 2, true)})
+                  (
+                  {formatPercent(
+                    positionCzk.totalCost > 0
+                      ? (positionCzk.unrealizedPnL / positionCzk.totalCost) *
+                          100
+                      : 0,
+                    2,
+                    true,
+                  )}
+                  )
                 </span>
               </p>
             </div>
