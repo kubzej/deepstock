@@ -51,4 +51,16 @@ export const queryKeys = {
   // Transactions
   transactions: (portfolioId: string) => ['transactions', portfolioId] as const,
   allTransactions: () => ['transactions', 'all'] as const,
+  
+  // Options
+  optionHoldings: (portfolioId?: string) => portfolioId 
+    ? ['optionHoldings', portfolioId] as const 
+    : ['optionHoldings', 'all'] as const,
+  optionTransactions: (portfolioId?: string) => portfolioId
+    ? ['optionTransactions', portfolioId] as const
+    : ['optionTransactions', 'all'] as const,
+  optionStats: (portfolioId?: string) => portfolioId
+    ? ['optionStats', portfolioId] as const
+    : ['optionStats', 'all'] as const,
+  optionQuotes: (symbols: string[]) => ['optionQuotes', symbols.sort().join(',')] as const,
 } as const;

@@ -6,6 +6,7 @@ import {
   Settings,
   Plus,
   LogOut,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,18 +16,21 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onNewTransaction: () => void;
+  onNewOptionTransaction?: () => void;
 }
 
 export function Sidebar({
   activeTab,
   onTabChange,
   onNewTransaction,
+  onNewOptionTransaction,
 }: SidebarProps) {
   const { signOut, user } = useAuth();
 
   const menuItems = [
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
+    { id: 'opce', icon: Target, label: 'Opce' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
@@ -47,11 +51,15 @@ export function Sidebar({
         />
       </div>
 
-      {/* New Transaction Button */}
-      <div className="p-4">
+      {/* New Transaction Buttons */}
+      <div className="p-4 space-y-2">
         <Button onClick={onNewTransaction} className="w-full gap-2">
           <Plus className="w-4 h-4" />
           Přidat transakci
+        </Button>
+        <Button onClick={onNewOptionTransaction} className="w-full gap-2">
+          <Plus className="w-4 h-4" />
+          Přidat opci
         </Button>
       </div>
 

@@ -152,6 +152,67 @@ class MarketDataService:
             print(f"Error fetching history for {ticker}: {e}")
             return []
 
+    async def get_option_quotes(self, occ_symbols: List[str]) -> Dict[str, dict]:
+        """
+        Fetch option quotes for OCC symbols.
+        Uses same pattern as stock quotes - cache first, batch fetch missing.
+        """
+        results = {}
+        missing = []
+
+        # 1. Try Cache
+        for occ in occ_symbols:
+            cached = await self.redis.get(f"option_quote:{occ}")
+            if cached:
+                results[occ] = json.loads(cached)
+            else:
+                missing.append(occ)
+
+        # 2. Fetch missing from Yahoo
+        if missing:
+            for occ in missing:
+                try:
+                    t = yf.Ticker(occ)
+                    # For options, we need to use .info as .fast_info doesn't work
+                    info = t.info
+                    
+                    if not info or info.get("regularMarketPrice") is None:
+                        results[occ] = None
+                        continue
+                    
+                    quote = {
+                        "symbol": occ,
+                        "price": info.get("regularMarketPrice"),
+                        "bid": info.get("bid"),
+                        "ask": info.get("ask"),
+                        "previousClose": info.get("regularMarketPreviousClose"),
+                        "volume": info.get("volume") or 0,
+                        "openInterest": info.get("openInterest"),
+                        "impliedVolatility": info.get("impliedVolatility"),
+                        "lastUpdated": str(pd.Timestamp.now()),
+                    }
+                    
+                    # Calculate change from previous close
+                    if quote["price"] and quote.get("previousClose"):
+                        quote["change"] = round(quote["price"] - quote["previousClose"], 4)
+                        quote["changePercent"] = round(
+                            (quote["change"] / quote["previousClose"]) * 100, 2
+                        )
+                    else:
+                        quote["change"] = 0
+                        quote["changePercent"] = 0
+                    
+                    results[occ] = quote
+                    
+                    # Cache (60s TTL for option prices)
+                    await self.redis.set(f"option_quote:{occ}", json.dumps(quote), ex=60)
+                    
+                except Exception as e:
+                    print(f"Error fetching option quote for {occ}: {e}")
+                    results[occ] = None
+        
+        return results
+
 # Singleton instance
 settings = get_settings()
 market_service = MarketDataService(redis_url=settings.redis_url)

@@ -9,6 +9,9 @@ router = APIRouter()
 class TickerRequest(BaseModel):
     tickers: List[str]
 
+class OptionSymbolsRequest(BaseModel):
+    symbols: List[str]
+
 @router.post("/batch-quotes")
 async def get_quotes(payload: TickerRequest):
     """
@@ -16,6 +19,16 @@ async def get_quotes(payload: TickerRequest):
     Uses Redis caching + yfinance batch download.
     """
     return await market_service.get_quotes(payload.tickers)
+
+
+@router.post("/option-quotes")
+async def get_option_quotes(payload: OptionSymbolsRequest):
+    """
+    Fetch price and Greeks for option OCC symbols.
+    Uses Redis caching + yfinance.
+    Example symbols: AAPL250117C00150000, SOFI260320P00028000
+    """
+    return await market_service.get_option_quotes(payload.symbols)
 
 
 @router.get("/exchange-rates")

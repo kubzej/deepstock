@@ -9,6 +9,7 @@ import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
 import { WatchlistsPage } from '@/components/WatchlistsPage';
 import { SettingsPage } from '@/components/SettingsPage';
+import { OptionsPage, OptionTransactionModal } from '@/components/options';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -26,6 +27,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
+  const [optionModalOpen, setOptionModalOpen] = useState(false);
 
   // Stock edit/delete state
   const [editStock, setEditStock] = useState<Stock | null>(null);
@@ -102,7 +104,11 @@ function App() {
   // If viewing stock detail
   if (selectedTicker) {
     return (
-      <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+      <AppLayout
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onNewOptionTransaction={() => setOptionModalOpen(true)}
+      >
         <StockDetail
           ticker={selectedTicker}
           onBack={handleBackFromDetail}
@@ -158,6 +164,8 @@ function App() {
         return <Dashboard onStockClick={handleStockClick} />;
       case 'stocks':
         return <StocksManager onStockClick={handleStockClick} />;
+      case 'opce':
+        return <OptionsPage />;
       case 'analysis':
         return (
           <div className="p-4">
@@ -184,13 +192,23 @@ function App() {
   };
 
   return (
-    <AppLayout activeTab={activeTab} onTabChange={handleTabChange}>
+    <AppLayout
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      onNewOptionTransaction={() => setOptionModalOpen(true)}
+    >
       {renderContent()}
 
       {/* Transaction Modal */}
       <TransactionModal
         open={transactionModalOpen}
         onOpenChange={setTransactionModalOpen}
+      />
+
+      {/* Option Transaction Modal */}
+      <OptionTransactionModal
+        open={optionModalOpen}
+        onOpenChange={setOptionModalOpen}
       />
     </AppLayout>
   );
