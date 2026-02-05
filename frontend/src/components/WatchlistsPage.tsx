@@ -1,22 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
   Table,
   TableBody,
   TableCell,
@@ -25,7 +8,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -45,6 +27,11 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Plus,
@@ -57,27 +44,23 @@ import {
   ArrowDown,
   RefreshCw,
   Eye,
-  TrendingUp,
-  TrendingDown,
-  GripVertical,
   Target,
+  Tag,
 } from 'lucide-react';
-import { type Watchlist, type WatchlistItem, type Quote } from '@/lib/api';
+import { type WatchlistItem, type Quote } from '@/lib/api';
 import { formatPrice, formatPercent } from '@/lib/format';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useWatchlists,
   useWatchlistItems,
-  useCreateWatchlist,
-  useUpdateWatchlist,
-  useDeleteWatchlist,
-  useReorderWatchlists,
   useAddWatchlistItem,
   useUpdateWatchlistItem,
   useDeleteWatchlistItem,
   useMoveWatchlistItem,
 } from '@/hooks/useWatchlists';
+import { useWatchlistTags, useSetItemTags } from '@/hooks/useWatchlistTags';
+import { WatchlistItemCard } from '@/components/WatchlistItemCard';
 
 type SortKey =
   | 'ticker'
@@ -90,87 +73,6 @@ type SortDir = 'asc' | 'desc';
 
 interface WatchlistsPageProps {
   onStockClick?: (ticker: string) => void;
-}
-
-// Sortable watchlist item component
-interface SortableWatchlistItemProps {
-  watchlist: Watchlist;
-  isSelected: boolean;
-  onSelect: (id: string) => void;
-  onEdit: (w: Watchlist) => void;
-  onDelete: (w: Watchlist) => void;
-}
-
-function SortableWatchlistItem({
-  watchlist,
-  isSelected,
-  onSelect,
-  onEdit,
-  onDelete,
-}: SortableWatchlistItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: watchlist.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-1 ${isDragging ? 'opacity-50' : ''}`}
-    >
-      <button
-        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <button
-        onClick={() => onSelect(watchlist.id)}
-        className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-          isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
-        }`}
-      >
-        <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{watchlist.name}</div>
-          <div className="text-xs text-muted-foreground">
-            {watchlist.item_count || 0} položek
-          </div>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <Button variant="ghost" size="icon" className="h-7 w-7">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(watchlist)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Upravit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDelete(watchlist)}
-              className="text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Smazat
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </button>
-    </div>
-  );
 }
 
 export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
@@ -203,11 +105,11 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
   );
   const { data: quotes = {}, isFetching: quotesLoading } = useQuotes(tickers);
 
+  // Tags
+  const { data: allTags = [] } = useWatchlistTags();
+  const setItemTagsMutation = useSetItemTags();
+
   // Mutations
-  const createWatchlistMutation = useCreateWatchlist();
-  const updateWatchlistMutation = useUpdateWatchlist();
-  const deleteWatchlistMutation = useDeleteWatchlist();
-  const reorderWatchlistsMutation = useReorderWatchlists();
   const addItemMutation = useAddWatchlistItem();
   const updateItemMutation = useUpdateWatchlistItem();
   const deleteItemMutation = useDeleteWatchlistItem();
@@ -216,25 +118,18 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
   const error = watchlistsError ? (watchlistsError as Error).message : null;
 
   // Dialogs
-  const [watchlistDialogOpen, setWatchlistDialogOpen] = useState(false);
-  const [editingWatchlist, setEditingWatchlist] = useState<Watchlist | null>(
-    null,
-  );
-  const [deleteWatchlistData, setDeleteWatchlistData] =
-    useState<Watchlist | null>(null);
-
   const [addItemDialogOpen, setAddItemDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
   const [deleteItemData, setDeleteItemData] = useState<WatchlistItem | null>(
     null,
   );
   const [moveItemData, setMoveItemData] = useState<WatchlistItem | null>(null);
+  const [tagsDialogItem, setTagsDialogItem] = useState<WatchlistItem | null>(
+    null,
+  );
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   // Form state
-  const [formName, setFormName] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formSaving, setFormSaving] = useState(false);
-
   const [itemTicker, setItemTicker] = useState('');
   const [itemBuyTarget, setItemBuyTarget] = useState('');
   const [itemSellTarget, setItemSellTarget] = useState('');
@@ -246,31 +141,9 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-
   const selectedWatchlist = watchlists.find(
     (w) => w.id === selectedWatchlistId,
   );
-
-  // Drag end handler for watchlist reordering
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      const oldIndex = watchlists.findIndex((w) => w.id === active.id);
-      const newIndex = watchlists.findIndex((w) => w.id === over.id);
-      const newOrder = arrayMove(watchlists, oldIndex, newIndex).map(
-        (w) => w.id,
-      );
-      reorderWatchlistsMutation.mutate(newOrder);
-    }
-  }
 
   // Sorting
   const handleSort = (key: SortKey) => {
@@ -325,64 +198,6 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
       return sortDir === 'asc' ? numA - numB : numB - numA;
     });
   }, [items, quotes, sortKey, sortDir]);
-
-  // Watchlist CRUD
-  const openCreateWatchlist = () => {
-    setEditingWatchlist(null);
-    setFormName('');
-    setFormDescription('');
-    setWatchlistDialogOpen(true);
-  };
-
-  const openEditWatchlist = (w: Watchlist) => {
-    setEditingWatchlist(w);
-    setFormName(w.name);
-    setFormDescription(w.description || '');
-    setWatchlistDialogOpen(true);
-  };
-
-  const handleSaveWatchlist = async () => {
-    if (!formName.trim()) return;
-
-    setFormSaving(true);
-    try {
-      if (editingWatchlist) {
-        await updateWatchlistMutation.mutateAsync({
-          id: editingWatchlist.id,
-          name: formName.trim(),
-          description: formDescription.trim() || undefined,
-        });
-      } else {
-        const created = await createWatchlistMutation.mutateAsync({
-          name: formName.trim(),
-          description: formDescription.trim() || undefined,
-        });
-        setSelectedWatchlistId(created.id);
-      }
-      setWatchlistDialogOpen(false);
-    } catch (err) {
-      console.error('Failed to save watchlist:', err);
-    } finally {
-      setFormSaving(false);
-    }
-  };
-
-  const handleDeleteWatchlist = async () => {
-    if (!deleteWatchlistData) return;
-
-    setFormSaving(true);
-    try {
-      await deleteWatchlistMutation.mutateAsync(deleteWatchlistData.id);
-      setDeleteWatchlistData(null);
-      if (selectedWatchlistId === deleteWatchlistData.id) {
-        setSelectedWatchlistId(null);
-      }
-    } catch (err) {
-      console.error('Failed to delete watchlist:', err);
-    } finally {
-      setFormSaving(false);
-    }
-  };
 
   // Item CRUD
   const openAddItem = () => {
@@ -474,6 +289,39 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     }
   };
 
+  // Tags dialog
+  const openTagsDialog = (item: WatchlistItem) => {
+    setTagsDialogItem(item);
+    setSelectedTagIds(item.tags?.map((t) => t.id) || []);
+  };
+
+  const toggleTag = (tagId: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId],
+    );
+  };
+
+  const handleSaveTags = async () => {
+    if (!tagsDialogItem || !selectedWatchlistId) return;
+
+    try {
+      await setItemTagsMutation.mutateAsync({
+        itemId: tagsDialogItem.id,
+        tagIds: selectedTagIds,
+      });
+      // Invalidate watchlist items to refresh tags
+      queryClient.invalidateQueries({
+        queryKey: ['watchlistItems', selectedWatchlistId],
+      });
+      setTagsDialogItem(null);
+    } catch (err) {
+      console.error('Failed to save tags:', err);
+      alert(err instanceof Error ? err.message : 'Nepodařilo se uložit tagy');
+    }
+  };
+
   // Helper: check if price is at target
   const isAtBuyTarget = (item: WatchlistItem, quote?: Quote) => {
     if (!item.target_buy_price || !quote) return false;
@@ -540,12 +388,6 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
         }}
         isRefreshing={loading || quotesLoading}
-        actions={
-          <Button onClick={openCreateWatchlist} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Nový watchlist
-          </Button>
-        }
       />
 
       {/* Empty state */}
@@ -557,88 +399,117 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
           <h2 className="text-xl font-semibold mb-2">
             Zatím nemáte žádný watchlist
           </h2>
-          <p className="text-muted-foreground mb-4">
-            Vytvořte watchlist pro sledování akcií, které vás zajímají.
+          <p className="text-muted-foreground">
+            Vytvořte watchlist v Nastavení → Watchlisty.
           </p>
-          <Button onClick={openCreateWatchlist}>
-            <Plus className="h-4 w-4 mr-1" />
-            Vytvořit watchlist
-          </Button>
         </div>
       ) : (
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar - watchlist list with drag & drop */}
-          <div className="md:w-60 flex-shrink-0 space-y-1">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
+        <div className="space-y-4">
+          {/* Watchlist toggle buttons + Add button */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1 flex-wrap">
+              {watchlists.map((w) => (
+                <Button
+                  key={w.id}
+                  variant={selectedWatchlistId === w.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedWatchlistId(w.id)}
+                  className="h-8"
+                >
+                  {w.name}
+                  <span className="ml-1.5 text-xs opacity-60">
+                    {w.item_count || 0}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            {quotesLoading && (
+              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+            <div className="flex-1" />
+            <Button
+              size="sm"
+              onClick={openAddItem}
+              disabled={!selectedWatchlistId}
             >
-              <SortableContext
-                items={watchlists.map((w) => w.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                {watchlists.map((w) => (
-                  <SortableWatchlistItem
-                    key={w.id}
-                    watchlist={w}
-                    isSelected={selectedWatchlistId === w.id}
-                    onSelect={setSelectedWatchlistId}
-                    onEdit={openEditWatchlist}
-                    onDelete={setDeleteWatchlistData}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
+              <Plus className="h-4 w-4 mr-1" />
+              Přidat akcii
+            </Button>
           </div>
 
-          {/* Main content - items table */}
-          <div className="flex-1 min-w-0">
-            {selectedWatchlist && (
-              <>
-                {/* Watchlist header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-lg font-semibold">
-                      {selectedWatchlist.name}
-                    </h2>
-                    {selectedWatchlist.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {selectedWatchlist.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {quotesLoading && (
-                      <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                    <Button size="sm" onClick={openAddItem}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Přidat akcii
-                    </Button>
-                  </div>
+          {/* Items table */}
+          {selectedWatchlist && (
+            <>
+              {itemsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
                 </div>
+              ) : items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
+                  <Target className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground mb-4">
+                    Watchlist je prázdný
+                  </p>
+                  <Button variant="outline" onClick={openAddItem}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Přidat akcii
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile: Sort pills + Cards */}
+                  <div className="md:hidden">
+                    {/* Sort pills */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-1 px-1">
+                      {[
+                        { key: 'ticker' as SortKey, label: 'A-Z' },
+                        { key: 'price' as SortKey, label: 'Cena' },
+                        { key: 'change' as SortKey, label: 'Změna' },
+                        { key: 'buyTarget' as SortKey, label: 'Nákup' },
+                        { key: 'sellTarget' as SortKey, label: 'Prodej' },
+                      ].map((option) => {
+                        const isActive = sortKey === option.key;
+                        return (
+                          <button
+                            key={option.key}
+                            onClick={() => handleSort(option.key)}
+                            className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {option.label}
+                            {isActive && (
+                              <span className="ml-0.5">
+                                {sortDir === 'desc' ? '↓' : '↑'}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                {/* Items table */}
-                {itemsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-12 w-full" />
-                    ))}
+                    {/* Cards */}
+                    <div className="space-y-1.5">
+                      {sortedItems.map((item) => (
+                        <WatchlistItemCard
+                          key={item.id}
+                          item={item}
+                          quote={quotes[item.stocks.ticker] || null}
+                          onEdit={() => openEditItem(item)}
+                          onDelete={() => setDeleteItemData(item)}
+                          onTags={() => openTagsDialog(item)}
+                          onClick={() => onStockClick?.(item.stocks.ticker)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                ) : items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-                    <Target className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground mb-4">
-                      Watchlist je prázdný
-                    </p>
-                    <Button variant="outline" onClick={openAddItem}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Přidat akcii
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="border rounded-lg overflow-hidden">
+
+                  {/* Desktop: Table */}
+                  <div className="hidden md:block border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -678,6 +549,9 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                           >
                             Sektor <SortIcon columnKey="sector" />
                           </TableHead>
+                          <TableHead className="hidden lg:table-cell">
+                            Poznámka
+                          </TableHead>
                           <TableHead className="w-10" />
                         </TableRow>
                       </TableHeader>
@@ -690,37 +564,79 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                           return (
                             <TableRow
                               key={item.id}
-                              className="cursor-pointer hover:bg-muted/50"
+                              className={`cursor-pointer hover:bg-muted/50 ${
+                                atBuy
+                                  ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500'
+                                  : atSell
+                                    ? 'bg-amber-500/5 border-l-2 border-l-amber-500'
+                                    : ''
+                              }`}
                               onClick={() => onStockClick?.(item.stocks.ticker)}
                             >
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <div>
-                                    <div className="font-mono font-semibold">
-                                      {item.stocks.ticker}
+                                  {/* Signal indicator */}
+                                  {(atBuy || atSell) && (
+                                    <span
+                                      className={`relative flex h-2 w-2 ${atBuy ? 'mr-0.5' : ''}`}
+                                    >
+                                      <span
+                                        className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                                          atBuy
+                                            ? 'bg-emerald-400'
+                                            : 'bg-amber-400'
+                                        }`}
+                                      />
+                                      <span
+                                        className={`relative inline-flex rounded-full h-2 w-2 ${
+                                          atBuy
+                                            ? 'bg-emerald-500'
+                                            : 'bg-amber-500'
+                                        }`}
+                                      />
+                                    </span>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={`font-mono font-semibold ${
+                                          atBuy
+                                            ? 'text-emerald-500'
+                                            : atSell
+                                              ? 'text-amber-500'
+                                              : ''
+                                        }`}
+                                      >
+                                        {item.stocks.ticker}
+                                      </span>
+                                      {/* Tags */}
+                                      {item.tags && item.tags.length > 0 && (
+                                        <div className="flex gap-1 items-center">
+                                          {item.tags.map((tag) => (
+                                            <span
+                                              key={tag.id}
+                                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+                                              style={{
+                                                backgroundColor: `${tag.color}15`,
+                                                color: tag.color,
+                                              }}
+                                            >
+                                              <span
+                                                className="h-1.5 w-1.5 rounded-full"
+                                                style={{
+                                                  backgroundColor: tag.color,
+                                                }}
+                                              />
+                                              {tag.name}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                    <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                                       {item.stocks.name}
                                     </div>
                                   </div>
-                                  {atBuy && (
-                                    <Badge
-                                      variant="default"
-                                      className="bg-emerald-500 text-xs"
-                                    >
-                                      <TrendingDown className="h-3 w-3 mr-1" />
-                                      Koupit
-                                    </Badge>
-                                  )}
-                                  {atSell && (
-                                    <Badge
-                                      variant="default"
-                                      className="bg-amber-500 text-xs"
-                                    >
-                                      <TrendingUp className="h-3 w-3 mr-1" />
-                                      Prodat
-                                    </Badge>
-                                  )}
                                 </div>
                               </TableCell>
                               <TableCell className="text-right font-mono">
@@ -775,6 +691,27 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                               <TableCell className="text-muted-foreground hidden md:table-cell">
                                 {item.sector || item.stocks.sector || '—'}
                               </TableCell>
+                              <TableCell className="hidden lg:table-cell max-w-[150px]">
+                                {item.notes ? (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-muted-foreground truncate block cursor-help">
+                                        {item.notes}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      className="max-w-[300px] whitespace-pre-wrap"
+                                    >
+                                      {item.notes}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ) : (
+                                  <span className="text-muted-foreground">
+                                    —
+                                  </span>
+                                )}
+                              </TableCell>
                               <TableCell onClick={(e) => e.stopPropagation()}>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -792,6 +729,12 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                                     >
                                       <Pencil className="h-4 w-4 mr-2" />
                                       Upravit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => openTagsDialog(item)}
+                                    >
+                                      <Tag className="h-4 w-4 mr-2" />
+                                      Tagy
                                     </DropdownMenuItem>
                                     {watchlists.length > 1 && (
                                       <DropdownMenuItem
@@ -818,97 +761,16 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                       </TableBody>
                     </Table>
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {/* Create/Edit Watchlist Dialog */}
-      <Dialog open={watchlistDialogOpen} onOpenChange={setWatchlistDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingWatchlist ? 'Upravit watchlist' : 'Nový watchlist'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Název</Label>
-              <Input
-                id="name"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder="Např. Tech akcie"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Popis (volitelný)</Label>
-              <Textarea
-                id="description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Poznámky k watchlistu..."
-                rows={2}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setWatchlistDialogOpen(false)}
-            >
-              Zrušit
-            </Button>
-            <Button
-              onClick={handleSaveWatchlist}
-              disabled={formSaving || !formName.trim()}
-            >
-              {formSaving
-                ? 'Ukládám...'
-                : editingWatchlist
-                  ? 'Uložit'
-                  : 'Vytvořit'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Watchlist Dialog */}
-      <Dialog
-        open={!!deleteWatchlistData}
-        onOpenChange={(open) => !open && setDeleteWatchlistData(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Smazat watchlist?</DialogTitle>
-            <DialogDescription>
-              Opravdu chcete smazat watchlist "{deleteWatchlistData?.name}"?
-              Tato akce je nevratná a smaže všechny položky v něm.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteWatchlistData(null)}
-            >
-              Zrušit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteWatchlist}
-              disabled={formSaving}
-            >
-              {formSaving ? 'Mažu...' : 'Smazat'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Add/Edit Item Dialog */}
       <Dialog open={addItemDialogOpen} onOpenChange={setAddItemDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingItem
@@ -921,7 +783,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                 : 'Přidejte novou akcii do watchlistu.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto flex-1 py-2">
             {!editingItem && (
               <div className="space-y-2">
                 <Label htmlFor="ticker">Ticker</Label>
@@ -1050,6 +912,64 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveItemData(null)}>
               Zrušit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tags Dialog */}
+      <Dialog
+        open={!!tagsDialogItem}
+        onOpenChange={(open) => !open && setTagsDialogItem(null)}
+      >
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Tagy pro {tagsDialogItem?.stocks.ticker}</DialogTitle>
+            <DialogDescription>Vyberte tagy pro tuto akcii.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {allTags.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-4">
+                Nemáte žádné tagy. Vytvořte je v Nastavení → Watchlist tagy.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => {
+                  const isSelected = selectedTagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag.id)}
+                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-offset-2 ring-offset-background'
+                          : 'opacity-60 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: isSelected
+                          ? tag.color
+                          : `${tag.color}20`,
+                        color: isSelected ? '#fff' : tag.color,
+                        borderColor: tag.color,
+                        ringColor: tag.color,
+                      }}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTagsDialogItem(null)}>
+              Zrušit
+            </Button>
+            <Button
+              onClick={handleSaveTags}
+              disabled={setItemTagsMutation.isPending}
+            >
+              {setItemTagsMutation.isPending ? 'Ukládám...' : 'Uložit'}
             </Button>
           </DialogFooter>
         </DialogContent>

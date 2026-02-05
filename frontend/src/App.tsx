@@ -9,6 +9,7 @@ import { TransactionModal } from '@/components/TransactionModal';
 import { StockFormDialog } from '@/components/StockFormDialog';
 import StocksManager from '@/components/StocksManager';
 import { WatchlistsPage } from '@/components/WatchlistsPage';
+import { SettingsPage } from '@/components/SettingsPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -171,12 +172,7 @@ function App() {
         return <WatchlistsPage onStockClick={handleStockClick} />;
       case 'settings':
       case 'menu':
-        return (
-          <div className="p-4">
-            <h1 className="text-2xl font-bold">Nastavení</h1>
-            <p className="text-muted-foreground mt-2">Připravuje se...</p>
-          </div>
-        );
+        return <SettingsPage />;
       default:
         return <Dashboard onStockClick={handleStockClick} />;
     }

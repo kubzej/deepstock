@@ -37,6 +37,10 @@ export const queryKeys = {
   watchlists: () => ['watchlists'] as const,
   watchlistItems: (watchlistId: string) => ['watchlistItems', watchlistId] as const,
   
+  // Watchlist Tags
+  watchlistTags: () => ['watchlistTags'] as const,
+  itemTags: (itemId: string) => ['itemTags', itemId] as const,
+  
   // Exchange rates
   exchangeRates: () => ['exchangeRates'] as const,
   

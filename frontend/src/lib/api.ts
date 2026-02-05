@@ -789,12 +789,14 @@ export interface WatchlistItem {
     sector: string | null;
     price_scale: number;
   };
+  tags?: WatchlistTag[];
 }
 
 export interface WatchlistTag {
   id: string;
   user_id: string;
   name: string;
+  color: string;
   created_at: string;
 }
 
@@ -1058,6 +1060,7 @@ export async function fetchWatchlistTags(): Promise<WatchlistTag[]> {
 
 export async function createWatchlistTag(data: {
   name: string;
+  color?: string;
 }): Promise<WatchlistTag> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/watchlists/tags`, {
@@ -1083,7 +1086,7 @@ export async function createWatchlistTag(data: {
 
 export async function updateWatchlistTag(
   tagId: string,
-  data: { name?: string }
+  data: { name?: string; color?: string }
 ): Promise<WatchlistTag> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/watchlists/tags/${tagId}`, {

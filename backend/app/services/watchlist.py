@@ -40,10 +40,12 @@ class WatchlistItemUpdate(BaseModel):
 
 class TagCreate(BaseModel):
     name: str
+    color: Optional[str] = None
 
 
 class TagUpdate(BaseModel):
     name: Optional[str] = None
+    color: Optional[str] = None
 
 
 # ============================================
@@ -138,13 +140,37 @@ class WatchlistService:
     # ==========================================
     
     async def get_watchlist_items(self, watchlist_id: str) -> List[dict]:
-        """Get all items in a watchlist with stock info."""
+        """Get all items in a watchlist with stock info and tags."""
         response = supabase.table("watchlist_items") \
             .select("*, stocks(id, ticker, name, currency, sector, price_scale)") \
             .eq("watchlist_id", watchlist_id) \
             .order("added_at", desc=True) \
             .execute()
-        return response.data
+        
+        items = response.data
+        
+        # Fetch tags for all items in one query
+        if items:
+            item_ids = [item["id"] for item in items]
+            tags_response = supabase.table("watchlist_item_tags") \
+                .select("item_id, watchlist_tags(*)") \
+                .in_("item_id", item_ids) \
+                .execute()
+            
+            # Group tags by item_id
+            tags_by_item = {}
+            for row in tags_response.data:
+                item_id = row["item_id"]
+                if item_id not in tags_by_item:
+                    tags_by_item[item_id] = []
+                if row.get("watchlist_tags"):
+                    tags_by_item[item_id].append(row["watchlist_tags"])
+            
+            # Attach tags to items
+            for item in items:
+                item["tags"] = tags_by_item.get(item["id"], [])
+        
+        return items
     
     async def get_item(self, item_id: str) -> Optional[dict]:
         """Get a single item by ID."""
@@ -195,17 +221,13 @@ class WatchlistService:
     
     async def update_item(self, item_id: str, data: WatchlistItemUpdate) -> Optional[dict]:
         """Update a watchlist item."""
-        update_data = {}
+        # Get only the fields that were explicitly set in the request
+        # This allows setting fields to null (to clear them)
+        update_data = data.model_dump(exclude_unset=False)
         
-        # Handle explicit None (clear value) vs not provided
-        if data.target_buy_price is not None:
-            update_data["target_buy_price"] = data.target_buy_price
-        if data.target_sell_price is not None:
-            update_data["target_sell_price"] = data.target_sell_price
-        if data.notes is not None:
-            update_data["notes"] = data.notes
-        if data.sector is not None:
-            update_data["sector"] = data.sector
+        # Filter out None values only if we want to keep existing values
+        # But we want to allow clearing values, so we include all fields
+        # that are in the request body
         
         if not update_data:
             return await self.get_item(item_id)
@@ -298,11 +320,14 @@ class WatchlistService:
     
     async def create_tag(self, user_id: str, data: TagCreate) -> dict:
         """Create a new tag."""
+        insert_data = {
+            "user_id": user_id,
+            "name": data.name.strip()
+        }
+        if data.color:
+            insert_data["color"] = data.color
         response = supabase.table("watchlist_tags") \
-            .insert({
-                "user_id": user_id,
-                "name": data.name.strip()
-            }) \
+            .insert(insert_data) \
             .execute()
         return response.data[0]
     
@@ -311,6 +336,8 @@ class WatchlistService:
         update_data = {}
         if data.name is not None:
             update_data["name"] = data.name.strip()
+        if data.color is not None:
+            update_data["color"] = data.color
         
         if not update_data:
             response = supabase.table("watchlist_tags") \
