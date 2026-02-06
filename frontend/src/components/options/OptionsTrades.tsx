@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import type { OptionHolding } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { formatPercent } from '@/lib/format';
 import { X, Trash2 } from 'lucide-react';
 
 interface OptionsTradesProps {
@@ -35,12 +36,6 @@ function formatDate(dateStr: string): string {
     day: 'numeric',
     month: 'short',
   });
-}
-
-function formatPercent(value: number | null): string {
-  if (value === null) return '—';
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}%`;
 }
 
 function getDaysPassed(transactionDate: string | null): number | null {
@@ -129,7 +124,7 @@ export function OptionsTrades({
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-lg font-semibold">
+                <span className="font-mono-price text-lg font-semibold">
                   {h.symbol}
                 </span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -151,7 +146,7 @@ export function OptionsTrades({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
                   onClick={() => onDelete?.(h)}
                   title="Smazat"
                 >
@@ -167,7 +162,7 @@ export function OptionsTrades({
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
                   Strike
                 </div>
-                <div className="font-mono font-medium">
+                <div className="font-mono-price font-medium">
                   {formatUSD(h.strike_price)}
                 </div>
                 {h.underlying_price !== null && (
@@ -186,6 +181,8 @@ export function OptionsTrades({
                       >
                         {formatPercent(
                           isShort ? h.buffer_percent : -h.buffer_percent,
+                          1,
+                          true,
                         )}
                       </span>
                     )}
@@ -198,7 +195,7 @@ export function OptionsTrades({
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
                   Premium
                 </div>
-                <div className="font-mono font-medium">
+                <div className="font-mono-price font-medium">
                   {formatUSD(h.avg_premium)}
                 </div>
                 {h.current_price !== null && (
@@ -219,7 +216,7 @@ export function OptionsTrades({
                             : 'text-rose-500',
                         )}
                       >
-                        {formatPercent(h.priceChangePercent)}
+                        {formatPercent(h.priceChangePercent, 1, true)}
                       </span>
                     )}
                   </div>
@@ -233,7 +230,7 @@ export function OptionsTrades({
                 </div>
                 <div
                   className={cn(
-                    'font-mono font-medium',
+                    'font-mono-price font-medium',
                     h.dte < 0
                       ? 'text-muted-foreground'
                       : h.dte <= 7
@@ -247,7 +244,7 @@ export function OptionsTrades({
                 </div>
                 <div className="text-[10px] text-muted-foreground">
                   {formatDate(h.expiration_date)}
-                  {h.totalDays > 0 && <span> · z {h.totalDays}</span>}
+                  {h.totalDays > 0 && <span> · z {h.totalDays} dní</span>}
                 </div>
               </div>
 
@@ -259,7 +256,7 @@ export function OptionsTrades({
                 {h.pl !== null ? (
                   <div
                     className={cn(
-                      'font-mono font-medium',
+                      'font-mono-price font-medium',
                       h.pl >= 0 ? 'text-emerald-500' : 'text-rose-500',
                     )}
                   >
@@ -281,7 +278,7 @@ export function OptionsTrades({
                 </div>
                 {h.breakeven !== null ? (
                   <>
-                    <div className="font-mono font-medium">
+                    <div className="font-mono-price font-medium">
                       {formatUSD(h.breakeven)}
                     </div>
                     {h.breakevenDistance !== null && (
@@ -297,7 +294,7 @@ export function OptionsTrades({
                                 : 'text-rose-500',
                           )}
                         >
-                          {formatPercent(h.breakevenDistance)}
+                          {formatPercent(h.breakevenDistance, 1, true)}
                         </span>
                       </div>
                     )}

@@ -2,6 +2,7 @@
 Watchlist service - CRUD operations for watchlists and items
 """
 from app.core.supabase import supabase
+from app.services.stocks import stock_service
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -135,6 +136,36 @@ class WatchlistService:
                 .execute()
         return True
     
+    async def get_all_tickers(self, user_id: str) -> List[str]:
+        """
+        Get all unique tickers from all user's watchlists.
+        Used for prefetching quotes on app load.
+        """
+        # First get user's watchlist IDs
+        watchlist_response = supabase.table("watchlists") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        watchlist_ids = [w["id"] for w in watchlist_response.data]
+        
+        if not watchlist_ids:
+            return []
+        
+        # Get all items from these watchlists with stock ticker
+        items_response = supabase.table("watchlist_items") \
+            .select("stocks(ticker)") \
+            .in_("watchlist_id", watchlist_ids) \
+            .execute()
+        
+        # Extract unique tickers
+        tickers = set()
+        for item in items_response.data:
+            if item.get("stocks") and item["stocks"].get("ticker"):
+                tickers.add(item["stocks"]["ticker"])
+        
+        return sorted(list(tickers))
+    
     # ==========================================
     # WATCHLIST ITEMS
     # ==========================================
@@ -186,7 +217,7 @@ class WatchlistService:
         
         # If no stock_id but ticker provided, lookup or create stock
         if not stock_id and data.ticker:
-            stock = await self._get_or_create_stock(
+            stock = await stock_service.get_or_create(
                 ticker=data.ticker.upper(),
                 name=data.stock_name
             )
@@ -282,28 +313,6 @@ class WatchlistService:
         # Tags stay with item (item_id doesn't change), so no action needed
         
         return await self.get_item(item_id)
-    
-    async def _get_or_create_stock(self, ticker: str, name: Optional[str] = None) -> dict:
-        """Get existing stock or create new one."""
-        # Try to find existing
-        response = supabase.table("stocks") \
-            .select("*") \
-            .eq("ticker", ticker) \
-            .execute()
-        
-        if response.data:
-            return response.data[0]
-        
-        # Create new stock
-        create_response = supabase.table("stocks") \
-            .insert({
-                "ticker": ticker,
-                "name": name or ticker,
-                "currency": "USD"  # Default, can be updated later
-            }) \
-            .execute()
-        
-        return create_response.data[0]
     
     # ==========================================
     # TAGS

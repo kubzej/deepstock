@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { PortfolioSelector } from '@/components/PortfolioSelector';
+import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
 interface SidebarProps {
   activeTab: string;

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -19,28 +20,9 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useStocks } from '@/hooks/useStocks';
-import { updateTransaction, type Transaction } from '@/lib/api';
+import { updateTransaction, API_URL, type Transaction } from '@/lib/api';
 import { formatPrice, formatDate, formatNumber } from '@/lib/format';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
-const CURRENCY_OPTIONS = [
-  'USD',
-  'EUR',
-  'GBP',
-  'CZK',
-  'CHF',
-  'CAD',
-  'AUD',
-  'JPY',
-  'SEK',
-  'DKK',
-  'NOK',
-  'PLN',
-  'HUF',
-  'HKD',
-  'CNY',
-];
+import { CURRENCIES } from '@/lib/constants';
 
 type TransactionType = 'BUY' | 'SELL';
 type SellMode = 'entire' | 'lot' | 'partial';
@@ -190,7 +172,7 @@ export function TransactionModal({
     () =>
       stocks.map((s) => ({
         value: s.ticker,
-        label: `${s.ticker} - ${s.name}`,
+        label: s.name ? `${s.ticker} - ${s.name}` : s.ticker,
       })),
     [stocks],
   );
@@ -431,9 +413,9 @@ export function TransactionModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="p-3 text-sm text-rose-500 bg-rose-500/10 rounded-lg">
-              {error}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {/* Transaction Type Toggle - disabled in edit mode */}
@@ -510,9 +492,11 @@ export function TransactionModal({
                   Načítám dostupné pozice...
                 </p>
               ) : availableLots.length === 0 ? (
-                <div className="p-3 text-sm text-rose-500 bg-rose-500/10 rounded-lg">
-                  Nemáte žádné akcie k prodeji v tomto portfoliu.
-                </div>
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Nemáte žádné akcie k prodeji v tomto portfoliu.
+                  </AlertDescription>
+                </Alert>
               ) : (
                 <>
                   <div className="space-y-2">
@@ -556,13 +540,13 @@ export function TransactionModal({
                               <span className="text-sm font-medium">
                                 {formatDate(lot.date)}
                               </span>
-                              <span className="text-sm font-mono">
+                              <span className="text-sm font-mono-price">
                                 {formatNumber(lot.remaining_shares)} ks
                               </span>
                             </div>
                             <div className="flex justify-between items-center mt-1 text-xs text-muted-foreground">
                               <span>Nákupní cena</span>
-                              <span className="font-mono">
+                              <span className="font-mono-price">
                                 {formatPrice(lot.price_per_share, lot.currency)}
                               </span>
                             </div>
@@ -673,7 +657,7 @@ export function TransactionModal({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CURRENCY_OPTIONS.map((curr) => (
+                  {CURRENCIES.map((curr) => (
                     <SelectItem key={curr} value={curr}>
                       {curr}
                     </SelectItem>
@@ -715,23 +699,23 @@ export function TransactionModal({
           {/* Total Display */}
           <div className="p-3 bg-muted rounded-lg space-y-1">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Celková částka</span>
-              <span className="font-mono font-medium">
+              <span>Akcie</span>
+              <span className="font-mono-price">
                 {formatPrice(totalAmount, formData.currency)}
                 {formData.fees > 0 &&
                   ` + ${formatPrice(formData.fees, formData.currency)} poplatky`}
               </span>
             </div>
-            <div className="flex justify-between text-sm font-medium">
+            <div className="flex justify-between text-sm">
               <span>Celkem</span>
-              <span className="font-mono">
+              <span className="font-mono-price">
                 {formatPrice(totalWithFees, formData.currency)}
               </span>
             </div>
             {totalInCzk !== null && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Celkem v CZK</span>
-                <span className="font-mono">
+                <span>Celkem v CZK</span>
+                <span className="font-mono-price">
                   {formatPrice(totalInCzk, 'CZK')}
                 </span>
               </div>

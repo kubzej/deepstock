@@ -1,18 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Login } from '@/components/Login';
+import { Login } from '@/components/shared/Login';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Dashboard } from '@/components/Dashboard';
-import { StockDetail } from '@/components/StockDetail';
-import { TransactionModal } from '@/components/TransactionModal';
-import { StockFormDialog } from '@/components/StockFormDialog';
-import StocksManager from '@/components/StocksManager';
-import { WatchlistsPage } from '@/components/WatchlistsPage';
-import { SettingsPage } from '@/components/SettingsPage';
+import { Dashboard } from '@/components/dashboard';
+import { StockDetail, StockFormDialog, StocksManager } from '@/components/stocks';
+import { TransactionModal, TransactionHistoryPage } from '@/components/transactions';
+import { WatchlistsPage } from '@/components/watchlists';
+import { SettingsPage } from '@/components/settings';
 import { OptionsPage, OptionTransactionModal } from '@/components/options';
-import { TransactionHistoryPage } from '@/components/TransactionHistoryPage';
-import { AnalysisPage } from '@/components/AnalysisPage';
-import { ResearchPage } from '@/components/ResearchPage';
+import { AnalysisPage } from '@/components/analysis';
+import { ResearchPage } from '@/components/research';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {

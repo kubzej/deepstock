@@ -3,7 +3,7 @@ import {
   fetchOpenLots,
   fetchAllOpenLots,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Hook for fetching open lots for a specific portfolio.
@@ -13,7 +13,8 @@ export function useOpenLots(portfolioId: string | null) {
     queryKey: portfolioId ? queryKeys.openLots(portfolioId) : queryKeys.allOpenLots(),
     queryFn: () => portfolioId ? fetchOpenLots(portfolioId) : fetchAllOpenLots(),
     enabled: portfolioId !== undefined,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: STALE_TIMES.openLots,
+    gcTime: GC_TIMES.medium,
   });
 }
 
@@ -24,7 +25,8 @@ export function useAllOpenLots() {
   return useQuery({
     queryKey: queryKeys.allOpenLots(),
     queryFn: fetchAllOpenLots,
-    staleTime: 2 * 60 * 1000,
+    staleTime: STALE_TIMES.openLots,
+    gcTime: GC_TIMES.medium,
   });
 }
 

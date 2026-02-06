@@ -131,6 +131,8 @@ export function OptionTransactionModal({
   const [expirationDate, setExpirationDate] = useState('');
   const [contracts, setContracts] = useState('1');
   const [premium, setPremium] = useState('');
+  const [fees, setFees] = useState('');
+  const [exchangeRate, setExchangeRate] = useState('');
   const [transactionDate, setTransactionDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -159,6 +161,8 @@ export function OptionTransactionModal({
       setExpirationDate(holding.expiration_date);
       setContracts(holding.contracts.toString());
       setPremium('');
+      setFees('');
+      setExchangeRate('');
       setTransactionDate(new Date().toISOString().split('T')[0]);
       setNotes('');
     } else {
@@ -170,6 +174,8 @@ export function OptionTransactionModal({
       setExpirationDate('');
       setContracts('1');
       setPremium('');
+      setFees('');
+      setExchangeRate('');
       setTransactionDate(new Date().toISOString().split('T')[0]);
       setNotes('');
     }
@@ -203,7 +209,8 @@ export function OptionTransactionModal({
       !strikePrice ||
       !expirationDate ||
       !contracts ||
-      !transactionDate
+      !transactionDate ||
+      !exchangeRate
     ) {
       return false;
     }
@@ -221,6 +228,7 @@ export function OptionTransactionModal({
     expirationDate,
     contracts,
     transactionDate,
+    exchangeRate,
     premium,
     isPremiumRequired,
     isCloseMode,
@@ -243,6 +251,8 @@ export function OptionTransactionModal({
           contracts: parseInt(contracts, 10),
           closeDate: transactionDate,
           premium: premium ? parseFloat(premium) : undefined,
+          fees: fees ? parseFloat(fees) : undefined,
+          exchangeRateToCzk: parseFloat(exchangeRate),
           notes: notes || undefined,
         });
       } else {
@@ -257,6 +267,8 @@ export function OptionTransactionModal({
             expiration_date: expirationDate,
             contracts: parseInt(contracts, 10),
             premium: parseFloat(premium),
+            fees: fees ? parseFloat(fees) : undefined,
+            exchange_rate_to_czk: parseFloat(exchangeRate),
             date: transactionDate,
             notes: notes || undefined,
           },
@@ -294,7 +306,7 @@ export function OptionTransactionModal({
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-sm">
                 Zavíráte pozici:{' '}
-                <span className="font-mono font-medium">
+                <span className="font-mono-price font-medium">
                   {holding.symbol} {holding.option_type.toUpperCase()} $
                   {holding.strike_price}
                 </span>
@@ -440,13 +452,46 @@ export function OptionTransactionModal({
             />
           </div>
 
+          {/* Fees & Exchange Rate */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fees">
+                Poplatky ($)
+                <span className="text-muted-foreground ml-1">(volitelné)</span>
+              </Label>
+              <Input
+                id="fees"
+                type="number"
+                step="0.01"
+                min="0"
+                value={fees}
+                onChange={(e) => setFees(e.target.value)}
+                placeholder="0.65"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="exchangeRate">Kurz USD/CZK</Label>
+              <Input
+                id="exchangeRate"
+                type="number"
+                step="0.001"
+                min="0"
+                value={exchangeRate}
+                onChange={(e) => setExchangeRate(e.target.value)}
+                placeholder="23.5"
+                required
+              />
+            </div>
+          </div>
+
           {/* OCC Symbol Preview - only in open mode */}
           {isOpenMode && occSymbol && (
             <div className="bg-muted/50 rounded-lg p-3">
               <Label className="text-muted-foreground text-xs">
                 OCC Symbol
               </Label>
-              <p className="font-mono text-sm mt-1">{occSymbol}</p>
+              <p className="font-mono-price text-sm mt-1">{occSymbol}</p>
             </div>
           )}
 

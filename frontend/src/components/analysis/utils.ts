@@ -216,41 +216,40 @@ export function calculateOptionPerformance(
     totalTrades: transactions.length,
   };
 
-  // Group by option_symbol
-  const symbolTrades: Record<string, OptionTransaction[]> = {};
+  // Simpler logic: categorize by action type
+  // Opening transactions (STO, BTO) go to "open"
+  // Closing transactions (STC, BTC, EXPIRATION, ASSIGNMENT, EXERCISE) go to "closed"
   transactions.forEach((tx) => {
-    if (!symbolTrades[tx.option_symbol]) {
-      symbolTrades[tx.option_symbol] = [];
-    }
-    symbolTrades[tx.option_symbol].push(tx);
-  });
+    const premium = Math.abs(tx.total_premium || 0) * (tx.exchange_rate_to_czk || 1);
+    const fees = (tx.fees || 0) * (tx.exchange_rate_to_czk || 1);
 
-  // Process each symbol
-  Object.values(symbolTrades).forEach((trades) => {
-    let openContracts = 0;
-    let totalReceived = 0;
-    let totalPaid = 0;
-
-    trades.forEach((tx) => {
-      const premium = (tx.total_premium || 0) * (tx.exchange_rate_to_czk || 1);
-
-      if (tx.action === 'STO' || tx.action === 'STC') {
-        totalReceived += premium;
-        openContracts += tx.action === 'STO' ? tx.contracts : -tx.contracts;
-      } else if (tx.action === 'BTO' || tx.action === 'BTC') {
-        totalPaid += premium;
-        openContracts += tx.action === 'BTO' ? tx.contracts : -tx.contracts;
-      }
-    });
-
-    if (openContracts === 0) {
-      result.closed.premiumReceived += totalReceived;
-      result.closed.premiumPaid += totalPaid;
-      result.closed.realizedPL += totalReceived - totalPaid;
-    } else {
-      result.open.premiumReceived += totalReceived;
-      result.open.premiumPaid += totalPaid;
-      result.open.netPremium += totalReceived - totalPaid;
+    switch (tx.action) {
+      case 'STO': // Sell to Open - received premium
+        result.open.premiumReceived += premium;
+        result.open.netPremium += premium - fees;
+        break;
+      case 'BTO': // Buy to Open - paid premium
+        result.open.premiumPaid += premium;
+        result.open.netPremium -= premium + fees;
+        break;
+      case 'STC': // Sell to Close - received premium (closing long position)
+        result.closed.premiumReceived += premium;
+        result.closed.realizedPL += premium - fees;
+        break;
+      case 'BTC': // Buy to Close - paid premium (closing short position)
+        result.closed.premiumPaid += premium;
+        result.closed.realizedPL -= premium + fees;
+        break;
+      case 'EXPIRATION':
+        // No premium movement, but position is closed
+        // If we know the original position, we could count full profit/loss
+        break;
+      case 'ASSIGNMENT':
+      case 'EXERCISE':
+        // Premium movement depends on the stock transaction
+        // For now, just track the fees
+        result.closed.realizedPL -= fees;
+        break;
     }
   });
 

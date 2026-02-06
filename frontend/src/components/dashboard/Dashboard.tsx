@@ -3,9 +3,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   HoldingsTable,
   type Holding as HoldingView,
-} from '@/components/HoldingsTable';
-import { OpenLotsRanking, type OpenLot } from '@/components/OpenLotsRanking';
+} from './HoldingsTable';
+import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, RefreshCw } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
@@ -105,8 +107,17 @@ export function Dashboard({ onStockClick }: DashboardProps) {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Načítání portfolia...</p>
+      <div className="space-y-6 pb-12">
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-12 w-64" />
+          <div className="flex gap-8">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-24" />
+          </div>
+        </div>
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
@@ -114,8 +125,10 @@ export function Dashboard({ onStockClick }: DashboardProps) {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
-        <p className="text-destructive">{error}</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
         <Button onClick={refresh} variant="outline">
           Zkusit znovu
         </Button>

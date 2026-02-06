@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { List, Tag, ChevronRight, Briefcase } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { WatchlistSettings } from '@/components/settings/WatchlistSettings';
 import { WatchlistTagSettings } from '@/components/settings/WatchlistTagSettings';
 import { PortfolioSettings } from '@/components/settings/PortfolioSettings';
@@ -30,12 +31,10 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
   // Main menu
   return (
     <div className="space-y-6 pb-12">
-      <div>
-        <h1 className="text-2xl font-bold">Nastavení</h1>
-        <p className="text-muted-foreground mt-1">
-          Správa portfolií, watchlistů a dalších nastavení
-        </p>
-      </div>
+      <PageHeader
+        title="Nastavení"
+        subtitle="Správa portfolií, watchlistů a dalších nastavení"
+      />
 
       {/* Portfolia section */}
       <div className="space-y-1">

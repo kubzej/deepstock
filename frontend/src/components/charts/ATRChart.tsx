@@ -133,7 +133,7 @@ function CustomTooltip({
           style={{ backgroundColor: COLORS.atr }}
         />
         <span className="text-zinc-600">ATR %:</span>
-        <span className="font-mono text-zinc-800">
+        <span className="font-mono-price text-zinc-800">
           {atrPercent?.toFixed(2) ?? '—'}%
         </span>
       </div>
@@ -141,7 +141,7 @@ function CustomTooltip({
         <div className="flex items-center gap-2 text-sm mt-1">
           <span className="h-2 w-2 rounded-full bg-purple-300" />
           <span className="text-zinc-600">ATR:</span>
-          <span className="font-mono text-zinc-800">
+          <span className="font-mono-price text-zinc-800">
             {atrAbsolute?.toFixed(2) ?? '—'}
           </span>
         </div>

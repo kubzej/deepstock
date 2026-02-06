@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
-import { PortfolioSelector } from '@/components/PortfolioSelector';
+import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
 interface MobileHeaderProps {
   activeTab: string;

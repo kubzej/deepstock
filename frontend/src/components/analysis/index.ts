@@ -2,6 +2,9 @@
  * Analysis Components - Barrel Export
  */
 
+// Main page
+export { AnalysisPage } from './AnalysisPage';
+
 // Components
 export { DateRangeFilter } from './DateRangeFilter';
 export { DistributionList } from './DistributionList';

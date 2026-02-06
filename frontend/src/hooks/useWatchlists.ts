@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchWatchlists,
   fetchWatchlistItems,
+  fetchAllWatchlistTickers,
   createWatchlist,
   updateWatchlist,
   deleteWatchlist,
@@ -22,6 +23,19 @@ export function useWatchlists() {
     queryKey: queryKeys.watchlists(),
     queryFn: fetchWatchlists,
     staleTime: Infinity, // Only invalidate manually on CRUD
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * Fetch all unique tickers from all watchlists.
+ * Used for prefetching quotes on app load.
+ */
+export function useAllWatchlistTickers() {
+  return useQuery({
+    queryKey: queryKeys.watchlistTickers(),
+    queryFn: fetchAllWatchlistTickers,
+    staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000,
   });
 }

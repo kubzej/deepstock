@@ -40,7 +40,7 @@ import {
   formatDate,
   toCZK,
 } from '@/lib/format';
-import { TransactionModal } from './TransactionModal';
+import { TransactionModal } from '@/components/transactions';
 
 interface StockDetailProps {
   ticker: string;
@@ -210,12 +210,20 @@ export function StockDetail({
     : null;
 
   // CZK conversions for position
+  // Use historical total_invested_czk for cost basis (preserves historical exchange rate)
+  // Fall back to current rate conversion if not available
   const positionCzk = position
-    ? {
-        totalCost: toCZK(position.totalCost, stockCurrency, rates),
-        totalValue: toCZK(position.totalValue, stockCurrency, rates),
-        unrealizedPnL: toCZK(position.unrealizedPnL, stockCurrency, rates),
-      }
+    ? (() => {
+        const totalCost =
+          holding?.total_invested_czk ??
+          toCZK(position.totalCost, stockCurrency, rates);
+        const totalValue = toCZK(position.totalValue, stockCurrency, rates);
+        return {
+          totalCost,
+          totalValue,
+          unrealizedPnL: totalValue - totalCost,
+        };
+      })()
     : null;
 
   return (
@@ -357,7 +365,16 @@ export function StockDetail({
               >
                 {formatCurrency(positionCzk.unrealizedPnL)}
                 <span className="text-sm ml-2">
-                  ({formatPercent(position.unrealizedPnLPercent, 2, true)})
+                  (
+                  {formatPercent(
+                    positionCzk.totalCost > 0
+                      ? (positionCzk.unrealizedPnL / positionCzk.totalCost) *
+                          100
+                      : 0,
+                    2,
+                    true,
+                  )}
+                  )
                 </span>
               </p>
             </div>
@@ -485,7 +502,7 @@ export function StockDetail({
                           </TableCell>
                         )}
                         <TableCell>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-900 text-white">
                             {isBuy ? 'BUY' : 'SELL'}
                           </span>
                         </TableCell>

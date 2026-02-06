@@ -147,7 +147,7 @@ function CustomTooltip({
           <span className="text-zinc-600">
             {entry.dataKey === 'k' ? '%K' : '%D'}:
           </span>
-          <span className="font-mono text-zinc-800">
+          <span className="font-mono-price text-zinc-800">
             {entry.value?.toFixed(1) ?? '—'}
           </span>
         </div>

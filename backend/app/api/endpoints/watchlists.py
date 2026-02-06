@@ -29,6 +29,12 @@ async def get_watchlists(user_id: str = Depends(get_current_user_id)) -> List[di
     return await watchlist_service.get_user_watchlists(user_id)
 
 
+@router.get("/tickers")
+async def get_all_tickers(user_id: str = Depends(get_current_user_id)) -> List[str]:
+    """Get all unique tickers from all user's watchlists for prefetching."""
+    return await watchlist_service.get_all_tickers(user_id)
+
+
 @router.get("/{watchlist_id}")
 async def get_watchlist(
     watchlist_id: str,

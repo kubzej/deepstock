@@ -13,3 +13,5 @@ export { ATRChart } from './ATRChart';
 export { OBVChart } from './OBVChart';
 export { ADXChart } from './ADXChart';
 export { FibonacciChart } from './FibonacciChart';
+export { PriceChart } from './PriceChart';
+export { TechnicalAnalysis } from './TechnicalAnalysis';

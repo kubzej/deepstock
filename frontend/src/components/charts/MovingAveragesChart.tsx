@@ -141,7 +141,7 @@ function CustomTooltip({
             {entry.dataKey === 'sma50' && 'SMA 50'}
             {entry.dataKey === 'sma200' && 'SMA 200'}:
           </span>
-          <span className="font-mono text-zinc-800">
+          <span className="font-mono-price text-zinc-800">
             {entry.value?.toFixed(2) ?? '—'}
           </span>
         </div>

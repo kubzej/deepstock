@@ -174,3 +174,14 @@ export function fromCZK(
   const rate = rates[currency] || 1;
   return rate > 0 ? amountCzk / rate : amountCzk;
 }
+
+/**
+ * Format ratio value with specified decimals
+ */
+export function formatRatio(
+  value: number | null | undefined,
+  decimals: number = 2
+): string {
+  if (value === null || value === undefined) return '—';
+  return value.toFixed(decimals);
+}

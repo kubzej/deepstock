@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchExchangeRates, DEFAULT_RATES } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Hook for fetching exchange rates.
- * Rates are cached for 30 minutes as they don't change frequently.
+ * Very long stale time - FX rates change slowly.
  */
 export function useExchangeRates() {
   return useQuery({
     queryKey: queryKeys.exchangeRates(),
     queryFn: fetchExchangeRates,
-    staleTime: 30 * 60 * 1000, // 30 minutes
-    gcTime: 60 * 60 * 1000, // 1 hour
+    staleTime: STALE_TIMES.exchangeRates,
+    gcTime: GC_TIMES.long,
     placeholderData: DEFAULT_RATES,
   });
 }

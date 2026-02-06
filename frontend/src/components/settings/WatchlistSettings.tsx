@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Plus, Pencil, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
 import { type Watchlist } from '@/lib/api';
 import {
@@ -302,28 +303,15 @@ export function WatchlistSettings({ onBack }: WatchlistSettingsProps) {
       </Dialog>
 
       {/* Delete Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteData}
         onOpenChange={(open) => !open && setDeleteData(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Smazat watchlist?</DialogTitle>
-            <DialogDescription>
-              Opravdu chcete smazat watchlist &quot;{deleteData?.name}&quot;?
-              Tato akce je nevratná a smaže i všechny položky v něm.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteData(null)}>
-              Zrušit
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Smazat
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Smazat watchlist?"
+        description={`Opravdu chcete smazat watchlist "${deleteData?.name}"? Tato akce je nevratná a smaže i všechny položky v něm.`}
+        confirmLabel="Smazat"
+        onConfirm={handleDelete}
+        variant="destructive"
+      />
     </div>
   );
 }

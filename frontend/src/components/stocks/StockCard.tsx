@@ -6,6 +6,7 @@ import {
   formatPercent,
   formatPrice,
   formatShares,
+  formatVolumeRatio,
 } from '@/lib/format';
 
 interface PortfolioHolding {
@@ -173,6 +174,12 @@ export function StockCard({
                 </span>
                 <span className="font-mono-price">
                   {formatCurrency(investedCzk)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground/70 block">Objem</span>
+                <span className="font-mono-price">
+                  {formatVolumeRatio(quote?.volume, quote?.avgVolume)}
                 </span>
               </div>
               {targetPrice && (

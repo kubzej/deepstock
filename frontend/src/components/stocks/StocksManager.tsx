@@ -15,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -42,49 +41,11 @@ import {
 } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
 
 type CompletenessFilter = 'all' | 'complete' | 'incomplete';
-
-// Options from portfolio-tracker
-const EXCHANGE_OPTIONS = [
-  { value: '', label: 'Bez burzy' },
-  { value: 'NYSE', label: 'NYSE (USA)' },
-  { value: 'NASDAQ', label: 'Nasdaq (USA)' },
-  { value: 'LSE', label: 'London Stock Exchange (UK)' },
-  { value: 'XETRA', label: 'Xetra / Deutsche Börse (DE)' },
-  { value: 'SIX', label: 'SIX Swiss Exchange (CH)' },
-  { value: 'TSX', label: 'Toronto Stock Exchange (CA)' },
-  { value: 'ASX', label: 'Australian Securities Exchange (AU)' },
-  { value: 'JPX', label: 'Japan Exchange Group (JP)' },
-  { value: 'SSE', label: 'Shanghai Stock Exchange (CN)' },
-  { value: 'HKEX', label: 'Hong Kong Exchanges (HK)' },
-  { value: 'PSE', label: 'Philippine Stock Exchange (PH)' },
-  { value: 'OMX-STO', label: 'Nasdaq Stockholm (SE)' },
-  { value: 'VIE', label: 'Vienna Stock Exchange (AT)' },
-  { value: 'WSE', label: 'Warsaw Stock Exchange (PL)' },
-  { value: 'PSE-PRA', label: 'Prague Stock Exchange (CZ)' },
-  { value: 'EURONEXT-PARIS', label: 'Euronext Paris (FR)' },
-  { value: 'Other', label: 'Jiná' },
-];
-
-const CURRENCY_OPTIONS = [
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'GBP', label: 'GBP' },
-  { value: 'JPY', label: 'JPY' },
-  { value: 'CHF', label: 'CHF' },
-  { value: 'CAD', label: 'CAD' },
-  { value: 'AUD', label: 'AUD' },
-  { value: 'CNY', label: 'CNY' },
-  { value: 'CZK', label: 'CZK' },
-  { value: 'HKD', label: 'HKD' },
-  { value: 'SEK', label: 'SEK' },
-  { value: 'DKK', label: 'DKK' },
-  { value: 'NOK', label: 'NOK' },
-  { value: 'PLN', label: 'PLN' },
-  { value: 'HUF', label: 'HUF' },
-];
 
 interface StockFormData {
   ticker: string;
@@ -476,7 +437,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                             e.stopPropagation();
                             openDeleteDialog(stock);
                           }}
-                          className="text-rose-500"
+                          className="text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Smazat
@@ -521,7 +482,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                           </Tooltip>
                         );
                       })()}
-                      <span className="font-mono font-bold text-sm flex-shrink-0">
+                      <span className="font-mono-price font-bold text-sm flex-shrink-0">
                         {stock.ticker}
                       </span>
                       <span className="text-xs text-muted-foreground truncate">
@@ -559,7 +520,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-rose-500"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
                         openDeleteDialog(stock);
@@ -736,38 +697,16 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
       </Dialog>
 
       {/* Delete Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Smazat akcii</DialogTitle>
-            <DialogDescription>
-              Opravdu chcete smazat akcii {selectedStock?.ticker}? Tuto akci
-              nelze vrátit zpět. Akci nelze smazat pokud má existující
-              transakce.
-            </DialogDescription>
-          </DialogHeader>
-          {formError && (
-            <Alert variant="destructive">
-              <AlertDescription>{formError}</AlertDescription>
-            </Alert>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Zrušit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={saving}
-            >
-              {saving ? 'Mažu...' : 'Smazat'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Smazat akcii"
+        description={`Opravdu chcete smazat akcii ${selectedStock?.ticker}? Tuto akci nelze vrátit zpět. Akci nelze smazat pokud má existující transakce.`}
+        confirmLabel="Smazat"
+        onConfirm={handleDelete}
+        loading={saving}
+        variant="destructive"
+      />
     </div>
   );
 }

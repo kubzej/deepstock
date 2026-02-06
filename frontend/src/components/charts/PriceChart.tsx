@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { fetchPriceHistory, type ChartPeriod } from '@/lib/api';
+import { formatCurrency } from '@/lib/format';
 
 interface PriceChartProps {
   ticker: string;
@@ -57,16 +58,6 @@ function formatXAxisDate(date: string, range: ChartPeriod): string {
     day: 'numeric',
     month: 'short',
   });
-}
-
-// Format currency
-function formatCurrency(value: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 // Format number
@@ -207,11 +198,11 @@ export function PriceChart({
       {displayData && (
         <div className="space-y-1">
           <div className="flex items-baseline gap-3">
-            <span className="text-2xl font-mono font-semibold">
+            <span className="text-2xl font-mono-price font-semibold">
               {formatCurrency(displayData.close, currency)}
             </span>
             <span
-              className={`text-sm font-mono ${
+              className={`text-sm font-mono-price ${
                 displayData.isPositive ? 'text-emerald-500' : 'text-rose-500'
               }`}
             >
@@ -221,7 +212,7 @@ export function PriceChart({
               {formatNumber(displayData.changePercent)}%)
             </span>
           </div>
-          <div className="flex gap-4 text-xs text-muted-foreground font-mono">
+          <div className="flex gap-4 text-xs text-muted-foreground font-mono-price">
             <span>O {formatNumber(displayData.open)}</span>
             <span>H {formatNumber(displayData.high)}</span>
             <span>L {formatNumber(displayData.low)}</span>

@@ -1,9 +1,12 @@
 import yfinance as yf
-import redis.asyncio as redis
 import json
 import math
+import logging
 from typing import Dict
 from app.core.config import get_settings
+from app.core.redis import get_redis
+
+logger = logging.getLogger(__name__)
 
 class ExchangeRateService:
     """Service for fetching and caching exchange rates to CZK."""
@@ -27,8 +30,8 @@ class ExchangeRateService:
         'SGD': 17.5, 'TWD': 0.73, 'KRW': 0.017,
     }
     
-    def __init__(self, redis_url: str = "redis://redis:6379/0"):
-        self.redis = redis.from_url(redis_url)
+    def __init__(self):
+        self.redis = get_redis()  # Uses shared connection pool
     
     async def get_rates(self) -> Dict[str, float]:
         """
@@ -87,14 +90,14 @@ class ExchangeRateService:
                     cross_rate = curr_to_usd * usd_czk
                     rates[currency] = round(cross_rate, 4)
                 except Exception as e:
-                    print(f"Failed to get cross rate for {currency}: {e}")
+                    logger.warning(f"Failed to get cross rate for {currency}: {e}")
                     rates[currency] = self.FALLBACK_RATES.get(currency, 1.0)
             
             # Cache for 1 hour (rates don't change that fast)
             await self.redis.set("exchange_rates:czk", json.dumps(rates), ex=3600)
             
         except Exception as e:
-            print(f"Error fetching exchange rates: {e}")
+            logger.error(f"Error fetching exchange rates: {e}")
             # Return fallback rates
             rates = self.FALLBACK_RATES.copy()
         
@@ -110,5 +113,5 @@ class ExchangeRateService:
         return round(amount * rate, 2)
 
 
-settings = get_settings()
-exchange_service = ExchangeRateService(redis_url=settings.redis_url)
+# Singleton instance using shared Redis pool
+exchange_service = ExchangeRateService()
