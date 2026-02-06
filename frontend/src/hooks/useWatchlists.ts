@@ -3,6 +3,7 @@ import {
   fetchWatchlists,
   fetchWatchlistItems,
   fetchAllWatchlistTickers,
+  fetchAllWatchlistItems,
   createWatchlist,
   updateWatchlist,
   deleteWatchlist,
@@ -36,6 +37,19 @@ export function useAllWatchlistTickers() {
     queryKey: queryKeys.watchlistTickers(),
     queryFn: fetchAllWatchlistTickers,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * Fetch ALL items from ALL watchlists.
+ * Used for cross-watchlist filtering view.
+ */
+export function useAllWatchlistItems() {
+  return useQuery({
+    queryKey: ['allWatchlistItems'],
+    queryFn: fetchAllWatchlistItems,
+    staleTime: Infinity, // Only invalidate manually
     gcTime: 30 * 60 * 1000,
   });
 }

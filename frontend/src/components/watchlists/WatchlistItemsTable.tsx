@@ -32,7 +32,11 @@ import {
   ArrowDown,
   Tag,
 } from 'lucide-react';
-import { type WatchlistItem, type Quote } from '@/lib/api';
+import {
+  type WatchlistItem,
+  type WatchlistItemWithSource,
+  type Quote,
+} from '@/lib/api';
 import { formatPrice, formatPercent } from '@/lib/format';
 
 export type SortKey =
@@ -56,6 +60,7 @@ interface WatchlistItemsTableProps {
   onMove: (item: WatchlistItem) => void;
   onTagsEdit: (item: WatchlistItem) => void;
   showMoveOption?: boolean;
+  showWatchlistName?: boolean;
 }
 
 // Helper: check if price is at target
@@ -101,6 +106,7 @@ export function WatchlistItemsTable({
   onMove,
   onTagsEdit,
   showMoveOption = true,
+  showWatchlistName = false,
 }: WatchlistItemsTableProps) {
   return (
     <div className="hidden md:block overflow-x-auto">
@@ -251,8 +257,16 @@ export function WatchlistItemsTable({
                           </div>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {item.stocks.name}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                          {item.stocks.name}
+                        </span>
+                        {showWatchlistName &&
+                          (item as WatchlistItemWithSource).watchlist_name && (
+                            <span className="text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                              {(item as WatchlistItemWithSource).watchlist_name}
+                            </span>
+                          )}
                       </div>
                     </div>
                   </div>

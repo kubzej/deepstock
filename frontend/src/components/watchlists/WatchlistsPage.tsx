@@ -13,13 +13,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { Plus, Eye, Target } from 'lucide-react';
-import { type WatchlistItem } from '@/lib/api';
+import { Plus, Eye, Target, Filter, X } from 'lucide-react';
+import {
+  type WatchlistItem,
+  type WatchlistItemWithSource,
+  type Quote,
+} from '@/lib/api';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useWatchlists,
   useWatchlistItems,
+  useAllWatchlistItems,
   useAddWatchlistItem,
   useUpdateWatchlistItem,
   useDeleteWatchlistItem,
@@ -36,6 +41,20 @@ import {
   WatchlistItemFormDialog,
   type WatchlistItemFormData,
 } from './WatchlistItemFormDialog';
+
+// Special ID for filter view
+const FILTER_VIEW_ID = '__filter__';
+
+// Helper: check if price is at target
+function isAtBuyTarget(item: WatchlistItem, quote?: Quote): boolean {
+  if (!item.target_buy_price || !quote) return false;
+  return quote.price <= item.target_buy_price;
+}
+
+function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
+  if (!item.target_sell_price || !quote) return false;
+  return quote.price >= item.target_sell_price;
+}
 
 interface WatchlistsPageProps {
   onStockClick?: (ticker: string) => void;
@@ -54,6 +73,12 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     null,
   );
 
+  // Filter view state
+  const isFilterView = selectedWatchlistId === FILTER_VIEW_ID;
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [showAtBuyTarget, setShowAtBuyTarget] = useState(false);
+  const [showAtSellTarget, setShowAtSellTarget] = useState(false);
+
   // Auto-select first watchlist
   useEffect(() => {
     if (watchlists.length > 0 && !selectedWatchlistId) {
@@ -61,8 +86,19 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     }
   }, [watchlists, selectedWatchlistId]);
 
-  const { data: items = [], isLoading: itemsLoading } =
-    useWatchlistItems(selectedWatchlistId);
+  // Single watchlist items
+  const { data: singleWatchlistItems = [], isLoading: itemsLoading } =
+    useWatchlistItems(isFilterView ? null : selectedWatchlistId);
+
+  // All watchlist items (for filter view)
+  const { data: allItems = [], isLoading: allItemsLoading } =
+    useAllWatchlistItems();
+
+  // Determine which items to display
+  const items = useMemo(() => {
+    if (!isFilterView) return singleWatchlistItems;
+    return allItems as WatchlistItem[];
+  }, [isFilterView, singleWatchlistItems, allItems]);
 
   // Get tickers from items for quotes
   const tickers = useMemo(
@@ -114,8 +150,38 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     }
   };
 
-  const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
+  // Filtering + Sorting
+  const filteredAndSortedItems = useMemo(() => {
+    // First filter (only in filter view)
+    let filtered = [...items];
+
+    if (isFilterView) {
+      // Filter by tags
+      if (filterTags.length > 0) {
+        filtered = filtered.filter((item) =>
+          item.tags?.some((tag) => filterTags.includes(tag.id)),
+        );
+      }
+
+      // Filter by target status
+      if (showAtBuyTarget || showAtSellTarget) {
+        filtered = filtered.filter((item) => {
+          const quote = quotes[item.stocks.ticker];
+          const atBuy = isAtBuyTarget(item, quote);
+          const atSell = isAtSellTarget(item, quote);
+
+          if (showAtBuyTarget && showAtSellTarget) {
+            return atBuy || atSell;
+          }
+          if (showAtBuyTarget) return atBuy;
+          if (showAtSellTarget) return atSell;
+          return true;
+        });
+      }
+    }
+
+    // Then sort
+    return filtered.sort((a, b) => {
       let aVal: number | string = 0;
       let bVal: number | string = 0;
 
@@ -156,7 +222,20 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
       const numB = bVal as number;
       return sortDir === 'asc' ? numA - numB : numB - numA;
     });
-  }, [items, quotes, sortKey, sortDir]);
+  }, [
+    items,
+    quotes,
+    sortKey,
+    sortDir,
+    isFilterView,
+    filterTags,
+    showAtBuyTarget,
+    showAtSellTarget,
+  ]);
+
+  // Check if any filters are active
+  const hasActiveFilters =
+    filterTags.length > 0 || showAtBuyTarget || showAtSellTarget;
 
   // Item CRUD
   const openAddItem = () => {
@@ -178,8 +257,12 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
         await updateItemMutation.mutateAsync({
           itemId: editingItem.id,
           watchlistId: selectedWatchlistId,
-          targetBuyPrice: formData.buyTarget ? parseFloat(formData.buyTarget) : null,
-          targetSellPrice: formData.sellTarget ? parseFloat(formData.sellTarget) : null,
+          targetBuyPrice: formData.buyTarget
+            ? parseFloat(formData.buyTarget)
+            : null,
+          targetSellPrice: formData.sellTarget
+            ? parseFloat(formData.sellTarget)
+            : null,
           notes: formData.notes.trim() || null,
           sector: formData.sector.trim() || null,
         });
@@ -188,8 +271,12 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
         await addItemMutation.mutateAsync({
           watchlistId: selectedWatchlistId,
           ticker: formData.ticker.trim().toUpperCase(),
-          targetBuyPrice: formData.buyTarget ? parseFloat(formData.buyTarget) : undefined,
-          targetSellPrice: formData.sellTarget ? parseFloat(formData.sellTarget) : undefined,
+          targetBuyPrice: formData.buyTarget
+            ? parseFloat(formData.buyTarget)
+            : undefined,
+          targetSellPrice: formData.sellTarget
+            ? parseFloat(formData.sellTarget)
+            : undefined,
           notes: formData.notes.trim() || undefined,
           sector: formData.sector.trim() || undefined,
         });
@@ -307,9 +394,10 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
         onRefresh={() => {
           queryClient.invalidateQueries({ queryKey: ['watchlists'] });
           queryClient.invalidateQueries({ queryKey: ['watchlistItems'] });
+          queryClient.invalidateQueries({ queryKey: ['allWatchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
         }}
-        isRefreshing={loading || quotesLoading}
+        isRefreshing={loading || quotesLoading || allItemsLoading}
       />
 
       {/* Empty state */}
@@ -327,9 +415,25 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Watchlist toggle buttons + Add button */}
+          {/* Watchlist toggle buttons + Filter + Add button */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex gap-1 flex-wrap">
+              {/* Filter view button */}
+              <Button
+                variant={isFilterView ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedWatchlistId(FILTER_VIEW_ID)}
+                className="h-8"
+              >
+                <Filter className="h-3.5 w-3.5 mr-1" />
+                Filtrované
+                {hasActiveFilters && (
+                  <span className="ml-1 h-2 w-2 rounded-full bg-orange-500" />
+                )}
+              </Button>
+              {/* Separator */}
+              <div className="w-px h-6 bg-border mx-1 self-center" />
+              {/* Watchlist buttons */}
               {watchlists.map((w) => (
                 <Button
                   key={w.id}
@@ -349,32 +453,137 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
             <Button
               size="sm"
               onClick={openAddItem}
-              disabled={!selectedWatchlistId}
+              disabled={!selectedWatchlistId || isFilterView}
             >
               <Plus className="h-4 w-4 mr-1" />
               Přidat akcii
             </Button>
           </div>
 
+          {/* Filter panel (only in filter view) */}
+          {isFilterView && (
+            <div className="flex flex-col gap-3 p-4 rounded-lg bg-muted/30 border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Filtry</span>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterTags([]);
+                      setShowAtBuyTarget(false);
+                      setShowAtSellTarget(false);
+                    }}
+                    className="h-7 text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Vymazat filtry
+                  </Button>
+                )}
+              </div>
+
+              {/* Target status filters */}
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setShowAtBuyTarget(!showAtBuyTarget)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    showAtBuyTarget
+                      ? 'bg-emerald-500 text-white ring-2 ring-offset-1 ring-offset-background ring-emerald-500'
+                      : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${showAtBuyTarget ? 'bg-white' : 'bg-emerald-500'}`}
+                  />
+                  Nákupní cíl
+                </button>
+                <button
+                  onClick={() => setShowAtSellTarget(!showAtSellTarget)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    showAtSellTarget
+                      ? 'bg-amber-500 text-white ring-2 ring-offset-1 ring-offset-background ring-amber-500'
+                      : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${showAtSellTarget ? 'bg-white' : 'bg-amber-500'}`}
+                  />
+                  Prodejní cíl
+                </button>
+              </div>
+
+              {/* Tag filters */}
+              {allTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {allTags.map((tag) => {
+                    const isSelected = filterTags.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() =>
+                          setFilterTags((prev) =>
+                            isSelected
+                              ? prev.filter((id) => id !== tag.id)
+                              : [...prev, tag.id],
+                          )
+                        }
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                          isSelected
+                            ? 'ring-2 ring-offset-1 ring-offset-background'
+                            : 'opacity-50 hover:opacity-80'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected
+                            ? tag.color
+                            : `${tag.color}20`,
+                          color: isSelected ? '#fff' : tag.color,
+                        }}
+                      >
+                        <span
+                          className="h-1.5 w-1.5 rounded-full"
+                          style={{
+                            backgroundColor: isSelected ? '#fff' : tag.color,
+                          }}
+                        />
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Results count */}
+              <div className="text-xs text-muted-foreground">
+                {filteredAndSortedItems.length} z {allItems.length} položek
+              </div>
+            </div>
+          )}
+
           {/* Items table */}
-          {selectedWatchlist && (
+          {(selectedWatchlist || isFilterView) && (
             <>
-              {itemsLoading ? (
+              {(isFilterView ? allItemsLoading : itemsLoading) ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
-              ) : items.length === 0 ? (
+              ) : filteredAndSortedItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
                   <Target className="h-8 w-8 text-muted-foreground mb-2" />
                   <p className="text-muted-foreground mb-4">
-                    Watchlist je prázdný
+                    {isFilterView
+                      ? hasActiveFilters
+                        ? 'Žádné položky neodpovídají filtrům'
+                        : 'Žádné položky ve watchlistech'
+                      : 'Watchlist je prázdný'}
                   </p>
-                  <Button variant="outline" onClick={openAddItem}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Přidat akcii
-                  </Button>
+                  {!isFilterView && (
+                    <Button variant="outline" onClick={openAddItem}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Přidat akcii
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <>
@@ -407,7 +616,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
 
                     {/* Cards */}
                     <div className="space-y-1.5">
-                      {sortedItems.map((item) => (
+                      {filteredAndSortedItems.map((item) => (
                         <WatchlistItemCard
                           key={item.id}
                           item={item}
@@ -416,6 +625,12 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                           onDelete={() => setDeleteItemData(item)}
                           onTags={() => openTagsDialog(item)}
                           onClick={() => onStockClick?.(item.stocks.ticker)}
+                          showWatchlistName={isFilterView}
+                          watchlistName={
+                            isFilterView
+                              ? (item as WatchlistItemWithSource).watchlist_name
+                              : undefined
+                          }
                         />
                       ))}
                     </div>
@@ -423,7 +638,7 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
 
                   {/* Desktop: Table */}
                   <WatchlistItemsTable
-                    items={sortedItems}
+                    items={filteredAndSortedItems}
                     quotes={quotes}
                     sortKey={sortKey}
                     sortDir={sortDir}
@@ -433,7 +648,8 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                     onDelete={setDeleteItemData}
                     onMove={setMoveItemData}
                     onTagsEdit={openTagsDialog}
-                    showMoveOption={watchlists.length > 1}
+                    showMoveOption={watchlists.length > 1 && !isFilterView}
+                    showWatchlistName={isFilterView}
                   />
                 </>
               )}

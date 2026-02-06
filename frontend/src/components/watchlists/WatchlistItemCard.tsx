@@ -18,6 +18,8 @@ interface WatchlistItemCardProps {
   onDelete: () => void;
   onTags: () => void;
   onClick?: () => void;
+  showWatchlistName?: boolean;
+  watchlistName?: string;
 }
 
 export function WatchlistItemCard({
@@ -27,6 +29,8 @@ export function WatchlistItemCard({
   onDelete,
   onTags,
   onClick,
+  showWatchlistName,
+  watchlistName,
 }: WatchlistItemCardProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -121,9 +125,16 @@ export function WatchlistItemCard({
                 </div>
               )}
             </div>
-            <span className="text-[11px] text-muted-foreground truncate block">
-              {item.stocks.name}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-muted-foreground truncate">
+                {item.stocks.name}
+              </span>
+              {showWatchlistName && watchlistName && (
+                <span className="text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded">
+                  {watchlistName}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Right: Price + Change */}
