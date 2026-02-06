@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoldingsTable, type Holding as HoldingView } from './HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, RefreshCw } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
+import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 
 interface DashboardProps {
@@ -20,30 +21,13 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     openLots,
     quotes,
     rates,
-    loading,
+    isInitialLoading,
+    isFetching,
     error,
     refresh,
-    lastFetched,
+    dataUpdatedAt,
     isAllPortfolios,
   } = usePortfolio();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refresh();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  // Format last fetched time
-  const lastFetchedText = lastFetched
-    ? lastFetched.toLocaleTimeString('cs-CZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
 
   // Transform holdings to HoldingsTable format
   const holdingsForTable: HoldingView[] = useMemo(() => {
@@ -165,8 +149,8 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     }));
   }, [openLots, quotes]);
 
-  // Loading state
-  if (loading) {
+  // Loading state - only show skeleton on initial load (no data yet)
+  if (isInitialLoading) {
     return (
       <div className="space-y-6 pb-12">
         <div className="space-y-4">
@@ -237,20 +221,19 @@ export function Dashboard({ onStockClick }: DashboardProps) {
               : (portfolio?.name ?? 'Portfolio')}
           </p>
           <div className="flex items-center gap-2">
-            {lastFetchedText && (
-              <span className="text-xs text-muted-foreground">
-                {lastFetchedText}
-              </span>
-            )}
+            <DataFreshnessIndicator
+              dataUpdatedAt={dataUpdatedAt}
+              isFetching={isFetching}
+            />
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleRefresh}
-              disabled={isRefreshing || loading}
+              onClick={refresh}
+              disabled={isFetching}
               className="h-7 w-7"
             >
               <RefreshCw
-                className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
               />
             </Button>
           </div>

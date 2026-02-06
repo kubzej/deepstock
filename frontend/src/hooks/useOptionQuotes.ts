@@ -46,8 +46,8 @@ export function useOptionQuotes(occSymbols: string[]) {
 
       return cached;
     },
-    staleTime: 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    staleTime: 10 * 60 * 1000, // 10 minutes - refresh manually when needed
+    gcTime: 30 * 60 * 1000, // 30 minutes cache
     enabled: occSymbols.length > 0,
   });
 }

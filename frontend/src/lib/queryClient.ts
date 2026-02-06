@@ -2,17 +2,17 @@ import { QueryClient } from '@tanstack/react-query';
 
 /**
  * Centralized stale time configuration.
- * 
+ *
  * Strategy:
- * - Market data (quotes, prices): Short stale time (1 min) - changes frequently
+ * - Market data (quotes, prices): Longer stale time (10 min) - manual refresh when needed
  * - User data (holdings, transactions): Medium stale time (5 min) - only changes via CRUD
  * - Static data (stocks, portfolios): Long stale time (30 min) - rarely changes
  * - FX rates: Very long (1 hour) - changes slowly
  */
 export const STALE_TIMES = {
-  // Market data - needs to be fresh
-  quotes: 60 * 1000,           // 1 minute
-  optionQuotes: 60 * 1000,     // 1 minute
+  // Market data - longer cache, manual refresh when needed
+  quotes: 10 * 60 * 1000,      // 10 minutes
+  optionQuotes: 10 * 60 * 1000, // 10 minutes
   
   // User portfolio data - changes via user actions
   holdings: 5 * 60 * 1000,     // 5 minutes

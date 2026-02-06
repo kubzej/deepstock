@@ -42,8 +42,16 @@ interface PortfolioContextType {
   rates: ExchangeRates;
 
   // State
+  /** True only on initial load (no data yet) - show skeleton */
+  isInitialLoading: boolean;
+  /** True when fetching (may have stale data) - show spinner */
+  isFetching: boolean;
+  /** @deprecated Use isInitialLoading instead */
   loading: boolean;
   error: string | null;
+  /** Timestamp when data was last updated (oldest of all queries) */
+  dataUpdatedAt: number | null;
+  /** @deprecated Use dataUpdatedAt instead */
   lastFetched: Date | null;
   /** True when viewing all portfolios combined */
   isAllPortfolios: boolean;
@@ -75,6 +83,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const {
     data: portfoliosData = [],
     isLoading: portfoliosLoading,
+    isFetching: portfoliosFetching,
+    dataUpdatedAt: portfoliosUpdatedAt,
     error: portfoliosError,
   } = usePortfolios();
 
@@ -95,15 +105,22 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const {
     data: holdingsData = [],
     isLoading: holdingsLoading,
+    isFetching: holdingsFetching,
+    dataUpdatedAt: holdingsUpdatedAt,
     error: holdingsError,
   } = useHoldings(portfolioIdForQuery);
 
   // Fetch open lots
-  const { data: openLotsData = [], isLoading: openLotsLoading } =
-    useOpenLots(portfolioIdForQuery);
+  const {
+    data: openLotsData = [],
+    isLoading: openLotsLoading,
+    isFetching: openLotsFetching,
+    dataUpdatedAt: openLotsUpdatedAt,
+  } = useOpenLots(portfolioIdForQuery);
 
   // Fetch exchange rates
-  const { data: ratesData = DEFAULT_RATES } = useExchangeRates();
+  const { data: ratesData = DEFAULT_RATES, dataUpdatedAt: ratesUpdatedAt } =
+    useExchangeRates();
 
   // Prefetch: Get all watchlist tickers for background prefetching
   const { data: watchlistTickers = [] } = useAllWatchlistTickers();
@@ -116,8 +133,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   }, [holdingsData, watchlistTickers]);
 
   // Fetch quotes for holdings + watchlist tickers (single batch)
-  const { data: quotesData = {}, isLoading: quotesLoading } =
-    useQuotes(tickers);
+  const {
+    data: quotesData = {},
+    isLoading: quotesLoading,
+    isFetching: quotesFetching,
+    dataUpdatedAt: quotesUpdatedAt,
+  } = useQuotes(tickers);
 
   // Merge holdings with quotes
   const holdingsWithPrices: HoldingWithPrice[] = useMemo(() => {
@@ -129,9 +150,39 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [holdingsData, quotesData]);
 
-  // Combined loading state
-  const loading =
+  // Initial loading state (no data yet - show skeleton)
+  const isInitialLoading =
     portfoliosLoading || holdingsLoading || openLotsLoading || quotesLoading;
+
+  // Fetching state (may have stale data - show spinner)
+  const isFetching =
+    portfoliosFetching ||
+    holdingsFetching ||
+    openLotsFetching ||
+    quotesFetching;
+
+  // Combined loading state (deprecated, kept for backwards compatibility)
+  const loading = isInitialLoading;
+
+  // Calculate oldest data update time (most stale data)
+  const dataUpdatedAt = useMemo(() => {
+    const timestamps = [
+      portfoliosUpdatedAt,
+      holdingsUpdatedAt,
+      openLotsUpdatedAt,
+      quotesUpdatedAt,
+      ratesUpdatedAt,
+    ].filter((t): t is number => t !== undefined && t > 0);
+
+    if (timestamps.length === 0) return null;
+    return Math.min(...timestamps);
+  }, [
+    portfoliosUpdatedAt,
+    holdingsUpdatedAt,
+    openLotsUpdatedAt,
+    quotesUpdatedAt,
+    ratesUpdatedAt,
+  ]);
 
   // Combined error
   const error = portfoliosError?.message || holdingsError?.message || null;
@@ -154,7 +205,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       setDefaultCreated(true);
       createPortfolioMutation.mutate('Hlavní portfolio');
     }
-  }, [portfoliosLoading, portfoliosError, portfoliosData.length, user, defaultCreated]);
+  }, [
+    portfoliosLoading,
+    portfoliosError,
+    portfoliosData.length,
+    user,
+    defaultCreated,
+  ]);
 
   const getHoldingByTicker = useCallback(
     (ticker: string): HoldingWithPrice | undefined => {
@@ -222,9 +279,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     openLots: openLotsData,
     quotes: quotesData,
     rates: ratesData,
+    isInitialLoading,
+    isFetching,
     loading,
     error,
-    lastFetched: null, // No longer tracked, React Query handles this
+    dataUpdatedAt,
+    lastFetched: dataUpdatedAt ? new Date(dataUpdatedAt) : null,
     isAllPortfolios,
     refresh,
     setActivePortfolio,

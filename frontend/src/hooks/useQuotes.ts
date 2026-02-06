@@ -2,8 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchQuotes, type Quote } from '@/lib/api';
 import { queryKeys } from '@/lib/queryClient';
 
-const QUOTE_STALE_TIME = 60 * 1000; // 1 minute
-const QUOTE_GC_TIME = 5 * 60 * 1000; // 5 minutes
+const QUOTE_STALE_TIME = 10 * 60 * 1000; // 10 minutes - refresh manually when needed
+const QUOTE_GC_TIME = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Normalized quotes cache - each ticker has its own cache entry.

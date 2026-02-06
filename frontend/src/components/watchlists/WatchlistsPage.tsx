@@ -66,7 +66,9 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
   // React Query hooks
   const {
     data: watchlists = [],
-    isLoading: loading,
+    isLoading: watchlistsLoading,
+    isFetching: watchlistsFetching,
+    dataUpdatedAt: watchlistsUpdatedAt,
     error: watchlistsError,
   } = useWatchlists();
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(
@@ -87,12 +89,18 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
   }, [watchlists, selectedWatchlistId]);
 
   // Single watchlist items
-  const { data: singleWatchlistItems = [], isLoading: itemsLoading } =
-    useWatchlistItems(isFilterView ? null : selectedWatchlistId);
+  const {
+    data: singleWatchlistItems = [],
+    isLoading: itemsLoading,
+    isFetching: itemsFetching,
+  } = useWatchlistItems(isFilterView ? null : selectedWatchlistId);
 
   // All watchlist items (for filter view)
-  const { data: allItems = [], isLoading: allItemsLoading } =
-    useAllWatchlistItems();
+  const {
+    data: allItems = [],
+    isLoading: allItemsLoading,
+    isFetching: allItemsFetching,
+  } = useAllWatchlistItems();
 
   // Determine which items to display
   const items = useMemo(() => {
@@ -105,7 +113,24 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     () => items.map((item) => item.stocks.ticker),
     [items],
   );
-  const { data: quotes = {}, isFetching: quotesLoading } = useQuotes(tickers);
+  const {
+    data: quotes = {},
+    isFetching: quotesFetching,
+    dataUpdatedAt: quotesUpdatedAt,
+  } = useQuotes(tickers);
+
+  // Combined fetching state for refresh indicator
+  const isFetching =
+    watchlistsFetching || itemsFetching || allItemsFetching || quotesFetching;
+
+  // Oldest data update time (for freshness indicator)
+  const dataUpdatedAt = useMemo(() => {
+    const timestamps = [watchlistsUpdatedAt, quotesUpdatedAt].filter(
+      (t): t is number => t !== undefined && t > 0,
+    );
+    if (timestamps.length === 0) return null;
+    return Math.min(...timestamps);
+  }, [watchlistsUpdatedAt, quotesUpdatedAt]);
 
   // Tags
   const { data: allTags = [] } = useWatchlistTags();
@@ -356,8 +381,8 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
     }
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state - only show skeleton on initial load (no data yet)
+  if (watchlistsLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -396,8 +421,10 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
           queryClient.invalidateQueries({ queryKey: ['watchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['allWatchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
+          queryClient.invalidateQueries({ queryKey: ['quote'] });
         }}
-        isRefreshing={loading || quotesLoading || allItemsLoading}
+        isRefreshing={isFetching}
+        dataUpdatedAt={dataUpdatedAt}
       />
 
       {/* Empty state */}

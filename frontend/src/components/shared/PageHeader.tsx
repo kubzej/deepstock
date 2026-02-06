@@ -1,5 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DataFreshnessIndicator } from './DataFreshnessIndicator';
 
 interface PageHeaderProps {
   /** Page title */
@@ -10,8 +11,8 @@ interface PageHeaderProps {
   onRefresh?: () => void;
   /** Show loading spinner on refresh button */
   isRefreshing?: boolean;
-  /** Last updated timestamp text */
-  lastUpdated?: string | null;
+  /** Timestamp when data was last updated (epoch ms) */
+  dataUpdatedAt?: number | null;
   /** Additional actions (buttons) to show on the right */
   actions?: React.ReactNode;
 }
@@ -21,7 +22,7 @@ export function PageHeader({
   subtitle,
   onRefresh,
   isRefreshing = false,
-  lastUpdated,
+  dataUpdatedAt,
   actions,
 }: PageHeaderProps) {
   return (
@@ -34,11 +35,13 @@ export function PageHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Last updated timestamp */}
-        {lastUpdated && (
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            {lastUpdated}
-          </span>
+        {/* Data freshness indicator */}
+        {dataUpdatedAt !== undefined && (
+          <DataFreshnessIndicator
+            dataUpdatedAt={dataUpdatedAt}
+            isFetching={isRefreshing}
+            className="hidden sm:inline"
+          />
         )}
 
         {/* Custom actions */}
