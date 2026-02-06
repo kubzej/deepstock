@@ -428,19 +428,63 @@ export function HoldingsTable({
                     {formatShares(holding.shares)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    {formatPrice(holding.currentPrice, holding.currency)}
+                    <div>
+                      {formatPrice(holding.currentPrice, holding.currency)}
+                    </div>
+                    {/* Pre-market price */}
+                    {holding.quote?.preMarketPrice != null && (
+                      <div className="text-[10px] text-orange-500">
+                        {formatPrice(
+                          holding.quote.preMarketPrice,
+                          holding.currency,
+                        )}
+                      </div>
+                    )}
+                    {/* After-hours price (only if no pre-market) */}
+                    {holding.quote?.postMarketPrice != null &&
+                      holding.quote?.preMarketPrice == null && (
+                        <div className="text-[10px] text-violet-500">
+                          {formatPrice(
+                            holding.quote.postMarketPrice,
+                            holding.currency,
+                          )}
+                        </div>
+                      )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className={
-                        isDayPositive
-                          ? 'text-positive border-positive/20'
-                          : 'text-negative border-negative/20'
-                      }
-                    >
-                      {formatPercent(holding.quote?.changePercent, 2, true)}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <Badge
+                        variant="outline"
+                        className={
+                          isDayPositive
+                            ? 'text-positive border-positive/20'
+                            : 'text-negative border-negative/20'
+                        }
+                      >
+                        {formatPercent(holding.quote?.changePercent, 2, true)}
+                      </Badge>
+                      {/* Pre-market change */}
+                      {holding.quote?.preMarketChangePercent != null && (
+                        <span className="text-[10px] font-mono-price text-orange-500">
+                          {formatPercent(
+                            holding.quote.preMarketChangePercent,
+                            2,
+                            true,
+                          )}
+                        </span>
+                      )}
+                      {/* After-hours change (only if no pre-market) */}
+                      {holding.quote?.postMarketChangePercent != null &&
+                        holding.quote?.preMarketChangePercent == null && (
+                          <span className="text-[10px] font-mono-price text-violet-500">
+                            {formatPercent(
+                              holding.quote.postMarketChangePercent,
+                              2,
+                              true,
+                            )}
+                          </span>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono-price text-muted-foreground">
                     {formatVolumeRatio(

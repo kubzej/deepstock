@@ -12,6 +12,10 @@ export interface Quote {
   changePercent: number;
   volume: number;
   avgVolume: number;
+  preMarketPrice?: number | null;
+  preMarketChangePercent?: number | null;
+  postMarketPrice?: number | null;
+  postMarketChangePercent?: number | null;
   lastUpdated: string;
 }
 

@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  HoldingsTable,
-  type Holding as HoldingView,
-} from './HoldingsTable';
+import { HoldingsTable, type Holding as HoldingView } from './HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -94,6 +91,70 @@ export function Dashboard({ onStockClick }: DashboardProps) {
     totalValueCzk > 0
       ? (dailyChangeCzk / (totalValueCzk - dailyChangeCzk)) * 100
       : 0;
+
+  // Calculate extended hours (pre-market / after-hours) change
+  const extendedHoursData = useMemo(() => {
+    let preMarketChangeCzk = 0;
+    let postMarketChangeCzk = 0;
+    let hasPreMarket = false;
+    let hasPostMarket = false;
+
+    holdingsForTable.forEach((h) => {
+      const quote = quotes[h.ticker];
+      if (!quote) return;
+
+      const scale = h.priceScale ?? 1;
+      const regularPrice = quote.price;
+
+      // Pre-market change: difference between pre-market price and previous close
+      if (
+        quote.preMarketPrice &&
+        quote.preMarketChangePercent !== undefined &&
+        quote.preMarketChangePercent !== null
+      ) {
+        hasPreMarket = true;
+        // Pre-market change is relative to regular close, calculate absolute change
+        const preMarketChange =
+          regularPrice * (quote.preMarketChangePercent / 100);
+        preMarketChangeCzk += toCZK(
+          preMarketChange * scale * h.shares,
+          h.currency,
+          rates,
+        );
+      }
+
+      // Post-market (after-hours) change: difference between after-hours price and regular close
+      if (
+        quote.postMarketPrice &&
+        quote.postMarketChangePercent !== undefined &&
+        quote.postMarketChangePercent !== null
+      ) {
+        hasPostMarket = true;
+        // Post-market change is relative to regular close
+        const postMarketChange =
+          regularPrice * (quote.postMarketChangePercent / 100);
+        postMarketChangeCzk += toCZK(
+          postMarketChange * scale * h.shares,
+          h.currency,
+          rates,
+        );
+      }
+    });
+
+    const preMarketChangePercent =
+      totalValueCzk > 0 ? (preMarketChangeCzk / totalValueCzk) * 100 : 0;
+    const postMarketChangePercent =
+      totalValueCzk > 0 ? (postMarketChangeCzk / totalValueCzk) * 100 : 0;
+
+    return {
+      preMarketChangeCzk,
+      preMarketChangePercent,
+      hasPreMarket,
+      postMarketChangeCzk,
+      postMarketChangePercent,
+      hasPostMarket,
+    };
+  }, [holdingsForTable, quotes, rates, totalValueCzk]);
 
   // Enrich open lots with current prices
   const lotsWithPrices: OpenLot[] = useMemo(() => {
@@ -222,6 +283,44 @@ export function Dashboard({ onStockClick }: DashboardProps) {
               {formatPercent(dailyChangePercent, 1, true)}
             </span>
           </div>
+
+          {/* Pre-market Change - show only if data available */}
+          {extendedHoursData.hasPreMarket && (
+            <div>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
+                Pre-market
+              </span>
+              <span className="text-lg font-mono-price font-semibold text-orange-500">
+                {formatCurrency(extendedHoursData.preMarketChangeCzk)}
+              </span>
+              <span className="text-sm font-mono-price ml-1.5 text-orange-500/70">
+                {formatPercent(
+                  extendedHoursData.preMarketChangePercent,
+                  1,
+                  true,
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* After-hours Change - show only if data available */}
+          {extendedHoursData.hasPostMarket && (
+            <div>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
+                After-hours
+              </span>
+              <span className="text-lg font-mono-price font-semibold text-violet-500">
+                {formatCurrency(extendedHoursData.postMarketChangeCzk)}
+              </span>
+              <span className="text-sm font-mono-price ml-1.5 text-violet-500/70">
+                {formatPercent(
+                  extendedHoursData.postMarketChangePercent,
+                  1,
+                  true,
+                )}
+              </span>
+            </div>
+          )}
 
           {/* Total P/L */}
           <div>
