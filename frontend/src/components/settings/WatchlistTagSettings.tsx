@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Plus, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 import { type WatchlistTag } from '@/lib/api';
 import {
@@ -257,28 +258,15 @@ export function WatchlistTagSettings({ onBack }: WatchlistTagSettingsProps) {
       </Dialog>
 
       {/* Delete Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteData}
         onOpenChange={(open) => !open && setDeleteData(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Smazat tag?</DialogTitle>
-            <DialogDescription>
-              Opravdu chcete smazat tag &quot;{deleteData?.name}&quot;? Tag bude
-              odebrán ze všech položek ve watchlistech.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteData(null)}>
-              Zrušit
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Smazat
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title="Smazat tag?"
+        description={`Opravdu chcete smazat tag "${deleteData?.name}"? Tag bude odebrán ze všech položek ve watchlistech.`}
+        confirmLabel="Smazat"
+        onConfirm={handleDelete}
+        variant="destructive"
+      />
     </div>
   );
 }

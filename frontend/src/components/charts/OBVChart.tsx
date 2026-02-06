@@ -162,7 +162,7 @@ function CustomTooltip({
           <span className="text-zinc-600">
             {entry.dataKey === 'obv' ? 'OBV' : 'SMA'}:
           </span>
-          <span className="font-mono text-zinc-800">
+          <span className="font-mono-price text-zinc-800">
             {formatOBV(entry.value)}
           </span>
         </div>

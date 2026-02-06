@@ -39,10 +39,10 @@ async def get_all_open_lots_for_user(user_id: str = Depends(get_current_user_id)
 
 
 @router.post("/admin/recalculate-all")
-async def recalculate_all_portfolios():
+async def recalculate_all_portfolios(user_id: str = Depends(get_current_user_id)):
     """
     Recalculate all holdings across ALL portfolios.
-    One-time use after migration.
+    One-time use after migration. Requires authentication.
     """
     return await portfolio_service.recalculate_all_portfolios()
 

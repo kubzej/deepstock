@@ -157,7 +157,7 @@ function CustomTooltip({
           <span className="text-zinc-600">
             {entry.dataKey === 'volume' ? 'Objem' : 'Průměr'}:
           </span>
-          <span className="font-mono text-zinc-800">
+          <span className="font-mono-price text-zinc-800">
             {formatVolume(entry.value)}
           </span>
         </div>

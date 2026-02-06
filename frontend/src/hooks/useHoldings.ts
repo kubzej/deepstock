@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   fetchHoldings,
   fetchAllHoldings,
@@ -17,32 +17,4 @@ export function useHoldings(portfolioId: string | null) {
     staleTime: STALE_TIMES.holdings,
     gcTime: GC_TIMES.medium,
   });
-}
-
-/**
- * Hook for fetching all holdings across all portfolios.
- */
-export function useAllHoldings() {
-  return useQuery({
-    queryKey: queryKeys.allHoldings(),
-    queryFn: fetchAllHoldings,
-    staleTime: STALE_TIMES.holdings,
-    gcTime: GC_TIMES.medium,
-  });
-}
-
-/**
- * Invalidate holdings cache.
- */
-export function useInvalidateHoldings() {
-  const queryClient = useQueryClient();
-
-  return (portfolioId?: string) => {
-    if (portfolioId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.holdings(portfolioId) });
-    } else {
-      // Invalidate all holdings queries
-      queryClient.invalidateQueries({ queryKey: ['holdings'] });
-    }
-  };
 }

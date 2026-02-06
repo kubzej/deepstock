@@ -1,4 +1,5 @@
 from app.core.supabase import supabase
+from app.services.stocks import stock_service
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -316,7 +317,7 @@ class PortfolioService:
         - Otherwise, use FIFO (oldest lots first)
         """
         # 1. Ensure stock exists in master table
-        stock = await self._get_or_create_stock(data.stock_ticker, data.stock_name)
+        stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name)
         
         # 2. Create transaction record
         total_amount = data.shares * data.price_per_share
@@ -496,25 +497,6 @@ class PortfolioService:
                 ))
         
         return available_lots
-    
-    async def _get_or_create_stock(self, ticker: str, name: Optional[str] = None) -> dict:
-        """Get stock from master table or create if not exists."""
-        response = supabase.table("stocks") \
-            .select("*") \
-            .eq("ticker", ticker.upper()) \
-            .execute()
-        
-        if response.data:
-            return response.data[0]
-        
-        # Create new stock entry
-        create_response = supabase.table("stocks") \
-            .insert({
-                "ticker": ticker.upper(),
-                "name": name or ticker.upper()
-            }) \
-            .execute()
-        return create_response.data[0]
     
     async def _recalculate_holding(self, portfolio_id: str, stock_id: str):
         """

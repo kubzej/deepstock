@@ -7,13 +7,13 @@ import {
   Search,
   TrendingUp,
   TrendingDown,
-  RefreshCw,
   Info,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Tooltip,
   TooltipContent,
@@ -21,50 +21,20 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { fetchStockInfo, type StockInfo } from '@/lib/api';
-import { PriceChart } from './PriceChart';
+import {
+  formatLargeNumber,
+  formatPercent,
+  formatRatio,
+  formatCurrency,
+} from '@/lib/format';
+import { PriceChart } from '@/components/charts';
 
 // Lazy load TechnicalAnalysis - heavy component with indicators
 const TechnicalAnalysis = lazy(() =>
-  import('./TechnicalAnalysis').then((mod) => ({
+  import('@/components/charts/TechnicalAnalysis').then((mod) => ({
     default: mod.TechnicalAnalysis,
   })),
 );
-
-// Format large numbers (market cap, revenue)
-function formatLargeNumber(value: number | null): string {
-  if (value === null || value === undefined) return '—';
-
-  if (value >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
-  if (value >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (value >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
-  return value.toFixed(2);
-}
-
-// Format percentage
-function formatPercent(value: number | null): string {
-  if (value === null || value === undefined) return '—';
-  // yfinance returns decimals (0.15 = 15%)
-  const pct = Math.abs(value) < 1 ? value * 100 : value;
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
-}
-
-// Format ratio
-function formatRatio(value: number | null, decimals = 2): string {
-  if (value === null || value === undefined) return '—';
-  return value.toFixed(decimals);
-}
-
-// Format currency
-function formatCurrency(value: number | null, currency = 'USD'): string {
-  if (value === null || value === undefined) return '—';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 // ============================================================
 // Insight interface (data comes from backend)
@@ -242,7 +212,7 @@ function Metric({ label, value, sentiment = 'neutral' }: MetricProps) {
           </Tooltip>
         )}
       </div>
-      <p className={`text-lg font-mono font-medium ${colorClass}`}>{value}</p>
+      <p className={`text-lg font-mono-price font-medium ${colorClass}`}>{value}</p>
     </div>
   );
 }
@@ -267,7 +237,7 @@ function StockHeader({ data }: { data: StockInfo }) {
 
       {/* Price */}
       <div className="flex items-baseline gap-4">
-        <span className="text-4xl font-mono font-bold">
+        <span className="text-4xl font-mono-price font-bold">
           {formatCurrency(data.price, data.currency ?? 'USD')}
         </span>
         <div
@@ -278,7 +248,7 @@ function StockHeader({ data }: { data: StockInfo }) {
           ) : (
             <TrendingDown className="w-5 h-5" />
           )}
-          <span className="font-mono">
+          <span className="font-mono-price">
             {formatCurrency(data.change, data.currency ?? 'USD')} (
             {formatPercent(data.changePercent)})
           </span>
@@ -289,14 +259,14 @@ function StockHeader({ data }: { data: StockInfo }) {
       <div className="flex gap-6 text-sm">
         <div>
           <span className="text-muted-foreground">Denní rozpětí: </span>
-          <span className="font-mono">
+          <span className="font-mono-price">
             {formatCurrency(data.dayLow, data.currency ?? 'USD')} —{' '}
             {formatCurrency(data.dayHigh, data.currency ?? 'USD')}
           </span>
         </div>
         <div>
           <span className="text-muted-foreground">52T rozpětí: </span>
-          <span className="font-mono">
+          <span className="font-mono-price">
             {formatCurrency(data.fiftyTwoWeekLow, data.currency ?? 'USD')} —{' '}
             {formatCurrency(data.fiftyTwoWeekHigh, data.currency ?? 'USD')}
           </span>
@@ -584,7 +554,7 @@ function AnalystSection({ data }: { data: StockInfo }) {
           Doporučení
         </p>
         <p
-          className={`text-lg font-mono ${recColors[data.recommendationKey ?? ''] ?? 'text-foreground'}`}
+          className={`text-lg font-mono-price ${recColors[data.recommendationKey ?? ''] ?? 'text-foreground'}`}
         >
           {recLabels[data.recommendationKey ?? ''] ??
             data.recommendationKey ??
@@ -603,7 +573,7 @@ function AnalystSection({ data }: { data: StockInfo }) {
         <p className="text-xs text-muted-foreground uppercase tracking-wide">
           Rozpětí
         </p>
-        <p className="text-lg font-mono">
+        <p className="text-lg font-mono-price">
           {formatCurrency(data.targetLowPrice, data.currency ?? 'USD')} —{' '}
           {formatCurrency(data.targetHighPrice, data.currency ?? 'USD')}
         </p>
@@ -614,7 +584,7 @@ function AnalystSection({ data }: { data: StockInfo }) {
             Potenciál
           </p>
           <p
-            className={`text-lg font-mono ${upside >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+            className={`text-lg font-mono-price ${upside >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
           >
             {upside >= 0 ? '+' : ''}
             {upside.toFixed(1)}%
@@ -681,21 +651,11 @@ export function ResearchPage() {
     <TooltipProvider>
       <div className="space-y-8 pb-12">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Průzkum akcie</h1>
-          {activeTicker && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isLoading}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
-              />
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title="Průzkum akcie"
+          onRefresh={activeTicker ? () => refetch() : undefined}
+          isRefreshing={isLoading}
+        />
 
         {/* Search */}
         <form onSubmit={handleSubmit} className="flex gap-3 max-w-md">

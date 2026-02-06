@@ -2,8 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchTransactions,
   fetchAllTransactions,
+  addTransaction,
+  updateTransaction,
   deleteTransaction,
 } from '@/lib/api';
+import type { Transaction, TransactionUpdateData } from '@/lib/api';
 import { queryKeys } from '@/lib/queryClient';
 
 /**
@@ -60,19 +63,49 @@ export function useDeleteTransaction() {
 }
 
 /**
- * Invalidate transactions cache.
+ * Hook for adding a new transaction.
  */
-export function useInvalidateTransactions() {
+export function useAddTransaction() {
   const queryClient = useQueryClient();
 
-  return (portfolioId?: string) => {
-    if (portfolioId) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions(portfolioId) });
-    } else {
+  return useMutation({
+    mutationFn: ({ 
+      portfolioId, 
+      data 
+    }: { 
+      portfolioId: string; 
+      data: Omit<Transaction, 'id' | 'portfolio_id'>
+    }) => addTransaction(portfolioId, data),
+    onSuccess: () => {
+      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-    }
-    // Also invalidate related data
-    queryClient.invalidateQueries({ queryKey: ['holdings'] });
-    queryClient.invalidateQueries({ queryKey: ['openLots'] });
-  };
+      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries({ queryKey: ['openLots'] });
+    },
+  });
+}
+
+/**
+ * Hook for updating an existing transaction.
+ */
+export function useUpdateTransaction() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ 
+      portfolioId, 
+      transactionId, 
+      data 
+    }: { 
+      portfolioId: string; 
+      transactionId: string;
+      data: TransactionUpdateData;
+    }) => updateTransaction(portfolioId, transactionId, data),
+    onSuccess: () => {
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries({ queryKey: ['openLots'] });
+    },
+  });
 }

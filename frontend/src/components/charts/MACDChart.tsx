@@ -157,7 +157,7 @@ function CustomTooltip({
               style={{ backgroundColor: entry.color }}
             />
             <span className="text-zinc-600">{labelMap[entry.dataKey]}:</span>
-            <span className="font-mono text-zinc-800">
+            <span className="font-mono-price text-zinc-800">
               {entry.value?.toFixed(3) ?? '—'}
             </span>
           </div>

@@ -40,7 +40,7 @@ import {
   formatDate,
   toCZK,
 } from '@/lib/format';
-import { TransactionModal } from './TransactionModal';
+import { TransactionModal } from '@/components/transactions';
 
 interface StockDetailProps {
   ticker: string;
@@ -502,7 +502,7 @@ export function StockDetail({
                           </TableCell>
                         )}
                         <TableCell>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-900 text-white">
                             {isBuy ? 'BUY' : 'SELL'}
                           </span>
                         </TableCell>

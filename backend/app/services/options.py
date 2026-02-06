@@ -2,11 +2,14 @@
 Options Trading Service for DeepStock.
 Handles CRUD operations for option transactions and holdings.
 """
+import logging
 from app.core.supabase import supabase
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 from datetime import date, datetime
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================
@@ -370,11 +373,11 @@ class OptionsService:
                     })
                     
                 except Exception as e:
-                    print(f"Failed to fetch price for {occ_symbol}: {e}")
+                    logger.warning(f"Failed to fetch price for {occ_symbol}: {e}")
                     continue
                     
         except Exception as e:
-            print(f"Error creating batch tickers: {e}")
+            logger.error(f"Error creating batch tickers: {e}")
         
         return results
 
@@ -410,7 +413,7 @@ class OptionsService:
                     .execute()
                 results.append(result)
             except Exception as e:
-                print(f"Failed to upsert price: {e}")
+                logger.warning(f"Failed to upsert price: {e}")
         
         return results
     
@@ -460,11 +463,8 @@ class OptionsService:
         """Get summary statistics for option holdings."""
         holdings = await self.get_holdings(portfolio_id)
         
-        today = date.today()
-        week_from_now = date.today()
-        
-        # Calculate days to add for a week
         from datetime import timedelta
+        today = date.today()
         week_from_now = today + timedelta(days=7)
         
         stats = {

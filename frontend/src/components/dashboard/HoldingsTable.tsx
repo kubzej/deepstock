@@ -8,7 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { StockCard } from '@/components/StockCard';
+import { StockCard } from '@/components/stocks';
 import { PillButton } from '@/components/shared/PillButton';
 import {
   ArrowUpDown,

@@ -306,7 +306,7 @@ export function OptionTransactionModal({
             <div className="bg-muted/50 rounded-lg p-3">
               <p className="text-sm">
                 Zavíráte pozici:{' '}
-                <span className="font-mono font-medium">
+                <span className="font-mono-price font-medium">
                   {holding.symbol} {holding.option_type.toUpperCase()} $
                   {holding.strike_price}
                 </span>
@@ -491,7 +491,7 @@ export function OptionTransactionModal({
               <Label className="text-muted-foreground text-xs">
                 OCC Symbol
               </Label>
-              <p className="font-mono text-sm mt-1">{occSymbol}</p>
+              <p className="font-mono-price text-sm mt-1">{occSymbol}</p>
             </div>
           )}
 

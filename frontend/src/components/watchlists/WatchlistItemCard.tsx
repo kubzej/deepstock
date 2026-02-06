@@ -129,11 +129,11 @@ export function WatchlistItemCard({
           {/* Right: Price + Change */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="text-right">
-              <span className="font-mono text-sm font-medium block">
+              <span className="font-mono-price text-sm font-medium block">
                 {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
               </span>
               <span
-                className={`text-[10px] font-mono ${
+                className={`text-[10px] font-mono-price ${
                   isDayPositive ? 'text-emerald-500' : 'text-rose-500'
                 }`}
               >
@@ -199,7 +199,7 @@ export function WatchlistItemCard({
                   Nákupní cíl
                 </span>
                 <span
-                  className={`font-mono ${atBuyTarget ? 'text-emerald-500 font-semibold' : ''}`}
+                  className={`font-mono-price ${atBuyTarget ? 'text-emerald-500 font-semibold' : ''}`}
                 >
                   {item.target_buy_price
                     ? formatPrice(item.target_buy_price, item.stocks.currency)
@@ -211,7 +211,7 @@ export function WatchlistItemCard({
                   Prodejní cíl
                 </span>
                 <span
-                  className={`font-mono ${atSellTarget ? 'text-amber-500 font-semibold' : ''}`}
+                  className={`font-mono-price ${atSellTarget ? 'text-amber-500 font-semibold' : ''}`}
                 >
                   {item.target_sell_price
                     ? formatPrice(item.target_sell_price, item.stocks.currency)

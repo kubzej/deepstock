@@ -18,18 +18,10 @@ import {
 import { useOptionQuotes } from '@/hooks/useOptionQuotes';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { AlertCircle } from 'lucide-react';
 import { OptionsTrades } from './OptionsTrades';
 import { OptionsCalculator } from './OptionsCalculator';
@@ -192,39 +184,16 @@ export function OptionsPage() {
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Smazat pozici</DialogTitle>
-            <DialogDescription>
-              Opravdu chcete smazat tuto pozici? Budou smazány všechny
-              transakce.
-              {holdingToDelete && (
-                <span className="block mt-2 font-mono">
-                  {holdingToDelete.symbol}{' '}
-                  {holdingToDelete.option_type.toUpperCase()} $
-                  {holdingToDelete.strike_price}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Zrušit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteBySymbolMutation.isPending}
-            >
-              {deleteBySymbolMutation.isPending ? 'Mažu...' : 'Smazat'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Smazat pozici"
+        description={`Opravdu chcete smazat tuto pozici? Budou smazány všechny transakce.${holdingToDelete ? ` ${holdingToDelete.symbol} ${holdingToDelete.option_type.toUpperCase()} $${holdingToDelete.strike_price}` : ''}`}
+        confirmLabel="Smazat"
+        onConfirm={confirmDelete}
+        loading={deleteBySymbolMutation.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }
