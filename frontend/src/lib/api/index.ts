@@ -91,10 +91,12 @@ export {
   // Types
   type Watchlist,
   type WatchlistItem,
+  type WatchlistItemWithSource,
   type WatchlistTag,
   // Functions
   fetchWatchlists,
   fetchAllWatchlistTickers,
+  fetchAllWatchlistItems,
   fetchWatchlist,
   createWatchlist,
   updateWatchlist,

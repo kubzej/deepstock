@@ -117,14 +117,44 @@ export function StockCard({
 
         {/* Subrow: Price + Daily */}
         <div className="flex items-center justify-between mt-0.5">
-          <span className="text-[11px] text-muted-foreground font-mono-price">
-            {formatPrice(quote?.price, currency)}
-          </span>
-          <span
-            className={`text-[10px] font-mono-price ${isDayPositive ? 'text-positive/70' : 'text-negative/70'}`}
-          >
-            dnes {formatPercent(quote?.changePercent, 1, true)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground font-mono-price">
+              {formatPrice(quote?.price, currency)}
+            </span>
+            {/* Pre-market price */}
+            {quote?.preMarketPrice != null && (
+              <span className="text-[10px] font-mono-price text-orange-500">
+                → {formatPrice(quote.preMarketPrice, currency)}
+              </span>
+            )}
+            {/* After-hours price */}
+            {quote?.postMarketPrice != null &&
+              quote?.preMarketPrice == null && (
+                <span className="text-[10px] font-mono-price text-violet-500">
+                  → {formatPrice(quote.postMarketPrice, currency)}
+                </span>
+              )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[10px] font-mono-price ${isDayPositive ? 'text-positive/70' : 'text-negative/70'}`}
+            >
+              {formatPercent(quote?.changePercent, 1, true)}
+            </span>
+            {/* Pre-market change */}
+            {quote?.preMarketChangePercent != null && (
+              <span className="text-[10px] font-mono-price text-orange-500">
+                {formatPercent(quote.preMarketChangePercent, 1, true)}
+              </span>
+            )}
+            {/* After-hours change */}
+            {quote?.postMarketChangePercent != null &&
+              quote?.preMarketChangePercent == null && (
+                <span className="text-[10px] font-mono-price text-violet-500">
+                  {formatPercent(quote.postMarketChangePercent, 1, true)}
+                </span>
+              )}
+          </div>
         </div>
 
         {/* Expanded Details */}

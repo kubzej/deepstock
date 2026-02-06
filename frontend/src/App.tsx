@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import { Login } from '@/components/shared/Login';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/components/dashboard';
@@ -104,6 +105,7 @@ function App() {
   // If viewing stock detail
   if (selectedTicker) {
     return (
+      <PortfolioProvider>
       <AppLayout
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -155,6 +157,7 @@ function App() {
           </DialogContent>
         </Dialog>
       </AppLayout>
+      </PortfolioProvider>
     );
   }
 
@@ -191,6 +194,7 @@ function App() {
   };
 
   return (
+    <PortfolioProvider>
     <AppLayout
       activeTab={activeTab}
       onTabChange={handleTabChange}
@@ -210,6 +214,7 @@ function App() {
         onOpenChange={setOptionModalOpen}
       />
     </AppLayout>
+    </PortfolioProvider>
   );
 }
 

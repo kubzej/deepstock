@@ -137,9 +137,16 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   const error = portfoliosError?.message || holdingsError?.message || null;
 
   // Create default portfolio if none exists
+  // Only create if:
+  // 1. Not loading
+  // 2. No error (don't create if fetch failed)
+  // 3. Actually have 0 portfolios
+  // 4. User is logged in
+  // 5. Haven't already created one this session
   useEffect(() => {
     if (
       !portfoliosLoading &&
+      !portfoliosError &&
       portfoliosData.length === 0 &&
       user &&
       !defaultCreated
@@ -147,7 +154,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       setDefaultCreated(true);
       createPortfolioMutation.mutate('Hlavní portfolio');
     }
-  }, [portfoliosLoading, portfoliosData.length, user, defaultCreated]);
+  }, [portfoliosLoading, portfoliosError, portfoliosData.length, user, defaultCreated]);
 
   const getHoldingByTicker = useCallback(
     (ticker: string): HoldingWithPrice | undefined => {

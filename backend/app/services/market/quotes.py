@@ -40,18 +40,38 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                     if not ticker_obj:
                         continue
                         
-                    info = ticker_obj.fast_info
-                    price = info.last_price
-                    prev_close = info.previous_close
+                    fast_info = ticker_obj.fast_info
+                    full_info = ticker_obj.info
+                    
+                    # Use regularMarketPrice for consistency with Yahoo
+                    price = full_info.get("regularMarketPrice") or fast_info.last_price
+                    prev_close = full_info.get("regularMarketPreviousClose") or fast_info.previous_close
                     
                     if price is None:
                         continue
                     
-                    change = price - prev_close if prev_close else 0
-                    change_percent = (change / prev_close) * 100 if prev_close else 0
+                    # Use Yahoo's own change percent for accuracy (already in %)
+                    change_percent = full_info.get("regularMarketChangePercent")
+                    if change_percent is None:
+                        change_percent = ((price - prev_close) / prev_close) * 100 if prev_close else 0
                     
-                    volume = int(info.last_volume) if info.last_volume else 0
-                    avg_volume = int(info.ten_day_average_volume) if info.ten_day_average_volume else 0
+                    change = full_info.get("regularMarketChange") or (price - prev_close if prev_close else 0)
+                    
+                    volume = int(fast_info.last_volume) if fast_info.last_volume else 0
+                    avg_volume = int(fast_info.ten_day_average_volume) if fast_info.ten_day_average_volume else 0
+
+                    # Get extended hours data from full info
+                    pre_market_price = full_info.get("preMarketPrice")
+                    post_market_price = full_info.get("postMarketPrice")
+                    
+                    # Calculate extended hours change percent ourselves (relative to regular close)
+                    pre_market_change_pct = None
+                    if pre_market_price and price:
+                        pre_market_change_pct = ((pre_market_price - price) / price) * 100
+                    
+                    post_market_change_pct = None
+                    if post_market_price and price:
+                        post_market_change_pct = ((post_market_price - price) / price) * 100
 
                     quote = {
                         "symbol": t,
@@ -60,6 +80,10 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                         "changePercent": round(change_percent, 2),
                         "volume": volume,
                         "avgVolume": avg_volume,
+                        "preMarketPrice": round(pre_market_price, 2) if pre_market_price else None,
+                        "preMarketChangePercent": round(pre_market_change_pct, 2) if pre_market_change_pct else None,
+                        "postMarketPrice": round(post_market_price, 2) if post_market_price else None,
+                        "postMarketChangePercent": round(post_market_change_pct, 2) if post_market_change_pct else None,
                         "lastUpdated": str(pd.Timestamp.now())
                     }
 

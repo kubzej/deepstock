@@ -84,6 +84,47 @@ export async function fetchAllWatchlistTickers(): Promise<string[]> {
   return response.json();
 }
 
+/**
+ * Extended watchlist item with watchlist info for cross-watchlist views.
+ */
+export interface WatchlistItemWithSource extends WatchlistItem {
+  watchlist_name: string;
+}
+
+/**
+ * Fetch ALL items from ALL user's watchlists.
+ * Client-side aggregation - fetches watchlists then all their items.
+ */
+export async function fetchAllWatchlistItems(): Promise<WatchlistItemWithSource[]> {
+  // First get all watchlists
+  const watchlists = await fetchWatchlists();
+  
+  if (watchlists.length === 0) return [];
+  
+  // Fetch items from all watchlists in parallel
+  const authHeader = await getAuthHeader();
+  const itemPromises = watchlists.map(async (wl) => {
+    const response = await fetch(`${API_URL}/api/watchlists/${wl.id}/items`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      },
+    });
+    
+    if (!response.ok) return [];
+    
+    const items: WatchlistItem[] = await response.json();
+    // Add watchlist source info to each item
+    return items.map((item) => ({
+      ...item,
+      watchlist_name: wl.name,
+    }));
+  });
+  
+  const allItemsArrays = await Promise.all(itemPromises);
+  return allItemsArrays.flat();
+}
+
 export async function fetchWatchlist(watchlistId: string): Promise<Watchlist> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/watchlists/${watchlistId}`, {
