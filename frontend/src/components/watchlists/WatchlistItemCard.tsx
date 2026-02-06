@@ -129,16 +129,42 @@ export function WatchlistItemCard({
           {/* Right: Price + Change */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="text-right">
-              <span className="font-mono-price text-sm font-medium block">
-                {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
-              </span>
-              <span
-                className={`text-[10px] font-mono-price ${
-                  isDayPositive ? 'text-emerald-500' : 'text-rose-500'
-                }`}
-              >
-                {quote ? formatPercent(quote.changePercent) : '—'}
-              </span>
+              <div className="flex items-center justify-end gap-1">
+                <span className="font-mono-price text-sm font-medium">
+                  {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
+                </span>
+                {quote?.preMarketPrice && (
+                  <span className="font-mono-price text-[10px] text-orange-500">
+                    → {formatPrice(quote.preMarketPrice, item.stocks.currency)}
+                  </span>
+                )}
+                {quote?.postMarketPrice && (
+                  <span className="font-mono-price text-[10px] text-violet-500">
+                    → {formatPrice(quote.postMarketPrice, item.stocks.currency)}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-1">
+                <span
+                  className={`text-[10px] font-mono-price ${
+                    isDayPositive ? 'text-emerald-500' : 'text-rose-500'
+                  }`}
+                >
+                  {quote ? formatPercent(quote.changePercent) : '—'}
+                </span>
+                {quote?.preMarketChangePercent !== undefined &&
+                  quote?.preMarketChangePercent !== null && (
+                    <span className="font-mono-price text-[10px] text-orange-500">
+                      ({formatPercent(quote.preMarketChangePercent)})
+                    </span>
+                  )}
+                {quote?.postMarketChangePercent !== undefined &&
+                  quote?.postMarketChangePercent !== null && (
+                    <span className="font-mono-price text-[10px] text-violet-500">
+                      ({formatPercent(quote.postMarketChangePercent)})
+                    </span>
+                  )}
+              </div>
             </div>
 
             {/* Menu */}

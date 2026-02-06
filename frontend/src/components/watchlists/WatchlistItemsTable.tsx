@@ -111,37 +111,67 @@ export function WatchlistItemsTable({
               className="text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => onSort('ticker')}
             >
-              Ticker <SortIcon columnKey="ticker" currentKey={sortKey} currentDir={sortDir} />
+              Ticker{' '}
+              <SortIcon
+                columnKey="ticker"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => onSort('price')}
             >
-              Cena <SortIcon columnKey="price" currentKey={sortKey} currentDir={sortDir} />
+              Cena{' '}
+              <SortIcon
+                columnKey="price"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => onSort('change')}
             >
-              Změna <SortIcon columnKey="change" currentKey={sortKey} currentDir={sortDir} />
+              Změna{' '}
+              <SortIcon
+                columnKey="change"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => onSort('buyTarget')}
             >
-              Nákup <SortIcon columnKey="buyTarget" currentKey={sortKey} currentDir={sortDir} />
+              Nákup{' '}
+              <SortIcon
+                columnKey="buyTarget"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
               onClick={() => onSort('sellTarget')}
             >
-              Prodej <SortIcon columnKey="sellTarget" currentKey={sortKey} currentDir={sortDir} />
+              Prodej{' '}
+              <SortIcon
+                columnKey="sellTarget"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none hidden md:table-cell"
               onClick={() => onSort('sector')}
             >
-              Sektor <SortIcon columnKey="sector" currentKey={sortKey} currentDir={sortDir} />
+              Sektor{' '}
+              <SortIcon
+                columnKey="sector"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
             </TableHead>
             <TableHead className="text-xs uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
               Poznámka
@@ -171,7 +201,9 @@ export function WatchlistItemsTable({
                   <div className="flex items-center gap-2">
                     {/* Signal indicator */}
                     {(atBuy || atSell) && (
-                      <span className={`relative flex h-2 w-2 ${atBuy ? 'mr-0.5' : ''}`}>
+                      <span
+                        className={`relative flex h-2 w-2 ${atBuy ? 'mr-0.5' : ''}`}
+                      >
                         <span
                           className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                             atBuy ? 'bg-emerald-400' : 'bg-amber-400'
@@ -188,7 +220,11 @@ export function WatchlistItemsTable({
                       <div className="flex items-center gap-1.5">
                         <span
                           className={`font-bold ${
-                            atBuy ? 'text-emerald-500' : atSell ? 'text-amber-500' : ''
+                            atBuy
+                              ? 'text-emerald-500'
+                              : atSell
+                                ? 'text-amber-500'
+                                : ''
                           }`}
                         >
                           {item.stocks.ticker}
@@ -222,22 +258,60 @@ export function WatchlistItemsTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono-price">
-                  {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
+                  <div>
+                    {quote
+                      ? formatPrice(quote.price, item.stocks.currency)
+                      : '—'}
+                    {quote?.preMarketPrice && (
+                      <div className="text-[10px] text-orange-500">
+                        {formatPrice(
+                          quote.preMarketPrice,
+                          item.stocks.currency,
+                        )}
+                      </div>
+                    )}
+                    {quote?.postMarketPrice && (
+                      <div className="text-[10px] text-violet-500">
+                        {formatPrice(
+                          quote.postMarketPrice,
+                          item.stocks.currency,
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono-price">
+                  <div>
+                    <span
+                      className={
+                        quote && quote.changePercent > 0
+                          ? 'text-emerald-500'
+                          : quote && quote.changePercent < 0
+                            ? 'text-rose-500'
+                            : ''
+                      }
+                    >
+                      {quote ? formatPercent(quote.changePercent) : '—'}
+                    </span>
+                    {quote?.preMarketChangePercent !== undefined &&
+                      quote?.preMarketChangePercent !== null && (
+                        <div className="text-[10px] text-orange-500">
+                          {formatPercent(quote.preMarketChangePercent)}
+                        </div>
+                      )}
+                    {quote?.postMarketChangePercent !== undefined &&
+                      quote?.postMarketChangePercent !== null && (
+                        <div className="text-[10px] text-violet-500">
+                          {formatPercent(quote.postMarketChangePercent)}
+                        </div>
+                      )}
+                  </div>
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono-price ${
-                    quote && quote.changePercent > 0
-                      ? 'text-emerald-500'
-                      : quote && quote.changePercent < 0
-                        ? 'text-rose-500'
-                        : ''
-                  }`}
-                >
-                  {quote ? formatPercent(quote.changePercent) : '—'}
-                </TableCell>
-                <TableCell
-                  className={`text-right font-mono-price ${
-                    atBuy ? 'text-emerald-500 font-semibold' : 'text-muted-foreground'
+                    atBuy
+                      ? 'text-emerald-500 font-semibold'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   {item.target_buy_price
@@ -246,7 +320,9 @@ export function WatchlistItemsTable({
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono-price ${
-                    atSell ? 'text-amber-500 font-semibold' : 'text-muted-foreground'
+                    atSell
+                      ? 'text-amber-500 font-semibold'
+                      : 'text-muted-foreground'
                   }`}
                 >
                   {item.target_sell_price
@@ -264,7 +340,10 @@ export function WatchlistItemsTable({
                           {item.notes}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[300px] whitespace-pre-wrap">
+                      <TooltipContent
+                        side="top"
+                        className="max-w-[300px] whitespace-pre-wrap"
+                      >
                         {item.notes}
                       </TooltipContent>
                     </Tooltip>
