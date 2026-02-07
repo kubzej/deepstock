@@ -34,7 +34,11 @@ import type { OptionHolding } from '@/lib/api';
 
 type OptionsTab = 'positions' | 'calculator' | 'greeks';
 
-export function OptionsPage() {
+interface OptionsPageProps {
+  onAddOption?: () => void;
+}
+
+export function OptionsPage({ onAddOption }: OptionsPageProps) {
   const [activeTab, setActiveTab] = useState<OptionsTab>('positions');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>('open');
@@ -161,6 +165,7 @@ export function OptionsPage() {
               holdings={holdingsWithQuotes}
               onClose={handleClose}
               onDelete={handleDelete}
+              onAddOption={onAddOption}
             />
           )}
         </TabsContent>

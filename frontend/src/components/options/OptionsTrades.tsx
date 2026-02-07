@@ -4,9 +4,10 @@
 import { useMemo } from 'react';
 import type { OptionHolding } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils';
 import { formatPercent } from '@/lib/format';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, TrendingUp } from 'lucide-react';
 
 interface OptionsTradesProps {
   holdings: OptionHolding[];
@@ -14,6 +15,8 @@ interface OptionsTradesProps {
   onClose?: (holding: OptionHolding) => void;
   /** Delete the position (all transactions) */
   onDelete?: (holding: OptionHolding) => void;
+  /** Add new option callback */
+  onAddOption?: () => void;
 }
 
 // ============ Utility Functions ============
@@ -51,6 +54,7 @@ export function OptionsTrades({
   holdings,
   onClose,
   onDelete,
+  onAddOption,
 }: OptionsTradesProps) {
   const enrichedHoldings = useMemo(() => {
     return holdings.map((h) => {
@@ -106,10 +110,16 @@ export function OptionsTrades({
 
   if (holdings.length === 0) {
     return (
-      <div className="text-center text-muted-foreground py-12">
-        <p>Žádné otevřené opční pozice</p>
-        <p className="text-sm mt-1">Přidejte první opční transakci</p>
-      </div>
+      <EmptyState
+        icon={TrendingUp}
+        title="Žádné otevřené opční pozice"
+        description="Přidejte první opční transakci pro sledování vašich opcí."
+        action={
+          onAddOption
+            ? { label: 'Přidat opci', onClick: onAddOption }
+            : undefined
+        }
+      />
     );
   }
 

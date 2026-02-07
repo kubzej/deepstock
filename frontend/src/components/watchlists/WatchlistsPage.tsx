@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Plus, Eye, Target, Filter, X } from 'lucide-react';
 import {
   type WatchlistItem,
@@ -58,9 +59,13 @@ function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
 
 interface WatchlistsPageProps {
   onStockClick?: (ticker: string) => void;
+  onNavigateToSettings?: () => void;
 }
 
-export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
+export function WatchlistsPage({
+  onStockClick,
+  onNavigateToSettings,
+}: WatchlistsPageProps) {
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -429,17 +434,16 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
 
       {/* Empty state */}
       {watchlists.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-6 mb-4">
-            <Eye className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">
-            Zatím nemáte žádný watchlist
-          </h2>
-          <p className="text-muted-foreground">
-            Vytvořte watchlist v Nastavení → Watchlisty.
-          </p>
-        </div>
+        <EmptyState
+          icon={Eye}
+          title="Zatím nemáte žádný watchlist"
+          description="Vytvořte watchlist v Nastavení → Watchlisty."
+          action={
+            onNavigateToSettings
+              ? { label: 'Otevřít nastavení', onClick: onNavigateToSettings }
+              : undefined
+          }
+        />
       ) : (
         <div className="space-y-4">
           {/* Watchlist toggle buttons + Filter + Add button */}
@@ -596,22 +600,21 @@ export function WatchlistsPage({ onStockClick }: WatchlistsPageProps) {
                   ))}
                 </div>
               ) : filteredAndSortedItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-                  <Target className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground mb-4">
-                    {isFilterView
+                <EmptyState
+                  icon={Target}
+                  title={
+                    isFilterView
                       ? hasActiveFilters
                         ? 'Žádné položky neodpovídají filtrům'
                         : 'Žádné položky ve watchlistech'
-                      : 'Watchlist je prázdný'}
-                  </p>
-                  {!isFilterView && (
-                    <Button variant="outline" onClick={openAddItem}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Přidat akcii
-                    </Button>
-                  )}
-                </div>
+                      : 'Watchlist je prázdný'
+                  }
+                  action={
+                    !isFilterView
+                      ? { label: 'Přidat akcii', onClick: openAddItem }
+                      : undefined
+                  }
+                />
               ) : (
                 <>
                   {/* Mobile: Sort pills + Cards */}
