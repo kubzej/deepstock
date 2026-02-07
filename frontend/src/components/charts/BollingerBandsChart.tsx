@@ -20,6 +20,7 @@ import {
   type IndicatorSignalType,
   type TechnicalPeriod,
 } from '@/lib/api';
+import { getSmartDecimals } from '@/lib/format';
 
 // ============================================================
 // TYPES
@@ -210,6 +211,7 @@ export function BollingerBandsChart({ ticker }: BollingerBandsChartProps) {
     .filter((v): v is number => v !== null);
   const minPrice = Math.min(...allValues) * 0.98;
   const maxPrice = Math.max(...allValues) * 1.02;
+  const smartDecimals = getSmartDecimals(allValues);
 
   return (
     <ChartWrapper
@@ -254,9 +256,9 @@ export function BollingerBandsChart({ ticker }: BollingerBandsChartProps) {
               tick={{ fill: COLORS.axis, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => v.toFixed(0)}
+              tickFormatter={(v) => v.toFixed(smartDecimals)}
               orientation="right"
-              width={45}
+              width={55}
             />
             <Tooltip content={<CustomTooltip />} />
 

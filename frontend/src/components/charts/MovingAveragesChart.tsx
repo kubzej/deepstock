@@ -20,6 +20,7 @@ import {
   type TrendSignalType,
   type TechnicalPeriod,
 } from '@/lib/api';
+import { getSmartDecimals } from '@/lib/format';
 
 // ============================================================
 // TYPES
@@ -200,6 +201,7 @@ export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {
 
   const minPrice = Math.min(...prices) * 0.98;
   const maxPrice = Math.max(...prices) * 1.02;
+  const smartDecimals = getSmartDecimals(prices);
 
   // Format data for display
   const chartData = priceHistory.map((d) => ({
@@ -241,9 +243,9 @@ export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {
               tick={{ fill: COLORS.axis, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => v.toFixed(0)}
+              tickFormatter={(v) => v.toFixed(smartDecimals)}
               orientation="right"
-              width={45}
+              width={55}
             />
             <Tooltip content={<CustomTooltip />} />
 
