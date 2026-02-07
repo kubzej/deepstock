@@ -18,20 +18,64 @@ function TooltipProvider({
   );
 }
 
+/**
+ * Tooltip with click/tap support for mobile.
+ * On desktop: hover works as usual (via onOpenChange).
+ * On mobile: tap toggles open/close (via context + onClick).
+ */
+const TooltipContext = React.createContext<{
+  open: boolean;
+  toggle: () => void;
+}>({ open: false, toggle: () => {} });
+
 function Tooltip({
+  children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  const [open, setOpen] = React.useState(false);
+
+  const toggle = React.useCallback(() => {
+    setOpen((prev) => !prev);
+  }, []);
+
   return (
     <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+      <TooltipContext.Provider value={{ open: props.open ?? open, toggle }}>
+        <TooltipPrimitive.Root
+          data-slot="tooltip"
+          open={props.open ?? open}
+          onOpenChange={(value) => {
+            setOpen(value);
+            props.onOpenChange?.(value);
+          }}
+          {...props}
+        >
+          {children}
+        </TooltipPrimitive.Root>
+      </TooltipContext.Provider>
     </TooltipProvider>
   );
 }
 
 function TooltipTrigger({
+  onClick,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+}: React.ComponentProps<typeof TooltipPrimitive.Trigger> & {
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+}) {
+  const { toggle } = React.useContext(TooltipContext);
+
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      onClick={(e) => {
+        e.preventDefault();
+        toggle();
+        onClick?.(e);
+      }}
+      {...props}
+    />
+  );
 }
 
 function TooltipContent({
