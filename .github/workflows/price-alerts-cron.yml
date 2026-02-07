@@ -1,0 +1,18 @@
+name: Price Alerts Cron
+
+on:
+  schedule:
+    # Every 10 minutes during US market hours (14:30-21:00 UTC = 9:30-16:00 EST)
+    - cron: "*/10 14-21 * * 1-5"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Price Alerts
+        run: |
+          curl -X POST "${{ secrets.API_URL }}/api/cron/check-price-alerts" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail --silent --show-error
