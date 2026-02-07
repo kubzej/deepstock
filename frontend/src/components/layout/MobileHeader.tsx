@@ -54,8 +54,8 @@ export function MobileHeader({
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-sm md:hidden z-50">
-      <div className="flex items-center justify-between h-full px-4">
+    <header className="fixed top-0 left-0 right-0 bg-card/95 backdrop-blur-sm md:hidden z-50 pt-safe">
+      <div className="flex items-center justify-between h-14 px-4">
         {/* Logo + Portfolio Selector */}
         <div className="flex flex-col">
           <span className="text-lg font-bold text-primary">DeepStock</span>

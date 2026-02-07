@@ -1,0 +1,206 @@
+import {
+  ArrowLeft,
+  Bell,
+  BellOff,
+  Loader2,
+  Send,
+  ShoppingCart,
+  TrendingUp,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useState } from 'react';
+
+interface NotificationSettingsProps {
+  onBack: () => void;
+}
+
+export function NotificationSettings({ onBack }: NotificationSettingsProps) {
+  const {
+    isSupported,
+    isSubscribed,
+    permissionState,
+    settings,
+    settingsLoading,
+    subscribe,
+    unsubscribe,
+    toggleSetting,
+    sendTest,
+    isUpdating,
+    isTesting,
+  } = usePushNotifications();
+
+  const [subscribing, setSubscribing] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleToggleNotifications = async () => {
+    setSubscribing(true);
+    try {
+      if (isSubscribed) {
+        await unsubscribe();
+      } else {
+        const success = await subscribe();
+        if (!success && permissionState === 'denied') {
+          setTestResult(
+            'Notifikace jsou v prohlížeči zakázány. Povolte je v nastavení.',
+          );
+        }
+      }
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTestResult(null);
+    const result = await sendTest();
+    if (result.success) {
+      setTestResult(`Odesláno na ${result.devices} zařízení`);
+    } else {
+      setTestResult(result.message || 'Nepodařilo se odeslat');
+    }
+  };
+
+  if (!isSupported) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-2xl font-semibold">Notifikace</h1>
+        </div>
+
+        <Alert>
+          <BellOff className="h-4 w-4" />
+          <AlertDescription>
+            Váš prohlížeč nepodporuje push notifikace.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-2xl font-semibold">Notifikace</h1>
+      </div>
+
+      {/* Permission denied warning */}
+      {permissionState === 'denied' && (
+        <Alert variant="destructive">
+          <BellOff className="h-4 w-4" />
+          <AlertDescription>
+            Notifikace jsou v prohlížeči zakázány. Povolte je v nastavení
+            prohlížeče.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Main toggle */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Bell className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <Label className="text-base font-medium">Push notifikace</Label>
+              <p className="text-sm text-muted-foreground">
+                Upozornění na cenové cíle
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {subscribing && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Switch
+              checked={isSubscribed}
+              onCheckedChange={handleToggleNotifications}
+              disabled={subscribing || permissionState === 'denied'}
+            />
+          </div>
+        </div>
+
+        {/* Sub-toggles - only show when subscribed */}
+        {isSubscribed && (
+          <div className="space-y-3 pl-4 border-l-2 border-muted ml-5">
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <ShoppingCart className="h-4 w-4 text-emerald-500" />
+                <div>
+                  <Label className="text-sm font-medium">Nákupní cíle</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upozornit při dosažení cílové ceny pro nákup
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.alert_buy_enabled}
+                onCheckedChange={(v) => toggleSetting('alert_buy_enabled', v)}
+                disabled={isUpdating || settingsLoading}
+              />
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="h-4 w-4 text-rose-500" />
+                <div>
+                  <Label className="text-sm font-medium">Prodejní cíle</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upozornit při dosažení cílové ceny pro prodej
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.alert_sell_enabled}
+                onCheckedChange={(v) => toggleSetting('alert_sell_enabled', v)}
+                disabled={isUpdating || settingsLoading}
+              />
+            </div>
+
+            {/* Test notification */}
+            <div className="pt-4 space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTest}
+                disabled={isTesting}
+              >
+                {isTesting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Odeslat testovací notifikaci
+              </Button>
+
+              {testResult && (
+                <p className="text-sm text-muted-foreground">{testResult}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="text-sm text-muted-foreground space-y-2 pt-4">
+        <p>
+          Notifikace vás upozorní, když cena akcie ve vašem watchlistu dosáhne
+          nastavené cílové ceny pro nákup nebo prodej.
+        </p>
+        <p>
+          Nastavte cílové ceny u položek ve watchlistu pomocí polí "Cíl nákup" a
+          "Cíl prodej".
+        </p>
+      </div>
+    </div>
+  );
+}

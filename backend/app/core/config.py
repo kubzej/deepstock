@@ -11,6 +11,14 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     
+    # VAPID for Web Push
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_claim_email: str = ""
+    
+    # Cron job authentication
+    cron_secret: str = ""
+    
     # App
     debug: bool = False
     
