@@ -82,7 +82,9 @@ export function WatchlistItemFormDialog({
       <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {editingItem ? `Upravit ${editingItem.stocks.ticker}` : 'Přidat akcii'}
+            {editingItem
+              ? `Upravit ${editingItem.stocks.ticker}`
+              : 'Přidat akcii'}
           </DialogTitle>
           <DialogDescription>
             {editingItem
@@ -103,7 +105,7 @@ export function WatchlistItemFormDialog({
               />
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="buyTarget">Nákupní cíl</Label>
               <Input

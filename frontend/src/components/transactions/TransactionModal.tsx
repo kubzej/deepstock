@@ -573,7 +573,7 @@ export function TransactionModal({
           )}
 
           {/* Date and Quantity */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date">Datum *</Label>
               <Input
@@ -631,7 +631,7 @@ export function TransactionModal({
           </div>
 
           {/* Price and Currency */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="price">Cena za akcii *</Label>
               <Input
@@ -668,7 +668,7 @@ export function TransactionModal({
           </div>
 
           {/* Exchange Rate and Fees */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="exchangeRate">Kurz k CZK *</Label>
               <Input
