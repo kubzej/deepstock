@@ -89,10 +89,10 @@ function getEvaluation(
   const obvFormatted = formatOBV(obv);
 
   if (obvDivergence === 'bullish') {
-    return `Býčí divergence! OBV (${obvFormatted}) roste, zatímco cena klesá. Možný signál obratu nahoru.`;
+    return `Bullish divergence! OBV (${obvFormatted}) roste, zatímco cena klesá. Možný signál obratu nahoru.`;
   }
   if (obvDivergence === 'bearish') {
-    return `Medvědí divergence! OBV (${obvFormatted}) klesá, zatímco cena roste. Možný signál obratu dolů.`;
+    return `Bearish divergence! OBV (${obvFormatted}) klesá, zatímco cena roste. Možný signál obratu dolů.`;
   }
 
   if (obvTrend === 'bullish') {

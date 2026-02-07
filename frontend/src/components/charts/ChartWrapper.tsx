@@ -51,11 +51,11 @@ const TIME_RANGES: { value: TechnicalPeriod; label: string }[] = [
 function SignalBadge({ signal }: { signal: SignalType }) {
   const config = {
     bullish: {
-      label: 'Býčí',
+      label: 'Bullish',
       className: 'bg-emerald-50 text-emerald-700',
     },
     bearish: {
-      label: 'Medvědí',
+      label: 'Bearish',
       className: 'bg-rose-50 text-rose-700',
     },
     neutral: {

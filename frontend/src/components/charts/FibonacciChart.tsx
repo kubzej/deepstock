@@ -124,7 +124,7 @@ function getEvaluation(
 
   if (fibPosition >= 61.8) {
     const level618 = fibLevels['618'];
-    return `Cena ${priceText} nad klíčovou úrovní 61.8% (${level618 ? formatPrice(level618) : '-'}). Býčí signál, 61.8% slouží jako podpora.`;
+    return `Cena ${priceText} nad klíčovou úrovní 61.8% (${level618 ? formatPrice(level618) : '-'}). Bullish signál, 61.8% slouží jako podpora.`;
   }
 
   if (fibPosition >= 50) {

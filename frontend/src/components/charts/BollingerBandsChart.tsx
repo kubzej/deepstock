@@ -79,10 +79,10 @@ function getEvaluation(
     return `Cena u dolního pásma (${posPercent}%). Možná přeprodaná situace, potenciální odraz nahoru.`;
   }
   if (bollingerPosition >= 70) {
-    return `Cena v horní části pásem (${posPercent}%). Býčí momentum, sledujte případný návrat k středu.`;
+    return `Cena v horní části pásem (${posPercent}%). Bullish momentum, sledujte případný návrat k středu.`;
   }
   if (bollingerPosition <= 30) {
-    return `Cena v dolní části pásem (${posPercent}%). Medvědí tlak, sledujte podporu na dolním pásmu.`;
+    return `Cena v dolní části pásem (${posPercent}%). Bearish tlak, sledujte podporu na dolním pásmu.`;
   }
 
   return `Cena uprostřed pásem (${posPercent}%). Konsolidace, čekejte na průraz.`;

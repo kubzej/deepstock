@@ -52,9 +52,9 @@ function getEvaluation(rsi: number | null): string {
     return `RSI na ${rsi.toFixed(1)} - přeprodáno. Potenciální nákupní příležitost, sledujte obrat.`;
   }
   if (rsi >= 50) {
-    return `RSI na ${rsi.toFixed(1)} - neutrální s býčím nádechem. Momentum je mírně pozitivní.`;
+    return `RSI na ${rsi.toFixed(1)} - neutrální s bullish nádechem. Momentum je mírně pozitivní.`;
   }
-  return `RSI na ${rsi.toFixed(1)} - neutrální s medvědím nádechem. Momentum je mírně negativní.`;
+  return `RSI na ${rsi.toFixed(1)} - neutrální s bearish nádechem. Momentum je mírně negativní.`;
 }
 
 // ============================================================
