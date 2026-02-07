@@ -376,9 +376,16 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
               showPortfolioColumn={isAllPortfolios}
             />
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Žádné otevřené loty
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title="Žádné otevřené loty"
+              description="Přidejte transakci pro sledování jednotlivých nákupních lotů."
+              action={
+                onAddTransaction
+                  ? { label: 'Přidat transakci', onClick: onAddTransaction }
+                  : undefined
+              }
+            />
           )}
         </TabsContent>
       </Tabs>
