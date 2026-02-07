@@ -5,7 +5,7 @@ import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCw, TrendingUp } from 'lucide-react';
+import { RefreshCw, TrendingUp } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { EmptyState } from '@/components/shared/EmptyState';
