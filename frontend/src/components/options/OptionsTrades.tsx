@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { cn } from '@/lib/utils';
 import { formatPercent } from '@/lib/format';
-import { X, Trash2, TrendingUp } from 'lucide-react';
+import { X, Trash2, TrendingUp, MessageSquare } from 'lucide-react';
 
 interface OptionsTradesProps {
   holdings: OptionHolding[];
@@ -314,6 +314,14 @@ export function OptionsTrades({
                 )}
               </div>
             </div>
+
+            {/* Notes */}
+            {h.notes && (
+              <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs text-muted-foreground">
+                <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span className="line-clamp-2">{h.notes}</span>
+              </div>
+            )}
           </div>
         );
       })}

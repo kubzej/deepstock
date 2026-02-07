@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -46,7 +45,6 @@ interface TransactionFormData {
   currency: string;
   exchangeRateToCzk: number | null;
   fees: number;
-  notes: string;
   date: string;
   sourceTransactionId: string | null;
 }
@@ -60,7 +58,6 @@ const EMPTY_FORM: TransactionFormData = {
   currency: 'USD',
   exchangeRateToCzk: null,
   fees: 0,
-  notes: '',
   date: new Date().toISOString().split('T')[0],
   sourceTransactionId: null,
 };
@@ -115,7 +112,6 @@ export function TransactionModal({
           currency: editTransaction.currency,
           exchangeRateToCzk: editTransaction.exchangeRate || null,
           fees: editTransaction.fees || 0,
-          notes: editTransaction.notes || '',
           date: editTransaction.date.split('T')[0],
           sourceTransactionId: editTransaction.sourceTransactionId || null,
         });
@@ -300,7 +296,6 @@ export function TransactionModal({
             currency: formData.currency,
             exchange_rate_to_czk: formData.exchangeRateToCzk || undefined,
             fees: formData.fees,
-            notes: formData.notes || undefined,
             executed_at: new Date(formData.date).toISOString(),
           },
         );
@@ -386,7 +381,6 @@ export function TransactionModal({
           currency: data.currency,
           exchange_rate_to_czk: data.exchangeRateToCzk || null,
           fees: data.fees,
-          notes: data.notes || null,
           executed_at: new Date(data.date).toISOString(),
           source_transaction_id: data.sourceTransactionId,
         }),
@@ -720,20 +714,6 @@ export function TransactionModal({
                 </span>
               </div>
             )}
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Poznámky</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, notes: e.target.value }))
-              }
-              placeholder="Volitelné poznámky k transakci..."
-              rows={2}
-            />
           </div>
 
           {/* Actions */}
