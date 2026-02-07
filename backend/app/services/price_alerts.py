@@ -6,14 +6,12 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from app.core.supabase import supabase
 from app.services.market.quotes import get_quotes
-from app.services.push import PushService
+from app.services.push import send_push_notification
 
 logger = logging.getLogger(__name__)
 
 
 class PriceAlertService:
-    def __init__(self):
-        self.push_service = PushService()
     
     async def check_all_users(self, redis) -> Dict[str, int]:
         """
@@ -158,13 +156,14 @@ class PriceAlertService:
         title = f"🟢 Nákupní příležitost: {ticker}"
         body = f"{stock_name} je na ${current_price:.2f} (cíl: ${target:.2f})"
         
-        return await self.push_service.send_push_notification(
+        sent = send_push_notification(
             user_id=user_id,
             title=title,
             body=body,
             url=f"/watchlists",
             tag=f"buy-{ticker}"
         )
+        return sent > 0
     
     async def _send_sell_alert(self, user_id: str, item: dict, current_price: float) -> bool:
         """Send sell target reached notification."""
@@ -176,13 +175,14 @@ class PriceAlertService:
         title = f"🔴 Prodejní cíl dosažen: {ticker}"
         body = f"{stock_name} je na ${current_price:.2f} (cíl: ${target:.2f})"
         
-        return await self.push_service.send_push_notification(
+        sent = send_push_notification(
             user_id=user_id,
             title=title,
             body=body,
             url=f"/watchlists",
             tag=f"sell-{ticker}"
         )
+        return sent > 0
     
     async def _update_last_buy_alert(self, item_id: str, target_price: float):
         """Update last buy alert tracking."""
