@@ -4,8 +4,15 @@ import { PortfolioProvider } from '@/contexts/PortfolioContext';
 import { Login } from '@/components/shared/Login';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Dashboard } from '@/components/dashboard';
-import { StockDetail, StockFormDialog, StocksManager } from '@/components/stocks';
-import { TransactionModal, TransactionHistoryPage } from '@/components/transactions';
+import {
+  StockDetail,
+  StockFormDialog,
+  StocksManager,
+} from '@/components/stocks';
+import {
+  TransactionModal,
+  TransactionHistoryPage,
+} from '@/components/transactions';
 import { WatchlistsPage } from '@/components/watchlists';
 import { SettingsPage } from '@/components/settings';
 import { OptionsPage, OptionTransactionModal } from '@/components/options';
@@ -106,57 +113,57 @@ function App() {
   if (selectedTicker) {
     return (
       <PortfolioProvider>
-      <AppLayout
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onNewOptionTransaction={() => setOptionModalOpen(true)}
-      >
-        <StockDetail
-          ticker={selectedTicker}
-          onBack={handleBackFromDetail}
-          onEdit={handleEditStock}
-          onDelete={handleDeleteStock}
-        />
-
-        {/* Edit Stock Dialog */}
-        <StockFormDialog
-          stock={editStock}
-          open={!!editStock}
-          onOpenChange={(open) => !open && setEditStock(null)}
-          onSuccess={handleEditSuccess}
-        />
-
-        {/* Delete Stock Dialog */}
-        <Dialog
-          open={!!deleteStockData}
-          onOpenChange={(open) => !open && setDeleteStockData(null)}
+        <AppLayout
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          onNewOptionTransaction={() => setOptionModalOpen(true)}
         >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Smazat {deleteStockData?.ticker}?</DialogTitle>
-              <DialogDescription>
-                Tato akce je nevratná. Smazáním akcie smažete i všechny
-                transakce a holdings s ní spojené.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setDeleteStockData(null)}
-              >
-                Zrušit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-                disabled={deleteSaving}
-              >
-                {deleteSaving ? 'Mažu...' : 'Smazat'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </AppLayout>
+          <StockDetail
+            ticker={selectedTicker}
+            onBack={handleBackFromDetail}
+            onEdit={handleEditStock}
+            onDelete={handleDeleteStock}
+          />
+
+          {/* Edit Stock Dialog */}
+          <StockFormDialog
+            stock={editStock}
+            open={!!editStock}
+            onOpenChange={(open) => !open && setEditStock(null)}
+            onSuccess={handleEditSuccess}
+          />
+
+          {/* Delete Stock Dialog */}
+          <Dialog
+            open={!!deleteStockData}
+            onOpenChange={(open) => !open && setDeleteStockData(null)}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Smazat {deleteStockData?.ticker}?</DialogTitle>
+                <DialogDescription>
+                  Tato akce je nevratná. Smazáním akcie smažete i všechny
+                  transakce a holdings s ní spojené.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteStockData(null)}
+                >
+                  Zrušit
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleteSaving}
+                >
+                  {deleteSaving ? 'Mažu...' : 'Smazat'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </AppLayout>
       </PortfolioProvider>
     );
   }
@@ -164,11 +171,16 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
-        return <Dashboard onStockClick={handleStockClick} />;
+        return (
+          <Dashboard
+            onStockClick={handleStockClick}
+            onAddTransaction={() => setTransactionModalOpen(true)}
+          />
+        );
       case 'stocks':
         return <StocksManager onStockClick={handleStockClick} />;
       case 'opce':
-        return <OptionsPage />;
+        return <OptionsPage onAddOption={() => setOptionModalOpen(true)} />;
       case 'history':
         return <TransactionHistoryPage />;
       case 'analysis':
@@ -176,7 +188,12 @@ function App() {
       case 'research':
         return <ResearchPage />;
       case 'watchlist':
-        return <WatchlistsPage onStockClick={handleStockClick} />;
+        return (
+          <WatchlistsPage
+            onStockClick={handleStockClick}
+            onNavigateToSettings={() => setActiveTab('settings:watchlists')}
+          />
+        );
       case 'settings':
       case 'menu':
         return <SettingsPage />;
@@ -195,25 +212,25 @@ function App() {
 
   return (
     <PortfolioProvider>
-    <AppLayout
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      onNewOptionTransaction={() => setOptionModalOpen(true)}
-    >
-      {renderContent()}
+      <AppLayout
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onNewOptionTransaction={() => setOptionModalOpen(true)}
+      >
+        {renderContent()}
 
-      {/* Transaction Modal */}
-      <TransactionModal
-        open={transactionModalOpen}
-        onOpenChange={setTransactionModalOpen}
-      />
+        {/* Transaction Modal */}
+        <TransactionModal
+          open={transactionModalOpen}
+          onOpenChange={setTransactionModalOpen}
+        />
 
-      {/* Option Transaction Modal */}
-      <OptionTransactionModal
-        open={optionModalOpen}
-        onOpenChange={setOptionModalOpen}
-      />
-    </AppLayout>
+        {/* Option Transaction Modal */}
+        <OptionTransactionModal
+          open={optionModalOpen}
+          onOpenChange={setOptionModalOpen}
+        />
+      </AppLayout>
     </PortfolioProvider>
   );
 }

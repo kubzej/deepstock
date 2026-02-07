@@ -5,16 +5,18 @@ import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, RefreshCw } from 'lucide-react';
+import { RefreshCw, TrendingUp } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 
 interface DashboardProps {
   onStockClick?: (ticker: string) => void;
+  onAddTransaction?: () => void;
 }
 
-export function Dashboard({ onStockClick }: DashboardProps) {
+export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
   const {
     portfolio,
     holdings,
@@ -196,16 +198,16 @@ export function Dashboard({ onStockClick }: DashboardProps) {
         </div>
 
         {/* Empty state */}
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-6 mb-4">
-            <Plus className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">Prázdné portfolio</h2>
-          <p className="text-muted-foreground max-w-md">
-            Zatím nemáte žádné pozice. Přidejte první transakci pro sledování
-            vašeho portfolia.
-          </p>
-        </div>
+        <EmptyState
+          icon={TrendingUp}
+          title="Prázdné portfolio"
+          description="Zatím nemáte žádné pozice. Přidejte první transakci pro sledování vašeho portfolia."
+          action={
+            onAddTransaction
+              ? { label: 'Přidat transakci', onClick: onAddTransaction }
+              : undefined
+          }
+        />
       </div>
     );
   }
@@ -374,9 +376,16 @@ export function Dashboard({ onStockClick }: DashboardProps) {
               showPortfolioColumn={isAllPortfolios}
             />
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Žádné otevřené loty
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title="Žádné otevřené loty"
+              description="Přidejte transakci pro sledování jednotlivých nákupních lotů."
+              action={
+                onAddTransaction
+                  ? { label: 'Přidat transakci', onClick: onAddTransaction }
+                  : undefined
+              }
+            />
           )}
         </TabsContent>
       </Tabs>

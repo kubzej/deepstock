@@ -16,7 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { fetchPriceHistory, type ChartPeriod } from '@/lib/api';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, getSmartDecimals } from '@/lib/format';
 
 interface PriceChartProps {
   ticker: string;
@@ -101,16 +101,9 @@ export function PriceChart({
 
   // Determine decimal places for Y-axis based on price range
   const yAxisDecimals = useMemo(() => {
-    if (chartData.length === 0) return 0;
+    if (chartData.length === 0) return 2;
     const prices = chartData.flatMap((d) => [d.high, d.low]);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const range = max - min;
-
-    // If range is small, show more decimals
-    if (range < 1) return 2;
-    if (range < 5) return 1;
-    return 0;
+    return getSmartDecimals(prices);
   }, [chartData]);
 
   // Calculate if current price is up or down vs first price

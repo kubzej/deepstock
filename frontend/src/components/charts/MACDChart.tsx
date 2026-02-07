@@ -77,16 +77,16 @@ function getEvaluation(
 
   if (macdTrend === 'bullish') {
     if (macd > 0 && macdSignal > 0) {
-      return `Býčí trend. MACD (${macd.toFixed(2)}) je nad signální linií (${macdSignal.toFixed(2)}) v kladném pásmu. ${histogramText}`;
+      return `Bullish trend. MACD (${macd.toFixed(2)}) je nad signální linií (${macdSignal.toFixed(2)}) v kladném pásmu. ${histogramText}`;
     }
-    return `Býčí signál. MACD překřížilo signální linii směrem nahoru. ${histogramText}`;
+    return `Bullish signál. MACD překřížilo signální linii směrem nahoru. ${histogramText}`;
   }
 
   if (macdTrend === 'bearish') {
     if (macd < 0 && macdSignal < 0) {
-      return `Medvědí trend. MACD (${macd.toFixed(2)}) je pod signální linií (${macdSignal.toFixed(2)}) v záporném pásmu. ${histogramText}`;
+      return `Bearish trend. MACD (${macd.toFixed(2)}) je pod signální linií (${macdSignal.toFixed(2)}) v záporném pásmu. ${histogramText}`;
     }
-    return `Medvědí signál. MACD překřížilo signální linii směrem dolů. ${histogramText}`;
+    return `Bearish signál. MACD překřížilo signální linii směrem dolů. ${histogramText}`;
   }
 
   return `Neutrální. MACD a signální linie jsou blízko sebe. Sledujte další vývoj.`;
@@ -114,8 +114,8 @@ const tooltipExplanation = (
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-emerald-500">Býčí: MACD nad signálem</p>
-      <p className="text-rose-500">Medvědí: MACD pod signálem</p>
+      <p className="text-emerald-500">Bullish: MACD nad signálem</p>
+      <p className="text-rose-500">Bearish: MACD pod signálem</p>
     </div>
   </div>
 );

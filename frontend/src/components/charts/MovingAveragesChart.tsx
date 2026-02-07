@@ -20,6 +20,7 @@ import {
   type TrendSignalType,
   type TechnicalPeriod,
 } from '@/lib/api';
+import { getSmartDecimals } from '@/lib/format';
 
 // ============================================================
 // TYPES
@@ -58,16 +59,16 @@ function getEvaluation(
   }
 
   if (trendSignal === 'strong_bullish') {
-    return `Silný býčí trend. Cena je ${priceVsSma50.toFixed(1)}% nad SMA 50 a ${priceVsSma200.toFixed(1)}% nad SMA 200. Oba klouzavé průměry směřují nahoru.`;
+    return `Silný bullish trend. Cena je ${priceVsSma50.toFixed(1)}% nad SMA 50 a ${priceVsSma200.toFixed(1)}% nad SMA 200. Oba klouzavé průměry směřují nahoru.`;
   }
   if (trendSignal === 'bullish') {
-    return `Býčí trend. Cena drží nad oběma klouzavými průměry (${priceVsSma50.toFixed(1)}% vs SMA 50).`;
+    return `Bullish trend. Cena drží nad oběma klouzavými průměry (${priceVsSma50.toFixed(1)}% vs SMA 50).`;
   }
   if (trendSignal === 'strong_bearish') {
-    return `Silný medvědí trend. Cena je ${Math.abs(priceVsSma50).toFixed(1)}% pod SMA 50 a ${Math.abs(priceVsSma200).toFixed(1)}% pod SMA 200.`;
+    return `Silný bearish trend. Cena je ${Math.abs(priceVsSma50).toFixed(1)}% pod SMA 50 a ${Math.abs(priceVsSma200).toFixed(1)}% pod SMA 200.`;
   }
   if (trendSignal === 'bearish') {
-    return `Medvědí trend. Cena je pod oběma klouzavými průměry.`;
+    return `Bearish trend. Cena je pod oběma klouzavými průměry.`;
   }
 
   // Mixed
@@ -100,8 +101,8 @@ const tooltipExplanation = (
       dní).
     </p>
     <div className="pt-2 mt-2 space-y-1">
-      <p className="text-emerald-400">Býčí: Cena nad oběma SMA</p>
-      <p className="text-rose-400">Medvědí: Cena pod oběma SMA</p>
+      <p className="text-emerald-400">Bullish: Cena nad oběma SMA</p>
+      <p className="text-rose-400">Bearish: Cena pod oběma SMA</p>
     </div>
   </div>
 );
@@ -200,6 +201,7 @@ export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {
 
   const minPrice = Math.min(...prices) * 0.98;
   const maxPrice = Math.max(...prices) * 1.02;
+  const smartDecimals = getSmartDecimals(prices);
 
   // Format data for display
   const chartData = priceHistory.map((d) => ({
@@ -241,9 +243,9 @@ export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {
               tick={{ fill: COLORS.axis, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => v.toFixed(0)}
+              tickFormatter={(v) => v.toFixed(smartDecimals)}
               orientation="right"
-              width={45}
+              width={55}
             />
             <Tooltip content={<CustomTooltip />} />
 

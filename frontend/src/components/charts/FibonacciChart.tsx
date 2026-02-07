@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
 import { fetchTechnicalIndicators, type TechnicalPeriod } from '@/lib/api';
+import { getSmartDecimals } from '@/lib/format';
 
 // ============================================================
 // TYPES
@@ -124,7 +125,7 @@ function getEvaluation(
 
   if (fibPosition >= 61.8) {
     const level618 = fibLevels['618'];
-    return `Cena ${priceText} nad klíčovou úrovní 61.8% (${level618 ? formatPrice(level618) : '-'}). Býčí signál, 61.8% slouží jako podpora.`;
+    return `Cena ${priceText} nad klíčovou úrovní 61.8% (${level618 ? formatPrice(level618) : '-'}). Bullish signál, 61.8% slouží jako podpora.`;
   }
 
   if (fibPosition >= 50) {
@@ -285,6 +286,7 @@ export function FibonacciChart({ ticker }: FibonacciChartProps) {
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const padding = (maxPrice - minPrice) * 0.05;
+  const smartDecimals = getSmartDecimals(prices);
 
   return (
     <ChartWrapper
@@ -313,8 +315,8 @@ export function FibonacciChart({ ticker }: FibonacciChartProps) {
               tick={{ fontSize: 10, fill: COLORS.axis }}
               tickLine={false}
               axisLine={{ stroke: COLORS.axis, strokeWidth: 0.5 }}
-              tickFormatter={(value) => value.toFixed(0)}
-              width={45}
+              tickFormatter={(value) => value.toFixed(smartDecimals)}
+              width={55}
             />
             <Tooltip content={<CustomTooltip />} />
 

@@ -332,7 +332,7 @@ export function OptionTransactionModal({
           </div>
 
           {/* Option Type & Action */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Typ opce</Label>
               <ToggleGroup
@@ -372,7 +372,7 @@ export function OptionTransactionModal({
           </div>
 
           {/* Strike & Expiration - disabled in close mode */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="strike">Strike price ($)</Label>
               <Input
@@ -400,7 +400,7 @@ export function OptionTransactionModal({
           </div>
 
           {/* Contracts & Premium */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="contracts">
                 Počet kontraktů
@@ -453,7 +453,7 @@ export function OptionTransactionModal({
           </div>
 
           {/* Fees & Exchange Rate */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="fees">
                 Poplatky ($)

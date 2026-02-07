@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search } from 'lucide-react';
+import { Search, FileText, DollarSign } from 'lucide-react';
 import { usePortfolios } from '@/hooks/usePortfolios';
 import {
   useAllTransactions,
@@ -294,9 +295,11 @@ export function TransactionHistoryPage() {
               ))}
             </div>
           ) : filteredStockTransactions.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              Žádné transakce k zobrazení
-            </p>
+            <EmptyState
+              icon={FileText}
+              title="Žádné transakce k zobrazení"
+              description="Zkuste změnit filtry nebo datum."
+            />
           ) : (
             <>
               {/* Mobile Cards */}
@@ -429,9 +432,11 @@ export function TransactionHistoryPage() {
               ))}
             </div>
           ) : filteredOptionTransactions.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              Žádné opční transakce k zobrazení
-            </p>
+            <EmptyState
+              icon={DollarSign}
+              title="Žádné opční transakce k zobrazení"
+              description="Zkuste změnit filtry nebo datum."
+            />
           ) : (
             <>
               {/* Mobile Cards */}

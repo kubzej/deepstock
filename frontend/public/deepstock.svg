@@ -1,5 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+    <!-- Background -->
     <rect width="32" height="32" rx="6" fill="#000000" />
-    <text x="16" y="23" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700"
-        fill="#ffffff" text-anchor="middle">D</text>
+
+    <!-- Ascending trend line -->
+    <polyline points="5,24 10,18 14,21 20,12 27,5" fill="none" stroke="#ffffff" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Arrow head at the end -->
+    <polyline points="23,5 27,5 27,9" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"
+        stroke-linejoin="round" />
 </svg>

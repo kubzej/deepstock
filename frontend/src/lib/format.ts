@@ -1,5 +1,6 @@
 /**
  * Format number as currency (CZK by default)
+ * CZK uses 0 decimals (portfolio totals), other currencies use 2 decimals (stock prices)
  */
 export function formatCurrency(
   value: number | null | undefined,
@@ -7,11 +8,15 @@ export function formatCurrency(
 ): string {
   if (value === null || value === undefined) return '—';
   
+  // CZK is typically used for large portfolio totals — 0 decimals
+  // USD/EUR/GBP/CHF stock prices need 2 decimals
+  const decimals = currency === 'CZK' ? 0 : 2;
+  
   const formatter = new Intl.NumberFormat('cs-CZ', {
     style: 'currency',
     currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
   
   return formatter.format(value);
@@ -184,4 +189,26 @@ export function formatRatio(
 ): string {
   if (value === null || value === undefined) return '—';
   return value.toFixed(decimals);
+}
+
+/**
+ * Determine smart number of decimal places for price axis/display
+ * based on min/max range. Ensures we always show meaningful precision.
+ */
+export function getSmartDecimals(prices: number[]): number {
+  if (prices.length === 0) return 2;
+  
+  const validPrices = prices.filter((p) => p != null && isFinite(p));
+  if (validPrices.length === 0) return 2;
+  
+  const min = Math.min(...validPrices);
+  const max = Math.max(...validPrices);
+  const range = max - min;
+  
+  // Very tight range — show more decimals
+  if (range < 0.1) return 4;
+  if (range < 1) return 3;
+  if (range < 10) return 2;
+  if (range < 100) return 1;
+  return 0;
 }

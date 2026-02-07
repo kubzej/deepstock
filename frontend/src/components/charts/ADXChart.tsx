@@ -76,7 +76,7 @@ function getEvaluation(
   }
 
   const adxText = adx.toFixed(1);
-  const direction = plusDI > minusDI ? 'býčí' : 'medvědí';
+  const direction = plusDI > minusDI ? 'bullish' : 'bearish';
 
   if (adx >= 50) {
     return `Velmi silný ${direction} trend (ADX: ${adxText}). Trend je extrémně silný, ale pozor na možné vyčerpání.`;
@@ -104,17 +104,17 @@ const tooltipExplanation = (
         <span className="text-purple-500">ADX</span> - síla trendu
       </p>
       <p>
-        <span className="text-emerald-500">+DI</span> - býčí směr
+        <span className="text-emerald-500">+DI</span> - bullish směr
       </p>
       <p>
-        <span className="text-rose-500">-DI</span> - medvědí směr
+        <span className="text-rose-500">-DI</span> - bearish směr
       </p>
     </div>
     <div className="pt-2 space-y-1">
       <p className="text-purple-500">ADX nad 25 = silný trend</p>
       <p className="text-zinc-500">ADX pod 20 = slabý/žádný trend</p>
-      <p className="text-emerald-500">+DI nad -DI = býčí směr</p>
-      <p className="text-rose-500">-DI nad +DI = medvědí směr</p>
+      <p className="text-emerald-500">+DI nad -DI = bullish směr</p>
+      <p className="text-rose-500">-DI nad +DI = bearish směr</p>
     </div>
   </div>
 );
