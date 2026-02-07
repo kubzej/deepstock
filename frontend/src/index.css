@@ -187,3 +187,41 @@ path.recharts-area-area {
   border: none !important;
   box-shadow: none !important;
 }
+
+/* PWA Safe Area Support */
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-left: env(safe-area-inset-left);
+    --safe-area-inset-right: env(safe-area-inset-right);
+  }
+}
+
+/* Utility classes for safe area */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Mobile main content - accounts for header + safe area */
+@media (max-width: 767px) {
+  .pt-header-mobile {
+    padding-top: calc(56px + env(safe-area-inset-top, 0px));
+  }
+  
+  .pb-content-mobile {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+}
