@@ -7,6 +7,7 @@ import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePortfolio } from '@/contexts/PortfolioContext';
@@ -38,10 +39,12 @@ import type {
 } from '@/lib/api';
 
 type TabType = 'overview' | 'stocks' | 'options';
+type ValueMode = 'current' | 'invested';
 
 export function AnalysisPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [valueMode, setValueMode] = useState<ValueMode>('current');
   const [datePreset, setDatePreset] = useState<DateRangePreset>('YTD');
   const [customFrom, setCustomFrom] = useState(
     format(startOfYear(new Date()), 'yyyy-MM-dd'),
@@ -119,7 +122,7 @@ export function AnalysisPage() {
       const date = parseISO(tx.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
-  }, [optionTransactions, dateRange]);
+  }, [optionTransactions, dateRange, portfolioId]);
 
   // Calculate performance
   const stockPerf = useMemo(
@@ -141,19 +144,26 @@ export function AnalysisPage() {
     return map;
   }, [stocks]);
 
+  // Helper to get value for distribution based on mode
+  const calcValue = (h: (typeof holdings)[0]) => {
+    if (valueMode === 'invested') {
+      return h.total_invested_czk ?? 0;
+    }
+    const quote = quotes[h.ticker];
+    const price = quote?.price || 0;
+    const scale = h.price_scale ?? 1;
+    const rate = rates[h.currency] || 1;
+    return h.shares * price * scale * rate;
+  };
+
   // Holdings with computed current_value for distribution drilling
   const holdingsWithValue = useMemo(() => {
-    return holdings.map((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      return {
-        ...h,
-        current_value: h.shares * price * scale * rate,
-      };
-    });
-  }, [holdings, quotes, rates]);
+    return holdings.map((h) => ({
+      ...h,
+      current_value: calcValue(h),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, valueMode]);
 
   // Distribution calculations
   const sectorDistribution = useMemo((): DistributionItem[] => {
@@ -161,11 +171,7 @@ export function AnalysisPage() {
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const sector = h.sector || 'Other';
 
       sectorMap[sector] = (sectorMap[sector] || 0) + value;
@@ -180,20 +186,17 @@ export function AnalysisPage() {
         color: SECTOR_COLORS[label] || SECTOR_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, valueMode]);
 
   const countryDistribution = useMemo((): DistributionItem[] => {
     const countryMap: Record<string, number> = {};
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const stock = stockMap[h.ticker];
-      const country = stock?.country || 'Neznámá';
+      const country = stock?.country || 'Other';
 
       countryMap[country] = (countryMap[country] || 0) + value;
       totalValue += value;
@@ -207,18 +210,15 @@ export function AnalysisPage() {
         color: COUNTRY_COLORS[label] || COUNTRY_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates, stockMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, stockMap, valueMode]);
 
   const exchangeDistribution = useMemo((): DistributionItem[] => {
     const exchangeMap: Record<string, number> = {};
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const stock = stockMap[h.ticker];
       const exchange = stock?.exchange || 'Other';
 
@@ -234,7 +234,8 @@ export function AnalysisPage() {
         color: EXCHANGE_COLORS[label] || EXCHANGE_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates, stockMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, stockMap, valueMode]);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['all-transactions'] });
@@ -258,7 +259,23 @@ export function AnalysisPage() {
           <TabsTrigger value="options">Opce</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* Value mode toggle */}
+          <PillGroup>
+            <PillButton
+              active={valueMode === 'current'}
+              onClick={() => setValueMode('current')}
+            >
+              Aktuální hodnota
+            </PillButton>
+            <PillButton
+              active={valueMode === 'invested'}
+              onClick={() => setValueMode('invested')}
+            >
+              Investováno
+            </PillButton>
+          </PillGroup>
+
           {isLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
