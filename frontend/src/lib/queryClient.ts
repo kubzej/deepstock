@@ -28,6 +28,7 @@ export const STALE_TIMES = {
   exchangeRates: 60 * 60 * 1000, // 1 hour
   stockInfo: 10 * 60 * 1000,     // 10 minutes
   technicalIndicators: 10 * 60 * 1000, // 10 minutes
+  insiderTrades: 30 * 60 * 1000,  // 30 minutes (cached 12h on backend)
 } as const;
 
 /**
@@ -104,4 +105,7 @@ export const queryKeys = {
     ? ['optionStats', portfolioId] as const
     : ['optionStats', 'all'] as const,
   optionQuotes: (symbols: string[]) => ['optionQuotes', symbols.sort().join(',')] as const,
+
+  // Insider trading
+  insiderTrades: (ticker: string) => ['insiderTrades', ticker.toUpperCase()] as const,
 } as const;
