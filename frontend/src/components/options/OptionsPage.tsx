@@ -16,6 +16,7 @@ import {
   useDeleteOptionTransactionsBySymbol,
 } from '@/lib/optionsHooks';
 import { useOptionQuotes } from '@/hooks/useOptionQuotes';
+import { useQuotes } from '@/hooks/useQuotes';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -69,31 +70,46 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
     [holdings],
   );
 
+  // Extract underlying symbols for stock quotes
+  const underlyingSymbols = useMemo(
+    () => [...new Set(holdings.map((h) => h.symbol).filter(Boolean))],
+    [holdings],
+  );
+
   // Fetch live quotes for options
-  const { data: quotes = {} } = useOptionQuotes(optionSymbols);
+  const { data: optionQuotesData = {}, refetch: refetchOptionQuotes } =
+    useOptionQuotes(optionSymbols);
+
+  // Fetch live quotes for underlying stocks
+  const { data: underlyingQuotes = {}, refetch: refetchUnderlyingQuotes } =
+    useQuotes(underlyingSymbols);
 
   // Merge quotes into holdings
   const holdingsWithQuotes = useMemo(() => {
     return holdings.map((h) => {
-      const quote = quotes[h.option_symbol];
-      if (quote && quote.price !== null) {
-        return {
-          ...h,
-          current_price: quote.price,
-          bid: quote.bid,
-          ask: quote.ask,
-          implied_volatility: quote.impliedVolatility,
-        };
-      }
-      return h;
+      const optionQuote = optionQuotesData[h.option_symbol];
+      const underlyingQuote = underlyingQuotes[h.symbol];
+
+      return {
+        ...h,
+        // Option price data
+        current_price: optionQuote?.price ?? h.current_price,
+        bid: optionQuote?.bid ?? h.bid,
+        ask: optionQuote?.ask ?? h.ask,
+        implied_volatility:
+          optionQuote?.impliedVolatility ?? h.implied_volatility,
+        // Underlying price - use fresh quote
+        underlying_price: underlyingQuote?.price ?? h.underlying_price,
+      };
     });
-  }, [holdings, quotes]);
+  }, [holdings, optionQuotesData, underlyingQuotes]);
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
-    queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['optionStats'] });
-    queryClient.invalidateQueries({ queryKey: ['optionQuotes'] });
+    // Refetch all option data
+    queryClient.refetchQueries({ queryKey: ['optionHoldings'] });
+    queryClient.refetchQueries({ queryKey: ['optionStats'] });
+    refetchOptionQuotes();
+    refetchUnderlyingQuotes();
   };
 
   // Close position (add closing transaction)

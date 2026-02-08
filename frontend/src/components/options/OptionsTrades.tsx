@@ -61,6 +61,7 @@ export function OptionsTrades({
       const isShort = h.position === 'short';
       const premium = h.avg_premium || 0;
       const currentPrice = h.current_price;
+      const underlyingPrice = h.underlying_price;
 
       // P/L calculation
       let pl: number | null = null;
@@ -85,13 +86,40 @@ export function OptionsTrades({
             : h.strike_price - premium;
       }
 
+      // Recalculate moneyness with live underlying price
+      let moneyness: 'ITM' | 'OTM' | 'ATM' | null = null;
+      if (underlyingPrice !== null) {
+        if (h.option_type === 'put') {
+          if (underlyingPrice < h.strike_price) moneyness = 'ITM';
+          else if (underlyingPrice > h.strike_price) moneyness = 'OTM';
+          else moneyness = 'ATM';
+        } else {
+          // call
+          if (underlyingPrice > h.strike_price) moneyness = 'ITM';
+          else if (underlyingPrice < h.strike_price) moneyness = 'OTM';
+          else moneyness = 'ATM';
+        }
+      }
+
+      // Recalculate buffer_percent with live underlying price
+      let bufferPercent: number | null = null;
+      if (underlyingPrice !== null && h.strike_price !== null) {
+        if (h.option_type === 'put') {
+          bufferPercent =
+            ((underlyingPrice - h.strike_price) / underlyingPrice) * 100;
+        } else {
+          bufferPercent =
+            ((h.strike_price - underlyingPrice) / underlyingPrice) * 100;
+        }
+      }
+
       // Distance to break-even %
       let breakevenDistance: number | null = null;
-      if (breakeven !== null && h.underlying_price !== null) {
+      if (breakeven !== null && underlyingPrice !== null) {
         breakevenDistance =
           h.option_type === 'call'
-            ? ((breakeven - h.underlying_price) / h.underlying_price) * 100
-            : ((h.underlying_price - breakeven) / h.underlying_price) * 100;
+            ? ((breakeven - underlyingPrice) / underlyingPrice) * 100
+            : ((underlyingPrice - breakeven) / underlyingPrice) * 100;
       }
 
       // Days calculation
@@ -104,6 +132,9 @@ export function OptionsTrades({
         breakeven,
         breakevenDistance,
         totalDays,
+        // Override with recalculated values
+        moneyness: moneyness ?? h.moneyness,
+        buffer_percent: bufferPercent ?? h.buffer_percent,
       };
     });
   }, [holdings]);
