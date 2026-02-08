@@ -513,3 +513,76 @@ export async function deleteTransaction(
     throw new Error('Nepodařilo se smazat transakci');
   }
 }
+
+
+// ============ Performance Types ============
+
+export interface PerformancePoint {
+  date: string;
+  value: number;
+  invested: number;
+  benchmark?: number | null;
+}
+
+export interface PerformanceResult {
+  data: PerformancePoint[];
+  total_return: number;
+  total_return_pct: number;
+  benchmark_return_pct?: number | null;
+}
+
+export type PerformancePeriod = '1W' | '1M' | '3M' | '6M' | 'MTD' | 'YTD' | '1Y' | 'ALL';
+
+
+// ============ Performance Endpoints ============
+
+export async function fetchStockPerformance(
+  portfolioId?: string,
+  period: PerformancePeriod = '1Y',
+  customFrom?: string,
+  customTo?: string
+): Promise<PerformanceResult> {
+  const authHeader = await getAuthHeader();
+  const endpoint = portfolioId 
+    ? `${API_URL}/api/portfolio/${portfolioId}/performance/stocks`
+    : `${API_URL}/api/portfolio/all/performance/stocks`;
+  
+  const params = new URLSearchParams({ period });
+  if (customFrom) params.append('from_date', customFrom);
+  if (customTo) params.append('to_date', customTo);
+  
+  const response = await fetch(`${endpoint}?${params}`, {
+    headers: {
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error('Nepodařilo se načíst výkon portfolia');
+  }
+  
+  return response.json();
+}
+
+
+export async function fetchOptionsPerformance(
+  portfolioId?: string,
+  period: PerformancePeriod = '1Y'
+): Promise<PerformanceResult> {
+  const authHeader = await getAuthHeader();
+  const endpoint = portfolioId 
+    ? `${API_URL}/api/portfolio/${portfolioId}/performance/options`
+    : `${API_URL}/api/portfolio/all/performance/options`;
+  
+  const response = await fetch(`${endpoint}?period=${period}`, {
+    headers: {
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    throw new Error('Nepodařilo se načíst výkon opcí');
+  }
+  
+  return response.json();
+}

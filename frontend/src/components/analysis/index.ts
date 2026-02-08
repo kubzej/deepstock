@@ -9,6 +9,7 @@ export { AnalysisPage } from './AnalysisPage';
 export { DateRangeFilter } from './DateRangeFilter';
 export { DistributionList } from './DistributionList';
 export { Metric } from './Metric';
+export { PerformanceChart } from './PerformanceChart';
 export { StockPerformance } from './StockPerformance';
 export { OptionPerformance } from './OptionPerformance';
 

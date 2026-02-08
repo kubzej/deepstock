@@ -15,10 +15,12 @@ import {
   useAllOptionTransactions,
 } from '@/hooks/useTransactionHistory';
 import { useStocks } from '@/hooks/useStocks';
+import { useStockPerformance } from '@/hooks/usePerformance';
 import {
   DateRangeFilter,
   getDateRange,
   DistributionList,
+  PerformanceChart,
   StockPerformance,
   OptionPerformance,
   calculateStockPerformance,
@@ -28,7 +30,12 @@ import {
   EXCHANGE_COLORS,
 } from '@/components/analysis';
 import type { DateRangePreset, DistributionItem } from '@/components/analysis';
-import type { Transaction, OptionTransaction, Stock } from '@/lib/api';
+import type {
+  Transaction,
+  OptionTransaction,
+  Stock,
+  PerformancePeriod,
+} from '@/lib/api';
 
 type TabType = 'overview' | 'stocks' | 'options';
 
@@ -41,13 +48,51 @@ export function AnalysisPage() {
   );
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'));
 
+  // Map date preset to performance period
+  // Backend supports: 1W, 1M, 3M, 6M, MTD, YTD, 1Y, ALL
+  const perfPeriod = useMemo((): PerformancePeriod => {
+    const mapping: Record<string, PerformancePeriod> = {
+      '1D': '1W',
+      '2D': '1W',
+      '1W': '1W',
+      '1M': '1M',
+      '3M': '3M',
+      '6M': '6M',
+      MTD: 'MTD',
+      YTD: 'YTD',
+      '1Y': '1Y',
+      '5Y': 'ALL',
+      ALL: 'ALL',
+      CUSTOM: 'ALL',
+    };
+    return mapping[datePreset] || '1Y';
+  }, [datePreset]);
+
   // Data
-  const { holdings, quotes, rates, loading: portfolioLoading } = usePortfolio();
+  const {
+    holdings,
+    quotes,
+    rates,
+    loading: portfolioLoading,
+    activePortfolio,
+  } = usePortfolio();
+  const portfolioId = activePortfolio?.id;
+
   const { data: stockTransactions = [], isLoading: stocksLoading } =
     useAllTransactions();
   const { data: optionTransactions = [], isLoading: optionsLoading } =
     useAllOptionTransactions();
   const { data: stocks = [] } = useStocks();
+
+  // Performance chart data - use active portfolio
+  // Pass custom dates when CUSTOM preset is selected
+  const { data: stockPerfData, isLoading: stockPerfLoading } =
+    useStockPerformance(
+      portfolioId,
+      perfPeriod,
+      datePreset === 'CUSTOM' ? customFrom : undefined,
+      datePreset === 'CUSTOM' ? customTo : undefined,
+    );
 
   const isLoading = portfolioLoading || stocksLoading || optionsLoading;
 
@@ -57,16 +102,20 @@ export function AnalysisPage() {
     [datePreset, customFrom, customTo],
   );
 
-  // Filter transactions by date
+  // Filter transactions by date AND portfolio
   const filteredStockTransactions = useMemo(() => {
     return stockTransactions.filter((tx: Transaction) => {
+      // Filter by portfolio if one is selected
+      if (portfolioId && tx.portfolioId !== portfolioId) return false;
       const date = parseISO(tx.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
-  }, [stockTransactions, dateRange]);
+  }, [stockTransactions, dateRange, portfolioId]);
 
   const filteredOptionTransactions = useMemo(() => {
     return optionTransactions.filter((tx: OptionTransaction) => {
+      // Filter by portfolio if one is selected (OptionTransaction uses snake_case)
+      if (portfolioId && tx.portfolio_id !== portfolioId) return false;
       const date = parseISO(tx.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
@@ -177,6 +226,7 @@ export function AnalysisPage() {
     queryClient.invalidateQueries({ queryKey: ['all-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['all-option-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['holdings'] });
+    queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
   };
 
   return (
@@ -224,7 +274,15 @@ export function AnalysisPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="stocks" className="mt-6">
+        <TabsContent value="stocks" className="mt-6 space-y-8">
+          {/* Performance chart */}
+          <PerformanceChart
+            data={stockPerfData?.data ?? []}
+            isLoading={stockPerfLoading}
+            showInvested
+          />
+
+          {/* Transaction breakdown */}
           {stocksLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
@@ -232,7 +290,8 @@ export function AnalysisPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="options" className="mt-6">
+        <TabsContent value="options" className="mt-6 space-y-8">
+          {/* Transaction breakdown */}
           {optionsLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
