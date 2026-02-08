@@ -141,6 +141,20 @@ export function AnalysisPage() {
     return map;
   }, [stocks]);
 
+  // Holdings with computed current_value for distribution drilling
+  const holdingsWithValue = useMemo(() => {
+    return holdings.map((h) => {
+      const quote = quotes[h.ticker];
+      const price = quote?.price || 0;
+      const scale = h.price_scale ?? 1;
+      const rate = rates[h.currency] || 1;
+      return {
+        ...h,
+        current_value: h.shares * price * scale * rate,
+      };
+    });
+  }, [holdings, quotes, rates]);
+
   // Distribution calculations
   const sectorDistribution = useMemo((): DistributionItem[] => {
     const sectorMap: Record<string, number> = {};
@@ -237,15 +251,6 @@ export function AnalysisPage() {
         isRefreshing={isLoading}
       />
 
-      <DateRangeFilter
-        preset={datePreset}
-        onPresetChange={setDatePreset}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-      />
-
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
         <TabsList>
           <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
@@ -261,20 +266,37 @@ export function AnalysisPage() {
               <DistributionList
                 title="Podle sektoru"
                 items={sectorDistribution}
+                holdings={holdingsWithValue}
+                groupBy="sector"
               />
               <DistributionList
                 title="Podle země"
                 items={countryDistribution}
+                holdings={holdingsWithValue}
+                groupBy="country"
+                stockLookup={stockMap}
               />
               <DistributionList
                 title="Podle burzy"
                 items={exchangeDistribution}
+                holdings={holdingsWithValue}
+                groupBy="exchange"
+                stockLookup={stockMap}
               />
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="stocks" className="mt-6 space-y-8">
+        <TabsContent value="stocks" className="mt-6 space-y-6">
+          <DateRangeFilter
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+          />
+
           {/* Performance chart */}
           <PerformanceChart
             data={stockPerfData?.data ?? []}
@@ -290,7 +312,16 @@ export function AnalysisPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="options" className="mt-6 space-y-8">
+        <TabsContent value="options" className="mt-6 space-y-6">
+          <DateRangeFilter
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+          />
+
           {/* Transaction breakdown */}
           {optionsLoading ? (
             <Skeleton className="h-48 w-full" />
