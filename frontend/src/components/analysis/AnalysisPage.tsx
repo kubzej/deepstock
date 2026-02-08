@@ -7,6 +7,7 @@ import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePortfolio } from '@/contexts/PortfolioContext';
@@ -15,10 +16,12 @@ import {
   useAllOptionTransactions,
 } from '@/hooks/useTransactionHistory';
 import { useStocks } from '@/hooks/useStocks';
+import { useStockPerformance } from '@/hooks/usePerformance';
 import {
   DateRangeFilter,
   getDateRange,
   DistributionList,
+  PerformanceChart,
   StockPerformance,
   OptionPerformance,
   calculateStockPerformance,
@@ -28,26 +31,71 @@ import {
   EXCHANGE_COLORS,
 } from '@/components/analysis';
 import type { DateRangePreset, DistributionItem } from '@/components/analysis';
-import type { Transaction, OptionTransaction, Stock } from '@/lib/api';
+import type {
+  Transaction,
+  OptionTransaction,
+  Stock,
+  PerformancePeriod,
+} from '@/lib/api';
 
 type TabType = 'overview' | 'stocks' | 'options';
+type ValueMode = 'current' | 'invested';
 
 export function AnalysisPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [valueMode, setValueMode] = useState<ValueMode>('current');
   const [datePreset, setDatePreset] = useState<DateRangePreset>('YTD');
   const [customFrom, setCustomFrom] = useState(
     format(startOfYear(new Date()), 'yyyy-MM-dd'),
   );
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'));
 
+  // Map date preset to performance period
+  // Backend supports: 1W, 1M, 3M, 6M, MTD, YTD, 1Y, ALL
+  const perfPeriod = useMemo((): PerformancePeriod => {
+    const mapping: Record<string, PerformancePeriod> = {
+      '1D': '1W',
+      '2D': '1W',
+      '1W': '1W',
+      '1M': '1M',
+      '3M': '3M',
+      '6M': '6M',
+      MTD: 'MTD',
+      YTD: 'YTD',
+      '1Y': '1Y',
+      '5Y': 'ALL',
+      ALL: 'ALL',
+      CUSTOM: 'ALL',
+    };
+    return mapping[datePreset] || '1Y';
+  }, [datePreset]);
+
   // Data
-  const { holdings, quotes, rates, loading: portfolioLoading } = usePortfolio();
+  const {
+    holdings,
+    quotes,
+    rates,
+    loading: portfolioLoading,
+    activePortfolio,
+  } = usePortfolio();
+  const portfolioId = activePortfolio?.id;
+
   const { data: stockTransactions = [], isLoading: stocksLoading } =
     useAllTransactions();
   const { data: optionTransactions = [], isLoading: optionsLoading } =
     useAllOptionTransactions();
   const { data: stocks = [] } = useStocks();
+
+  // Performance chart data - use active portfolio
+  // Pass custom dates when CUSTOM preset is selected
+  const { data: stockPerfData, isLoading: stockPerfLoading } =
+    useStockPerformance(
+      portfolioId,
+      perfPeriod,
+      datePreset === 'CUSTOM' ? customFrom : undefined,
+      datePreset === 'CUSTOM' ? customTo : undefined,
+    );
 
   const isLoading = portfolioLoading || stocksLoading || optionsLoading;
 
@@ -57,20 +105,24 @@ export function AnalysisPage() {
     [datePreset, customFrom, customTo],
   );
 
-  // Filter transactions by date
+  // Filter transactions by date AND portfolio
   const filteredStockTransactions = useMemo(() => {
     return stockTransactions.filter((tx: Transaction) => {
+      // Filter by portfolio if one is selected
+      if (portfolioId && tx.portfolioId !== portfolioId) return false;
       const date = parseISO(tx.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
-  }, [stockTransactions, dateRange]);
+  }, [stockTransactions, dateRange, portfolioId]);
 
   const filteredOptionTransactions = useMemo(() => {
     return optionTransactions.filter((tx: OptionTransaction) => {
+      // Filter by portfolio if one is selected (OptionTransaction uses snake_case)
+      if (portfolioId && tx.portfolio_id !== portfolioId) return false;
       const date = parseISO(tx.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
-  }, [optionTransactions, dateRange]);
+  }, [optionTransactions, dateRange, portfolioId]);
 
   // Calculate performance
   const stockPerf = useMemo(
@@ -92,17 +144,34 @@ export function AnalysisPage() {
     return map;
   }, [stocks]);
 
+  // Helper to get value for distribution based on mode
+  const calcValue = (h: (typeof holdings)[0]) => {
+    if (valueMode === 'invested') {
+      return h.total_invested_czk ?? 0;
+    }
+    const quote = quotes[h.ticker];
+    const price = quote?.price || 0;
+    const scale = h.price_scale ?? 1;
+    const rate = rates[h.currency] || 1;
+    return h.shares * price * scale * rate;
+  };
+
+  // Holdings with computed current_value for distribution drilling
+  const holdingsWithValue = useMemo(() => {
+    return holdings.map((h) => ({
+      ...h,
+      current_value: calcValue(h),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, valueMode]);
+
   // Distribution calculations
   const sectorDistribution = useMemo((): DistributionItem[] => {
     const sectorMap: Record<string, number> = {};
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const sector = h.sector || 'Other';
 
       sectorMap[sector] = (sectorMap[sector] || 0) + value;
@@ -117,20 +186,17 @@ export function AnalysisPage() {
         color: SECTOR_COLORS[label] || SECTOR_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, valueMode]);
 
   const countryDistribution = useMemo((): DistributionItem[] => {
     const countryMap: Record<string, number> = {};
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const stock = stockMap[h.ticker];
-      const country = stock?.country || 'Neznámá';
+      const country = stock?.country || 'Other';
 
       countryMap[country] = (countryMap[country] || 0) + value;
       totalValue += value;
@@ -144,18 +210,15 @@ export function AnalysisPage() {
         color: COUNTRY_COLORS[label] || COUNTRY_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates, stockMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, stockMap, valueMode]);
 
   const exchangeDistribution = useMemo((): DistributionItem[] => {
     const exchangeMap: Record<string, number> = {};
     let totalValue = 0;
 
     holdings.forEach((h) => {
-      const quote = quotes[h.ticker];
-      const price = quote?.price || 0;
-      const scale = h.price_scale ?? 1;
-      const rate = rates[h.currency] || 1;
-      const value = h.shares * price * scale * rate;
+      const value = calcValue(h);
       const stock = stockMap[h.ticker];
       const exchange = stock?.exchange || 'Other';
 
@@ -171,12 +234,14 @@ export function AnalysisPage() {
         color: EXCHANGE_COLORS[label] || EXCHANGE_COLORS['Other'],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [holdings, quotes, rates, stockMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, stockMap, valueMode]);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['all-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['all-option-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['holdings'] });
+    queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
   };
 
   return (
@@ -187,15 +252,6 @@ export function AnalysisPage() {
         isRefreshing={isLoading}
       />
 
-      <DateRangeFilter
-        preset={datePreset}
-        onPresetChange={setDatePreset}
-        customFrom={customFrom}
-        customTo={customTo}
-        onCustomFromChange={setCustomFrom}
-        onCustomToChange={setCustomTo}
-      />
-
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
         <TabsList>
           <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
@@ -203,7 +259,23 @@ export function AnalysisPage() {
           <TabsTrigger value="options">Opce</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* Value mode toggle */}
+          <PillGroup>
+            <PillButton
+              active={valueMode === 'current'}
+              onClick={() => setValueMode('current')}
+            >
+              Aktuální hodnota
+            </PillButton>
+            <PillButton
+              active={valueMode === 'invested'}
+              onClick={() => setValueMode('invested')}
+            >
+              Investováno
+            </PillButton>
+          </PillGroup>
+
           {isLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
@@ -211,20 +283,45 @@ export function AnalysisPage() {
               <DistributionList
                 title="Podle sektoru"
                 items={sectorDistribution}
+                holdings={holdingsWithValue}
+                groupBy="sector"
               />
               <DistributionList
                 title="Podle země"
                 items={countryDistribution}
+                holdings={holdingsWithValue}
+                groupBy="country"
+                stockLookup={stockMap}
               />
               <DistributionList
                 title="Podle burzy"
                 items={exchangeDistribution}
+                holdings={holdingsWithValue}
+                groupBy="exchange"
+                stockLookup={stockMap}
               />
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="stocks" className="mt-6">
+        <TabsContent value="stocks" className="mt-6 space-y-6">
+          <DateRangeFilter
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+          />
+
+          {/* Performance chart */}
+          <PerformanceChart
+            data={stockPerfData?.data ?? []}
+            isLoading={stockPerfLoading}
+            showInvested
+          />
+
+          {/* Transaction breakdown */}
           {stocksLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
@@ -232,7 +329,17 @@ export function AnalysisPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="options" className="mt-6">
+        <TabsContent value="options" className="mt-6 space-y-6">
+          <DateRangeFilter
+            preset={datePreset}
+            onPresetChange={setDatePreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onCustomFromChange={setCustomFrom}
+            onCustomToChange={setCustomTo}
+          />
+
+          {/* Transaction breakdown */}
           {optionsLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (

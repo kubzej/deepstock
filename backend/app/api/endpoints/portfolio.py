@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot
+from app.services.performance import get_stock_performance, get_options_performance
 from app.core.auth import get_current_user_id
-from typing import List
+from typing import List, Optional
 
 router = APIRouter()
 
@@ -152,3 +153,58 @@ async def delete_transaction(portfolio_id: str, transaction_id: str):
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============ Performance endpoints ============
+
+@router.get("/all/performance/stocks")
+async def get_all_stock_performance(
+    period: str = "1Y",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get stock portfolio performance over time for all portfolios.
+    Period: 1W, 1M, 3M, 6M, MTD, YTD, 1Y, ALL
+    Or use from_date/to_date for custom range (YYYY-MM-DD format)
+    """
+    return await get_stock_performance(user_id, portfolio_id=None, period=period, from_date=from_date, to_date=to_date)
+
+
+@router.get("/all/performance/options")
+async def get_all_options_performance(
+    period: str = "1Y",
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get options P/L performance over time for all portfolios.
+    Period: 1W, 1M, 3M, 6M, MTD, YTD, 1Y, ALL
+    """
+    return await get_options_performance(user_id, portfolio_id=None, period=period)
+
+
+@router.get("/{portfolio_id}/performance/stocks")
+async def get_portfolio_stock_performance(
+    portfolio_id: str,
+    period: str = "1Y",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get stock portfolio performance over time for a specific portfolio.
+    """
+    return await get_stock_performance(user_id, portfolio_id=portfolio_id, period=period, from_date=from_date, to_date=to_date)
+
+
+@router.get("/{portfolio_id}/performance/options")
+async def get_portfolio_options_performance(
+    portfolio_id: str,
+    period: str = "1Y",
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    Get options P/L performance over time for a specific portfolio.
+    """
+    return await get_options_performance(user_id, portfolio_id=portfolio_id, period=period)

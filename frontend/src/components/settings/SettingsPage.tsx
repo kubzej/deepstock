@@ -111,7 +111,7 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
       {/* Notifikace section */}
       <div className="space-y-1">
         <h2 className="text-sm font-medium text-muted-foreground px-2 mb-2">
-          Ostatní
+          Notifikace
         </h2>
 
         <button

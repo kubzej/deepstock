@@ -248,17 +248,23 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     [holdingsWithPrices],
   );
 
-  const setActivePortfolio = useCallback(async (portfolioId: string | null) => {
-    if (portfolioId === null) {
-      // "All portfolios" mode
-      setIsAllPortfolios(true);
-      setSelectedPortfolioId(null);
-    } else {
-      // Single portfolio mode
-      setIsAllPortfolios(false);
-      setSelectedPortfolioId(portfolioId);
-    }
-  }, []);
+  const setActivePortfolio = useCallback(
+    async (portfolioId: string | null) => {
+      if (portfolioId === null) {
+        // "All portfolios" mode
+        setIsAllPortfolios(true);
+        setSelectedPortfolioId(null);
+      } else {
+        // Single portfolio mode
+        setIsAllPortfolios(false);
+        setSelectedPortfolioId(portfolioId);
+      }
+      // Invalidate performance queries so chart refetches for new portfolio
+      await queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
+      await queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
+    },
+    [queryClient],
+  );
 
   // Force refresh function
   const refresh = useCallback(async () => {
@@ -270,6 +276,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['openLots'] }),
       queryClient.invalidateQueries({ queryKey: ['quotes'] }),
       queryClient.invalidateQueries({ queryKey: ['exchangeRates'] }),
+      queryClient.invalidateQueries({ queryKey: ['stockPerformance'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] }),
     ]);
   }, [queryClient]);
 
