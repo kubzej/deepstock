@@ -7,11 +7,19 @@ import {
   Send,
   ShoppingCart,
   TrendingUp,
+  UserRoundSearch,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useState } from 'react';
 
@@ -185,6 +193,55 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
                 disabled={isUpdating || settingsLoading}
               />
             </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <UserRoundSearch className="h-4 w-4 text-amber-500" />
+                <div>
+                  <Label className="text-sm font-medium">Insider obchody</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Nákupy a prodeje insiderů u vašich akcií
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.alert_insider_enabled}
+                onCheckedChange={(v) =>
+                  toggleSetting('alert_insider_enabled', v)
+                }
+                disabled={isUpdating || settingsLoading}
+              />
+            </div>
+
+            {settings.alert_insider_enabled && (
+              <div className="flex items-center justify-between py-2 pl-7">
+                <div>
+                  <Label className="text-sm font-medium">
+                    Minimální hodnota
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Jen obchody nad touto částkou
+                  </p>
+                </div>
+                <Select
+                  value={String(settings.insider_min_value)}
+                  onValueChange={(v) =>
+                    toggleSetting('insider_min_value', Number(v))
+                  }
+                  disabled={isUpdating || settingsLoading}
+                >
+                  <SelectTrigger className="w-[120px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="50000">$50K</SelectItem>
+                    <SelectItem value="100000">$100K</SelectItem>
+                    <SelectItem value="500000">$500K</SelectItem>
+                    <SelectItem value="1000000">$1M</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Test notification */}
             <div className="pt-4 space-y-2">

@@ -137,7 +137,7 @@ export function usePushNotifications() {
   // Toggle a specific setting
   const toggleSetting = useCallback(async (
     key: keyof NotificationSettings,
-    value: boolean
+    value: boolean | number
   ) => {
     await updateSettingsMutation.mutateAsync({ [key]: value });
   }, [updateSettingsMutation]);
@@ -156,7 +156,9 @@ export function usePushNotifications() {
       notifications_enabled: false,
       alert_buy_enabled: true,
       alert_sell_enabled: true,
-      alert_earnings_enabled: true
+      alert_earnings_enabled: true,
+      alert_insider_enabled: true,
+      insider_min_value: 100000,
     },
     settingsLoading,
     

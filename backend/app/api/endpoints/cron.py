@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.core.redis import get_redis
 from app.services.price_alerts import price_alert_service
 from app.services.earnings_alerts import earnings_alert_service
+from app.services.insider_alerts import insider_alert_service
 
 router = APIRouter()
 
@@ -59,6 +60,27 @@ async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
     
     try:
         result = await earnings_alert_service.check_all_users(redis)
+        return {
+            "success": True,
+            "users_checked": result["users_checked"],
+            "alerts_sent": result["alerts_sent"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/check-insider-alerts")
+async def check_insider_alerts(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Check insider trades and notify users about significant activity.
+    Called daily at ~18:00 UTC.
+    """
+    await verify_cron_secret(x_cron_secret)
+
+    redis = await get_redis()
+
+    try:
+        result = await insider_alert_service.check_all_users(redis)
         return {
             "success": True,
             "users_checked": result["users_checked"],

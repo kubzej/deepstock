@@ -116,14 +116,17 @@ def unsubscribe_user(user_id: str, endpoint: str) -> bool:
 def get_notification_settings(user_id: str) -> dict:
     """Get user's notification preferences"""
     result = supabase.table("profiles").select(
-        "notifications_enabled, alert_buy_enabled, alert_sell_enabled, alert_earnings_enabled"
+        "notifications_enabled, alert_buy_enabled, alert_sell_enabled, "
+        "alert_earnings_enabled, alert_insider_enabled, insider_min_value"
     ).eq("id", user_id).single().execute()
     
     return result.data or {
         "notifications_enabled": False,
         "alert_buy_enabled": True,
         "alert_sell_enabled": True,
-        "alert_earnings_enabled": True
+        "alert_earnings_enabled": True,
+        "alert_insider_enabled": True,
+        "insider_min_value": 100000,
     }
 
 

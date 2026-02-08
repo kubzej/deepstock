@@ -142,3 +142,10 @@ export {
   deleteOptionTransactionsBySymbol,
   closeOptionPosition,
 } from './options';
+
+// Insider Trading
+export {
+  type InsiderTrade,
+  type InsiderTradesResponse,
+  fetchInsiderTrades,
+} from './insider';

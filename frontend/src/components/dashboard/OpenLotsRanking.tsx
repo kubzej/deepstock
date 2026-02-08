@@ -1,16 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { PillButton } from '@/components/shared/PillButton';
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   formatCurrency,
   formatPercent,
@@ -43,28 +34,8 @@ type SortKey =
   | 'plPercent';
 type SortDirection = 'asc' | 'desc';
 
-// Sort icon component
-function SortIcon({
-  sortKey,
-  columnKey,
-  sortDirection,
-}: {
-  sortKey: SortKey;
-  columnKey: SortKey;
-  sortDirection: SortDirection;
-}) {
-  if (sortKey !== columnKey) {
-    return <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-30" />;
-  }
-  return sortDirection === 'asc' ? (
-    <ArrowUp className="ml-1 h-3 w-3 inline" />
-  ) : (
-    <ArrowDown className="ml-1 h-3 w-3 inline" />
-  );
-}
-
-// Mobile Lot Card Component
-function LotCard({
+// Individual Lot Row — unified for mobile & desktop
+function LotRow({
   lot,
   showPortfolio,
   onClick,
@@ -107,13 +78,21 @@ function LotCard({
       <div className="px-3 py-2.5">
         {/* Header Row */}
         <div className="flex items-center justify-between">
-          {/* Left: Ticker + Date */}
+          {/* Left: Ticker + name (desktop) + date */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-center gap-1.5">
               <span className="font-bold text-sm">{lot.ticker}</span>
-              <span className="text-[11px] text-muted-foreground">
-                {formatDate(lot.date)}
+              <span className="hidden md:inline text-[11px] text-muted-foreground truncate max-w-[160px]">
+                {lot.stockName}
               </span>
+              <span className="text-[11px] text-muted-foreground">
+                · {formatDate(lot.date)}
+              </span>
+              {showPortfolio && lot.portfolioName && (
+                <span className="hidden md:inline text-[11px] text-muted-foreground">
+                  · {lot.portfolioName}
+                </span>
+              )}
             </div>
           </div>
 
@@ -124,27 +103,43 @@ function LotCard({
             >
               {formatCurrency(lot.plCzk)}
             </span>
+            <Badge
+              variant="outline"
+              className={`hidden md:inline-flex text-[10px] px-1.5 py-0 h-[18px] font-medium font-mono-price ${
+                isPositive
+                  ? 'text-positive border-positive/20'
+                  : 'text-negative border-negative/20'
+              }`}
+            >
+              {formatPercent(lot.plPercent, 1, true)}
+            </Badge>
             <span
-              className={`text-[10px] font-mono-price ${isPositive ? 'text-positive/60' : 'text-negative/60'}`}
+              className={`md:hidden text-[10px] font-mono-price ${isPositive ? 'text-positive/60' : 'text-negative/60'}`}
             >
               {formatPercent(lot.plPercent, 1, true)}
             </span>
           </div>
         </div>
 
-        {/* Subrow: Shares × Price → Current */}
+        {/* Subrow: Shares × Buy Price → Current Price | Cost → Value (desktop) */}
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[11px] text-muted-foreground font-mono-price">
             {lot.shares} ks × {formatPrice(lot.buyPrice, lot.currency)}
           </span>
-          <span className="text-[11px] text-muted-foreground font-mono-price">
-            → {formatPrice(lot.currentPriceScaled, lot.currency)}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted-foreground font-mono-price">
+              → {formatPrice(lot.currentPriceScaled, lot.currency)}
+            </span>
+            <span className="hidden md:inline text-[11px] text-muted-foreground font-mono-price">
+              {formatCurrency(lot.costBasisCzk)} →{' '}
+              {formatCurrency(lot.currentValueCzk)}
+            </span>
+          </div>
         </div>
 
-        {/* Expanded Details */}
+        {/* Expanded Details (mobile only — desktop shows inline) */}
         <div
-          className={`grid transition-all duration-200 ease-out ${
+          className={`md:hidden grid transition-all duration-200 ease-out ${
             expanded
               ? 'grid-rows-[1fr] opacity-100 mt-3'
               : 'grid-rows-[0fr] opacity-0'
@@ -157,8 +152,8 @@ function LotCard({
               </p>
             )}
 
-            {/* Stats - 3 column compact */}
-            <div className="grid grid-cols-3 gap-2 text-xs">
+            {/* Stats inline */}
+            <div className="flex items-start gap-6 text-xs">
               <div>
                 <span className="text-muted-foreground/70 block">
                   Investováno
@@ -171,12 +166,6 @@ function LotCard({
                 <span className="text-muted-foreground/70 block">Hodnota</span>
                 <span className="font-mono-price">
                   {formatCurrency(lot.currentValueCzk)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground/70 block">Aktuální</span>
-                <span className="font-mono-price">
-                  {formatPrice(lot.currentPriceScaled, lot.currency)}
                 </span>
               </div>
             </div>
@@ -303,147 +292,50 @@ export function OpenLotsRanking({
     }
   };
 
-  const renderSortableHeader = (
-    label: string,
-    columnKey: SortKey,
-    className = '',
-  ) => (
-    <TableHead
-      className={`text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none ${className}`}
-      onClick={() => handleSort(columnKey)}
-    >
-      {label}
-      <SortIcon
-        sortKey={sortKey}
-        columnKey={columnKey}
-        sortDirection={sortDirection}
-      />
-    </TableHead>
-  );
-
   if (lots.length === 0) {
     return null;
   }
 
   return (
     <div className="pb-12">
-      {/* Desktop Table */}
-      <div className="hidden md:block">
-        <Table className="w-full">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent border-border">
-              {renderSortableHeader('Ticker', 'ticker', 'w-[20%]')}
-              {renderSortableHeader('Datum', 'date', 'w-[14%]')}
-              {renderSortableHeader('Počet', 'shares', 'text-right w-[10%]')}
-              {renderSortableHeader('Nákup', 'buyPrice', 'text-right w-[14%]')}
-              {renderSortableHeader(
-                'Aktuální',
-                'currentPrice',
-                'text-right w-[14%]',
+      {/* Sort Pills */}
+      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+        {[
+          { key: 'plCzk' as SortKey, label: 'P/L' },
+          { key: 'plPercent' as SortKey, label: '%' },
+          { key: 'date' as SortKey, label: 'Datum' },
+          { key: 'shares' as SortKey, label: 'Počet' },
+          { key: 'ticker' as SortKey, label: 'A-Z' },
+        ].map((option) => {
+          const isActive = sortKey === option.key;
+          return (
+            <PillButton
+              key={option.key}
+              active={isActive}
+              onClick={() => handleSort(option.key)}
+              size="sm"
+            >
+              {option.label}
+              {isActive && (
+                <span className="ml-0.5">
+                  {sortDirection === 'desc' ? '↓' : '↑'}
+                </span>
               )}
-              {renderSortableHeader('P/L', 'plCzk', 'text-right w-[14%]')}
-              {renderSortableHeader('P/L %', 'plPercent', 'text-right w-[14%]')}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayedLots.map((lot) => {
-              const isPositive = lot.plCzk >= 0;
-              return (
-                <TableRow
-                  key={lot.id}
-                  className="cursor-pointer hover:bg-muted/50 border-border"
-                  onClick={() => onLotClick?.(lot.ticker)}
-                >
-                  <TableCell>
-                    <div>
-                      <span className="font-bold">{lot.ticker}</span>
-                      <p className="text-xs text-muted-foreground truncate max-w-[120px]">
-                        {lot.stockName}
-                      </p>
-                      {showPortfolioColumn && lot.portfolioName && (
-                        <p className="text-xs text-muted-foreground/70 truncate max-w-[120px]">
-                          {lot.portfolioName}
-                        </p>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(lot.date)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono-price">
-                    {lot.shares}
-                  </TableCell>
-                  <TableCell className="text-right font-mono-price">
-                    {formatPrice(lot.buyPrice, lot.currency)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono-price">
-                    {formatPrice(lot.currentPriceScaled, lot.currency)}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-mono-price ${isPositive ? 'text-positive' : 'text-negative'}`}
-                  >
-                    {formatCurrency(lot.plCzk)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge
-                      variant="outline"
-                      className={
-                        isPositive
-                          ? 'text-positive border-positive/20'
-                          : 'text-negative border-negative/20'
-                      }
-                    >
-                      {formatPercent(lot.plPercent, 1, true)}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+            </PillButton>
+          );
+        })}
       </div>
 
-      {/* Mobile Cards */}
-      <div className="md:hidden">
-        {/* Mobile Sort Pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 scrollbar-hide">
-          {[
-            { key: 'plCzk' as SortKey, label: 'P/L' },
-            { key: 'plPercent' as SortKey, label: '%' },
-            { key: 'date' as SortKey, label: 'Datum' },
-            { key: 'shares' as SortKey, label: 'Počet' },
-            { key: 'ticker' as SortKey, label: 'A-Z' },
-          ].map((option) => {
-            const isActive = sortKey === option.key;
-            return (
-              <PillButton
-                key={option.key}
-                active={isActive}
-                onClick={() => handleSort(option.key)}
-                size="sm"
-              >
-                {option.label}
-                {isActive && (
-                  <span className="ml-0.5">
-                    {sortDirection === 'desc' ? '↓' : '↑'}
-                  </span>
-                )}
-              </PillButton>
-            );
-          })}
-        </div>
-
-        {/* Cards */}
-        <div className="space-y-1">
-          {displayedLots.map((lot) => (
-            <LotCard
-              key={lot.id}
-              lot={lot}
-              showPortfolio={showPortfolioColumn}
-              onClick={() => onLotClick?.(lot.ticker)}
-            />
-          ))}
-        </div>
+      {/* Lot Rows */}
+      <div className="space-y-1">
+        {displayedLots.map((lot) => (
+          <LotRow
+            key={lot.id}
+            lot={lot}
+            showPortfolio={showPortfolioColumn}
+            onClick={() => onLotClick?.(lot.ticker)}
+          />
+        ))}
       </div>
     </div>
   );
