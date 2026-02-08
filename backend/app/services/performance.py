@@ -70,9 +70,13 @@ async def get_stock_performance(
     
     # Cache key - include custom dates
     cache_key = f"perf:stock:{user_id}:{portfolio_id or 'all'}:{period}:{from_date or ''}:{to_date or ''}"
+    
+    logger.info(f"[PERF] Request: portfolio_id={portfolio_id}, period={period}, from={from_date}, to={to_date}")
+    
     cached = await redis.get(cache_key)
     if cached:
         data = json.loads(cached)
+        logger.info(f"[PERF] Cache hit for {cache_key}, data points: {len(data.get('data', []))}")
         return PerformanceResult(**data)
     
     # 1. Get transactions
@@ -88,6 +92,7 @@ async def get_stock_performance(
             .eq("user_id", user_id) \
             .execute()
         if not portfolio.data:
+            logger.info(f"[PERF] Portfolio {portfolio_id} not found or not owned by user")
             return PerformanceResult(data=[], total_return=0, total_return_pct=0)
         query = query.eq("portfolio_id", portfolio_id)
     else:
@@ -98,11 +103,14 @@ async def get_stock_performance(
             .execute()
         portfolio_ids = [p["id"] for p in portfolios.data]
         if not portfolio_ids:
+            logger.info(f"[PERF] No portfolios found for user")
             return PerformanceResult(data=[], total_return=0, total_return_pct=0)
         query = query.in_("portfolio_id", portfolio_ids)
     
     transactions = query.execute().data
+    logger.info(f"[PERF] Found {len(transactions)} stock transactions for portfolio_id={portfolio_id}")
     if not transactions:
+        logger.info(f"[PERF] No transactions - returning empty result")
         return PerformanceResult(data=[], total_return=0, total_return_pct=0)
     
     # 2. Determine date range for DISPLAY (chart output)
@@ -146,15 +154,39 @@ async def get_stock_performance(
         )
         
         if hist_data.empty:
+            logger.info(f"[PERF] yfinance returned empty data for tickers: {tickers}")
             return PerformanceResult(data=[], total_return=0, total_return_pct=0)
         
-        # Handle single ticker case (no MultiIndex)
+        # yfinance returns different structures based on # of tickers
+        # Single ticker: columns are ['Open', 'High', 'Low', 'Close', 'Volume'] or MultiIndex
+        # Multiple tickers: columns are MultiIndex like [('Close', 'AAPL'), ('Close', 'MSFT')]
+        
         if len(tickers) == 1:
-            close_prices = pd.DataFrame({
-                tickers[0]: hist_data["Close"] if "Close" in hist_data.columns else hist_data[("Close", tickers[0])]
-            })
+            ticker = tickers[0]
+            # Check if it's MultiIndex columns
+            if isinstance(hist_data.columns, pd.MultiIndex):
+                # MultiIndex: get ('Close', ticker)
+                if ('Close', ticker) in hist_data.columns:
+                    close_series = hist_data[('Close', ticker)]
+                else:
+                    logger.error(f"[PERF] Could not find Close for {ticker} in MultiIndex")
+                    return PerformanceResult(data=[], total_return=0, total_return_pct=0)
+            else:
+                # Simple columns: just get 'Close'
+                close_series = hist_data['Close']
+            
+            # Flatten if needed (squeeze 2D to 1D)
+            if hasattr(close_series, 'squeeze'):
+                close_series = close_series.squeeze()
+            
+            close_prices = pd.DataFrame({ticker: close_series})
         else:
-            close_prices = hist_data["Close"]
+            # Multiple tickers - columns should be MultiIndex
+            if isinstance(hist_data.columns, pd.MultiIndex):
+                close_prices = hist_data["Close"]
+            else:
+                # Fallback - shouldn't happen but handle it
+                close_prices = hist_data[["Close"]].rename(columns={"Close": tickers[0]})
         
         # Forward-fill missing prices (weekends, holidays, newly listed stocks)
         close_prices = close_prices.ffill()
