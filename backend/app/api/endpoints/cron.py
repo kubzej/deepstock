@@ -6,6 +6,7 @@ from typing import Optional
 from app.core.config import get_settings
 from app.core.redis import get_redis
 from app.services.price_alerts import price_alert_service
+from app.services.earnings_alerts import earnings_alert_service
 
 router = APIRouter()
 
@@ -44,3 +45,24 @@ async def check_price_alerts(x_cron_secret: Optional[str] = Header(None)):
 async def cron_health():
     """Simple health check for cron service"""
     return {"status": "ok"}
+
+
+@router.post("/check-earnings-alerts")
+async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Check earnings calendar and notify users about today's earnings.
+    Called daily at 8:00 UTC (9:00 CET).
+    """
+    await verify_cron_secret(x_cron_secret)
+    
+    redis = await get_redis()
+    
+    try:
+        result = await earnings_alert_service.check_all_users(redis)
+        return {
+            "success": True,
+            "users_checked": result["users_checked"],
+            "alerts_sent": result["alerts_sent"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

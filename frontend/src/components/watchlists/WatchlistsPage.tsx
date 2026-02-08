@@ -176,7 +176,12 @@ export function WatchlistsPage({
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDir(key === 'ticker' || key === 'sector' ? 'asc' : 'desc');
+      // Text fields and earnings default to asc (A-Z, soonest first)
+      setSortDir(
+        key === 'ticker' || key === 'sector' || key === 'earnings'
+          ? 'asc'
+          : 'desc',
+      );
     }
   };
 
@@ -240,6 +245,20 @@ export function WatchlistsPage({
           aVal = a.sector ?? a.stocks.sector ?? '';
           bVal = b.sector ?? b.stocks.sector ?? '';
           break;
+        case 'earnings': {
+          const aDate = quotes[a.stocks.ticker]?.earningsDate;
+          const bDate = quotes[b.stocks.ticker]?.earningsDate;
+          // Items without earnings date always go to the bottom
+          const aHas = aDate ? 1 : 0;
+          const bHas = bDate ? 1 : 0;
+          if (aHas !== bHas) {
+            return bHas - aHas; // Items with dates first
+          }
+          if (!aDate || !bDate) return 0; // Both have no date
+          const aTime = new Date(aDate).getTime();
+          const bTime = new Date(bDate).getTime();
+          return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
+        }
       }
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -422,11 +441,13 @@ export function WatchlistsPage({
       <PageHeader
         title="Watchlisty"
         onRefresh={() => {
+          // Invalidate all caches - React Query will refetch them
           queryClient.invalidateQueries({ queryKey: ['watchlists'] });
           queryClient.invalidateQueries({ queryKey: ['watchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['allWatchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
-          queryClient.invalidateQueries({ queryKey: ['quote'] });
+          // Remove individual quote caches to force fresh batch fetch
+          queryClient.removeQueries({ queryKey: ['quote'] });
         }}
         isRefreshing={isFetching}
         dataUpdatedAt={dataUpdatedAt}

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pencil, Trash2, Tag, MoreHorizontal } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Pencil, Trash2, Tag, MoreHorizontal, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,7 +9,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Quote, WatchlistItem } from '@/lib/api';
-import { formatPrice, formatPercent } from '@/lib/format';
+import {
+  getDaysUntilEarnings,
+  shouldShowEarningsBadge,
+  formatEarningsBadge,
+  formatDateCzech,
+  formatPrice,
+  formatPercent,
+} from '@/lib/format';
 
 interface WatchlistItemCardProps {
   item: WatchlistItem;
@@ -33,6 +40,14 @@ export function WatchlistItemCard({
   watchlistName,
 }: WatchlistItemCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // Calculate earnings data from quote.earningsDate
+  const daysUntil = useMemo(
+    () => getDaysUntilEarnings(quote?.earningsDate),
+    [quote?.earningsDate],
+  );
+  const earningsBadge = formatEarningsBadge(daysUntil);
+  const showBadge = shouldShowEarningsBadge(daysUntil);
 
   const atBuyTarget =
     item.target_buy_price && quote
@@ -98,6 +113,13 @@ export function WatchlistItemCard({
               >
                 {item.stocks.ticker}
               </span>
+              {/* Earnings Badge - show only for -7 to +14 days */}
+              {showBadge && earningsBadge && (
+                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold leading-none bg-blue-500/15 text-blue-500">
+                  <Calendar className="h-2.5 w-2.5" />
+                  {earningsBadge}
+                </span>
+              )}
               {/* Tags */}
               {item.tags && item.tags.length > 0 && (
                 <div className="flex gap-0.5">
@@ -256,6 +278,14 @@ export function WatchlistItemCard({
                 </span>
               </div>
             </div>
+
+            {/* Earnings */}
+            {quote?.earningsDate && (
+              <div className="text-xs mb-2">
+                <span className="text-muted-foreground/70 block">Earnings</span>
+                <span>{formatDateCzech(quote.earningsDate)}</span>
+              </div>
+            )}
 
             {/* Sector */}
             {(item.sector || item.stocks.sector) && (

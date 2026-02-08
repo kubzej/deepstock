@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Bell,
   BellOff,
+  Calendar,
   Loader2,
   Send,
   ShoppingCart,
@@ -166,6 +167,25 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
               />
             </div>
 
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-4 w-4 text-blue-500" />
+                <div>
+                  <Label className="text-sm font-medium">Earnings</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Upozornit ráno v den hlášení výsledků
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.alert_earnings_enabled}
+                onCheckedChange={(v) =>
+                  toggleSetting('alert_earnings_enabled', v)
+                }
+                disabled={isUpdating || settingsLoading}
+              />
+            </div>
+
             {/* Test notification */}
             <div className="pt-4 space-y-2">
               <Button
@@ -188,18 +208,6 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Info */}
-      <div className="text-sm text-muted-foreground space-y-2 pt-4">
-        <p>
-          Notifikace vás upozorní, když cena akcie ve vašem watchlistu dosáhne
-          nastavené cílové ceny pro nákup nebo prodej.
-        </p>
-        <p>
-          Nastavte cílové ceny u položek ve watchlistu pomocí polí "Cíl nákup" a
-          "Cíl prodej".
-        </p>
       </div>
     </div>
   );

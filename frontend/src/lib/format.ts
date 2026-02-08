@@ -212,3 +212,75 @@ export function getSmartDecimals(prices: number[]): number {
   if (range < 100) return 1;
   return 0;
 }
+
+/**
+ * Calculate days until earnings (negative = past)
+ */
+export function getDaysUntilEarnings(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const earningsDay = new Date(dateStr);
+  earningsDay.setHours(0, 0, 0, 0);
+  return Math.ceil((earningsDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Check if earnings should show badge (within -7 to +14 days)
+ */
+export function shouldShowEarningsBadge(daysUntil: number | null): boolean {
+  if (daysUntil === null) return false;
+  return daysUntil >= -7 && daysUntil <= 14;
+}
+
+/**
+ * Format earnings badge label for mobile/highlights
+ * Only for earnings within -7 to +14 days
+ */
+export function formatEarningsBadge(daysUntil: number | null): string | null {
+  if (daysUntil === null) return null;
+  if (!shouldShowEarningsBadge(daysUntil)) return null;
+  
+  if (daysUntil < 0) {
+    const absDays = Math.abs(daysUntil);
+    if (absDays === 1) return 'Včera';
+    // Czech grammar - instrumental case: always "dny" for plural
+    return `Před ${absDays} dny`;
+  }
+  if (daysUntil === 0) return 'Dnes';
+  if (daysUntil === 1) return 'Zítra';
+  // Czech grammar - accusative case: 2-4 = dny, 5+ = dní
+  const dayWord = daysUntil >= 5 ? 'dní' : 'dny';
+  return `Za ${daysUntil} ${dayWord}`;
+}
+
+/**
+ * Check if earnings is in the past
+ */
+export function isEarningsPast(daysUntil: number | null): boolean {
+  return daysUntil !== null && daysUntil < 0;
+}
+
+/**
+ * Format date in Czech short format (e.g., "11. 2.")
+ */
+export function formatDateCzechShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  return `${date.getDate()}. ${date.getMonth() + 1}.`;
+}
+
+/**
+ * Format date in Czech format (e.g., "11. 2. 2026")
+ */
+export function formatDateCzech(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  
+  const day = date.getDate();
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  return `${day}. ${month}. ${year}`;
+}

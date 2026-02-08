@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.services.market import market_service
 from app.services.exchange import exchange_service
+from app.core.redis import get_redis
 from pydantic import BaseModel
 from typing import List
 

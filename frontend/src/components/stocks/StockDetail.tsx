@@ -38,6 +38,7 @@ import {
   formatPercent,
   formatPrice,
   formatDate,
+  formatDateCzech,
   toCZK,
 } from '@/lib/format';
 import { TransactionModal } from '@/components/transactions';
@@ -303,6 +304,12 @@ export function StockDetail({
             <span className="text-muted-foreground">Měna: </span>
             <span>{stockCurrency}</span>
           </div>
+          {quote?.earningsDate && (
+            <div>
+              <span className="text-muted-foreground">Earnings: </span>
+              <span>{formatDateCzech(quote.earningsDate)}</span>
+            </div>
+          )}
         </div>
       </div>
 
