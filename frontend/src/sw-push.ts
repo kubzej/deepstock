@@ -1,7 +1,15 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope;
+
+// Auto-update: activate new service worker immediately
+self.skipWaiting();
+clientsClaim();
+
+// Clean up old caches
+cleanupOutdatedCaches();
 
 // Precache static assets (injected by vite-plugin-pwa)
 precacheAndRoute(self.__WB_MANIFEST);

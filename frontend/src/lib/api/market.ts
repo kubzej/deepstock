@@ -16,6 +16,7 @@ export interface Quote {
   preMarketChangePercent?: number | null;
   postMarketPrice?: number | null;
   postMarketChangePercent?: number | null;
+  earningsDate?: string | null;
   lastUpdated: string;
 }
 

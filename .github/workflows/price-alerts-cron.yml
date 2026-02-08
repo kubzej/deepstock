@@ -2,8 +2,12 @@ name: Price Alerts Cron
 
 on:
   schedule:
-    # Every 10 minutes during US market hours (14:30-21:00 UTC = 9:30-16:00 EST)
-    - cron: "*/10 14-21 * * 1-5"
+    # EU + US markets: every 10 min, 7:00-21:00 UTC (8:00-22:00 CET)
+    - cron: "*/10 7-21 * * 1-5"
+    # HK market: 30 min after open (10:00 HKT = 2:00 UTC)
+    - cron: "0 2 * * 1-5"
+    # HK market: 30 min before close (15:30 HKT = 7:30 UTC)
+    - cron: "30 7 * * 1-5"
   workflow_dispatch: # Allow manual trigger
 
 jobs:

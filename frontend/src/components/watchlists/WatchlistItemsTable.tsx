@@ -37,7 +37,14 @@ import {
   type WatchlistItemWithSource,
   type Quote,
 } from '@/lib/api';
-import { formatPrice, formatPercent } from '@/lib/format';
+import {
+  getDaysUntilEarnings,
+  shouldShowEarningsBadge,
+  formatEarningsBadge,
+  formatDateCzech,
+  formatPrice,
+  formatPercent,
+} from '@/lib/format';
 
 export type SortKey =
   | 'ticker'
@@ -45,6 +52,7 @@ export type SortKey =
   | 'change'
   | 'buyTarget'
   | 'sellTarget'
+  | 'earnings'
   | 'sector';
 export type SortDir = 'asc' | 'desc';
 
@@ -169,6 +177,17 @@ export function WatchlistItemsTable({
               />
             </TableHead>
             <TableHead
+              className="text-xs uppercase tracking-wide text-muted-foreground text-center cursor-pointer hover:text-foreground transition-colors select-none hidden lg:table-cell"
+              onClick={() => onSort('earnings')}
+            >
+              Earnings{' '}
+              <SortIcon
+                columnKey="earnings"
+                currentKey={sortKey}
+                currentDir={sortDir}
+              />
+            </TableHead>
+            <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none hidden md:table-cell"
               onClick={() => onSort('sector')}
             >
@@ -190,6 +209,9 @@ export function WatchlistItemsTable({
             const quote = quotes[item.stocks.ticker];
             const atBuy = isAtBuyTarget(item, quote);
             const atSell = isAtSellTarget(item, quote);
+            const daysUntil = getDaysUntilEarnings(quote?.earningsDate);
+            const earningsBadge = formatEarningsBadge(daysUntil);
+            const showBadge = shouldShowEarningsBadge(daysUntil);
 
             return (
               <TableRow
@@ -342,6 +364,22 @@ export function WatchlistItemsTable({
                   {item.target_sell_price
                     ? formatPrice(item.target_sell_price, item.stocks.currency)
                     : '—'}
+                </TableCell>
+                <TableCell className="text-center hidden lg:table-cell">
+                  {quote?.earningsDate ? (
+                    <div>
+                      {showBadge && (
+                        <div className="text-xs font-semibold text-blue-500">
+                          {earningsBadge}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-muted-foreground">
+                        {formatDateCzech(quote.earningsDate)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground/50">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
                   {item.sector || item.stocks.sector || '—'}
