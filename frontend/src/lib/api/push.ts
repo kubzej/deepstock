@@ -8,6 +8,8 @@ export interface NotificationSettings {
   alert_buy_enabled: boolean;
   alert_sell_enabled: boolean;
   alert_earnings_enabled: boolean;
+  alert_insider_enabled: boolean;
+  insider_min_value: number;
 }
 
 export interface VapidKey {
