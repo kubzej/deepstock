@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoldingsTable, type Holding as HoldingView } from './HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
+import { PortfolioHeatmap } from './PortfolioHeatmap';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -355,6 +356,7 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
         <TabsList className="mb-4">
           <TabsTrigger value="holdings">Držené pozice</TabsTrigger>
           <TabsTrigger value="lots">Otevřené loty</TabsTrigger>
+          <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
         </TabsList>
 
         <TabsContent value="holdings">
@@ -387,6 +389,15 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
               }
             />
           )}
+        </TabsContent>
+
+        <TabsContent value="heatmap">
+          <PortfolioHeatmap
+            holdings={holdingsForTable}
+            quotes={quotes}
+            rates={rates}
+            onCellClick={onStockClick}
+          />
         </TabsContent>
       </Tabs>
     </div>
