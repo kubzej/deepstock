@@ -18,6 +18,7 @@ async def get_quotes(payload: TickerRequest):
     """
     Fetch price and change % for a list of tickers.
     Uses Redis caching + yfinance batch download.
+    Earnings date is included (from info, no extra API call).
     """
     return await market_service.get_quotes(payload.tickers)
 

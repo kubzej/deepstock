@@ -262,6 +262,8 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   // Force refresh function
   const refresh = useCallback(async () => {
+    // Remove individual quote caches to force fresh batch fetch
+    queryClient.removeQueries({ queryKey: ['quote'] });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['portfolios'] }),
       queryClient.invalidateQueries({ queryKey: ['holdings'] }),

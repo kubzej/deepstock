@@ -17,6 +17,8 @@ const QUOTE_GC_TIME = 30 * 60 * 1000; // 30 minutes
  * - Uses batch fetch for efficiency (single API call)
  * - Stores results in individual quote caches
  * - Returns combined result for the requested tickers
+ * 
+ * Earnings date is always included (from info, no extra API call).
  */
 export function useQuotes(tickers: string[]) {
   const queryClient = useQueryClient();
