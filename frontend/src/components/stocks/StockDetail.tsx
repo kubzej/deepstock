@@ -422,7 +422,7 @@ export function StockDetail({
           <p className="text-muted-foreground text-sm">Žádné transakce</p>
         ) : (
           <>
-            <div className="-mx-2">
+            <div className="space-y-1">
               {(showAllTx ? transactions : transactions.slice(0, 3)).map(
                 (tx) => {
                   const isBuy = tx.type === 'BUY';
@@ -460,132 +460,126 @@ export function StockDetail({
                   }
 
                   const isExpanded = expandedTxId === tx.id;
+                  const pnlCzk =
+                    pnl !== null ? pnl * (tx.exchangeRate || 1) : null;
 
                   return (
                     <div
                       key={tx.id}
-                      className="group rounded-lg hover:bg-muted/40 transition-colors"
+                      className="group bg-muted/30 rounded-xl cursor-pointer active:scale-[0.99] transition-transform"
+                      onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
                     >
-                      {/* Clickable row */}
-                      <div
-                        className="flex items-start justify-between py-2.5 px-2 cursor-pointer md:cursor-default"
-                        onClick={() =>
-                          setExpandedTxId(isExpanded ? null : tx.id)
-                        }
-                      >
-                        <div className="min-w-0 flex-1">
-                          {/* Line 1: Badge + lot# + date */}
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
-                            >
-                              {isBuy ? 'NÁKUP' : 'PRODEJ'}
-                            </Badge>
-                            {lotNum && (
-                              <span className="text-[10px] font-mono-price text-muted-foreground">
-                                #{lotNum}
+                      <div className="px-3 py-2.5">
+                        {/* Header Row */}
+                        <div className="flex items-center justify-between">
+                          {/* Left: Badge + lot# + date */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
+                              >
+                                {isBuy ? 'NÁKUP' : 'PRODEJ'}
+                              </Badge>
+                              {lotNum && (
+                                <span className="text-[10px] font-mono-price text-muted-foreground">
+                                  #{lotNum}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-muted-foreground">
+                                {formatDateCzech(tx.date)}
                               </span>
-                            )}
-                            <span className="text-sm font-medium">
-                              {formatDateCzech(tx.date)}
-                            </span>
-                            {isAllPortfolios && tx.portfolioName && (
-                              <span className="text-xs text-muted-foreground">
-                                · {tx.portfolioName}
-                              </span>
-                            )}
+                              {isAllPortfolios && tx.portfolioName && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  · {tx.portfolioName}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {/* Line 2: shares × price = total */}
-                          <div className="text-xs text-muted-foreground font-mono-price">
-                            {tx.shares} ks ×{' '}
-                            {formatPrice(tx.price, tx.currency)} ={' '}
-                            {formatCurrency(tx.totalCzk)}
+
+                          {/* Right: P/L or total */}
+                          <div className="flex items-baseline gap-1.5 flex-shrink-0">
+                            {pnlCzk !== null ? (
+                              <>
+                                <span
+                                  className={`font-mono-price text-sm font-medium ${
+                                    pnlCzk >= 0
+                                      ? 'text-positive'
+                                      : 'text-negative'
+                                  }`}
+                                >
+                                  {formatCurrency(pnlCzk)}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-mono-price ${
+                                    pnlPercent! >= 0
+                                      ? 'text-positive/60'
+                                      : 'text-negative/60'
+                                  }`}
+                                >
+                                  {formatPercent(pnlPercent!, 1, true)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="font-mono-price text-sm font-medium">
+                                {formatCurrency(tx.totalCzk)}
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Right side: P/L */}
-                        <div className="text-right shrink-0 ml-4 flex flex-col items-end">
+                        {/* Subrow: shares × price = total */}
+                        <div className="flex items-center justify-between mt-0.5">
+                          <span className="text-[11px] text-muted-foreground font-mono-price">
+                            {tx.shares} ks ×{' '}
+                            {formatPrice(tx.price, tx.currency)}
+                          </span>
                           {lotInfo && (
-                            <span className="text-[11px] text-muted-foreground mb-0.5">
+                            <span className="text-[11px] text-muted-foreground">
                               {lotInfo}
                             </span>
                           )}
-                          {pnl !== null ? (
-                            <div className="flex items-baseline gap-1.5">
-                              <span
-                                className={`font-mono-price text-sm font-medium ${
-                                  pnl >= 0 ? 'text-positive' : 'text-negative'
-                                }`}
+                        </div>
+
+                        {/* Expanded Details */}
+                        <div
+                          className={`grid transition-all duration-200 ease-out ${
+                            isExpanded
+                              ? 'grid-rows-[1fr] opacity-100 mt-3'
+                              : 'grid-rows-[0fr] opacity-0'
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            {/* Action buttons */}
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTransaction(tx);
+                                }}
                               >
-                                {formatCurrency(pnl * (tx.exchangeRate || 1))}
-                              </span>
-                              <span
-                                className={`font-mono-price text-xs ${
-                                  pnlPercent! >= 0
-                                    ? 'text-positive'
-                                    : 'text-negative'
-                                }`}
+                                <Pencil className="h-3 w-3" />
+                                Upravit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingTransaction(tx);
+                                }}
                               >
-                                ({formatPercent(pnlPercent!, 1, true)})
-                              </span>
+                                <Trash2 className="h-3 w-3" />
+                                Smazat
+                              </Button>
                             </div>
-                          ) : !lotInfo ? (
-                            <span className="text-sm text-muted-foreground">
-                              —
-                            </span>
-                          ) : null}
-                          {/* Desktop: hover actions */}
-                          <div className="hidden md:flex justify-end gap-0.5 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingTransaction(tx);
-                              }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingTransaction(tx);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
                           </div>
                         </div>
                       </div>
-
-                      {/* Mobile: expanded actions */}
-                      {isExpanded && (
-                        <div className="px-2 pb-2.5 flex items-center justify-end gap-1 md:hidden">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs gap-1.5"
-                            onClick={() => setEditingTransaction(tx)}
-                          >
-                            <Pencil className="h-3 w-3" />
-                            Upravit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-                            onClick={() => setDeletingTransaction(tx)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            Smazat
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   );
                 },

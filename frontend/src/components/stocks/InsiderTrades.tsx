@@ -4,7 +4,6 @@
  * Shown in StockDetail for US stocks. Hidden when no data (non-US).
  */
 import { useState } from 'react';
-import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -99,60 +98,53 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
       </div>
 
       {/* Trades list */}
-      <div className="-mx-2">
+      <div className="space-y-1">
         {visible.map((trade, i) => {
           const isBuy = trade.trade_type === 'Purchase';
 
           return (
             <div
               key={`${trade.trade_date}-${trade.insider_name}-${i}`}
-              className="group flex items-start justify-between py-2.5 px-2 rounded-lg hover:bg-muted/40 transition-colors"
+              className="bg-muted/30 rounded-xl"
             >
-              {/* Left: Name, title, date */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
-                  >
-                    {isBuy ? 'NÁKUP' : 'PRODEJ'}
-                  </Badge>
-                  <span className="text-sm font-medium truncate">
-                    {trade.insider_name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {trade.insider_title && (
-                    <span className="truncate max-w-[180px]">
-                      {trade.insider_title}
-                    </span>
-                  )}
-                  <span>·</span>
-                  <span>{formatDateCzech(trade.trade_date)}</span>
-                </div>
-              </div>
+              <div className="px-3 py-2.5">
+                {/* Header Row */}
+                <div className="flex items-center justify-between">
+                  {/* Left: Badge + Name */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
+                      >
+                        {isBuy ? 'NÁKUP' : 'PRODEJ'}
+                      </Badge>
+                      <span className="text-sm font-medium truncate">
+                        {trade.insider_name}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Right: Value, shares, link */}
-              <div className="text-right shrink-0 ml-4">
-                <div className="font-mono-price text-sm font-medium">
-                  {formatValue(trade.total_value)}
+                  {/* Right: Value */}
+                  <div className="flex items-baseline gap-1.5 flex-shrink-0">
+                    <span className="font-mono-price text-sm font-medium">
+                      {formatValue(trade.total_value)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-                  <span className="font-mono-price">
+
+                {/* Subrow: title · date | shares × price */}
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-[11px] text-muted-foreground truncate">
+                    {trade.insider_title && <>{trade.insider_title} · </>}
+                    {formatDateCzech(trade.trade_date)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground font-mono-price flex-shrink-0 ml-2">
                     {formatShares(trade.shares)} ks
                     {trade.price_per_share
                       ? ` × $${trade.price_per_share.toFixed(2)}`
                       : ''}
                   </span>
-                  <a
-                    href={trade.filing_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
-                    title="Zobrazit SEC filing"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
                 </div>
               </div>
             </div>
