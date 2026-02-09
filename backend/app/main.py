@@ -2,8 +2,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
-from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, news
+import logging
+from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider
 from app.core.redis import close_redis_pool
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Try to import news module (may fail on some environments)
+try:
+    from app.api.endpoints import news
+    NEWS_AVAILABLE = True
+    logger.info("News module loaded successfully")
+except Exception as e:
+    NEWS_AVAILABLE = False
+    logger.error(f"Failed to import news module: {e}")
 
 
 @asynccontextmanager
@@ -48,5 +62,7 @@ app.include_router(watchlists.router, prefix="/api/watchlists", tags=["Watchlist
 app.include_router(options.router, prefix="/api/options", tags=["Options"])
 app.include_router(push.router, prefix="/api/push", tags=["Push Notifications"])
 app.include_router(insider.router, prefix="/api/insider", tags=["Insider Trading"])
-app.include_router(news.router, prefix="/api/news", tags=["News"])
+if NEWS_AVAILABLE:
+    app.include_router(news.router, prefix="/api/news", tags=["News"])
+    logger.info("News router registered")
 app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])
