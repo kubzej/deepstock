@@ -10,7 +10,6 @@ import {
   History,
   Search,
   BarChart3,
-  Newspaper,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +36,6 @@ export function Sidebar({
     { id: 'opce', icon: Target, label: 'Opce' },
     { id: 'history', icon: History, label: 'Historie' },
     { id: 'market', icon: BarChart3, label: 'Trh' },
-    { id: 'news', icon: Newspaper, label: 'Novinky' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
