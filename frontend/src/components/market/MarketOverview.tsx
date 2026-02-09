@@ -233,10 +233,10 @@ function IndicatorCard({
 
       {/* Values */}
       <div className="flex items-baseline gap-2">
-        <span className="font-mono-price text-sm font-semibold">
+        <span className="font-mono-price text-sm">
           {price !== undefined ? formatPrice(price, 'USD') : '—'}
         </span>
-        <span className={`font-mono-price text-xs font-medium ${colorClass}`}>
+        <span className={`font-mono-price text-xs ${colorClass}`}>
           {changePercent !== undefined
             ? formatPercent(changePercent, 1, true)
             : '—'}
