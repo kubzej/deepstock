@@ -149,3 +149,11 @@ export {
   type InsiderTradesResponse,
   fetchInsiderTrades,
 } from './insider';
+
+// News
+export {
+  type NewsArticle,
+  type NewsFeedResponse,
+  fetchNewsFeed,
+  fetchTickerNews,
+} from './news';

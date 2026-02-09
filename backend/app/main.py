@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
-from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider
+from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, news
 from app.core.redis import close_redis_pool
 
 
@@ -48,4 +48,5 @@ app.include_router(watchlists.router, prefix="/api/watchlists", tags=["Watchlist
 app.include_router(options.router, prefix="/api/options", tags=["Options"])
 app.include_router(push.router, prefix="/api/push", tags=["Push Notifications"])
 app.include_router(insider.router, prefix="/api/insider", tags=["Insider Trading"])
+app.include_router(news.router, prefix="/api/news", tags=["News"])
 app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])

@@ -236,7 +236,7 @@ export function OptionsGreeksGuide() {
           </div>
 
           {/* Tip */}
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-foreground/5 border border-foreground/10">
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-background/50 border border-border/30">
             <span>💡</span>
             <p className="text-foreground text-sm">{greek.tip}</p>
           </div>
