@@ -41,19 +41,34 @@ const MARKET_INDICATORS = {
         inverted: true,
       },
       {
+        ticker: '^STOXX50E',
+        name: 'Euro Stoxx 50',
+        desc: 'Top 50 evropských firem. Hlavní benchmark EU.',
+      },
+      {
+        ticker: '^GDAXI',
+        name: 'DAX',
+        desc: 'Německo - největší ekonomika Evropy.',
+      },
+      {
+        ticker: '^FTSE',
+        name: 'FTSE 100',
+        desc: 'UK - Londýnská burza, top 100 firem.',
+      },
+      {
+        ticker: '^N225',
+        name: 'Nikkei 225',
+        desc: 'Japonsko - třetí největší ekonomika světa.',
+      },
+      {
+        ticker: '^HSI',
+        name: 'Hang Seng',
+        desc: 'Hong Kong - brána do Číny, asijský hub.',
+      },
+      {
         ticker: 'EEM',
         name: 'Emerging Markets',
         desc: 'Čína, Indie, Brazílie - citlivé na dolar a globální růst.',
-      },
-      {
-        ticker: 'EFA',
-        name: 'Vyspělé trhy',
-        desc: 'Evropa, Japonsko, Austrálie - mimo USA.',
-      },
-      {
-        ticker: 'FXI',
-        name: 'Čína',
-        desc: 'Druhá největší ekonomika. Politická rizika.',
       },
     ],
   },
