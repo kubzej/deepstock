@@ -18,6 +18,7 @@ import { SettingsPage } from '@/components/settings';
 import { OptionsPage, OptionTransactionModal } from '@/components/options';
 import { AnalysisPage } from '@/components/analysis';
 import { ResearchPage } from '@/components/research';
+import { MarketPage } from '@/components/market';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -185,6 +186,8 @@ function App() {
         return <TransactionHistoryPage />;
       case 'analysis':
         return <AnalysisPage />;
+      case 'market':
+        return <MarketPage />;
       case 'research':
         return <ResearchPage />;
       case 'watchlist':
