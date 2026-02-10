@@ -3,12 +3,7 @@
  */
 import { lazy, Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Search,
-  TrendingUp,
-  TrendingDown,
-  Info,
-} from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -212,7 +207,9 @@ function Metric({ label, value, sentiment = 'neutral' }: MetricProps) {
           </Tooltip>
         )}
       </div>
-      <p className={`text-lg font-mono-price font-medium ${colorClass}`}>{value}</p>
+      <p className={`text-lg font-mono-price font-medium ${colorClass}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -632,12 +629,13 @@ export function ResearchPage() {
   const [ticker, setTicker] = useState('');
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['stockInfo', activeTicker],
-    queryFn: () => fetchStockInfo(activeTicker!),
-    enabled: !!activeTicker,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const { data, isLoading, isFetching, dataUpdatedAt, error, refetch } =
+    useQuery({
+      queryKey: ['stockInfo', activeTicker],
+      queryFn: () => fetchStockInfo(activeTicker!),
+      enabled: !!activeTicker,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -654,7 +652,8 @@ export function ResearchPage() {
         <PageHeader
           title="Průzkum akcie"
           onRefresh={activeTicker ? () => refetch() : undefined}
-          isRefreshing={isLoading}
+          isRefreshing={isFetching}
+          dataUpdatedAt={activeTicker ? dataUpdatedAt : undefined}
         />
 
         {/* Search */}

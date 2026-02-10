@@ -432,12 +432,31 @@ export function StockDetail({
 
                   let pnl: number | null = null;
                   let pnlPercent: number | null = null;
+                  let pnlCzk: number | null = null;
 
-                  // P/L only for SELL transactions (realized)
+                  // Realized P/L for SELL transactions
                   if (!isBuy && tx.sourceTransaction) {
                     const srcPrice = tx.sourceTransaction.price;
                     pnl = (tx.price - srcPrice) * tx.shares;
                     pnlPercent = ((tx.price - srcPrice) / srcPrice) * 100;
+                    pnlCzk = pnl * (tx.exchangeRate || 1);
+                  }
+
+                  // Unrealized P/L for BUY transactions (open lots)
+                  if (
+                    isBuy &&
+                    lotStatus &&
+                    lotStatus.remaining > 0 &&
+                    quote?.price
+                  ) {
+                    const priceScale = stock?.price_scale ?? 1;
+                    const currentPriceScaled = quote.price * priceScale;
+                    pnl = (currentPriceScaled - tx.price) * lotStatus.remaining;
+                    pnlPercent =
+                      tx.price > 0
+                        ? ((currentPriceScaled - tx.price) / tx.price) * 100
+                        : 0;
+                    pnlCzk = toCZK(pnl, tx.currency, rates);
                   }
 
                   // Lot number for BUY, or source lot number for SELL
@@ -453,15 +472,13 @@ export function StockDetail({
                     if (lotStatus.isFullySold) {
                       lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
                     } else if (lotStatus.sold > 0) {
-                      lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
+                      lotInfo = `zbývá ${lotStatus.remaining}/${tx.shares}`;
                     }
                   } else if (!isBuy && tx.sourceTransaction) {
                     lotInfo = `z lotu #${lotNum ?? '?'} (${formatPrice(tx.sourceTransaction.price, tx.sourceTransaction.currency)})`;
                   }
 
                   const isExpanded = expandedTxId === tx.id;
-                  const pnlCzk =
-                    pnl !== null ? pnl * (tx.exchangeRate || 1) : null;
 
                   return (
                     <div
@@ -497,9 +514,40 @@ export function StockDetail({
                             </div>
                           </div>
 
-                          {/* Right: P/L or total */}
-                          <div className="flex items-baseline gap-1.5 flex-shrink-0">
-                            {pnlCzk !== null ? (
+                          {/* Right: Investment + P/L for BUY, just P/L for SELL */}
+                          <div className="flex flex-col items-end flex-shrink-0">
+                            {isBuy && lotStatus && lotStatus.remaining > 0 ? (
+                              <>
+                                {/* Investment amount */}
+                                <span className="font-mono-price text-sm font-medium">
+                                  {formatCurrency(tx.totalCzk)}
+                                </span>
+                                {/* Unrealized P/L */}
+                                {pnlCzk !== null && (
+                                  <div className="flex items-baseline gap-1">
+                                    <span
+                                      className={`font-mono-price text-[11px] ${
+                                        pnlCzk >= 0
+                                          ? 'text-positive'
+                                          : 'text-negative'
+                                      }`}
+                                    >
+                                      {pnlCzk >= 0 ? '+' : ''}
+                                      {formatCurrency(pnlCzk)}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-mono-price ${
+                                        pnlPercent! >= 0
+                                          ? 'text-positive/60'
+                                          : 'text-negative/60'
+                                      }`}
+                                    >
+                                      {formatPercent(pnlPercent!, 1, true)}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            ) : pnlCzk !== null ? (
                               <>
                                 <span
                                   className={`font-mono-price text-sm font-medium ${
@@ -528,11 +576,24 @@ export function StockDetail({
                           </div>
                         </div>
 
-                        {/* Subrow: shares × price = total */}
+                        {/* Subrow: shares × price → current price */}
                         <div className="flex items-center justify-between mt-0.5">
                           <span className="text-[11px] text-muted-foreground font-mono-price">
-                            {tx.shares} ks ×{' '}
-                            {formatPrice(tx.price, tx.currency)}
+                            {isBuy && lotStatus && lotStatus.remaining > 0
+                              ? `${lotStatus.remaining} ks × ${formatPrice(tx.price, tx.currency)}`
+                              : `${tx.shares} ks × ${formatPrice(tx.price, tx.currency)}`}
+                            {isBuy &&
+                              lotStatus &&
+                              lotStatus.remaining > 0 &&
+                              quote?.price && (
+                                <span className="ml-1">
+                                  →{' '}
+                                  {formatPrice(
+                                    quote.price * (stock?.price_scale ?? 1),
+                                    tx.currency,
+                                  )}
+                                </span>
+                              )}
                           </span>
                           {lotInfo && (
                             <span className="text-[11px] text-muted-foreground">

@@ -94,6 +94,8 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
   const {
     data: allStocks = [],
     isLoading: stocksLoading,
+    isFetching: stocksFetching,
+    dataUpdatedAt,
     error: stocksError,
   } = useStocks();
   const createStockMutation = useCreateStock();
@@ -306,7 +308,8 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
         onRefresh={() =>
           queryClient.invalidateQueries({ queryKey: ['stocks'] })
         }
-        isRefreshing={stocksLoading}
+        isRefreshing={stocksFetching}
+        dataUpdatedAt={dataUpdatedAt}
         actions={
           <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />

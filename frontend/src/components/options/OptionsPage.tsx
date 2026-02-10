@@ -60,6 +60,8 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
   const {
     data: holdings = [],
     isLoading,
+    isFetching,
+    dataUpdatedAt,
     error,
   } = useOptionHoldings(portfolioId);
   const { data: stats } = useOptionStats(portfolioId);
@@ -147,7 +149,8 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
         title="Opce"
         subtitle={stats ? `${stats.total_positions} pozic` : undefined}
         onRefresh={handleRefresh}
-        isRefreshing={isLoading}
+        isRefreshing={isFetching}
+        dataUpdatedAt={dataUpdatedAt}
       />
 
       {error && (

@@ -77,27 +77,40 @@ export function AnalysisPage() {
     quotes,
     rates,
     loading: portfolioLoading,
+    isFetching: portfolioFetching,
+    dataUpdatedAt,
     activePortfolio,
   } = usePortfolio();
   const portfolioId = activePortfolio?.id;
 
-  const { data: stockTransactions = [], isLoading: stocksLoading } =
-    useAllTransactions();
-  const { data: optionTransactions = [], isLoading: optionsLoading } =
-    useAllOptionTransactions();
+  const {
+    data: stockTransactions = [],
+    isLoading: stocksLoading,
+    isFetching: stocksFetching,
+  } = useAllTransactions();
+  const {
+    data: optionTransactions = [],
+    isLoading: optionsLoading,
+    isFetching: optionsFetching,
+  } = useAllOptionTransactions();
   const { data: stocks = [] } = useStocks();
 
   // Performance chart data - use active portfolio
   // Pass custom dates when CUSTOM preset is selected
-  const { data: stockPerfData, isLoading: stockPerfLoading } =
-    useStockPerformance(
-      portfolioId,
-      perfPeriod,
-      datePreset === 'CUSTOM' ? customFrom : undefined,
-      datePreset === 'CUSTOM' ? customTo : undefined,
-    );
+  const {
+    data: stockPerfData,
+    isLoading: stockPerfLoading,
+    isFetching: perfFetching,
+  } = useStockPerformance(
+    portfolioId,
+    perfPeriod,
+    datePreset === 'CUSTOM' ? customFrom : undefined,
+    datePreset === 'CUSTOM' ? customTo : undefined,
+  );
 
   const isLoading = portfolioLoading || stocksLoading || optionsLoading;
+  const isFetching =
+    portfolioFetching || stocksFetching || optionsFetching || perfFetching;
 
   // Date range
   const dateRange = useMemo(
@@ -249,7 +262,8 @@ export function AnalysisPage() {
       <PageHeader
         title="Analýza"
         onRefresh={handleRefresh}
-        isRefreshing={isLoading}
+        isRefreshing={isFetching}
+        dataUpdatedAt={dataUpdatedAt}
       />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>

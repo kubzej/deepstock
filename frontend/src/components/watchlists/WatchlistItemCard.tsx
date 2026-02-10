@@ -1,5 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Pencil, Trash2, Tag, MoreHorizontal, Calendar } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  Tag,
+  MoreHorizontal,
+  Calendar,
+  MoveRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +31,8 @@ interface WatchlistItemCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onTags: () => void;
+  onMove?: () => void;
+  showMoveOption?: boolean;
   onClick?: () => void;
   showWatchlistName?: boolean;
   watchlistName?: string;
@@ -35,6 +44,8 @@ export function WatchlistItemCard({
   onEdit,
   onDelete,
   onTags,
+  onMove,
+  showMoveOption = false,
   onClick,
   showWatchlistName,
   watchlistName,
@@ -226,6 +237,17 @@ export function WatchlistItemCard({
                   <Tag className="h-4 w-4 mr-2" />
                   Tagy
                 </DropdownMenuItem>
+                {showMoveOption && onMove && (
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMove();
+                    }}
+                  >
+                    <MoveRight className="h-4 w-4 mr-2" />
+                    Přesunout
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={(e) => {
