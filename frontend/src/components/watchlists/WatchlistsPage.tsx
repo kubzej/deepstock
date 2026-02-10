@@ -675,6 +675,10 @@ export function WatchlistsPage({
                           onEdit={() => openEditItem(item)}
                           onDelete={() => setDeleteItemData(item)}
                           onTags={() => openTagsDialog(item)}
+                          onMove={() => setMoveItemData(item)}
+                          showMoveOption={
+                            watchlists.length > 1 && !isFilterView
+                          }
                           onClick={() => onStockClick?.(item.stocks.ticker)}
                           showWatchlistName={isFilterView}
                           watchlistName={

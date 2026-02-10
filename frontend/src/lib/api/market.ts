@@ -169,6 +169,9 @@ export interface StockInfo {
   currentRatio: number | null;
   quickRatio: number | null;
   freeCashflow: number | null;
+  bookValue: number | null;
+  sharesOutstanding: number | null;
+  earningsGrowth: number | null;
   
   // Dividends
   dividendYield: number | null;
@@ -188,6 +191,27 @@ export interface StockInfo {
     title: string;
     description: string;
   }>;
+  
+  // Valuation (fair value estimates from backend)
+  valuation?: {
+    models: Array<{
+      method: string;
+      description: string;
+      tooltip?: string;
+      fairValue: number;
+      upside: number;
+      inputs: Record<string, number | string | null>;
+      confidence: 'high' | 'medium' | 'low';
+    }>;
+    composite: {
+      fairValue: number | null;
+      upside: number | null;
+      signal: 'undervalued' | 'slightly_undervalued' | 'fair' | 'slightly_overvalued' | 'overvalued' | 'hold';
+      modelsUsed: number;
+    } | null;
+    currentPrice: number;
+    currency: string;
+  };
   
   lastUpdated: string;
 }

@@ -62,12 +62,22 @@ export function TransactionHistoryPage() {
 
   // Data
   const { data: portfolios = [] } = usePortfolios();
-  const { data: stockTransactions = [], isLoading: stocksLoading } =
-    useAllTransactions();
-  const { data: optionTransactions = [], isLoading: optionsLoading } =
-    useAllOptionTransactions();
+  const {
+    data: stockTransactions = [],
+    isLoading: stocksLoading,
+    isFetching: stocksFetching,
+    dataUpdatedAt: stocksUpdatedAt,
+  } = useAllTransactions();
+  const {
+    data: optionTransactions = [],
+    isLoading: optionsLoading,
+    isFetching: optionsFetching,
+    dataUpdatedAt: optionsUpdatedAt,
+  } = useAllOptionTransactions();
 
-  const isLoading = activeTab === 'stocks' ? stocksLoading : optionsLoading;
+  const isFetching = activeTab === 'stocks' ? stocksFetching : optionsFetching;
+  const dataUpdatedAt =
+    activeTab === 'stocks' ? stocksUpdatedAt : optionsUpdatedAt;
 
   // Filter stock transactions
   const filteredStockTransactions = useMemo(() => {
@@ -196,7 +206,8 @@ export function TransactionHistoryPage() {
       <PageHeader
         title="Historie transakcí"
         onRefresh={handleRefresh}
-        isRefreshing={isLoading}
+        isRefreshing={isFetching}
+        dataUpdatedAt={dataUpdatedAt}
       />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
