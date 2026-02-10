@@ -75,7 +75,6 @@ export function TransactionHistoryPage() {
     dataUpdatedAt: optionsUpdatedAt,
   } = useAllOptionTransactions();
 
-  const isLoading = activeTab === 'stocks' ? stocksLoading : optionsLoading;
   const isFetching = activeTab === 'stocks' ? stocksFetching : optionsFetching;
   const dataUpdatedAt =
     activeTab === 'stocks' ? stocksUpdatedAt : optionsUpdatedAt;
