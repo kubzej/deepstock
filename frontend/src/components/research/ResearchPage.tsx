@@ -23,6 +23,7 @@ import {
   formatCurrency,
 } from '@/lib/format';
 import { PriceChart } from '@/components/charts';
+import { ValuationSection } from '@/components/research/ValuationSection';
 
 // Lazy load TechnicalAnalysis - heavy component with indicators
 const TechnicalAnalysis = lazy(() =>
@@ -519,79 +520,6 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
   );
 }
 
-// Analyst section
-function AnalystSection({ data }: { data: StockInfo }) {
-  if (!data.numberOfAnalystOpinions) return null;
-
-  const recColors: Record<string, string> = {
-    strong_buy: 'text-emerald-500',
-    buy: 'text-emerald-500',
-    hold: 'text-yellow-500',
-    sell: 'text-rose-500',
-    strong_sell: 'text-rose-500',
-  };
-
-  const recLabels: Record<string, string> = {
-    strong_buy: 'Silný nákup',
-    buy: 'Nákup',
-    hold: 'Držet',
-    sell: 'Prodej',
-    strong_sell: 'Silný prodej',
-  };
-
-  const upside =
-    data.price && data.targetMeanPrice
-      ? ((data.targetMeanPrice - data.price) / data.price) * 100
-      : null;
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">
-          Doporučení
-        </p>
-        <p
-          className={`text-lg font-mono-price ${recColors[data.recommendationKey ?? ''] ?? 'text-foreground'}`}
-        >
-          {recLabels[data.recommendationKey ?? ''] ??
-            data.recommendationKey ??
-            '—'}
-        </p>
-      </div>
-      <Metric
-        label="Počet analytiků"
-        value={String(data.numberOfAnalystOpinions)}
-      />
-      <Metric
-        label="Cílová cena"
-        value={formatCurrency(data.targetMeanPrice, data.currency ?? 'USD')}
-      />
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">
-          Rozpětí
-        </p>
-        <p className="text-lg font-mono-price">
-          {formatCurrency(data.targetLowPrice, data.currency ?? 'USD')} —{' '}
-          {formatCurrency(data.targetHighPrice, data.currency ?? 'USD')}
-        </p>
-      </div>
-      {upside !== null && (
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Potenciál
-          </p>
-          <p
-            className={`text-lg font-mono-price ${upside >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
-          >
-            {upside >= 0 ? '+' : ''}
-            {upside.toFixed(1)}%
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Technical section with price chart and indicators
 function TechnicalSection({
   ticker,
@@ -720,7 +648,7 @@ export function ResearchPage() {
             <Tabs defaultValue="fundamentals" className="w-full">
               <TabsList>
                 <TabsTrigger value="fundamentals">Fundamenty</TabsTrigger>
-                <TabsTrigger value="analysts">Analytici</TabsTrigger>
+                <TabsTrigger value="valuation">Valuace</TabsTrigger>
                 <TabsTrigger value="technical">Technika</TabsTrigger>
               </TabsList>
 
@@ -728,8 +656,8 @@ export function ResearchPage() {
                 <FundamentalsSection data={data} />
               </TabsContent>
 
-              <TabsContent value="analysts" className="mt-6">
-                <AnalystSection data={data} />
+              <TabsContent value="valuation" className="mt-6">
+                <ValuationSection data={data} />
               </TabsContent>
 
               <TabsContent value="technical" className="mt-6">
