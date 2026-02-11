@@ -80,7 +80,7 @@ SECTOR_RULES = {
         "div_yield_expected": 0.04,     # REITs should have high yield
         "ignore_debt": False,
         "ignore_pe": True,              # P/E is misleading for REITs
-        "payout_ratio_ok": 1.5,         # REITs can have >100% payout
+        "payout_ratio_ok": 1.9,         # REITs can have >100% payout (aligned with DDM model)
         "sector_label": "nemovitostní",
     },
     "Healthcare": {
@@ -222,8 +222,8 @@ def generate_insights(data: dict) -> List[dict]:
     payout_limit = rules.get("payout_ratio_ok", 1.0)
     if payout_ratio is not None and payout_ratio > payout_limit:
         if sector == "Real Estate":
-            # For REITs, only warn if extremely high
-            if payout_ratio > 1.5:
+            # For REITs, only warn if extremely high (>190% - same as DDM model)
+            if payout_ratio > 1.9:
                 insights.append({
                     "type": "warning",
                     "title": "Extrémně vysoký payout",
@@ -278,14 +278,21 @@ def generate_insights(data: dict) -> List[dict]:
     # LAYER 1: UNIVERSAL GREEN FLAGS (with sector adjustments)
     # ============================================================
     
-    # PEG undervalued (universal)
+    # PEG analysis (universal)
     peg = get_num("pegRatio")
-    if peg is not None and 0 < peg < 1.0:
-        insights.append({
-            "type": "positive",
-            "title": "Podhodnocené vzhledem k růstu",
-            "description": f"PEG Ratio je {peg:.2f}. Akcie je levná vzhledem k očekávanému růstu (PEG < 1).",
-        })
+    if peg is not None:
+        if 0 < peg < 1.0:
+            insights.append({
+                "type": "positive",
+                "title": "Podhodnocené vzhledem k růstu",
+                "description": f"PEG Ratio je {peg:.2f}. Akcie je levná vzhledem k očekávanému růstu (PEG < 1).",
+            })
+        elif peg > 2.0:
+            insights.append({
+                "type": "warning",
+                "title": "Vysoký PEG Ratio",
+                "description": f"PEG Ratio je {peg:.2f}. Drahá valuace vzhledem k růstu (PEG > 2 = přeplaceno).",
+            })
     
     # Excellent ROE (sector-adjusted)
     roe = get_num("roe")
@@ -545,10 +552,10 @@ def generate_insights(data: dict) -> List[dict]:
     # LAYER 3: SECTOR-SPECIFIC INSIGHTS
     # ============================================================
     
-    # Financial Services: P/B analysis
-    if sector == "Financial Services" and rules.get("pb_matters"):
-        pb = get_num("priceToBook")
-        if pb is not None:
+    # P/B analysis for asset-heavy sectors (Financial Services, Utilities, Energy, Materials, Industrials)
+    pb = get_num("priceToBook")
+    if pb is not None and sector in ["Financial Services", "Utilities", "Energy", "Basic Materials", "Industrials", "Real Estate"]:
+        if sector == "Financial Services" and rules.get("pb_matters"):
             if pb < rules["pb_cheap"]:
                 insights.append({
                     "type": "positive",
@@ -560,6 +567,26 @@ def generate_insights(data: dict) -> List[dict]:
                     "type": "info",
                     "title": "Dražší finanční firma",
                     "description": f"P/B je {pb:.2f}, nad 2.0. Premium valuace pro finanční sektor.",
+                })
+        else:
+            # Other asset-heavy sectors
+            if pb < 1.0:
+                insights.append({
+                    "type": "positive",
+                    "title": "Obchodování pod účetní hodnotou",
+                    "description": f"P/B je {pb:.2f}. Akcie stojí méně než hodnota čistých aktiv (P/B < 1).",
+                })
+            elif sector == "Utilities" and pb > 2.5:
+                insights.append({
+                    "type": "info",
+                    "title": "Vysoké P/B pro utility",
+                    "description": f"P/B je {pb:.2f}. Premium valuace pro utility sektor.",
+                })
+            elif sector in ["Energy", "Basic Materials"] and pb > 2.5:
+                insights.append({
+                    "type": "warning",
+                    "title": "Vysoké P/B pro cyklický sektor",
+                    "description": f"P/B je {pb:.2f}. Může signalizovat vrchol cyklu.",
                 })
     
     # Utilities/Energy: Expected dividend
@@ -609,67 +636,94 @@ SECTOR_PE_BENCHMARKS = {
 
 def _graham_valuation(data: dict) -> Optional[dict]:
     """
-    Benjamin Graham's intrinsic value formula:
-    V = EPS × (8.5 + 2g) × 4.4 / Y
-    where g = growth rate (%), Y = AAA bond yield
+    Benjamin Graham's Revised Formula (1974):
+    V = (EPS * (8.5 + 2g) * 4.4) / Y
     
-    Limitations (handled below):
-    - Does NOT work for negative/very low EPS (skip if EPS < 1.0)
-    - Unreliable for high-growth companies (>15% → low confidence)
-    - Designed for stable, profitable value stocks
-    - Y should ideally come from live bond data (FRED API), 
-      currently approximated at 5% (US 10Y ~ 4-5% in 2025-2026)
+    Where:
+    - EPS: Trailing 12-month earnings per share
+    - 8.5: P/E base for a no-growth company
+    - g: Reasonably expected 7 to 10 year growth rate (%)
+    - 4.4: The average yield of AAA corporate bonds in 1962
+    - Y: The current yield of AAA corporate bonds (approx. 5.0%)
+    
+    Ref: https://www.grahamvalue.com/article/understanding-benjamin-graham-formula-correctly
     """
     eps = data.get("eps")
     forward_eps = data.get("forwardEps")
     price = data.get("price")
-    earnings_growth = data.get("earningsGrowth")
-    revenue_growth = data.get("revenueGrowth")
+    earnings_growth = data.get("earningsGrowth") # YoY growth (volatile)
     
-    # Skip: negative or very low EPS — Graham is meaningless here
-    if not eps or eps < 1.0 or not price:
+    # 1. Negative or zero earnings - formula invalid
+    if not eps or eps <= 0 or not price:
         return None
-    
-    # Estimate growth rate: prefer earnings growth, fallback to revenue growth
+        
+    # 2. Determine Growth Rate (g)
+    # Ideally we want long-term expected growth.
+    # yfinance 'earningsGrowth' is usually quarterly YoY, which is too volatile for this formula.
+    # We prefer implied growth from Forward EPS vs Trailing EPS as a smoother proxy.
     growth = None
-    if earnings_growth is not None and earnings_growth > 0:
-        growth = earnings_growth * 100  # Convert to percentage
-    elif forward_eps and eps and forward_eps > eps:
-        growth = ((forward_eps / eps) - 1) * 100
-    elif revenue_growth is not None and revenue_growth > 0:
-        growth = revenue_growth * 100
     
-    if growth is None or growth < 0:
-        return None
+    if forward_eps and forward_eps > eps:
+        # Implied growth for next year
+        growth_decimal = (forward_eps / eps) - 1
+        growth = growth_decimal * 100
+    elif earnings_growth is not None and earnings_growth > 0:
+        # Fallback to YoY growth if forward not available
+        growth = earnings_growth * 100
+    else:
+        # Conservative fallback for profitable companies with missing growth data
+        growth = 3.0 
     
-    # Cap growth at 15% — Graham was designed for stable value stocks
+    # Cap growth at 15% - Graham warned against projecting high growth rates
+    # for value investing. 15% is already very optimistic for 7-10y period.
     growth = min(growth, 15)
     
-    # AAA corporate bond yield proxy
-    # TODO: fetch dynamically from FRED API (series AAA or DGS10)
+    # Floor growth at 0% - negative growth breaks the logic (though mathematically works)
+    growth = max(growth, 0)
+    
+    # 3. Bond Yield (Y)
+    # TODO: Fetch live AAA yield (e.g. Moody's Seasoned Aaa Corporate Bond Yield)
     bond_yield = 5.0
     
-    fair_value = eps * (8.5 + 2 * growth) * 4.4 / bond_yield
+    # 4. Calculation
+    # Formula: V = (EPS * (8.5 + 2g) * 4.4) / Y
+    fair_value = (eps * (8.5 + 2 * growth) * 4.4) / bond_yield
     
     if fair_value <= 0:
         return None
     
     upside = ((fair_value / price) - 1) * 100
     
-    # Sanity check: if fair value is more than 3× price, the formula
-    # is giving unrealistic results (e.g. cheap P/E + high growth = nonsense)
-    if upside > 200:
-        return None
+    # 5. Sanity Checks & Confidence
     
-    # Lower confidence for higher growth (Graham was meant for g < 10%)
+    # If upside is >200% (3x price), it's likely a data artifact (e.g. cyclical peak EPS)
+    # unless it's a deep value play.
+    if upside > 300: 
+        return None
+        
+    # Graham formula is meant for defensive/stable companies.
+    # If Beta is very high (>2.0), the company is likely too risky/volatile for this model.
+    beta = data.get("beta")
+    if beta and beta > 2.0:
+        return None
+        
+    # Confidence scoring
     confidence = "medium"
+    
+    # Lower confidence if using aggressive growth assumptions
     if growth > 10:
         confidence = "low"
     
+    # Lower confidence if Price is mismatched with "Value" sector traits
+    # (e.g. P/E > 50 implies expectations way beyond Graham's model)
+    pe = data.get("trailingPE")
+    if pe and pe > 50:
+        confidence = "low"
+
     return {
-        "method": "Graham Formula",
-        "description": "Grahamova formule: V = EPS × (8.5 + 2g) × 4.4/Y",
-        "tooltip": "Klasická formule Benjamina Grahama (otce hodnotového investování). Ocení akcii na základě aktuálního zisku a očekávaného růstu. Nejlépe funguje pro stabilní, ziskové firmy s mírným růstem.",
+        "method": "Grahamovy formule",
+        "description": f"Revidovaný vzorec (1974): V = (EPS * (8.5 + 2g) * 4.4) / {bond_yield}",
+        "tooltip": "Klasická formule Benjamina Grahama pro 'vnitřní hodnotu'. Předpokládá, že férové P/E je 8.5 plus dvojnásobek růstu. Model je citlivý na úrokové sazby (Y). Vhodné pro ziskové, stabilní firmy.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
@@ -683,51 +737,109 @@ def _graham_valuation(data: dict) -> Optional[dict]:
 
 def _dcf_valuation(data: dict) -> Optional[dict]:
     """
-    Simplified DCF using Free Cash Flow per share.
-    Projects FCF growth for 5 years, then terminal value with perpetuity growth.
-    Discount rate = 10% (typical equity cost of capital).
+    Discounted Cash Flow (DCF).
+    Projects Free Cash Flow (FCF) for 5 years and discounts to Present Value.
+    
+    Logic:
+    1. Calculate FCF per Share.
+    2. Estimate growth (g) from earnings/revenue estimates.
+    3. Project 5 years with fading growth (linear decay to terminal rate).
+    4. Calculate Terminal Value (Perpetuity Growth).
+    5. Discount all to PV at Discount Rate (WACC proxy).
+    
+    Ref: https://www.investopedia.com/terms/d/dcf.asp
     """
+    sector = data.get("sector")
+    
+    # 1. Applicability Check
+    # DCF based on FCF is NOT valid for Financial Services (Banks/Insurance)
+    # because their "operating cash flow" includes deposits/loans changes.
+    # also tricky for Real Estate (REITs use FFO).
+    if sector in ["Financial Services", "Real Estate"]:
+        return None
+
     fcf = data.get("freeCashflow")
     shares = data.get("sharesOutstanding")
     price = data.get("price")
     revenue_growth = data.get("revenueGrowth")
     earnings_growth = data.get("earningsGrowth")
+    beta = data.get("beta")
     
+    # 2. Basic Data Validity
     if not fcf or fcf <= 0 or not shares or shares <= 0 or not price:
         return None
     
     fcf_per_share = fcf / shares
     
-    # Estimate growth: prefer earnings, fallback to revenue
+    # 3. Growth Assumptions
+    # Growth estimate logic - needs to reflect the business reality
+    # 
+    # Problem: Companies like Amazon have low "earnings growth" (5%) but high "revenue growth" (13%)
+    # because they reinvest profits into expansion. Using earnings growth would undervalue them.
+    #
+    # Solution: For growth-oriented sectors, prefer the HIGHER of the two growth rates.
+    # For mature/value sectors, prefer earnings growth as it's more sustainable.
+    
+    growth_sectors = ["Technology", "Consumer Cyclical", "Communication Services", "Healthcare"]
+    
+    earnings_g = earnings_growth if earnings_growth and earnings_growth > 0 else None
+    revenue_g = revenue_growth if revenue_growth and revenue_growth > 0 else None
+    
     growth = None
-    if earnings_growth is not None and earnings_growth > 0:
-        growth = earnings_growth
-    elif revenue_growth is not None and revenue_growth > 0:
-        growth = revenue_growth
     
-    if growth is None or growth <= 0:
-        growth = 0.05  # Default 5%
+    if sector in growth_sectors:
+        # For growth sectors: use the higher of the two (reinvestment story)
+        if earnings_g and revenue_g:
+            growth = max(earnings_g, revenue_g)
+        else:
+            growth = earnings_g or revenue_g
+    else:
+        # For value/mature sectors: prefer earnings (more sustainable)
+        if earnings_g:
+            growth = earnings_g
+        elif revenue_g:
+            growth = revenue_g
     
-    # Cap growth at 25%
-    growth = min(growth, 0.25)
+    if growth is None:
+        growth = 0.05  # Default fallback assumption
+        
+    # Cap overly optimistic growth rates
+    # Even best companies rarely sustain >20% FCF growth for 5y + terminal
+    growth = min(growth, 0.20)
     
+    # Floor at 0 (simplified DCF doesn't handle shrinking firms well for this UI)
+    growth = max(growth, 0)
+    
+    # 4. Discount Rate (r) needs to reflect risk
+    # Standard: 10% (historical market return)
+    # Adjusted: If beta is high, increase discount rate
     discount_rate = 0.10
-    terminal_growth = 0.03  # 3% perpetuity growth
+    if beta and beta > 1.2:
+        discount_rate = 0.12 # Higher risk = higher discount
+    if beta and beta < 0.8:
+        discount_rate = 0.08 # Defensive = lower discount
+        
+    terminal_growth = 0.03  # Long term GDP growth proxy
     projection_years = 5
     
-    # Project future FCF and discount back
+    # 5. Calculation Loop
     total_pv = 0
     projected_fcf = fcf_per_share
+    
+    # "H-Model" style: Growth fades linearly from current 'growth' to 'terminal_growth' over the period
+    # This prevents overvaluation of companies with temporarily high growth.
     for year in range(1, projection_years + 1):
-        # Fade growth linearly toward terminal growth
-        year_growth = growth - (growth - terminal_growth) * (year / projection_years)
+        year_growth = growth - ((growth - terminal_growth) * (year / projection_years))
         projected_fcf = projected_fcf * (1 + year_growth)
+        
         pv = projected_fcf / ((1 + discount_rate) ** year)
         total_pv += pv
     
-    # Terminal value (Gordon Growth Model)
-    terminal_fcf = projected_fcf * (1 + terminal_growth)
-    terminal_value = terminal_fcf / (discount_rate - terminal_growth)
+    # Terminal Value (Gordon Growth Method) at end of year 5
+    # Value_term = FCF_5 * (1+g_term) / (r - g_term)
+    terminal_value = (projected_fcf * (1 + terminal_growth)) / (discount_rate - terminal_growth)
+    
+    # Discount Terminal Value back to today
     terminal_pv = terminal_value / ((1 + discount_rate) ** projection_years)
     
     fair_value = total_pv + terminal_pv
@@ -737,10 +849,21 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
     
     upside = ((fair_value / price) - 1) * 100
     
+    # 6. Sanity Checks
+    if upside > 300: # Upside > 300% usually means bad data (e.g. one-off massive FCF)
+        return None
+
+    # Confidence scoring
+    confidence = "medium"
+    
+    # High growth projections are risky
+    if growth > 0.15:
+        confidence = "low"
+        
     return {
-        "method": "DCF (zjednodušený)",
-        "description": f"Diskontované cash flow, {projection_years} let projekce, 10% diskont",
-        "tooltip": "Diskontované cash flow — zlatý standard valuace. Projektuje budoucí volné peněžní toky firmy a diskontuje je na dnešní hodnotu. Čím víc firma generuje hotovosti, tím vyšší hodnota.",
+        "method": "DCF (Diskontované CF)",
+        "description": f"Projekce FCF na {projection_years} let + terminální hodnota. Diskont {int(discount_rate*100)}%.",
+        "tooltip": "Zlatý standard valuace. Počítá současnou hodnotu všech budoucích volných peněz, které firma vydělá. Nevhodné pro banky a pojišťovny.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
@@ -749,60 +872,74 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
             "discountRate": round(discount_rate * 100, 1),
             "terminalGrowth": round(terminal_growth * 100, 1),
         },
-        "confidence": "medium",
+        "confidence": confidence,
     }
 
 
 def _pe_based_valuation(data: dict) -> Optional[dict]:
     """
     Fair value based on sector P/E range applied to forward EPS.
-    P/E is interpolated between sector low↔high based on company quality score.
     
-    Quality score (0–1) considers:
-    - ROE: >15% = good, >25% = great
-    - Profit margin: >10% = good, >20% = great
-    - Revenue growth: >5% = good, >15% = great
-    - Debt/Equity: <50 = good, <20 = great
+    Logic:
+    1. Identify Sector (Tech, Finance, Energy...).
+    2. Get target P/E range for that sector (Low, Mid, High).
+    3. Calculate 'Quality Score' (0.0 to 1.0) for the company based on:
+       - ROE, Margins, Growth, Debt.
+    4. Interpolate Fair P/E: Low + Score * (High - Low).
+    5. Fair Value = Fair P/E * Forward EPS.
+    
+    Ref: https://corporatefinanceinstitute.com/resources/valuation/price-earnings-ratio/
     """
     forward_eps = data.get("forwardEps")
     eps = data.get("eps")
     price = data.get("price")
     sector = data.get("sector")
     
-    # Use forward EPS if available, otherwise trailing
+    # 1. Applicability
+    # Real Estate (REITs) usage FFO, not EPS. Net Income is distorted by depreciation.
+    # P/E is misleading for them.
+    if sector == "Real Estate":
+        return None
+        
+    # Use forward EPS if available (markets look forward), otherwise trailing
     used_eps = forward_eps if forward_eps and forward_eps > 0 else eps
+    
     if not used_eps or used_eps <= 0 or not price:
         return None
     
-    benchmark = SECTOR_PE_BENCHMARKS.get(sector, {"low": 14, "mid": 18, "high": 24})
+    benchmark = SECTOR_PE_BENCHMARKS.get(sector, {"low": 15, "mid": 20, "high": 25})
     
-    # Calculate quality score (0–1) from available fundamentals
+    # 2. Calculate Quality Score (0–1)
+    # Higher score = company deserves to trade at top of sector P/E range
     scores = []
     
     roe = data.get("roe")
     if roe is not None:
-        # 0% → 0, 15% → 0.5, 30%+ → 1.0
+        # ROE > 15% is healthy, > 30% is elite
         scores.append(min(max(roe / 0.30, 0), 1.0))
     
     profit_margin = data.get("profitMargin")
     if profit_margin is not None:
-        # 0% → 0, 10% → 0.5, 20%+ → 1.0
+        # Net Margin > 10% is solid, > 20% is strong moat
         scores.append(min(max(profit_margin / 0.20, 0), 1.0))
     
     revenue_growth = data.get("revenueGrowth")
     if revenue_growth is not None:
-        # 0% → 0, 10% → 0.5, 20%+ → 1.0
+        # Growth drives P/E expansion
         scores.append(min(max(revenue_growth / 0.20, 0), 1.0))
     
     debt_to_equity = data.get("debtToEquity")
     if debt_to_equity is not None:
-        # 0 → 1.0, 50 → 0.5, 100+ → 0.0 (inverted — lower debt = better)
-        scores.append(min(max(1.0 - debt_to_equity / 100, 0), 1.0))
+        # For non-financials, lower debt is better.
+        # Score 1.0 if debt is 0, Score 0.0 if debt is > 150%
+        if sector != "Financial Services":
+            scores.append(min(max(1.5 - (debt_to_equity / 100), 0), 1.0))
     
-    # Quality = average of available scores, default 0.5 if no data
+    # Quality = average of available scores, default 0.5 (Mid-range) if no data
     quality = sum(scores) / len(scores) if scores else 0.5
     
-    # Interpolate P/E: low + quality × (high - low)
+    # 3. Interpolate Fair P/E
+    # fair_pe = low + quality * (range width)
     fair_pe = benchmark["low"] + quality * (benchmark["high"] - benchmark["low"])
     fair_pe = round(fair_pe, 1)
     
@@ -812,23 +949,24 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
         return None
     
     upside = ((fair_value / price) - 1) * 100
-    eps_type = "forward" if forward_eps and forward_eps > 0 else "trailing"
+    eps_type = "Forward" if forward_eps and forward_eps > 0 else "Trailing"
     
-    # Better confidence when we have more quality signals
-    confidence = "medium" if len(scores) >= 3 else "low"
+    # Confidence
+    confidence = "medium"
+    if len(scores) < 3: 
+        confidence = "low" # Not enough data to judge quality
     
     return {
         "method": "P/E sektorový",
-        "description": f"P/E {fair_pe}× (rozsah {benchmark['low']}–{benchmark['high']}, kvalita {quality:.0%}) × {eps_type} EPS",
-        "tooltip": "Porovnává P/E firmy s typickým rozsahem pro daný sektor. Férové P/E se odvozuje od kvality firmy (ROE, marže, růst, zadlužení) — lepší firma si zaslouží vyšší násobek.",
+        "description": f"Férové P/E {fair_pe}× (sektor {benchmark['low']}–{benchmark['high']}, kvalita {int(quality*100)}%) × {eps_type} EPS",
+        "tooltip": "Srovnává firmu s typickými násobky v jejím sektoru. 'Lepší' firmy (vyšší ROE, marže, růst) si zaslouží ocenění na horní hraně sektoru, průměrné uprostřed. Nevhodné pro REITs (používají FFO).",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
             "eps": round(used_eps, 2),
-            "epsType": eps_type,
-            "sectorPE": fair_pe,
-            "kvalita": f"{quality:.0%}",
-            "sector": sector or "N/A",
+            "fairPE": fair_pe,
+            "qualityScore": round(quality, 2),
+            "sector": sector or "Unknown"
         },
         "confidence": confidence,
     }
@@ -873,57 +1011,117 @@ def _analyst_target_valuation(data: dict) -> Optional[dict]:
 
 def _book_value_valuation(data: dict) -> Optional[dict]:
     """
-    Fair value based on book value per share.
-    Only useful for traditional asset-heavy industries where book value
-    reflects real economic value (banks, insurance, REITs, utilities).
-    Excluded: fintech, software, asset-light businesses.
+    Price-to-Book (P/B) Valuation.
+    Fair Value = Book Value per Share × Sector Fair P/B Multiple.
+    
+    Logic:
+    Book Value = Total Assets - Total Liabilities (= Shareholder Equity).
+    Book Value per Share = Equity / Shares Outstanding.
+    
+    P/B Ratio = Market Price / Book Value per Share.
+    - P/B < 1.0 → Trading below net asset value (potential value opportunity).
+    - P/B = 1.0 → Trading at book value.
+    - P/B > 1.0 → Market expects growth or values intangibles.
+    
+    Applicability:
+    - ✅ Banks, Insurance (P/B 0.8-1.5) - Assets are tangible, accurately valued.
+    - ✅ Real Estate / REITs (P/B 0.9-1.5) - Book value = property holdings.
+    - ✅ Utilities (P/B 1.3-2.0) - Infrastructure assets.
+    - ✅ Manufacturing / Industrial (P/B 1.5-3.0) - Physical plants, equipment.
+    - ❌ Technology / Software (P/B often >5) - Value is in IP, not balance sheet.
+    - ❌ Services / Consulting - Value is in people and relationships.
+    
+    Ref: https://www.investopedia.com/terms/b/bookvalue.asp
     """
-    book_value = data.get("bookValue")
+    book_value = data.get("bookValue")  # Book Value per Share from yfinance
+    price_to_book = data.get("priceToBook")  # Current P/B ratio
     price = data.get("price")
-    sector = data.get("sector")
-    industry = data.get("industry") or ""
+    sector = data.get("sector", "")
+    industry = data.get("industry", "")
     
     if not book_value or book_value <= 0 or not price:
         return None
     
-    # Only for sectors where book value matters
-    pb_multiples = {
-        "Financial Services": 1.3,
-        "Real Estate": 1.2,
-        "Basic Materials": 1.5,
-        "Utilities": 1.6,
-        "Energy": 1.4,
+    # 1. Sector P/B Benchmarks (Typical Range)
+    # Source: Industry averages from CFI and Investopedia (2024-2025).
+    sector_pb_benchmarks = {
+        "Financial Services": {"low": 0.8, "mid": 1.2, "high": 1.5},
+        "Real Estate": {"low": 0.9, "mid": 1.2, "high": 1.5},
+        "Utilities": {"low": 1.3, "mid": 1.6, "high": 2.0},
+        "Energy": {"low": 1.0, "mid": 1.4, "high": 2.0},
+        "Basic Materials": {"low": 1.2, "mid": 1.5, "high": 2.0},
+        "Industrials": {"low": 1.5, "mid": 2.2, "high": 3.0},
     }
     
-    if sector not in pb_multiples:
+    benchmark = sector_pb_benchmarks.get(sector)
+    if not benchmark:
+        # Book Value is not a reliable metric for this sector
         return None
     
-    # Exclude asset-light / fintech industries within Financial Services
-    excluded_industries = {
-        "credit services", "financial data & stock exchanges",
-        "financial conglomerates", "capital markets",
-        "insurance - diversified", "insurance brokers",
-        "software", "internet content & information",
-    }
-    if industry.lower() in excluded_industries:
+    # 2. Exclude Asset-Light Industries within asset-heavy sectors
+    # (e.g., Fintech within Financial Services should be excluded)
+    excluded_keywords = [
+        "software", "internet", "fintech", "data & stock exchanges",
+        "capital markets", "insurance brokers", "consulting",
+    ]
+    if any(keyword in industry.lower() for keyword in excluded_keywords):
         return None
     
-    fair_pb = pb_multiples[sector]
+    # 3. Calculate Current P/B
+    current_pb = price_to_book if price_to_book else (price / book_value)
+    
+    # 4. Exclude "growth" companies masquerading as traditional asset-heavy firms
+    # Example: NU Holdings is classified as "Banks - Regional" but has P/B of 8×
+    # That's a fintech/neobank, not a traditional bank where P/B valuation makes sense.
+    # Rule: If P/B > 3× the sector's typical "high" range, model is not applicable.
+    if current_pb > benchmark["high"] * 2.5:
+        return None
+    
+    # 5. Fair P/B Multiple
+    # Use sector median as fair value benchmark.
+    fair_pb = benchmark["mid"]
+    
+    # 6. Calculate Fair Value
     fair_value = book_value * fair_pb
+    
+    if fair_value <= 0:
+        return None
+    
     upside = ((fair_value / price) - 1) * 100
     
+    # 7. Confidence
+    # Book Value is MOST reliable for Banks and Utilities (balance sheet = real value).
+    # Less reliable for cyclical materials/energy (asset write-downs).
+    confidence = "medium"
+    
+    if sector in ["Financial Services", "Utilities"]:
+        confidence = "high"
+    elif sector in ["Energy", "Basic Materials"]:
+        # Cyclical sectors can have volatile asset values
+        confidence = "low"
+    
+    # If P/B is somewhat outside typical range, reduce confidence
+    if current_pb < benchmark["low"] * 0.5 or current_pb > benchmark["high"] * 2:
+        confidence = "low"
+    
     return {
-        "method": "Účetní hodnota",
-        "description": f"Účetní hodnota × {fair_pb}× P/B (typický pro {sector})",
-        "tooltip": "Ocenění na základě účetní hodnoty (aktiva minus závazky). Smysluplné hlavně pro banky, pojišťovny a firmy s velkými fyzickými aktivy. Pro technologické firmy je irelevantní.",
+        "method": "Účetní hodnota (P/B)",
+        "description": f"BV ${book_value:.2f} × {fair_pb:.1f}× P/B. Aktuální P/B {current_pb:.1f}×.",
+        "tooltip": (
+            "Ocenění dle účetní hodnoty (čistá aktiva = Aktiva - Závazky). "
+            "P/B < 1.0 znamená, že akcie stojí MÉNĚ než hodnota aktiv na akcii (potenciální příležitost). "
+            "Smysluplné jen pro banky, pojišťovny, utility a průmysl. "
+            "Pro technologie a služby je irelevantní (jejich hodnota je v IP a lidech, ne v rozvaze)."
+        ),
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
-            "bookValue": round(book_value, 2),
-            "fairPB": fair_pb,
-            "sector": sector,
+            "bookValuePerShare": round(book_value, 2),
+            "currentPB": round(current_pb, 2),
+            "sectorFairPB": round(fair_pb, 1),
+            "sectorPBRange": f"{benchmark['low']:.1f} - {benchmark['high']:.1f}"
         },
-        "confidence": "low",
+        "confidence": confidence,
     }
 
 
@@ -931,62 +1129,104 @@ def _ddm_valuation(data: dict) -> Optional[dict]:
     """
     Dividend Discount Model (Gordon Growth Model).
     V = D1 / (r - g)
-    Only for stable dividend-paying stocks.
+    
+    Logic:
+    Valuation based strictly on future dividend stream.
+    Requires:
+    - Stable dividend history.
+    - Sustainable Payout Ratio (Net Income > Dividend).
+    
+    Ref: https://corporatefinanceinstitute.com/resources/valuation/gordon-growth-model/
     """
     dividend = data.get("dividendRate")  # annual dividend per share
     payout_ratio = data.get("payoutRatio")
-    earnings_growth = data.get("earningsGrowth")  # decimal
+    earnings_growth = data.get("earningsGrowth")
+    beta = data.get("beta")
+    sector = data.get("sector")
     price = data.get("price")
 
     if not dividend or dividend <= 0 or not price:
         return None
 
-    # Need a reasonable payout ratio (not paying out more than earnings)
-    if payout_ratio and payout_ratio > 1.0:
+    # 1. Payout Ratio Sustainability Check
+    # General Rule: Payout > 1.0 (100%) is unsustainable (paying more than earning).
+    # Exception: REITs (Real Estate) often have Payout > 100% of Net Income due to depreciation,
+    # but strictly speaking DDM works best on companies with EPS coverage.
+    is_reit = sector == "Real Estate"
+    safe_payout_limit = 1.9 if is_reit else 0.95
+    
+    if payout_ratio and payout_ratio > safe_payout_limit:
+        # Dividend probably at risk of being cut
         return None
 
-    # Dividend growth estimate: use earnings growth but cap conservatively
+    # 2. Dividend Growth Estimate (g)
+    # Conservative cap. Companies rarely grow dividend > 6% perpetuity.
     if earnings_growth and earnings_growth > 0:
-        div_growth = min(earnings_growth, 0.06)  # cap at 6%
+        div_growth = min(earnings_growth, 0.06)
     else:
-        div_growth = 0.03  # default 3% for stable dividend payers
+        # If no growth info, assume inflation-matching growth for payers
+        div_growth = 0.025 
 
-    # Cost of equity (discount rate) - simplified CAPM
-    beta = data.get("beta") or 1.0
-    risk_free = 0.04  # ~4% long-term treasury
-    equity_premium = 0.05  # ~5% equity risk premium
-    r = max(risk_free + beta * equity_premium, 0.08)  # floor at 8%
+    # 3. Cost of Equity (r) via CAPM
+    # r = RiskFree + Beta * EquityRiskPremium
+    # Risk Free ~ 4.2% (10Y Treasury), Premium ~ 5.0%
+    beta_val = beta if beta else 1.0
+    risk_free = 0.042
+    equity_premium = 0.05
+    
+    discount_rate = risk_free + (beta_val * equity_premium)
+    
+    # Floor discount rate at 7% (no equity is practically risk-free)
+    discount_rate = max(discount_rate, 0.07)
+    
+    # Gordon Model Requirement: r > g
+    # If expected return is lower than growth, math breaks (infinity value).
+    # Usually means strict overvaluation or extremely low beta.
+    if discount_rate <= div_growth + 0.01:
+        # Force bigger gap or invalidate
+        # Adjusting discount rate up is safer than discarding a good stock
+        discount_rate = div_growth + 0.02
 
-    # Gordon formula requires r > g
-    if r <= div_growth + 0.01:
+    # 4. Calculation
+    # D1 = Next Year Dividend
+    d1 = dividend * (1 + div_growth)
+    
+    fair_value = d1 / (discount_rate - div_growth)
+    
+    if fair_value <= 0:
         return None
 
-    d1 = dividend * (1 + div_growth)  # next year's dividend
-    fair_value = d1 / (r - div_growth)
-
-    # Sanity check
     upside = ((fair_value / price) - 1) * 100
-    if upside > 200 or upside < -70:
-        return None
+    
+    # 5. Sanity Checks
+    if upside > 200: 
+        return None # Unrealistic
 
-    # Confidence: higher for stable low-growth dividend stocks
-    dividend_yield = data.get("dividendYield") or 0
-    if dividend_yield > 0.02 and div_growth <= 0.05 and payout_ratio and payout_ratio < 0.8:
-        confidence = "medium"
-    else:
+    # Confidence Scoring
+    confidence = "medium"
+    
+    # Dividend Yield Check
+    current_yield = (dividend / price)
+    
+    # If yield is suspicious (>10%), market pricing in a cut -> Low confidence
+    if current_yield > 0.10:
+        confidence = "low"
+        
+    # High Payout is risky
+    if payout_ratio and payout_ratio > 0.85 and not is_reit:
         confidence = "low"
 
     return {
         "method": "Dividendový model",
-        "description": f"Gordon Growth: D₁ ${d1:.2f} / ({r:.1%} − {div_growth:.1%})",
-        "tooltip": "Gordonův dividendový model — oceňuje akcii jako součet všech budoucích dividend. Funguje nejlépe pro stabilní dividendové plátce (utility, consumer staples). Nezahrnuje růst ceny.",
+        "description": f"Gordon Growth: D₁ ${d1:.2f} / (r {discount_rate:.1%} − g {div_growth:.1%})",
+        "tooltip": "Gordonův model oceňuje akcii jako nekonečnou řadu budoucích dividend. Vyžaduje, aby firma dividendu nejen vyplácela, ale aby na ni 'měla' (Payout Ratio < 100%). Ideální pro Utility, Coca-Colu apod.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
-            "dividend": round(dividend, 2),
-            "divGrowth": round(div_growth * 100, 1),
-            "discountRate": round(r * 100, 1),
-            "beta": round(beta, 2),
+            "annualDividend": round(dividend, 2),
+            "expectedGrowth": round(div_growth * 100, 1),
+            "discountRate": round(discount_rate * 100, 1),
+            "payoutRatio": f"{payout_ratio:.1%}" if payout_ratio else "N/A",
         },
         "confidence": confidence,
     }
@@ -994,9 +1234,24 @@ def _ddm_valuation(data: dict) -> Optional[dict]:
 
 def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
     """
-    EV/EBITDA-based fair value.
-    Compares company's EV/EBITDA to sector typical range.
-    More reliable than P/E — ignores capital structure and tax differences.
+    EV/EBITDA Valuation.
+    Multiples Valuation method that compares Enterprise Value to EBITDA.
+    
+    Logic:
+    1. Calculate Implied EBITDA = EV / (EV/EBITDA).
+    2. Calculate Net Debt = EV - Market Cap.
+    3. Determine Sector Fair Multiple (avg).
+    4. Fair EV = Implied EBITDA * Fair Multiple.
+    5. Fair Equity = Fair EV - Net Debt.
+    6. Fair Price = Fair Equity / Shares.
+
+    Applicability:
+    - Excellent for capital-intensive industries (Energy, Utilities, Industrials).
+    - Good for M&A targets (neutral to capital structure).
+    - INVALID for Financial Services (Banks do not have "EBITDA" in the industrial sense).
+    - INVALID for Real Estate (uses FFO).
+    
+    Ref: https://corporatefinanceinstitute.com/resources/valuation/ev-ebitda/
     """
     ev_ebitda = data.get("enterpriseToEbitda")
     enterprise_value = data.get("enterpriseValue")
@@ -1007,38 +1262,49 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
     if not ev_ebitda or ev_ebitda <= 0 or not enterprise_value or not shares or not price:
         return None
 
-    # Sector typical EV/EBITDA ranges
+    # 1. Applicability Check
+    # Financials: Interest is core business, not excluded from EBITDA -> model invalid.
+    # Real Estate: Depreciation is huge but not real cash expense -> use FFO/AFFO -> model invalid.
+    if sector in ["Financial Services", "Real Estate"]:
+        return None
+
+    # Sector typical EV/EBITDA ranges (Historical Averages)
+    # Source: Damodaran / CFI benchmarks
     sector_ev_ebitda = {
-        "Technology": {"low": 12, "mid": 18, "high": 25},
-        "Healthcare": {"low": 10, "mid": 15, "high": 22},
-        "Financial Services": {"low": 6, "mid": 10, "high": 14},
-        "Consumer Cyclical": {"low": 8, "mid": 12, "high": 18},
-        "Consumer Defensive": {"low": 10, "mid": 14, "high": 18},
-        "Industrials": {"low": 8, "mid": 12, "high": 17},
-        "Energy": {"low": 4, "mid": 7, "high": 10},
-        "Utilities": {"low": 8, "mid": 11, "high": 14},
-        "Real Estate": {"low": 12, "mid": 16, "high": 22},
-        "Basic Materials": {"low": 6, "mid": 9, "high": 13},
-        "Communication Services": {"low": 8, "mid": 12, "high": 18},
+        "Technology": {"low": 15, "mid": 20, "high": 25}, # Tech trades higher
+        "Healthcare": {"low": 12, "mid": 16, "high": 20},
+        "Consumer Cyclical": {"low": 10, "mid": 14, "high": 18},
+        "Consumer Defensive": {"low": 12, "mid": 15, "high": 18},
+        "Industrials": {"low": 9, "mid": 13, "high": 17},
+        "Energy": {"low": 5, "mid": 8, "high": 10}, # Capital intensive, low multiples
+        "Utilities": {"low": 10, "mid": 12, "high": 15},
+        "Basic Materials": {"low": 6, "mid": 9, "high": 12},
+        "Communication Services": {"low": 10, "mid": 15, "high": 20},
     }
 
     benchmarks = sector_ev_ebitda.get(sector)
+    # If sector unknown, default to broad market avg ~14x
     if not benchmarks:
-        return None
+        benchmarks = {"low": 10, "mid": 14, "high": 18}
 
-    # Calculate EBITDA from EV and multiple
+    # 2. Derive implied Metrics
+    # We back-calculate EBITDA to be consistent with the provided EV and Ratio
     ebitda = enterprise_value / ev_ebitda
 
-    # Fair EV/EBITDA = sector mid (could improve with quality score later)
-    fair_multiple = benchmarks["mid"]
-    fair_ev = ebitda * fair_multiple
-
-    # Net debt = EV - market cap
     market_cap = price * shares
     net_debt = enterprise_value - market_cap
-
-    # Fair equity value = fair EV - net debt
+    
+    # 3. Calculate Fair Value
+    # Using 'mid' benchmark as baseline fair value
+    fair_multiple = benchmarks["mid"]
+    
+    fair_ev = ebitda * fair_multiple
     fair_equity = fair_ev - net_debt
+    
+    # If debt is huge, fair_equity might be negative (company is distressed/bankrupt)
+    if fair_equity <= 0:
+        return None
+        
     fair_value = fair_equity / shares
 
     if fair_value <= 0:
@@ -1046,27 +1312,32 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
 
     upside = ((fair_value / price) - 1) * 100
 
-    # Sanity
-    if upside > 200 or upside < -70:
+    # 4. Sanity Checks
+    if upside > 300: 
         return None
 
-    # Confidence based on how far current multiple is from normal range
-    if benchmarks["low"] <= ev_ebitda <= benchmarks["high"]:
-        confidence = "medium"
-    else:
+    # Confidence Scoring
+    confidence = "medium"
+    
+    # If current multiple is widely outlier from sector, confidence drops
+    # e.g. Sector 12x, Company 40x -> Model suggests huge downside, but maybe market knows something (high growth?)
+    if ev_ebitda > benchmarks["high"] * 2:
+        confidence = "low"
+        
+    if ev_ebitda < benchmarks["low"] / 2:
         confidence = "low"
 
     return {
         "method": "EV/EBITDA",
-        "description": f"Aktuální {ev_ebitda:.1f}× vs. sektorový průměr {fair_multiple:.0f}×",
-        "tooltip": "Porovnává hodnotu celé firmy (včetně dluhu) vůči provoznímu zisku před odpisy. Spolehlivější než P/E, protože eliminuje vliv kapitálové struktury a daní. Oblíbený nástroj M&A analytiků.",
+        "description": f"Target EV/EBITDA {fair_multiple:.0f}x (Sektor). Odvozené EBITDA ${ebitda/1e9:.1f}B.",
+        "tooltip": "Oceňuje firmu jako celek (včetně dluhu) oproti jejímu provoznímu zisku (EBITDA). Ideální pro průmysl, energie a utility, protože očišťuje vliv zadlužení a daní. Nevhodné pro banky.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
-            "evEbitda": round(ev_ebitda, 1),
-            "fairMultiple": fair_multiple,
-            "ebitda": round(ebitda / 1e9, 2),
-            "sector": sector,
+            "currentMultiple": round(ev_ebitda, 1),
+            "targetMultiple": fair_multiple,
+            "impliedEbitdaB": round(ebitda / 1e9, 2),
+            "netDebtB": round(net_debt / 1e9, 2),
         },
         "confidence": confidence,
     }
@@ -1081,43 +1352,74 @@ def _epv_valuation(data: dict) -> Optional[dict]:
     eps = data.get("eps")
     price = data.get("price")
     beta = data.get("beta") or 1.0
+    sector = data.get("sector", "")
+    industry = data.get("industry", "")
 
     if not eps or eps <= 0 or not price:
         return None
 
-    # Cost of equity
+    # 1. Cost of equity (Discount Rate)
+    # EPV ignores growth, so we just want the cost to maintain current earnings.
     risk_free = 0.04
     equity_premium = 0.05
-    r = max(risk_free + beta * equity_premium, 0.08)  # floor at 8%
+    r = max(risk_free + beta * equity_premium, 0.07)  # Floor at 7%
 
-    # EPV = EPS / r (perpetuity of current earnings, no growth)
-    fair_value = eps / r
+    # 2. Normalized Earnings Estimate
+    # Ideally should adjust for cycle. We use current EPS but handle cyclicals conservatively.
+    # If the sector is highly cyclical, we might want to dampen the EPS if it looks like a peak,
+    # but we don't have historicals here easily. We'll stick to TTM EPS as proxy for current power.
+    normalized_earnings = eps
+
+    # EPV = Normalized Earnings / Cost of Capital (Zero Growth Perpetuity)
+    # Value = Earnings / r
+    fair_value = normalized_earnings / r
 
     if fair_value <= 0:
         return None
 
     upside = ((fair_value / price) - 1) * 100
 
-    # This is a conservative floor — most growth stocks will show negative upside
-    # Skip if too far below price (not useful signal)
-    if upside < -60:
+    # 3. Applicability Logic & Filtering
+    # EPV is often very low for high growth stocks (Tech, Biotech) because it assumes NO growth.
+    # Showing a -70% valuations for Amazon/NVIDIA is confusing for users.
+    is_growth_sector = sector in ["Technology", "Communication Services", "Consumer Cyclical"]
+    
+    # Filter 1: Hide if massively negative for growth sectors (it's not a useful floor if it's irrelevant)
+    if is_growth_sector and upside < -50:
+        return None
+        
+    # Filter 2: Hide if massively negative for anything (-75%)
+    if upside < -75:
         return None
 
-    # Always low-medium confidence (it's a floor estimate)
+    # 4. Confidence Score
+    # EPV is a "Floor". It shouldn't be high confidence unless the stock is actually TRADING at this floor.
+    # If Price ~ EPV, it's a very strong buy signal (getting growth for free).
     confidence = "low"
-    if -10 <= upside <= 30:
-        confidence = "medium"  # near current price = earnings alone justify it
+    
+    if upside > 0:
+        # If stock is cheaper than its zero-growth value, that's a powerful signal.
+        confidence = "high"
+    elif upside > -20:
+        # Close to floor
+        confidence = "medium"
 
     return {
         "method": "Výnosová síla (EPV)",
-        "description": f"EPS ${eps:.2f} / {r:.1%} náklad kapitálu (bez růstu)",
-        "tooltip": "Výnosová síla dle Bruce Greenwalda — kolik firma stojí, kdyby její zisky nerostly. Konzervativní ‚podlaha' hodnoty. Pokud je cena pod EPV, trh oceňuje firmu pod její výdělečnou schopností.",
+        # CZ: "Conservative value without growth"
+        "description": f"Normalizovaný zisk ${normalized_earnings:.2f} / {r:.1%} náklad kapitálu (bez růstu)",
+        "tooltip": (
+            "Model dle Bruce Greenwalda. Ukazuje hodnotu firmy za předpokladu, že už nikdy neporoste "
+            "a bude jen udržovat současné zisky (Zero Growth). Je to 'tvrdá podlaha' hodnoty. "
+            "Pokud je cena akcie pod touto hodnotou, trh oceňuje firmu iracionálně nízko (dostáváte růst zdarma)."
+        ),
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
-            "eps": round(eps, 2),
-            "costOfEquity": round(r * 100, 1),
+            "normalizedEps": round(normalized_earnings, 2),
+            "costOfCapital": round(r * 100, 1),
             "beta": round(beta, 2),
+            "assumption": "Zero Growth"
         },
         "confidence": confidence,
     }
@@ -1125,52 +1427,78 @@ def _epv_valuation(data: dict) -> Optional[dict]:
 
 def _peg_valuation(data: dict) -> Optional[dict]:
     """
-    PEG-based fair value (Peter Lynch).
-    Fair P/E = expected earnings growth rate (in %).
-    PEG = 1.0 means fairly valued.
-    Works best for GARP stocks with 8-25% growth.
+    PEG Ratio Valuation (Peter Lynch's Rule of Thumb).
+    Fair Value = Trailing EPS * (Growth Rate * 100).
+    Basically assumes Fair PEG = 1.0.
     """
     eps = data.get("eps")
-    forward_pe = data.get("forwardPE")
-    earnings_growth = data.get("earningsGrowth")  # decimal, e.g. 0.18
+    forward_eps = data.get("forwardEps")
     price = data.get("price")
-
-    if not eps or eps <= 0 or not price or not earnings_growth:
+    
+    # Growth inputs
+    earnings_growth = data.get("earningsGrowth") # TTM growth
+    
+    if not eps or eps <= 0 or not price:
         return None
 
-    growth_pct = earnings_growth * 100  # e.g. 18.3%
-
-    # Only meaningful for moderate growth stocks (8-30%)
-    if growth_pct < 8 or growth_pct > 30:
+    # 1. Determine Growth Rate (g)
+    # We prioritize forward-looking estimates implied by Forward EPS vs Current EPS
+    growth_pct = None
+    
+    if forward_eps and forward_eps > eps:
+        # Implied growth for next year
+        growth_pct = ((forward_eps / eps) - 1) * 100
+    elif earnings_growth:
+         # Fallback to TTM growth if valid
+        growth_pct = earnings_growth * 100
+        
+    if growth_pct is None:
         return None
 
-    # Fair P/E = growth rate (PEG = 1.0)
+    # 2. Applicability Filters (Lynch's Rules)
+    # Rule A: Growth must be reasonable (10% - 25% is the sweet spot)
+    # Slow growers (<5%) aren't valued by PEG.
+    # Hyper growers (>40%) are too risky for linear PEG.
+    if growth_pct < 8 or growth_pct > 40:
+        return None
+
+    # Rule B: Exclude Cyclicals and Financials
+    # Banks often trade at PEG < 1 naturally without being undervalued.
+    sector = data.get("sector", "")
+    if sector in ["Financial Services", "Energy", "Utilities", "Real Estate", "Basic Materials"]:
+        return None
+
+    # 3. Valuation
+    # Fair P/E = Growth Rate (PEG = 1.0)
     fair_pe = growth_pct
     fair_value = eps * fair_pe
-
-    # Sanity: skip if fair value is unreasonably low vs price
-    upside = ((fair_value / price) - 1) * 100
-    if upside < -60:
+    
+    if fair_value <= 0:
         return None
 
-    # Confidence based on how reliable the growth estimate is
-    actual_peg = forward_pe / growth_pct if forward_pe and growth_pct > 0 else None
-    if 10 <= growth_pct <= 20:
-        confidence = "medium"
-    else:
-        confidence = "low"
+    upside = ((fair_value / price) - 1) * 100
+    
+    # 4. Confidence
+    confidence = "medium"
+    
+    # Best confidence in the sweet spot of GARP (Growth At Reasonable Price)
+    if 15 <= growth_pct <= 25:
+        confidence = "high"
 
     return {
-        "method": "PEG model",
-        "description": f"P/E = růst zisku {growth_pct:.0f}% → férové P/E = {fair_pe:.1f}×",
-        "tooltip": "Model Petera Lynche — akcie je férově oceněná, když P/E odpovídá tempu růstu zisku (PEG = 1). Praktický rychlý test pro růstové firmy. PEG pod 1 = levná, nad 2 = drahá.",
+        "method": "PEG Model",
+        "description": f"Férové P/E {fair_pe:.1f}x = Oček. růst {growth_pct:.1f}%",
+        "tooltip": (
+            "Peter Lynch: 'Férově oceněná růstová firma má P/E rovné tempu růstu zisků.' "
+            "(tzn. PEG = 1.0). Vhodné pro firmy rostoucí 10-25 % ročně. "
+            "Nevhodné pro pomalé giganty nebo cyklické sektory."
+        ),
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
             "eps": round(eps, 2),
-            "growthPct": round(growth_pct, 1),
-            "fairPE": round(fair_pe, 1),
-            "actualPEG": round(actual_peg, 2) if actual_peg else None,
+            "expectedGrowth": round(growth_pct, 1),
+            "targetPEG": 1.0
         },
         "confidence": confidence,
     }
