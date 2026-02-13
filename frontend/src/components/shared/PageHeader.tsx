@@ -35,6 +35,9 @@ export function PageHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Custom actions */}
+        {actions}
+
         {/* Data freshness indicator */}
         {dataUpdatedAt !== undefined && (
           <DataFreshnessIndicator
@@ -43,9 +46,6 @@ export function PageHeader({
             className="hidden sm:inline"
           />
         )}
-
-        {/* Custom actions */}
-        {actions}
 
         {/* Refresh button */}
         {onRefresh && (

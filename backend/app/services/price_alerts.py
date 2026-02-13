@@ -1,12 +1,17 @@
 """
-Price Alerts Service - Check watchlist targets and send push notifications
+Price Alerts Service - Check custom alerts and watchlist targets, send push notifications
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from app.core.supabase import supabase
 from app.services.market.quotes import get_quotes
 from app.services.push import send_push_notification
+from app.schemas.price_alerts import (
+    PriceAlertCreate,
+    PriceAlertUpdate,
+    PriceAlertTriggerInfo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +214,295 @@ class PriceAlertService:
                 .execute()
         except Exception as e:
             logger.error(f"Failed to update sell alert tracking: {e}")
+
+    # ==========================================
+    # CUSTOM PRICE ALERTS CRUD
+    # ==========================================
+    
+    async def get_user_alerts(self, user_id: str) -> List[dict]:
+        """Get all custom alerts for a user with stock info."""
+        response = supabase.table("price_alerts") \
+            .select("*, stocks(ticker, name)") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .execute()
+        return response.data
+    
+    async def get_active_alerts(self, user_id: str) -> List[dict]:
+        """Get only active (non-triggered, enabled) alerts for a user."""
+        response = supabase.table("price_alerts") \
+            .select("*, stocks(ticker, name)") \
+            .eq("user_id", user_id) \
+            .eq("is_enabled", True) \
+            .eq("is_triggered", False) \
+            .order("created_at", desc=True) \
+            .execute()
+        return response.data
+    
+    async def get_alert(self, alert_id: str, user_id: str) -> Optional[dict]:
+        """Get a single alert by ID."""
+        response = supabase.table("price_alerts") \
+            .select("*, stocks(ticker, name)") \
+            .eq("id", alert_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return response.data[0] if response.data else None
+    
+    async def create_alert(self, user_id: str, data: PriceAlertCreate) -> dict:
+        """Create a new custom price alert."""
+        insert_data = {
+            "user_id": user_id,
+            "stock_id": data.stock_id,
+            "condition_type": data.condition_type,
+            "condition_value": data.condition_value,
+            "is_enabled": data.is_enabled if data.is_enabled is not None else True,
+            "repeat_after_trigger": data.repeat_after_trigger if data.repeat_after_trigger is not None else False,
+        }
+        
+        if data.notes is not None:
+            insert_data["notes"] = data.notes
+        
+        response = supabase.table("price_alerts") \
+            .insert(insert_data) \
+            .execute()
+        
+        # Fetch with stock info
+        return await self.get_alert(response.data[0]["id"], user_id)
+    
+    async def update_alert(self, alert_id: str, user_id: str, data: PriceAlertUpdate) -> Optional[dict]:
+        """Update a custom alert."""
+        update_data = {}
+        
+        if data.condition_type is not None:
+            update_data["condition_type"] = data.condition_type
+        if data.condition_value is not None:
+            update_data["condition_value"] = data.condition_value
+        if data.is_enabled is not None:
+            update_data["is_enabled"] = data.is_enabled
+        if data.repeat_after_trigger is not None:
+            update_data["repeat_after_trigger"] = data.repeat_after_trigger
+        if data.notes is not None:
+            update_data["notes"] = data.notes
+        
+        if not update_data:
+            return await self.get_alert(alert_id, user_id)
+        
+        response = supabase.table("price_alerts") \
+            .update(update_data) \
+            .eq("id", alert_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not response.data:
+            return None
+        
+        return await self.get_alert(alert_id, user_id)
+    
+    async def delete_alert(self, alert_id: str, user_id: str) -> bool:
+        """Delete a custom alert."""
+        response = supabase.table("price_alerts") \
+            .delete() \
+            .eq("id", alert_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
+    
+    async def reset_alert(self, alert_id: str, user_id: str) -> Optional[dict]:
+        """Reset a triggered alert to active state."""
+        response = supabase.table("price_alerts") \
+            .update({
+                "is_triggered": False,
+                "triggered_at": None,
+            }) \
+            .eq("id", alert_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        if not response.data:
+            return None
+        
+        return await self.get_alert(alert_id, user_id)
+
+    # ==========================================
+    # CUSTOM ALERT CHECKING (for cron job)
+    # ==========================================
+    
+    async def get_all_pending_alerts(self) -> List[dict]:
+        """
+        Get all enabled, non-triggered custom alerts across all users.
+        Used by cron job to check alerts.
+        """
+        response = supabase.table("price_alerts") \
+            .select("*, stocks(ticker, name)") \
+            .eq("is_enabled", True) \
+            .eq("is_triggered", False) \
+            .execute()
+        return response.data
+    
+    async def mark_alert_triggered(self, alert_id: str) -> dict:
+        """Mark a custom alert as triggered with timestamp."""
+        now = datetime.now(timezone.utc).isoformat()
+        response = supabase.table("price_alerts") \
+            .update({
+                "is_triggered": True,
+                "triggered_at": now,
+            }) \
+            .eq("id", alert_id) \
+            .execute()
+        return response.data[0] if response.data else None
+    
+    def check_alert_condition(
+        self, 
+        alert: dict, 
+        current_price: float, 
+        previous_close: float
+    ) -> PriceAlertTriggerInfo:
+        """
+        Check if a custom alert condition is met.
+        
+        Args:
+            alert: The alert dict with condition_type, condition_value
+            current_price: Current market price
+            previous_close: Previous day's closing price
+        
+        Returns:
+            PriceAlertTriggerInfo with is_triggered and current_value
+        """
+        condition_type = alert["condition_type"]
+        condition_value = float(alert["condition_value"])
+        
+        if condition_type == "price_above":
+            return PriceAlertTriggerInfo(
+                is_triggered=current_price >= condition_value,
+                current_value=current_price
+            )
+        
+        elif condition_type == "price_below":
+            return PriceAlertTriggerInfo(
+                is_triggered=current_price <= condition_value,
+                current_value=current_price
+            )
+        
+        elif condition_type == "percent_change_day":
+            if previous_close == 0:
+                return PriceAlertTriggerInfo(
+                    is_triggered=False,
+                    current_value=0
+                )
+            
+            percent_change = ((current_price - previous_close) / previous_close) * 100
+            
+            # Check if absolute change exceeds threshold
+            return PriceAlertTriggerInfo(
+                is_triggered=abs(percent_change) >= abs(condition_value),
+                current_value=percent_change
+            )
+        
+        logger.warning(f"Unknown condition type: {condition_type}")
+        return PriceAlertTriggerInfo(
+            is_triggered=False,
+            current_value=0
+        )
+    
+    async def check_custom_alerts(self, redis) -> Dict[str, int]:
+        """
+        Check all custom price alerts and send notifications.
+        Returns summary of alerts checked and triggered.
+        """
+        pending_alerts = await self.get_all_pending_alerts()
+        
+        if not pending_alerts:
+            return {"alerts_checked": 0, "alerts_triggered": 0}
+        
+        # Group alerts by ticker for efficient quote fetching
+        alerts_by_ticker: Dict[str, List[dict]] = {}
+        for alert in pending_alerts:
+            stock = alert.get("stocks", {})
+            ticker = stock.get("ticker")
+            if ticker:
+                if ticker not in alerts_by_ticker:
+                    alerts_by_ticker[ticker] = []
+                alerts_by_ticker[ticker].append(alert)
+        
+        if not alerts_by_ticker:
+            return {"alerts_checked": 0, "alerts_triggered": 0}
+        
+        # Fetch current prices for all relevant tickers
+        tickers = list(alerts_by_ticker.keys())
+        quotes = await get_quotes(redis, tickers)
+        
+        alerts_triggered = 0
+        
+        for ticker, alerts in alerts_by_ticker.items():
+            quote = quotes.get(ticker, {})
+            current_price = quote.get("price")
+            previous_close = quote.get("previousClose", quote.get("price", 0))
+            
+            if not current_price:
+                continue
+            
+            for alert in alerts:
+                trigger_info = self.check_alert_condition(
+                    alert, current_price, previous_close
+                )
+                
+                if trigger_info.is_triggered:
+                    # Mark as triggered
+                    await self.mark_alert_triggered(alert["id"])
+                    
+                    # Send push notification
+                    await self._send_custom_alert_notification(
+                        alert, current_price, trigger_info.current_value
+                    )
+                    
+                    alerts_triggered += 1
+                    
+                    # If repeat_after_trigger, reset immediately
+                    if alert.get("repeat_after_trigger"):
+                        await self.reset_alert(alert["id"], alert["user_id"])
+        
+        return {
+            "alerts_checked": len(pending_alerts),
+            "alerts_triggered": alerts_triggered
+        }
+    
+    async def _send_custom_alert_notification(
+        self, 
+        alert: dict, 
+        current_price: float,
+        current_value: float
+    ) -> bool:
+        """Send notification for a triggered custom alert."""
+        stock = alert.get("stocks", {})
+        ticker = stock.get("ticker", "Unknown")
+        stock_name = stock.get("name", ticker)
+        condition_type = alert.get("condition_type")
+        condition_value = float(alert.get("condition_value", 0))
+        user_id = alert.get("user_id")
+        
+        # Build notification message based on condition type
+        if condition_type == "price_above":
+            title = f"⬆️ {ticker} nad ${condition_value:.2f}"
+            body = f"{stock_name} je na ${current_price:.2f}"
+        elif condition_type == "price_below":
+            title = f"⬇️ {ticker} pod ${condition_value:.2f}"
+            body = f"{stock_name} je na ${current_price:.2f}"
+        elif condition_type == "percent_change_day":
+            direction = "+" if current_value >= 0 else ""
+            title = f"📊 {ticker} změna {direction}{current_value:.1f}%"
+            body = f"{stock_name} překročil práh ±{abs(condition_value):.1f}%"
+        else:
+            title = f"🔔 Alert: {ticker}"
+            body = f"Cena: ${current_price:.2f}"
+        
+        sent = send_push_notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            url=f"/alerts",
+            tag=f"alert-{alert['id']}"
+        )
+        return sent > 0
 
 
 price_alert_service = PriceAlertService()

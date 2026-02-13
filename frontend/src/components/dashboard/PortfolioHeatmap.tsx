@@ -34,29 +34,30 @@ interface HeatmapItem {
 const GAP = 2;
 
 /**
- * Modern color palette for change %.
- * Smooth interpolation between muted tones — avoids neon/harsh colors.
+ * Color palette matching TradingView heatmap.
+ * Range: -5.5% to +5.5%
  *
- *   -5 %  →  rich rose
- *    0 %  →  zinc-700 neutral
- *   +5 %  →  rich emerald
+ *   -5.5%  →  dark red
+ *    0%    →  light gray (neutral)
+ *   +5.5%  →  dark green
  */
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
 function getChangeColor(pct: number): string {
-  const c = Math.max(-5, Math.min(5, pct));
-  const t = (c + 5) / 10; // 0..1
+  const c = Math.max(-5.5, Math.min(5.5, pct));
+  const t = (c + 5.5) / 11; // 0..1
 
-  // Colour stops (r, g, b)
+  // TradingView-style colour stops (r, g, b)
   const stops: [number, [number, number, number]][] = [
-    [0.0, [180, 50, 50]], // deep rose
-    [0.3, [140, 55, 55]], // muted rose
-    [0.45, [70, 70, 78]], // neutral-warm
-    [0.55, [65, 75, 72]], // neutral-cool
-    [0.7, [40, 130, 75]], // muted emerald
-    [1.0, [22, 163, 74]], // rich emerald (tailwind green-600)
+    [0.0, [127, 42, 42]], // dark red (-5.5%)
+    [0.18, [153, 51, 51]], // red (-3.5%)
+    [0.36, [180, 90, 90]], // light red (-1.5%)
+    [0.5, [200, 200, 200]], // neutral gray (0%)
+    [0.64, [100, 160, 100]], // light green (+1.5%)
+    [0.82, [60, 130, 60]], // green (+3.5%)
+    [1.0, [35, 100, 35]], // dark green (+5.5%)
   ];
 
   // Find the two surrounding stops
@@ -118,23 +119,38 @@ function HeatmapCell(
   const bgColor = getChangeColor(change);
   const sign = change >= 0 ? '+' : '';
 
-  // Adaptive content visibility
-  const showTicker = iw > 36 && ih > 20;
-  const showChange = iw > 44 && ih > 38;
-  const showPrice = iw > 62 && ih > 56;
-  const showWeight = iw > 72 && ih > 72;
-
-  // Adaptive font sizing based on cell area
+  // Always show all values - adjust font size to fit
   const area = iw * ih;
-  const tickerSize =
-    area > 40000 ? 14 : area > 20000 ? 13 : area > 8000 ? 11 : 9.5;
-  const subSize = area > 25000 ? 11 : area > 12000 ? 10 : 9;
 
-  // How many text rows are visible → center them vertically
-  const rows = [showTicker, showChange, showPrice, showWeight].filter(
-    Boolean,
-  ).length;
-  const lineH = rows <= 2 ? tickerSize * 1.8 : tickerSize * 1.55;
+  // More aggressive font scaling for small cells
+  const tickerSize =
+    area > 40000
+      ? 14
+      : area > 20000
+        ? 13
+        : area > 8000
+          ? 11
+          : area > 4000
+            ? 9
+            : area > 2000
+              ? 7.5
+              : 6;
+  const subSize =
+    area > 25000
+      ? 11
+      : area > 12000
+        ? 10
+        : area > 6000
+          ? 9
+          : area > 3000
+            ? 7.5
+            : area > 1500
+              ? 6
+              : 5;
+
+  // Always show all 4 rows
+  const rows = 4;
+  const lineH = tickerSize * 1.4;
   const blockH = rows * lineH;
   const startY = iy + (ih - blockH) / 2 + lineH * 0.55;
   let row = 0;
@@ -167,67 +183,59 @@ function HeatmapCell(
       />
 
       {/* Ticker */}
-      {showTicker && (
-        <text
-          x={ix + iw / 2}
-          y={startY + lineH * row++}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="white"
-          fontWeight="600"
-          fontSize={tickerSize}
-          letterSpacing="0.03em"
-          fontFamily="var(--font-mono-price, ui-monospace, monospace)"
-        >
-          {String(ticker)}
-        </text>
-      )}
+      <text
+        x={ix + iw / 2}
+        y={startY + lineH * row++}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="white"
+        fontWeight="600"
+        fontSize={tickerSize}
+        letterSpacing="0.03em"
+        fontFamily="var(--font-mono-price, ui-monospace, monospace)"
+      >
+        {String(ticker)}
+      </text>
 
       {/* Change % */}
-      {showChange && (
-        <text
-          x={ix + iw / 2}
-          y={startY + lineH * row++}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="rgba(255,255,255,0.88)"
-          fontSize={subSize}
-          fontWeight="500"
-          fontFamily="var(--font-mono-price, ui-monospace, monospace)"
-        >
-          {sign}
-          {change.toFixed(2)}%
-        </text>
-      )}
+      <text
+        x={ix + iw / 2}
+        y={startY + lineH * row++}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="rgba(255,255,255,0.88)"
+        fontSize={subSize}
+        fontWeight="500"
+        fontFamily="var(--font-mono-price, ui-monospace, monospace)"
+      >
+        {sign}
+        {change.toFixed(2)}%
+      </text>
 
       {/* Price */}
-      {showPrice && (
-        <text
-          x={ix + iw / 2}
-          y={startY + lineH * row++}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="rgba(255,255,255,0.55)"
-          fontSize={subSize - 1}
-          fontFamily="var(--font-mono-price, ui-monospace, monospace)"
-        >
-          {formatPrice(Number(price), String(currency))}
-        </text>
-      )}
+      <text
+        x={ix + iw / 2}
+        y={startY + lineH * row++}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="rgba(255,255,255,0.55)"
+        fontSize={subSize - 1}
+        fontFamily="var(--font-mono-price, ui-monospace, monospace)"
+      >
+        {formatPrice(Number(price), String(currency))}
+      </text>
 
       {/* Weight */}
-      {showWeight && (
-        <text
-          x={ix + iw / 2}
-          y={startY + lineH * row++}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="rgba(255,255,255,0.38)"
-          fontSize={subSize - 1}
-        >
-          {wt.toFixed(1)}%
-        </text>
-      )}
+      <text
+        x={ix + iw / 2}
+        y={startY + lineH * row++}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="rgba(255,255,255,0.38)"
+        fontSize={subSize - 1}
+      >
+        {wt.toFixed(1)}%
+      </text>
     </g>
   );
 }
@@ -292,9 +300,9 @@ export function PortfolioHeatmap({
   }
 
   // Build smooth CSS gradient for the legend bar
-  const legendSteps = 11; // -5 to +5
+  const legendSteps = 12; // -5.5 to +5.5
   const gradientColors = Array.from({ length: legendSteps }, (_, i) => {
-    const pct = -5 + i;
+    const pct = -5.5 + i;
     return getChangeColor(pct);
   });
   const gradientCSS = `linear-gradient(to right, ${gradientColors.join(', ')})`;
@@ -332,14 +340,14 @@ export function PortfolioHeatmap({
       {/* Gradient legend bar */}
       <div className="flex items-center justify-center gap-3 px-4">
         <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-          −5 %
+          −5.5 %
         </span>
         <div
           className="h-2 flex-1 max-w-52 rounded-full"
           style={{ background: gradientCSS }}
         />
         <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-          +5 %
+          +5.5 %
         </span>
       </div>
     </div>

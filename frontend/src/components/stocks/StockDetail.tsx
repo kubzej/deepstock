@@ -36,6 +36,10 @@ import {
 } from '@/lib/format';
 import { TransactionModal } from '@/components/transactions';
 import { InsiderTrades } from './InsiderTrades';
+import {
+  SymbolOverview,
+  isTradingViewSupported,
+} from '@/components/shared/TradingViewWidgets';
 
 interface StockDetailProps {
   ticker: string;
@@ -329,6 +333,17 @@ export function StockDetail({
         </p>
       )}
 
+      {/* Price Chart - only for supported exchanges */}
+      {isTradingViewSupported(ticker, stock.exchange || undefined) && (
+        <div className="mb-8">
+          <SymbolOverview
+            symbol={ticker}
+            exchange={stock.exchange || undefined}
+            height={350}
+          />
+        </div>
+      )}
+
       {/* Position Stats */}
       {position && positionCzk && (
         <div className="mb-8">
@@ -456,7 +471,21 @@ export function StockDetail({
                       tx.price > 0
                         ? ((currentPriceScaled - tx.price) / tx.price) * 100
                         : 0;
-                    pnlCzk = toCZK(pnl, tx.currency, rates);
+                    // Use historical exchange rate for cost, current rate for value
+                    // This matches the main position P/L calculation
+                    const costBasisCzk = tx.exchangeRate
+                      ? tx.price * lotStatus.remaining * tx.exchangeRate
+                      : toCZK(
+                          tx.price * lotStatus.remaining,
+                          tx.currency,
+                          rates,
+                        );
+                    const currentValueCzk = toCZK(
+                      currentPriceScaled * lotStatus.remaining,
+                      tx.currency,
+                      rates,
+                    );
+                    pnlCzk = currentValueCzk - costBasisCzk;
                   }
 
                   // Lot number for BUY, or source lot number for SELL

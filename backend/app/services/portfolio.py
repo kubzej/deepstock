@@ -287,6 +287,7 @@ class PortfolioService:
                     "buyPrice": float(buy["price_per_share"]),
                     "currency": stock_info.get("currency") or buy.get("currency") or "USD",
                     "priceScale": price_scale,
+                    "exchangeRate": float(buy["exchange_rate_to_czk"]) if buy.get("exchange_rate_to_czk") else None,
                     "portfolioName": portfolio_names.get(buy["portfolio_id"], ""),
                 })
         
@@ -430,6 +431,7 @@ class PortfolioService:
                     "buyPrice": float(buy["price_per_share"]),
                     "currency": stock_info.get("currency") or buy.get("currency") or "USD",
                     "priceScale": price_scale,
+                    "exchangeRate": float(buy["exchange_rate_to_czk"]) if buy.get("exchange_rate_to_czk") else None,
                 })
         
         return open_lots

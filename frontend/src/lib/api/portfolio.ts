@@ -101,6 +101,7 @@ export interface OpenLot {
   buyPrice: number;
   currency: string;
   priceScale?: number;
+  exchangeRate?: number;
   portfolioName?: string;
 }
 

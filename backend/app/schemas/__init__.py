@@ -24,6 +24,14 @@ from .market import (
     ExchangeRatesResponse,
 )
 
+from .price_alerts import (
+    PriceAlertCreate,
+    PriceAlertUpdate,
+    PriceAlertResponse,
+    PriceAlertResetRequest,
+    PriceAlertTriggerInfo,
+)
+
 __all__ = [
     # Portfolio
     "PortfolioResponse",
@@ -40,4 +48,10 @@ __all__ = [
     # Market
     "QuoteResponse",
     "ExchangeRatesResponse",
+    # Price Alerts
+    "PriceAlertCreate",
+    "PriceAlertUpdate",
+    "PriceAlertResponse",
+    "PriceAlertResetRequest",
+    "PriceAlertTriggerInfo",
 ]

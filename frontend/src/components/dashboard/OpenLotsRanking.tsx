@@ -21,6 +21,7 @@ export interface OpenLot {
   currentPrice: number;
   currency: string;
   priceScale?: number;
+  exchangeRate?: number;
   portfolioName?: string;
 }
 
@@ -216,7 +217,11 @@ export function OpenLotsRanking({
         const plAmount = currentValue - costBasis;
         const plPercent = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
 
-        const costBasisCzk = toCZK(costBasis, lot.currency, rates);
+        // Use historical exchange rate for cost basis if available
+        // This ensures P/L matches the main position calculation
+        const costBasisCzk = lot.exchangeRate
+          ? costBasis * lot.exchangeRate
+          : toCZK(costBasis, lot.currency, rates);
         const currentValueCzk = toCZK(currentValue, lot.currency, rates);
         const plCzk = currentValueCzk - costBasisCzk;
 

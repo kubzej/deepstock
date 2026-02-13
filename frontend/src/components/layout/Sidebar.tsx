@@ -10,6 +10,7 @@ import {
   History,
   Search,
   BarChart3,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +39,7 @@ export function Sidebar({
     { id: 'market', icon: BarChart3, label: 'Trh' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
+    { id: 'alerts', icon: Bell, label: 'Alerty' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
