@@ -306,7 +306,7 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
           symbol: tvSymbol,
           interval: interval,
           timezone: 'Europe/Prague',
-          theme: 'dark',
+          theme: 'light',
           style: '1', // Candles
           locale: 'en',
           enable_publishing: false,
@@ -318,12 +318,12 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
           withdateranges: true,
           hide_side_toolbar: false,
           allow_symbol_change: false,
-          details: false,
+          details: true,
           hotlist: false,
           calendar: false,
-          show_popup_button: false,
-          popup_width: '1000',
-          popup_height: '650',
+          show_popup_button: true,
+          popup_width: '1200',
+          popup_height: '800',
           support_host: 'https://www.tradingview.com',
         });
       }

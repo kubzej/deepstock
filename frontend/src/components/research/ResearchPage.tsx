@@ -24,6 +24,10 @@ import {
 } from '@/lib/format';
 import { PriceChart } from '@/components/charts';
 import { ValuationSection } from '@/components/research/ValuationSection';
+import {
+  TradingViewAdvancedChart,
+  isTradingViewSupported,
+} from '@/components/shared/TradingViewWidgets';
 
 // Lazy load TechnicalAnalysis - heavy component with indicators
 const TechnicalAnalysis = lazy(() =>
@@ -528,10 +532,16 @@ function TechnicalSection({
   ticker: string;
   currency: string;
 }) {
+  const isSupported = isTradingViewSupported(ticker);
+
   return (
     <div className="space-y-8">
-      {/* Price Chart */}
-      <PriceChart ticker={ticker} currency={currency} height={350} />
+      {/* Price Chart - TradingView for supported exchanges */}
+      {isSupported ? (
+        <TradingViewAdvancedChart symbol={ticker} height={450} />
+      ) : (
+        <PriceChart ticker={ticker} currency={currency} height={350} />
+      )}
 
       {/* Technical Indicators - lazy loaded */}
       <Suspense
