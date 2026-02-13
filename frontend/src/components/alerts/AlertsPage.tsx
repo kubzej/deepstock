@@ -242,12 +242,6 @@ export function AlertsPage() {
         onRefresh={handleRefresh}
         isRefreshing={alertsFetching}
         dataUpdatedAt={dataUpdatedAt}
-        actions={
-          <Button onClick={openCreateForm} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Nový alert
-          </Button>
-        }
       />
 
       {/* Error */}
@@ -261,21 +255,28 @@ export function AlertsPage() {
         </Alert>
       )}
 
-      {/* Filter Pills */}
-      <PillGroup>
-        <PillButton
-          active={filterView === 'active'}
-          onClick={() => setFilterView('active')}
-        >
-          Aktivní ({activeCount})
-        </PillButton>
-        <PillButton
-          active={filterView === 'inactive'}
-          onClick={() => setFilterView('inactive')}
-        >
-          Neaktivní ({inactiveCount})
-        </PillButton>
-      </PillGroup>
+      {/* Filter Pills + Add button */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <PillGroup>
+          <PillButton
+            active={filterView === 'active'}
+            onClick={() => setFilterView('active')}
+          >
+            Aktivní ({activeCount})
+          </PillButton>
+          <PillButton
+            active={filterView === 'inactive'}
+            onClick={() => setFilterView('inactive')}
+          >
+            Neaktivní ({inactiveCount})
+          </PillButton>
+        </PillGroup>
+        <div className="flex-1" />
+        <Button onClick={openCreateForm} size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          Nový alert
+        </Button>
+      </div>
 
       {/* Loading */}
       {alertsLoading && (
