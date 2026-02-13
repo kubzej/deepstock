@@ -350,7 +350,7 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
 // ============================================================
 
 interface StockHeatmapProps {
-  dataSource?: 'SPX500' | 'NASDAQ100' | 'DJIA' | 'STOXX600' | 'ETF';
+  dataSource?: 'SPX500' | 'NASDAQ100' | 'DJIA' | 'STOXX600';
   height?: string | number;
   blockColor?:
     | 'change'
@@ -381,7 +381,7 @@ export function StockHeatmap({
         blockSize: 'market_cap_basic',
         blockColor,
         locale: 'en',
-        colorTheme: 'dark',
+        colorTheme: 'light',
         hasTopBar: true,
         isZoomEnabled: true,
         hasSymbolTooltip: true,
@@ -450,7 +450,7 @@ interface EconomicCalendarProps {
  */
 export function EconomicCalendar({
   height = 'calc(100vh - 200px)',
-  countries = ['us', 'eu', 'gb'],
+  countries = ['us'],
 }: EconomicCalendarProps) {
   return (
     <TradingViewWidget
@@ -458,10 +458,10 @@ export function EconomicCalendar({
       config={{
         width: '100%',
         height: '100%',
-        colorTheme: 'dark',
-        isTransparent: true,
+        colorTheme: 'light',
+        isTransparent: false,
         locale: 'en',
-        importanceFilter: '-1,0,1',
+        importanceFilter: '1',
         countryFilter: countries.join(','),
       }}
       height={height}
@@ -505,6 +505,90 @@ export function MiniChart({
         isTransparent: true,
         autosize: false,
         largeChartUrl: '',
+      }}
+      height={height}
+    />
+  );
+}
+
+// ============================================================
+// Market Overview Widget
+// ============================================================
+
+interface MarketOverviewWidgetProps {
+  height?: string | number;
+  showSymbolLogo?: boolean;
+}
+
+/**
+ * TradingView Market Overview
+ * Shows multiple markets grouped by tabs (Indices, Forex, Futures, etc.)
+ */
+export function MarketOverviewWidget({
+  height = 'calc(100vh - 250px)',
+  showSymbolLogo = true,
+}: MarketOverviewWidgetProps) {
+  return (
+    <TradingViewWidget
+      scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js"
+      config={{
+        colorTheme: 'light',
+        dateRange: '1D',
+        showChart: true,
+        locale: 'en',
+        width: '100%',
+        height: '100%',
+        largeChartUrl: '',
+        isTransparent: true,
+        showSymbolLogo: showSymbolLogo,
+        showFloatingTooltip: true,
+        plotLineColorGrowing: 'rgba(16, 185, 129, 1)',
+        plotLineColorFalling: 'rgba(239, 68, 68, 1)',
+        gridLineColor: 'rgba(240, 243, 250, 0)',
+        scaleFontColor: 'rgba(120, 123, 134, 1)',
+        belowLineFillColorGrowing: 'rgba(16, 185, 129, 0.12)',
+        belowLineFillColorFalling: 'rgba(239, 68, 68, 0.12)',
+        belowLineFillColorGrowingBottom: 'rgba(16, 185, 129, 0)',
+        belowLineFillColorFallingBottom: 'rgba(239, 68, 68, 0)',
+        symbolActiveColor: 'rgba(16, 185, 129, 0.12)',
+        tabs: [
+          {
+            title: 'Indices',
+            symbols: [
+              { s: 'FOREXCOM:SPXUSD', d: 'S&P 500' },
+              { s: 'FOREXCOM:NSXUSD', d: 'Nasdaq 100' },
+              { s: 'FOREXCOM:DJI', d: 'Dow 30' },
+              { s: 'INDEX:NKY', d: 'Nikkei 225' },
+              { s: 'INDEX:DEU40', d: 'DAX' },
+              { s: 'FOREXCOM:UKXGBP', d: 'FTSE 100' },
+            ],
+            originalTitle: 'Indices',
+          },
+          {
+            title: 'Futures',
+            symbols: [
+              { s: 'CME_MINI:ES1!', d: 'S&P 500 Futures' },
+              { s: 'CME:NQ1!', d: 'Nasdaq Futures' },
+              { s: 'COMEX:GC1!', d: 'Gold' },
+              { s: 'NYMEX:CL1!', d: 'Crude Oil' },
+              { s: 'NYMEX:NG1!', d: 'Natural Gas' },
+              { s: 'CBOT:ZC1!', d: 'Corn' },
+            ],
+            originalTitle: 'Futures',
+          },
+          {
+            title: 'Forex',
+            symbols: [
+              { s: 'FX:EURUSD', d: 'EUR/USD' },
+              { s: 'FX:GBPUSD', d: 'GBP/USD' },
+              { s: 'FX:USDJPY', d: 'USD/JPY' },
+              { s: 'FX:USDCHF', d: 'USD/CHF' },
+              { s: 'FX:AUDUSD', d: 'AUD/USD' },
+              { s: 'FX:USDCAD', d: 'USD/CAD' },
+            ],
+            originalTitle: 'Forex',
+          },
+        ],
       }}
       height={height}
     />

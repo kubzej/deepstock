@@ -34,29 +34,30 @@ interface HeatmapItem {
 const GAP = 2;
 
 /**
- * Modern color palette for change %.
- * Smooth interpolation between muted tones — avoids neon/harsh colors.
+ * Color palette matching TradingView heatmap.
+ * Range: -5.5% to +5.5%
  *
- *   -5 %  →  rich rose
- *    0 %  →  zinc-700 neutral
- *   +5 %  →  rich emerald
+ *   -5.5%  →  dark red
+ *    0%    →  light gray (neutral)
+ *   +5.5%  →  dark green
  */
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
 function getChangeColor(pct: number): string {
-  const c = Math.max(-5, Math.min(5, pct));
-  const t = (c + 5) / 10; // 0..1
+  const c = Math.max(-5.5, Math.min(5.5, pct));
+  const t = (c + 5.5) / 11; // 0..1
 
-  // Colour stops (r, g, b)
+  // TradingView-style colour stops (r, g, b)
   const stops: [number, [number, number, number]][] = [
-    [0.0, [180, 50, 50]], // deep rose
-    [0.3, [140, 55, 55]], // muted rose
-    [0.45, [70, 70, 78]], // neutral-warm
-    [0.55, [65, 75, 72]], // neutral-cool
-    [0.7, [40, 130, 75]], // muted emerald
-    [1.0, [22, 163, 74]], // rich emerald (tailwind green-600)
+    [0.0, [127, 42, 42]], // dark red (-5.5%)
+    [0.18, [153, 51, 51]], // red (-3.5%)
+    [0.36, [180, 90, 90]], // light red (-1.5%)
+    [0.5, [200, 200, 200]], // neutral gray (0%)
+    [0.64, [100, 160, 100]], // light green (+1.5%)
+    [0.82, [60, 130, 60]], // green (+3.5%)
+    [1.0, [35, 100, 35]], // dark green (+5.5%)
   ];
 
   // Find the two surrounding stops
@@ -299,9 +300,9 @@ export function PortfolioHeatmap({
   }
 
   // Build smooth CSS gradient for the legend bar
-  const legendSteps = 11; // -5 to +5
+  const legendSteps = 12; // -5.5 to +5.5
   const gradientColors = Array.from({ length: legendSteps }, (_, i) => {
-    const pct = -5 + i;
+    const pct = -5.5 + i;
     return getChangeColor(pct);
   });
   const gradientCSS = `linear-gradient(to right, ${gradientColors.join(', ')})`;
@@ -339,14 +340,14 @@ export function PortfolioHeatmap({
       {/* Gradient legend bar */}
       <div className="flex items-center justify-center gap-3 px-4">
         <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-          −5 %
+          −5.5 %
         </span>
         <div
           className="h-2 flex-1 max-w-52 rounded-full"
           style={{ background: gradientCSS }}
         />
         <span className="text-[11px] text-muted-foreground/70 tabular-nums">
-          +5 %
+          +5.5 %
         </span>
       </div>
     </div>

@@ -28,5 +28,6 @@ export {
   TechnicalAnalysis,
   EconomicCalendar,
   MiniChart,
+  MarketOverviewWidget,
   isTradingViewSupported,
 } from './TradingViewWidgets';
