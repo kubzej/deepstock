@@ -239,7 +239,7 @@ export function SymbolOverview({
         lineType: 0,
         dateRanges: ['1d|1', '1m|30', '3m|60', '12m|1D', '60m|1W', 'all|1M'],
         dateFormat: 'dd/MM/yyyy',
-        isTransparent: true,
+        isTransparent: false,
       }}
       height={height}
     />
