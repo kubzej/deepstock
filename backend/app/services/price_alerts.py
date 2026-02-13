@@ -2,6 +2,7 @@
 Price Alerts Service - Check custom alerts and watchlist targets, send push notifications
 """
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from app.core.supabase import supabase
@@ -10,8 +11,15 @@ from app.services.push import send_push_notification
 from app.schemas.price_alerts import (
     PriceAlertCreate,
     PriceAlertUpdate,
-    PriceAlertTriggerInfo,
 )
+
+
+@dataclass
+class AlertCheckResult:
+    """Internal result of checking an alert condition."""
+    is_triggered: bool
+    current_value: float
+
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +364,7 @@ class PriceAlertService:
         alert: dict, 
         current_price: float, 
         previous_close: float
-    ) -> PriceAlertTriggerInfo:
+    ) -> AlertCheckResult:
         """
         Check if a custom alert condition is met.
         
@@ -366,32 +374,36 @@ class PriceAlertService:
             previous_close: Previous day's closing price
         
         Returns:
-            PriceAlertTriggerInfo with is_triggered and current_value
+            AlertCheckResult with is_triggered and current_value
         """
         condition_type = alert.get("condition_type")
         raw_value = alert.get("condition_value")
         
         if not condition_type or raw_value is None:
             logger.warning(f"Alert missing condition_type or condition_value: {alert.get('id')}")
-            return PriceAlertTriggerInfo(is_triggered=False, current_value=0)
+            return AlertCheckResult(is_triggered=False, current_value=0)
         
         condition_value = float(raw_value)
         
         if condition_type == "price_above":
-            return PriceAlertTriggerInfo(
-                is_triggered=current_price >= condition_value,
+            triggered = current_price >= condition_value
+            logger.info(f"price_above check: {current_price} >= {condition_value} = {triggered}")
+            return AlertCheckResult(
+                is_triggered=triggered,
                 current_value=current_price
             )
         
         elif condition_type == "price_below":
-            return PriceAlertTriggerInfo(
-                is_triggered=current_price <= condition_value,
+            triggered = current_price <= condition_value
+            logger.info(f"price_below check: {current_price} <= {condition_value} = {triggered}")
+            return AlertCheckResult(
+                is_triggered=triggered,
                 current_value=current_price
             )
         
         elif condition_type == "percent_change_day":
             if previous_close == 0:
-                return PriceAlertTriggerInfo(
+                return AlertCheckResult(
                     is_triggered=False,
                     current_value=0
                 )
@@ -399,13 +411,13 @@ class PriceAlertService:
             percent_change = ((current_price - previous_close) / previous_close) * 100
             
             # Check if absolute change exceeds threshold
-            return PriceAlertTriggerInfo(
+            return AlertCheckResult(
                 is_triggered=abs(percent_change) >= abs(condition_value),
                 current_value=percent_change
             )
         
         logger.warning(f"Unknown condition type: {condition_type}")
-        return PriceAlertTriggerInfo(
+        return AlertCheckResult(
             is_triggered=False,
             current_value=0
         )
@@ -416,6 +428,7 @@ class PriceAlertService:
         Returns summary of alerts checked and triggered.
         """
         pending_alerts = await self.get_all_pending_alerts()
+        logger.info(f"Pending alerts: {len(pending_alerts) if pending_alerts else 0}")
         
         if not pending_alerts:
             return {"alerts_checked": 0, "alerts_triggered": 0}
@@ -423,18 +436,21 @@ class PriceAlertService:
         # Group alerts by ticker for efficient quote fetching
         alerts_by_ticker: Dict[str, List[dict]] = {}
         for alert in pending_alerts:
-            stock = alert.get("stocks", {})
+            stock = alert.get("stocks") or {}
             ticker = stock.get("ticker")
+            logger.info(f"Alert {alert.get('id')}: stock={stock}, ticker={ticker}")
             if ticker:
                 if ticker not in alerts_by_ticker:
                     alerts_by_ticker[ticker] = []
                 alerts_by_ticker[ticker].append(alert)
         
         if not alerts_by_ticker:
+            logger.warning("No tickers found in alerts")
             return {"alerts_checked": 0, "alerts_triggered": 0}
         
         # Fetch current prices for all relevant tickers
         tickers = list(alerts_by_ticker.keys())
+        logger.info(f"Fetching quotes for tickers: {tickers}")
         quotes = await get_quotes(redis, tickers)
         
         alerts_triggered = 0
@@ -444,23 +460,35 @@ class PriceAlertService:
             current_price = quote.get("price")
             previous_close = quote.get("previousClose", quote.get("price", 0))
             
+            logger.info(f"Ticker {ticker}: quote={quote}, current_price={current_price}")
+            
             if not current_price:
+                logger.warning(f"No price for ticker {ticker}, skipping")
                 continue
             
             for alert in alerts:
                 try:
+                    condition_type = alert.get("condition_type")
+                    condition_value = alert.get("condition_value")
+                    logger.info(f"Checking alert: {condition_type} {condition_value} vs price {current_price}")
+                    
                     trigger_info = self.check_alert_condition(
                         alert, current_price, previous_close
                     )
+                    
+                    logger.info(f"Alert {alert.get('id')}: is_triggered={trigger_info.is_triggered}")
                     
                     if trigger_info.is_triggered:
                         # Mark as triggered
                         await self.mark_alert_triggered(alert["id"])
                         
-                        # Send push notification
-                        await self._send_custom_alert_notification(
-                            alert, current_price, trigger_info.current_value
-                        )
+                        # Send push notification (don't fail if push fails)
+                        try:
+                            await self._send_custom_alert_notification(
+                                alert, current_price, trigger_info.current_value
+                            )
+                        except Exception as push_error:
+                            logger.error(f"Push notification failed for alert {alert.get('id')}: {push_error}")
                         
                         alerts_triggered += 1
                         
@@ -483,7 +511,7 @@ class PriceAlertService:
         current_value: float
     ) -> bool:
         """Send notification for a triggered custom alert."""
-        stock = alert.get("stocks", {})
+        stock = alert.get("stocks") or {}
         ticker = stock.get("ticker", "Unknown")
         stock_name = stock.get("name", ticker)
         condition_type = alert.get("condition_type")
