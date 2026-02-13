@@ -36,6 +36,10 @@ import {
 } from '@/lib/format';
 import { TransactionModal } from '@/components/transactions';
 import { InsiderTrades } from './InsiderTrades';
+import {
+  SymbolOverview,
+  isTradingViewSupported,
+} from '@/components/shared/TradingViewWidgets';
 
 interface StockDetailProps {
   ticker: string;
@@ -327,6 +331,17 @@ export function StockDetail({
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
           {stock.notes}
         </p>
+      )}
+
+      {/* Price Chart - only for supported exchanges */}
+      {isTradingViewSupported(ticker, stock.exchange || undefined) && (
+        <div className="mb-8">
+          <SymbolOverview
+            symbol={ticker}
+            exchange={stock.exchange || undefined}
+            height={350}
+          />
+        </div>
       )}
 
       {/* Position Stats */}

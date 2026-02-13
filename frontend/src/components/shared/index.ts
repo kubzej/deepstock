@@ -18,3 +18,15 @@ export { TickerInput } from './TickerInput';
 
 // Dialog components
 export { ConfirmDialog } from './ConfirmDialog';
+
+// TradingView components
+export {
+  TradingViewWidget,
+  TradingViewAdvancedChart,
+  SymbolOverview,
+  StockHeatmap,
+  TechnicalAnalysis,
+  EconomicCalendar,
+  MiniChart,
+  isTradingViewSupported,
+} from './TradingViewWidgets';
