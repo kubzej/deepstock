@@ -42,6 +42,27 @@ async def check_price_alerts(x_cron_secret: Optional[str] = Header(None)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/check-custom-alerts")
+async def check_custom_alerts(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Check all custom price alerts (price_above, price_below, percent_change_day).
+    Called by Railway cron every 5-15 minutes during market hours.
+    """
+    await verify_cron_secret(x_cron_secret)
+    
+    redis = await get_redis()
+    
+    try:
+        result = await price_alert_service.check_custom_alerts(redis)
+        return {
+            "success": True,
+            "alerts_checked": result["alerts_checked"],
+            "alerts_triggered": result["alerts_triggered"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/health")
 async def cron_health():
     """Simple health check for cron service"""

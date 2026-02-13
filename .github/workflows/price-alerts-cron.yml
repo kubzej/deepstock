@@ -14,9 +14,16 @@ jobs:
   check-alerts:
     runs-on: ubuntu-latest
     steps:
-      - name: Check Price Alerts
+      - name: Check Watchlist Price Alerts
         run: |
           curl -X POST "${{ secrets.API_URL }}/api/cron/check-price-alerts" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail --silent --show-error
+
+      - name: Check Custom Price Alerts
+        run: |
+          curl -X POST "${{ secrets.API_URL }}/api/cron/check-custom-alerts" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             --fail --silent --show-error

@@ -108,4 +108,8 @@ export const queryKeys = {
 
   // Insider trading
   insiderTrades: (ticker: string) => ['insiderTrades', ticker.toUpperCase()] as const,
+  
+  // Price Alerts
+  alerts: () => ['alerts'] as const,
+  activeAlerts: () => ['alerts', 'active'] as const,
 } as const;
