@@ -79,6 +79,7 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                     quote = {
                         "symbol": t,
                         "price": round(price, 2),
+                        "previousClose": round(prev_close, 2) if prev_close else None,
                         "change": round(change, 2),
                         "changePercent": round(change_percent, 2),
                         "volume": volume,

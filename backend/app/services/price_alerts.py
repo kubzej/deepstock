@@ -368,8 +368,14 @@ class PriceAlertService:
         Returns:
             PriceAlertTriggerInfo with is_triggered and current_value
         """
-        condition_type = alert["condition_type"]
-        condition_value = float(alert["condition_value"])
+        condition_type = alert.get("condition_type")
+        raw_value = alert.get("condition_value")
+        
+        if not condition_type or raw_value is None:
+            logger.warning(f"Alert missing condition_type or condition_value: {alert.get('id')}")
+            return PriceAlertTriggerInfo(is_triggered=False, current_value=0)
+        
+        condition_value = float(raw_value)
         
         if condition_type == "price_above":
             return PriceAlertTriggerInfo(
@@ -442,24 +448,28 @@ class PriceAlertService:
                 continue
             
             for alert in alerts:
-                trigger_info = self.check_alert_condition(
-                    alert, current_price, previous_close
-                )
-                
-                if trigger_info.is_triggered:
-                    # Mark as triggered
-                    await self.mark_alert_triggered(alert["id"])
-                    
-                    # Send push notification
-                    await self._send_custom_alert_notification(
-                        alert, current_price, trigger_info.current_value
+                try:
+                    trigger_info = self.check_alert_condition(
+                        alert, current_price, previous_close
                     )
                     
-                    alerts_triggered += 1
-                    
-                    # If repeat_after_trigger, reset immediately
-                    if alert.get("repeat_after_trigger"):
-                        await self.reset_alert(alert["id"], alert["user_id"])
+                    if trigger_info.is_triggered:
+                        # Mark as triggered
+                        await self.mark_alert_triggered(alert["id"])
+                        
+                        # Send push notification
+                        await self._send_custom_alert_notification(
+                            alert, current_price, trigger_info.current_value
+                        )
+                        
+                        alerts_triggered += 1
+                        
+                        # If repeat_after_trigger, reset immediately
+                        if alert.get("repeat_after_trigger"):
+                            await self.reset_alert(alert["id"], alert["user_id"])
+                except Exception as e:
+                    logger.error(f"Error processing alert {alert.get('id')}: {e}")
+                    continue
         
         return {
             "alerts_checked": len(pending_alerts),
