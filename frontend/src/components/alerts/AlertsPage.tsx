@@ -8,13 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -135,6 +129,34 @@ export function AlertsPage() {
         return alerts;
     }
   }, [alerts, filterView]);
+
+  // Group alerts by ticker
+  const groupedAlerts = useMemo(() => {
+    const groups: Record<string, PriceAlert[]> = {};
+    for (const alert of filteredAlerts) {
+      const ticker = alert.stocks?.ticker || 'N/A';
+      if (!groups[ticker]) {
+        groups[ticker] = [];
+      }
+      groups[ticker].push(alert);
+    }
+
+    // Sort alerts within each group: price alerts by value, then percent alerts
+    for (const ticker of Object.keys(groups)) {
+      groups[ticker].sort((a, b) => {
+        const aIsPercent = a.condition_type === 'percent_change_day';
+        const bIsPercent = b.condition_type === 'percent_change_day';
+        // Percent alerts go to the end
+        if (aIsPercent && !bIsPercent) return 1;
+        if (!aIsPercent && bIsPercent) return -1;
+        // Both same type - sort by value ascending
+        return parseFloat(a.condition_value) - parseFloat(b.condition_value);
+      });
+    }
+
+    // Sort groups by ticker alphabetically
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredAlerts]);
 
   // Filtered stocks for dropdown
   const filteredStocks = useMemo(() => {
@@ -309,116 +331,124 @@ export function AlertsPage() {
         />
       )}
 
-      {/* Alerts list */}
+      {/* Alerts list - grouped by ticker */}
       {!alertsLoading && filteredAlerts.length > 0 && (
-        <div className="space-y-2">
-          {filteredAlerts.map((alert) => {
-            const quote = quotes[alert.stocks?.ticker];
+        <div className="space-y-4">
+          {groupedAlerts.map(([ticker, tickerAlerts]) => {
+            const quote = quotes[ticker];
             const currentPrice = quote?.price;
+            const stockName = tickerAlerts[0]?.stocks?.name;
 
             return (
-              <div
-                key={alert.id}
-                className={`rounded-xl px-3 py-2.5 ${
-                  alert.is_triggered
-                    ? 'bg-amber-500/10'
-                    : alert.is_enabled
-                      ? 'bg-muted/30'
-                      : 'bg-muted/20 opacity-60'
-                }`}
-              >
-                {/* Row 1: Ticker + Condition + Actions */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="font-bold text-sm">
-                      {alert.stocks?.ticker || 'N/A'}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground truncate hidden sm:inline">
-                      {alert.stocks?.name}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">·</span>
-                    <div className="flex items-center gap-1">
-                      {CONDITION_ICONS[alert.condition_type]}
-                      <span className="font-mono-price text-sm">
-                        {formatConditionValue(
-                          alert.condition_type,
-                          alert.condition_value,
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {alert.is_triggered ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleReset(alert)}
-                        disabled={resetMutation.isPending}
-                        title="Reset"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : (
-                      <Switch
-                        checked={alert.is_enabled}
-                        onCheckedChange={() => handleToggle(alert)}
-                        disabled={toggleMutation.isPending}
-                      />
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => openEditForm(alert)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setDeleteConfirm(alert)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </div>
+              <div key={ticker} className="space-y-1.5">
+                {/* Group header */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="font-bold text-sm">{ticker}</span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {stockName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <span className="text-xs font-mono-price text-muted-foreground">
+                    {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {tickerAlerts.length}{' '}
+                    {tickerAlerts.length === 1 ? 'alert' : 'alertů'}
+                  </span>
                 </div>
 
-                {/* Row 2: Current price + status badges */}
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-[11px] text-muted-foreground font-mono-price">
-                    {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
-                    {alert.repeat_after_trigger && (
-                      <span className="ml-2">
-                        <RotateCcw className="h-3 w-3 inline mr-0.5" />
-                        opakující
-                      </span>
-                    )}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {alert.is_triggered && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30"
-                      >
-                        <Check className="h-3 w-3 mr-0.5" />
-                        Dokončeno
-                      </Badge>
-                    )}
-                    {!alert.is_enabled && !alert.is_triggered && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0 h-[18px] text-muted-foreground"
-                      >
-                        Vypnuto
-                      </Badge>
-                    )}
-                  </div>
+                {/* Alerts for this ticker */}
+                <div className="space-y-1">
+                  {tickerAlerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`rounded-lg px-3 py-2 ${
+                        alert.is_triggered
+                          ? 'bg-amber-500/10'
+                          : alert.is_enabled
+                            ? 'bg-muted/30'
+                            : 'bg-muted/20 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        {/* Condition */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            {CONDITION_ICONS[alert.condition_type]}
+                            <span className="font-mono-price text-sm">
+                              {formatConditionValue(
+                                alert.condition_type,
+                                alert.condition_value,
+                              )}
+                            </span>
+                          </div>
+                          {alert.repeat_after_trigger && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                              <RotateCcw className="h-3 w-3" />
+                              opakující
+                            </span>
+                          )}
+                          {alert.is_triggered && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30"
+                            >
+                              <Check className="h-3 w-3 mr-0.5" />
+                              Dokončeno
+                            </Badge>
+                          )}
+                          {!alert.is_enabled && !alert.is_triggered && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-[18px] text-muted-foreground"
+                            >
+                              Vypnuto
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {alert.is_triggered ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleReset(alert)}
+                              disabled={resetMutation.isPending}
+                              title="Reset"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Switch
+                              checked={alert.is_enabled}
+                              onCheckedChange={() => handleToggle(alert)}
+                              disabled={toggleMutation.isPending}
+                            />
+                          )}
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => openEditForm(alert)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setDeleteConfirm(alert)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -481,36 +511,40 @@ export function AlertsPage() {
             {/* Condition type */}
             <div className="space-y-2">
               <Label>Podmínka</Label>
-              <Select
+              <ToggleGroup
+                type="single"
                 value={formData.condition_type}
-                onValueChange={(v: AlertConditionType) =>
-                  setFormData({ ...formData, condition_type: v })
+                onValueChange={(v) =>
+                  v &&
+                  setFormData({
+                    ...formData,
+                    condition_type: v as AlertConditionType,
+                  })
                 }
+                className="w-full"
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="price_above">
-                    <div className="flex items-center gap-2">
-                      <ArrowUp className="h-4 w-4 text-emerald-500" />
-                      Cena nad
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="price_below">
-                    <div className="flex items-center gap-2">
-                      <ArrowDown className="h-4 w-4 text-rose-500" />
-                      Cena pod
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="percent_change_day">
-                    <div className="flex items-center gap-2">
-                      <Percent className="h-4 w-4 text-blue-500" />
-                      Denní změna ±%
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                <ToggleGroupItem
+                  value="price_above"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                >
+                  <ArrowUp className="h-3.5 w-3.5" />
+                  Nad
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="price_below"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
+                >
+                  <ArrowDown className="h-3.5 w-3.5" />
+                  Pod
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="percent_change_day"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                >
+                  <Percent className="h-3.5 w-3.5" />
+                  ±%
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
             {/* Condition value */}
@@ -538,12 +572,6 @@ export function AlertsPage() {
                   setFormData({ ...formData, condition_value: e.target.value })
                 }
               />
-              {formData.condition_type === 'percent_change_day' && (
-                <p className="text-xs text-muted-foreground">
-                  Alert se spustí při změně ±{formData.condition_value || '0'}%
-                  za den
-                </p>
-              )}
             </div>
 
             {/* Options */}
