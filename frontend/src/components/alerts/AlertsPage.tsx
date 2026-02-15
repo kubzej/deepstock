@@ -150,7 +150,7 @@ export function AlertsPage() {
         if (aIsPercent && !bIsPercent) return 1;
         if (!aIsPercent && bIsPercent) return -1;
         // Both same type - sort by value ascending
-        return parseFloat(a.condition_value) - parseFloat(b.condition_value);
+        return a.condition_value - b.condition_value;
       });
     }
 
