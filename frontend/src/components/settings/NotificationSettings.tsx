@@ -147,7 +147,7 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
                 <div>
                   <Label className="text-sm font-medium">Nákupní cíle</Label>
                   <p className="text-xs text-muted-foreground">
-                    Upozornit při dosažení cílové ceny pro nákup
+                    Cílová cena pro nákup nastavená ve watchlistu
                   </p>
                 </div>
               </div>
@@ -164,7 +164,7 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
                 <div>
                   <Label className="text-sm font-medium">Prodejní cíle</Label>
                   <p className="text-xs text-muted-foreground">
-                    Upozornit při dosažení cílové ceny pro prodej
+                    Cílová cena pro prodej nastavená ve watchlistu
                   </p>
                 </div>
               </div>
@@ -217,10 +217,10 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
               <div className="flex items-center justify-between py-2 pl-7">
                 <div>
                   <Label className="text-sm font-medium">
-                    Minimální hodnota
+                    Minimální obchod
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Jen obchody nad touto částkou
+                    Notifikovat jen insider obchody nad tuto částku
                   </p>
                 </div>
                 <Select
@@ -234,10 +234,15 @@ export function NotificationSettings({ onBack }: NotificationSettingsProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="10000">$10K</SelectItem>
+                    <SelectItem value="25000">$25K</SelectItem>
                     <SelectItem value="50000">$50K</SelectItem>
                     <SelectItem value="100000">$100K</SelectItem>
+                    <SelectItem value="250000">$250K</SelectItem>
                     <SelectItem value="500000">$500K</SelectItem>
                     <SelectItem value="1000000">$1M</SelectItem>
+                    <SelectItem value="2000000">$2M</SelectItem>
+                    <SelectItem value="5000000">$5M</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
