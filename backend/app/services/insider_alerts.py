@@ -138,11 +138,13 @@ class InsiderAlertService:
                 logger.warning("Failed to fetch insider trades for %s: %s", ticker, e)
                 continue
 
-            # Filter: new trades since last check, Purchase/Sale only, above threshold
+            # Filter: new filings since last check, Purchase/Sale only, above threshold
+            # NOTE: We filter by filing_date (when SEC received it), not trade_date,
+            # because trades only appear in the API after they are filed.
             new_trades = [
                 t
                 for t in trades
-                if t.get("trade_date", "") > cutoff
+                if t.get("filing_date", "") > cutoff
                 and t.get("trade_type") in ("Purchase", "Sale")
                 and (t.get("total_value") or 0) >= min_value
             ]
