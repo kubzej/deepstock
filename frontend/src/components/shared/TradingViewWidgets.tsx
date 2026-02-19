@@ -349,8 +349,20 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
 // Stock Heatmap Widget
 // ============================================================
 
+// TradingView heatmap supported dataSource values
+// US: SPX500, NASDAQ100
+// Europe: SX5E (Euro Stoxx 50), SXXP (Stoxx 600), UK100
+// Asia: HSI (Hang Seng)
+type HeatmapDataSource =
+  | 'SPX500'
+  | 'NASDAQ100'
+  | 'SX5E'
+  | 'SXXP'
+  | 'UK100'
+  | 'HSI';
+
 interface StockHeatmapProps {
-  dataSource?: 'SPX500' | 'NASDAQ100' | 'DJIA' | 'STOXX600';
+  dataSource?: HeatmapDataSource;
   height?: string | number;
   blockColor?:
     | 'change'
@@ -365,30 +377,69 @@ interface StockHeatmapProps {
 /**
  * TradingView Stock Heatmap
  * Shows stocks grouped by sector with color = daily change.
+ * Note: This component directly manages the widget to ensure proper re-rendering
+ * when dataSource changes (the memo'd TradingViewWidget doesn't work well for this).
  */
 export function StockHeatmap({
   dataSource = 'SPX500',
   height = 'calc(100vh - 200px)',
   blockColor = 'change',
 }: StockHeatmapProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Clear previous widget
+    container.innerHTML = '';
+
+    const widgetContainer = document.createElement('div');
+    widgetContainer.className = 'tradingview-widget-container';
+    widgetContainer.style.height = '100%';
+    widgetContainer.style.width = '100%';
+
+    const widgetInner = document.createElement('div');
+    widgetInner.className = 'tradingview-widget-container__widget';
+    widgetInner.style.height = 'calc(100% - 32px)';
+    widgetInner.style.width = '100%';
+    widgetContainer.appendChild(widgetInner);
+
+    container.appendChild(widgetContainer);
+
+    const config = {
+      dataSource,
+      grouping: 'sector',
+      blockSize: 'market_cap_basic',
+      blockColor,
+      locale: 'en',
+      colorTheme: 'light',
+      hasTopBar: true,
+      isZoomEnabled: true,
+      hasSymbolTooltip: true,
+      width: '100%',
+      height: '100%',
+    };
+
+    const script = document.createElement('script');
+    script.src =
+      'https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js';
+    script.async = true;
+    script.type = 'text/javascript';
+    script.innerHTML = JSON.stringify(config);
+
+    widgetContainer.appendChild(script);
+
+    return () => {
+      container.innerHTML = '';
+    };
+  }, [dataSource, blockColor]);
+
   return (
-    <TradingViewWidget
-      scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-stock-heatmap.js"
-      config={{
-        exchanges: [],
-        dataSource,
-        grouping: 'sector',
-        blockSize: 'market_cap_basic',
-        blockColor,
-        locale: 'en',
-        colorTheme: 'light',
-        hasTopBar: true,
-        isZoomEnabled: true,
-        hasSymbolTooltip: true,
-        width: '100%',
-        height: '100%',
-      }}
-      height={height}
+    <div
+      ref={containerRef}
+      className="w-full rounded-lg overflow-hidden"
+      style={{ height: typeof height === 'number' ? `${height}px` : height }}
     />
   );
 }

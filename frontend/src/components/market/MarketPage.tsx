@@ -13,13 +13,11 @@ import {
 } from '@/components/shared/TradingViewWidgets';
 import { MarketOverview } from './MarketOverview';
 
-type HeatmapSource = 'SPX500' | 'NASDAQ100' | 'DJIA' | 'STOXX600';
+type HeatmapSource = 'SPX500' | 'NASDAQ100';
 
 const HEATMAP_OPTIONS: { value: HeatmapSource; label: string }[] = [
   { value: 'SPX500', label: 'S&P 500' },
   { value: 'NASDAQ100', label: 'Nasdaq 100' },
-  { value: 'DJIA', label: 'Dow Jones' },
-  { value: 'STOXX600', label: 'Stoxx 600' },
 ];
 
 export function MarketPage() {
@@ -73,6 +71,7 @@ export function MarketPage() {
             ))}
           </PillGroup>
           <StockHeatmap
+            key={heatmapSource}
             dataSource={heatmapSource}
             height="calc(100vh - 340px)"
           />

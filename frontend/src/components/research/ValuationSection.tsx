@@ -175,6 +175,14 @@ function UpsideBar({ upside }: { upside: number }) {
   );
 }
 
+// ── Horizon badge config ─────────────────────────────────────────────────────
+
+const HORIZON_BADGE: Record<string, { label: string; color: string }> = {
+  short: { label: '6-18M', color: 'bg-muted text-muted-foreground' },
+  medium: { label: '1-3R', color: 'bg-muted text-muted-foreground' },
+  long: { label: '3-5R+', color: 'bg-muted text-muted-foreground' },
+};
+
 // ── Individual Model Row ─────────────────────────────────────────────────────
 
 function ModelRow({
@@ -187,6 +195,7 @@ function ModelRow({
   const [expanded, setExpanded] = useState(false);
   const conf = CONFIDENCE_CONFIG[model.confidence] ?? CONFIDENCE_CONFIG.low;
   const ConfIcon = conf.icon;
+  const horizonBadge = HORIZON_BADGE[model.horizon] ?? HORIZON_BADGE.medium;
 
   return (
     <div>
@@ -194,9 +203,14 @@ function ModelRow({
         onClick={() => setExpanded(!expanded)}
         className="w-full py-2.5 flex items-center gap-3 hover:bg-muted/20 transition-colors text-left rounded"
       >
-        {/* Method name */}
-        <div className="flex-1 min-w-0">
+        {/* Method name with horizon badge */}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
           <span className="text-sm truncate">{model.method}</span>
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${horizonBadge.color}`}
+          >
+            {horizonBadge.label}
+          </span>
         </div>
 
         {/* Fair value */}
@@ -300,6 +314,29 @@ function formatInputValue(val: number | string | null): string {
   return translations[val] ?? val;
 }
 
+// ── Horizon grouping config ──────────────────────────────────────────────────
+
+const HORIZON_CONFIG: Record<
+  string,
+  { label: string; description: string; order: number }
+> = {
+  short: {
+    label: 'Krátkodobé',
+    description: '6-18 měsíců',
+    order: 1,
+  },
+  medium: {
+    label: 'Střednědobé',
+    description: '1-3 roky',
+    order: 2,
+  },
+  long: {
+    label: 'Dlouhodobé',
+    description: '3-5+ let',
+    order: 3,
+  },
+};
+
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function ValuationSection({ data }: { data: StockInfo }) {
@@ -320,6 +357,13 @@ export function ValuationSection({ data }: { data: StockInfo }) {
     );
   }
 
+  // Sort models by horizon (short first)
+  const sortedModels = [...valuation.models].sort((a, b) => {
+    const orderA = HORIZON_CONFIG[a.horizon]?.order ?? 99;
+    const orderB = HORIZON_CONFIG[b.horizon]?.order ?? 99;
+    return orderA - orderB;
+  });
+
   return (
     <div className="space-y-8">
       {/* Composite fair value */}
@@ -331,23 +375,19 @@ export function ValuationSection({ data }: { data: StockInfo }) {
         />
       )}
 
-      {/* Individual models */}
+      {/* Models list */}
       <div>
-        <h4 className="text-sm font-semibold text-foreground/70 mb-2">
-          Použité modely
-        </h4>
-
         {/* Table header */}
-        <div className="flex items-center gap-3 pb-1.5 text-xs text-muted-foreground uppercase tracking-wide">
+        <div className="flex items-center gap-3 pb-2 text-xs text-muted-foreground uppercase tracking-wide">
           <div className="flex-1">Metoda</div>
-          <div className="font-mono-price w-24 text-right">Fér. hodnota</div>
-          <div className="font-mono-price w-16 text-right">Potenciál</div>
+          <div className="w-24 text-right">Fér. hodnota</div>
+          <div className="w-16 text-right">Potenciál</div>
           <div className="w-3.5" />
           <div className="w-3.5" />
         </div>
 
         {/* Model rows */}
-        {valuation.models.map((model) => (
+        {sortedModels.map((model) => (
           <ModelRow
             key={model.method}
             model={model}
