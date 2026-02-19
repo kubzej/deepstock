@@ -1504,6 +1504,148 @@ def _peg_valuation(data: dict) -> Optional[dict]:
     }
 
 
+def _forward_peg_valuation(data: dict) -> Optional[dict]:
+    """
+    Forward PEG Valuation for High-Growth Companies (incl. Fintech).
+    
+    Inspired by growth investor methodology:
+    1. Uses Forward EPS (next year's estimate) as base.
+    2. Normalizes growth rate - caps excessive early-stage growth.
+    3. Calculates fair value using PEG = 1.0 formula: Price = EPS × Growth%
+    4. Optionally discounts future target price back to present value.
+    
+    This model is specifically designed for:
+    - High-growth fintechs (SoFi, NU Holdings, etc.)
+    - Tech companies transitioning to profitability
+    - Companies with forward EPS significantly higher than trailing
+    
+    Key difference from standard PEG:
+    - Standard PEG excludes Financial Services (banks trade at low PEG naturally)
+    - Forward PEG INCLUDES high-growth fintech because their growth story matters
+    """
+    eps = data.get("eps")
+    forward_eps = data.get("forwardEps")
+    price = data.get("price")
+    sector = data.get("sector", "")
+    earnings_growth = data.get("earningsGrowth")
+    
+    # 1. Must be profitable (or about to be with forward EPS)
+    if not forward_eps or forward_eps <= 0:
+        return None
+    if not price:
+        return None
+    
+    # 2. Calculate implied growth rate
+    # Primary: Forward EPS vs Trailing EPS
+    # Fallback: earningsGrowth from yfinance
+    growth_pct = None
+    
+    if eps and eps > 0 and forward_eps > eps:
+        # Implied YoY growth
+        growth_pct = ((forward_eps / eps) - 1) * 100
+    elif earnings_growth and earnings_growth > 0:
+        growth_pct = earnings_growth * 100
+    
+    if growth_pct is None or growth_pct <= 0:
+        return None
+    
+    # 3. Applicability: This model is for HIGH-GROWTH companies
+    # Minimum threshold: 25% growth (otherwise standard PE models are fine)
+    if growth_pct < 25:
+        return None
+    
+    # 4. Normalize growth rate
+    # Problem: Early-stage growth (e.g., 160% for SOFI 2024→2025) is unsustainable.
+    # Solution: Cap growth to a "believable long-term" rate.
+    #
+    # Logic:
+    # - If growth > 60%: This is transition/turnaround. Normalize to 40-45%.
+    # - If growth 40-60%: Strong growth phase. Use as-is but cap at 50%.
+    # - If growth 25-40%: GARP sweet spot. Use as-is.
+    
+    normalized_growth = growth_pct
+    growth_phase = "stable"
+    
+    if growth_pct > 80:
+        # Extreme growth (turnaround, first profitable year)
+        # Normalize heavily - this won't sustain
+        normalized_growth = 45
+        growth_phase = "turnaround"
+    elif growth_pct > 50:
+        # High growth - moderate normalization
+        normalized_growth = min(growth_pct * 0.8, 50)
+        growth_phase = "high_growth"
+    elif growth_pct > 40:
+        # Strong growth - slight cap
+        normalized_growth = min(growth_pct, 45)
+        growth_phase = "strong"
+    # else: 25-40% - use as-is
+    
+    # 5. Calculate Fair P/E using PEG = 1.0
+    # Fair P/E = Normalized Growth Rate
+    fair_pe = normalized_growth
+    
+    # 6. Calculate Fair Value
+    # Use FORWARD EPS (not trailing) - markets look ahead
+    fair_value = forward_eps * fair_pe
+    
+    if fair_value <= 0:
+        return None
+    
+    upside = ((fair_value / price) - 1) * 100
+    
+    # 7. Calculate future target (2-3 year horizon)
+    # If we project EPS growing at normalized rate for 2 years:
+    # Target EPS (Y+2) = Forward EPS × (1 + norm_growth)²
+    # Target Price = Target EPS × fair_pe
+    # Present Value = Target Price / (1 + discount_rate)²
+    
+    discount_rate = 0.12  # 12% required return
+    years_ahead = 2
+    
+    projected_eps_y2 = forward_eps * ((1 + normalized_growth / 100) ** years_ahead)
+    target_price_y2 = projected_eps_y2 * fair_pe
+    present_value_of_target = target_price_y2 / ((1 + discount_rate) ** years_ahead)
+    
+    # 8. Confidence scoring
+    confidence = "medium"
+    
+    # Higher confidence in GARP sweet spot
+    if 30 <= normalized_growth <= 45:
+        confidence = "high" if growth_phase == "stable" else "medium"
+    
+    # Lower confidence for extreme normalization
+    if growth_phase == "turnaround":
+        confidence = "low"
+    
+    # Sector bonus: Fintech with proven growth gets medium minimum
+    if sector == "Financial Services" and growth_pct > 40:
+        confidence = max(confidence, "medium")
+    
+    return {
+        "method": "Forward PEG (růstový)",
+        "description": f"Forward EPS ${forward_eps:.2f} × norm. růst {normalized_growth:.0f}% (PEG 1.0)",
+        "tooltip": (
+            "Model pro rychle rostoucí firmy (fintech, tech v přechodu do zisku). "
+            "Používá forward EPS a normalizuje extrémní růst na udržitelnou úroveň. "
+            "PEG 1.0 = růst je férově oceněn. Zahrnuje i 2letý výhled s diskontem."
+        ),
+        "fairValue": round(fair_value, 2),
+        "upside": round(upside, 1),
+        "inputs": {
+            "forwardEps": round(forward_eps, 2),
+            "rawGrowth": round(growth_pct, 1),
+            "normalizedGrowth": round(normalized_growth, 1),
+            "fairPE": round(fair_pe, 1),
+            "targetPEG": 1.0,
+            "growthPhase": growth_phase,
+            "target2Y": round(target_price_y2, 2),
+            "presentValue2Y": round(present_value_of_target, 2),
+        },
+        "confidence": confidence,
+    }
+
+
 def calculate_valuation(data: dict) -> dict:
     """
     Run all applicable valuation models and return composite result.
@@ -1520,6 +1662,7 @@ def calculate_valuation(data: dict) -> dict:
         _dcf_valuation,
         _pe_based_valuation,
         _peg_valuation,
+        _forward_peg_valuation,
         _ddm_valuation,
         _ev_ebitda_valuation,
         _epv_valuation,

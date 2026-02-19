@@ -340,8 +340,8 @@ export function ValuationSection({ data }: { data: StockInfo }) {
         {/* Table header */}
         <div className="flex items-center gap-3 pb-1.5 text-xs text-muted-foreground uppercase tracking-wide">
           <div className="flex-1">Metoda</div>
-          <div className="font-mono-price w-24 text-right">Fér. hodnota</div>
-          <div className="font-mono-price w-16 text-right">Potenciál</div>
+          <div className="w-24 text-right">Fér. hodnota</div>
+          <div className="w-16 text-right">Potenciál</div>
           <div className="w-3.5" />
           <div className="w-3.5" />
         </div>
