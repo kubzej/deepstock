@@ -202,6 +202,8 @@ export interface StockInfo {
       upside: number;
       inputs: Record<string, number | string | null>;
       confidence: 'high' | 'medium' | 'low';
+      horizon: 'short' | 'medium' | 'long';
+      horizonLabel: string;
     }>;
     composite: {
       fairValue: number | null;

@@ -732,6 +732,8 @@ def _graham_valuation(data: dict) -> Optional[dict]:
             "bondYield": bond_yield,
         },
         "confidence": confidence,
+        "horizon": "long",
+        "horizonLabel": "3-5+ let",
     }
 
 
@@ -873,6 +875,8 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
             "terminalGrowth": round(terminal_growth * 100, 1),
         },
         "confidence": confidence,
+        "horizon": "long",
+        "horizonLabel": "3-5+ let",
     }
 
 
@@ -969,6 +973,8 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
             "sector": sector or "Unknown"
         },
         "confidence": confidence,
+        "horizon": "short",
+        "horizonLabel": "6-18 měsíců",
     }
 
 
@@ -1006,6 +1012,8 @@ def _analyst_target_valuation(data: dict) -> Optional[dict]:
             "recommendation": data.get("recommendationKey"),
         },
         "confidence": confidence,
+        "horizon": "medium",
+        "horizonLabel": "12 měsíců",
     }
 
 
@@ -1122,6 +1130,8 @@ def _book_value_valuation(data: dict) -> Optional[dict]:
             "sectorPBRange": f"{benchmark['low']:.1f} - {benchmark['high']:.1f}"
         },
         "confidence": confidence,
+        "horizon": "long",
+        "horizonLabel": "3-5+ let",
     }
 
 
@@ -1229,6 +1239,8 @@ def _ddm_valuation(data: dict) -> Optional[dict]:
             "payoutRatio": f"{payout_ratio:.1%}" if payout_ratio else "N/A",
         },
         "confidence": confidence,
+        "horizon": "long",
+        "horizonLabel": "3-5+ let",
     }
 
 
@@ -1340,6 +1352,8 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
             "netDebtB": round(net_debt / 1e9, 2),
         },
         "confidence": confidence,
+        "horizon": "medium",
+        "horizonLabel": "1-3 roky",
     }
 
 
@@ -1422,6 +1436,8 @@ def _epv_valuation(data: dict) -> Optional[dict]:
             "assumption": "Zero Growth"
         },
         "confidence": confidence,
+        "horizon": "medium",
+        "horizonLabel": "1-3 roky",
     }
 
 
@@ -1501,6 +1517,8 @@ def _peg_valuation(data: dict) -> Optional[dict]:
             "targetPEG": 1.0
         },
         "confidence": confidence,
+        "horizon": "medium",
+        "horizonLabel": "1-3 roky",
     }
 
 
@@ -1643,6 +1661,8 @@ def _forward_peg_valuation(data: dict) -> Optional[dict]:
             "presentValue2Y": round(present_value_of_target, 2),
         },
         "confidence": confidence,
+        "horizon": "short",
+        "horizonLabel": "6-18 měsíců",
     }
 
 
