@@ -52,12 +52,22 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                     if price is None:
                         continue
                     
-                    # Use Yahoo's own change percent for accuracy (already in %)
+                    # Use Yahoo's own change values - only calculate if missing AND prev_close is valid
                     change_percent = info.get("regularMarketChangePercent")
-                    if change_percent is None:
-                        change_percent = ((price - prev_close) / prev_close) * 100 if prev_close else 0
+                    change = info.get("regularMarketChange")
                     
-                    change = info.get("regularMarketChange") or (price - prev_close if prev_close else 0)
+                    # Only calculate fallback if prev_close is valid (not None, not 0)
+                    if prev_close and prev_close > 0:
+                        if change_percent is None:
+                            change_percent = ((price - prev_close) / prev_close) * 100
+                        if change is None:
+                            change = price - prev_close
+                    else:
+                        # Invalid prev_close - set change to 0 to avoid misleading data
+                        if change_percent is None:
+                            change_percent = 0
+                        if change is None:
+                            change = 0
                     
                     # Volume from info
                     volume = int(info.get("regularMarketVolume") or 0)
