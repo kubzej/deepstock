@@ -123,7 +123,11 @@ export function ChartWrapper({
                 <Info className="h-4 w-4" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-xs text-left">
+            <TooltipContent
+              side="bottom"
+              align="start"
+              className="max-w-xs text-left"
+            >
               {tooltipContent}
             </TooltipContent>
           </Tooltip>

@@ -67,6 +67,22 @@ export function formatPercent(
 }
 
 /**
+ * Format decimal ratio as percentage (e.g., 0.41 → "41.00%")
+ * Use for API data that comes as decimals (margins, yields, etc.)
+ */
+export function formatRatioAsPercent(
+  value: number | null | undefined,
+  decimals: number = 2,
+  showSign: boolean = false
+): string {
+  if (value === null || value === undefined) return '—';
+  
+  const percentValue = value * 100;
+  const sign = showSign && percentValue > 0 ? '+' : '';
+  return `${sign}${percentValue.toFixed(decimals)}%`;
+}
+
+/**
  * Format number with thousands separator
  */
 export function formatNumber(

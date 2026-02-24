@@ -20,6 +20,7 @@ import {
   formatLargeNumber,
   formatPercent,
   formatRatio,
+  formatRatioAsPercent,
   formatCurrency,
 } from '@/lib/format';
 import { PriceChart } from '@/components/charts';
@@ -410,7 +411,7 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3">
           <Metric
             label="Gross Margin"
-            value={formatPercent(data.grossMargin)}
+            value={formatRatioAsPercent(data.grossMargin)}
             sentiment={
               data.grossMargin && data.grossMargin > 0.4
                 ? 'positive'
@@ -419,7 +420,7 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
           />
           <Metric
             label="Operating Margin"
-            value={formatPercent(data.operatingMargin)}
+            value={formatRatioAsPercent(data.operatingMargin)}
             sentiment={
               data.operatingMargin && data.operatingMargin > 0.2
                 ? 'positive'
@@ -428,7 +429,7 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
           />
           <Metric
             label="Profit Margin"
-            value={formatPercent(data.profitMargin)}
+            value={formatRatioAsPercent(data.profitMargin)}
             sentiment={
               data.profitMargin && data.profitMargin > 0.15
                 ? 'positive'
@@ -437,17 +438,17 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
           />
           <Metric
             label="ROE"
-            value={formatPercent(data.roe)}
+            value={formatRatioAsPercent(data.roe)}
             sentiment={data.roe && data.roe > 0.15 ? 'positive' : 'neutral'}
           />
           <Metric
             label="ROA"
-            value={formatPercent(data.roa)}
+            value={formatRatioAsPercent(data.roa)}
             sentiment={data.roa && data.roa > 0.1 ? 'positive' : 'neutral'}
           />
           <Metric
             label="Revenue Growth"
-            value={formatPercent(data.revenueGrowth)}
+            value={formatRatioAsPercent(data.revenueGrowth)}
             sentiment={
               data.revenueGrowth && data.revenueGrowth > 0.1
                 ? 'positive'
@@ -506,7 +507,7 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3">
             <Metric
               label="Dividend Yield"
-              value={formatPercent(data.dividendYield)}
+              value={formatRatioAsPercent(data.dividendYield)}
               sentiment="positive"
             />
             <Metric
@@ -515,7 +516,7 @@ function FundamentalsSection({ data }: { data: StockInfo }) {
             />
             <Metric
               label="Payout Ratio"
-              value={formatPercent(data.payoutRatio)}
+              value={formatRatioAsPercent(data.payoutRatio)}
             />
           </div>
         </div>
