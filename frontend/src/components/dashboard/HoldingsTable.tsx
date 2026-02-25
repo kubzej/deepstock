@@ -232,7 +232,7 @@ export function HoldingsTable({
     }
 
     return result;
-  }, [enrichedHoldings, showPortfolioColumn]);
+  }, [enrichedHoldings, showPortfolioColumn, rates]);
 
   // Sort the holdings
   const sortedHoldings = useMemo(() => {
