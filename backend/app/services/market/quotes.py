@@ -1,5 +1,9 @@
 """
 Quote fetching logic - stock quotes and price history
+
+Hybrid approach for efficiency:
+1. Basic prices via yf.download() - 1 HTTP request for all tickers, TTL 5min
+2. Extended data via .info - N requests but TTL 15min (pre/post market, avgVolume, earnings)
 """
 import yfinance as yf
 import pandas as pd
@@ -10,113 +14,160 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# Cache TTLs
+BASIC_QUOTE_TTL = 300      # 5 minutes for prices
+EXTENDED_DATA_TTL = 900    # 15 minutes for pre/post market, avgVolume, earnings
+
 
 async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
     """
-    Smart fetcher with cache.
-    1. Check Redis for each ticker.
-    2. BATCH fetch missing from yfinance (single call).
-    3. Cache new results.
-    
-    Earnings date is included from info (no extra API call needed).
+    Smart fetcher with two-tier caching:
+    1. Basic quotes (price, change, volume) via yf.download() - fast, 1 request
+    2. Extended data (pre/post market, avgVolume, earnings) via .info - slower, cached longer
     """
     results = {}
-    missing = []
-
-    # 1. Try Cache
+    
+    # ========================================
+    # TIER 1: Basic quotes via yf.download()
+    # ========================================
+    missing_basic = []
+    
     for t in tickers:
         cached = await redis.get(f"quote:{t}")
         if cached:
             results[t] = json.loads(cached)
         else:
-            missing.append(t)
-
-    # 2. BATCH Fetch Missing from Yahoo
-    if missing:
+            missing_basic.append(t)
+    
+    if missing_basic:
         try:
-            # Single batch call for all missing tickers
-            batch = yf.Tickers(" ".join(missing))
+            # Single batch download for all missing tickers
+            df = yf.download(
+                " ".join(missing_basic), 
+                period="2d",  # Need 2 days for previous close
+                interval="1d",
+                progress=False,
+                threads=True
+            )
             
-            for t in missing:
+            if not df.empty:
+                # Handle single vs multiple tickers (yfinance returns different structure)
+                is_multi = len(missing_basic) > 1
+                
+                for t in missing_basic:
+                    try:
+                        if is_multi:
+                            ticker_data = df.xs(t, level=1, axis=1) if t in df.columns.get_level_values(1) else None
+                        else:
+                            ticker_data = df
+                        
+                        if ticker_data is None or ticker_data.empty:
+                            continue
+                        
+                        # Get latest row
+                        latest = ticker_data.iloc[-1]
+                        price = float(latest["Close"])
+                        volume = int(latest["Volume"]) if pd.notna(latest["Volume"]) else 0
+                        
+                        # Get previous close from second-to-last row
+                        prev_close = None
+                        change = 0
+                        change_percent = 0
+                        if len(ticker_data) >= 2:
+                            prev_close = float(ticker_data.iloc[-2]["Close"])
+                            change = price - prev_close
+                            change_percent = (change / prev_close * 100) if prev_close else 0
+                        
+                        quote = {
+                            "symbol": t,
+                            "price": round(price, 2),
+                            "previousClose": round(prev_close, 2) if prev_close else None,
+                            "change": round(change, 2),
+                            "changePercent": round(change_percent, 2),
+                            "volume": volume,
+                            "lastUpdated": str(pd.Timestamp.now())
+                        }
+                        
+                        results[t] = quote
+                        await redis.set(f"quote:{t}", json.dumps(quote), ex=BASIC_QUOTE_TTL)
+                        
+                    except Exception as e:
+                        logger.warning(f"Error processing {t} from download: {e}")
+                        
+        except Exception as e:
+            logger.error(f"Error in yf.download batch: {e}")
+    
+    # ========================================
+    # TIER 2: Extended data via .info (longer TTL)
+    # ========================================
+    missing_extended = []
+    
+    for t in tickers:
+        if t not in results:
+            continue
+        cached_ext = await redis.get(f"quote_ext:{t}")
+        if cached_ext:
+            # Merge extended data into results
+            ext_data = json.loads(cached_ext)
+            results[t].update(ext_data)
+        else:
+            missing_extended.append(t)
+    
+    if missing_extended:
+        try:
+            batch = yf.Tickers(" ".join(missing_extended))
+            
+            for t in missing_extended:
                 try:
                     ticker_obj = batch.tickers.get(t)
                     if not ticker_obj:
                         continue
                     
-                    # Use only .info - fast_info is redundant HTTP call
                     info = ticker_obj.info
                     
-                    price = info.get("regularMarketPrice")
-                    prev_close = info.get("regularMarketPreviousClose")
+                    # Extended data only
+                    ext_data = {}
                     
-                    if price is None:
-                        continue
+                    # Average volume
+                    avg_volume = info.get("averageDailyVolume10Day")
+                    if avg_volume:
+                        ext_data["avgVolume"] = int(avg_volume)
                     
-                    # Use Yahoo's own change values - only calculate if missing AND prev_close is valid
-                    change_percent = info.get("regularMarketChangePercent")
-                    change = info.get("regularMarketChange")
-                    
-                    # Only calculate fallback if prev_close is valid (not None, not 0)
-                    if prev_close and prev_close > 0:
-                        if change_percent is None:
-                            change_percent = ((price - prev_close) / prev_close) * 100
-                        if change is None:
-                            change = price - prev_close
-                    else:
-                        # Invalid prev_close - set change to 0 to avoid misleading data
-                        if change_percent is None:
-                            change_percent = 0
-                        if change is None:
-                            change = 0
-                    
-                    # Volume from info
-                    volume = int(info.get("regularMarketVolume") or 0)
-                    avg_volume = int(info.get("averageDailyVolume10Day") or 0)
-
-                    # Extended hours data
+                    # Pre-market
                     pre_market_price = info.get("preMarketPrice")
+                    if pre_market_price:
+                        ext_data["preMarketPrice"] = round(pre_market_price, 2)
+                        # Calculate pre-market change vs regular close
+                        if results[t].get("price"):
+                            pct = ((pre_market_price - results[t]["price"]) / results[t]["price"]) * 100
+                            ext_data["preMarketChangePercent"] = round(pct, 2)
+                    
+                    # Post-market
                     post_market_price = info.get("postMarketPrice")
+                    if post_market_price:
+                        ext_data["postMarketPrice"] = round(post_market_price, 2)
+                        if results[t].get("price"):
+                            pct = ((post_market_price - results[t]["price"]) / results[t]["price"]) * 100
+                            ext_data["postMarketChangePercent"] = round(pct, 2)
                     
-                    # Calculate extended hours change percent (relative to regular close)
-                    pre_market_change_pct = None
-                    if pre_market_price and price:
-                        pre_market_change_pct = ((pre_market_price - price) / price) * 100
-                    
-                    post_market_change_pct = None
-                    if post_market_price and price:
-                        post_market_change_pct = ((post_market_price - price) / price) * 100
-
-                    quote = {
-                        "symbol": t,
-                        "price": round(price, 2),
-                        "previousClose": round(prev_close, 2) if prev_close else None,
-                        "change": round(change, 2),
-                        "changePercent": round(change_percent, 2),
-                        "volume": volume,
-                        "avgVolume": avg_volume,
-                        "preMarketPrice": round(pre_market_price, 2) if pre_market_price else None,
-                        "preMarketChangePercent": round(pre_market_change_pct, 2) if pre_market_change_pct else None,
-                        "postMarketPrice": round(post_market_price, 2) if post_market_price else None,
-                        "postMarketChangePercent": round(post_market_change_pct, 2) if post_market_change_pct else None,
-                        "lastUpdated": str(pd.Timestamp.now())
-                    }
-                    
-                    # Add earnings date from info (no extra API call)
+                    # Earnings date
                     earnings_ts = info.get("earningsTimestamp")
                     if earnings_ts:
-                        quote["earningsDate"] = datetime.fromtimestamp(earnings_ts).date().isoformat()
+                        ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts).date().isoformat()
                     
-                    results[t] = quote
+                    # Merge into results
+                    results[t].update(ext_data)
                     
-                    # Cache for 5 minutes (was 60s - too short)
-                    await redis.set(f"quote:{t}", json.dumps(quote), ex=300)
-
+                    # Cache extended data separately with longer TTL
+                    await redis.set(f"quote_ext:{t}", json.dumps(ext_data), ex=EXTENDED_DATA_TTL)
+                    
                 except Exception as e:
-                    logger.warning(f"Error processing {t}: {e}")
-                    results[t] = None
+                    logger.warning(f"Error fetching extended data for {t}: {e}")
                     
         except Exception as e:
-            logger.error(f"Error in batch fetch: {e}")
+            logger.error(f"Error in extended data batch: {e}")
+    
+    return results
     
     return results
 
