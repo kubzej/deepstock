@@ -45,7 +45,7 @@ export function useCreateStock() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Omit<Stock, 'id' | 'createdAt'>) => createStock(data),
+    mutationFn: (data: Omit<Stock, 'id' | 'created_at'>) => createStock(data),
     onSuccess: () => {
       // Invalidate stocks list to refetch
       queryClient.invalidateQueries({ queryKey: stocksKey });

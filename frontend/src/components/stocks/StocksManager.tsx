@@ -246,7 +246,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
           data: payload,
         });
       } else {
-        await createStockMutation.mutateAsync(payload as any);
+        await createStockMutation.mutateAsync(payload);
       }
 
       setDialogOpen(false);
