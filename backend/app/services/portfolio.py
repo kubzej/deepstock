@@ -42,6 +42,72 @@ class AvailableLot(BaseModel):
 
 
 class PortfolioService:
+
+    async def _get_sold_amount_for_buy_lot(self, buy_tx: dict) -> float:
+        """
+        Return how many shares from a BUY transaction were already sold.
+
+        Covers both models used in this app:
+        1) Explicit lot-linked sells (source_transaction_id)
+        2) Legacy/fallback sells without source_transaction_id (FIFO allocation)
+        """
+        buy_id = buy_tx["id"]
+        portfolio_id = buy_tx["portfolio_id"]
+        stock_id = buy_tx["stock_id"]
+
+        sold_amount = 0.0
+
+        # 1) Explicit lot-linked sells
+        linked_sells = supabase.table("transactions") \
+            .select("shares") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("stock_id", stock_id) \
+            .eq("type", "SELL") \
+            .eq("source_transaction_id", buy_id) \
+            .execute()
+
+        for sell in (linked_sells.data or []):
+            sold_amount += float(sell["shares"])
+
+        # 2) FIFO fallback sells (no source_transaction_id)
+        fifo_sells = supabase.table("transactions") \
+            .select("shares") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("stock_id", stock_id) \
+            .eq("type", "SELL") \
+            .is_("source_transaction_id", "null") \
+            .execute()
+
+        total_fifo_to_allocate = sum(float(row["shares"]) for row in (fifo_sells.data or []))
+        if total_fifo_to_allocate <= 0:
+            return sold_amount
+
+        # Get BUY lots in chronological order and allocate FIFO sells
+        buys = supabase.table("transactions") \
+            .select("id, shares") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("stock_id", stock_id) \
+            .eq("type", "BUY") \
+            .order("executed_at", desc=False) \
+            .execute()
+
+        remaining_fifo = total_fifo_to_allocate
+        sold_by_fifo_for_target = 0.0
+
+        for buy in (buys.data or []):
+            if remaining_fifo <= 0:
+                break
+
+            lot_shares = float(buy["shares"])
+            sell_from_lot = min(lot_shares, remaining_fifo)
+
+            if buy["id"] == buy_id:
+                sold_by_fifo_for_target = sell_from_lot
+                break
+
+            remaining_fifo -= sell_from_lot
+
+        return sold_amount + sold_by_fifo_for_target
     
     async def get_user_portfolios(self, user_id: str) -> List[dict]:
         """Get all portfolios for a user."""
@@ -618,6 +684,26 @@ class PortfolioService:
         
         tx = existing.data[0]
         stock_id = tx["stock_id"]
+
+        # Lot integrity guard:
+        # If this BUY lot is already consumed by SELL transactions (linked or FIFO fallback),
+        # block updates that would affect cost basis / chronology.
+        if tx["type"] == "BUY":
+            sold_amount = await self._get_sold_amount_for_buy_lot(tx)
+            modifies_fifo_fields = any([
+                data.shares is not None,
+                data.price_per_share is not None,
+                data.currency is not None,
+                data.exchange_rate_to_czk is not None,
+                data.executed_at is not None,
+            ])
+
+            if sold_amount > 0 and modifies_fifo_fields:
+                raise ValueError(
+                    "Nelze upravit tento nákup, protože z něj už byly provedeny prodeje (SELL) "
+                    "- navázané na lot nebo přes fallback alokaci. "
+                    "Nejprve upravte nebo smažte navázané SELL transakce."
+                )
         
         # Build update dict
         update_data = {}
@@ -672,15 +758,16 @@ class PortfolioService:
         tx = existing.data[0]
         stock_id = tx["stock_id"]
         
-        # Check if this is a BUY that has sells pointing to it
+        # Check if this BUY was already consumed by SELL transactions
         if tx["type"] == "BUY":
-            sells_from_lot = supabase.table("transactions") \
-                .select("id") \
-                .eq("source_transaction_id", transaction_id) \
-                .execute()
-            
-            if sells_from_lot.data:
-                raise ValueError("Nelze smazat nákup, ze kterého už byly prodány akcie")
+            sold_amount = await self._get_sold_amount_for_buy_lot(tx)
+
+            if sold_amount > 0:
+                raise ValueError(
+                    "Nelze smazat tento nákup, protože z něj už byly provedeny prodeje (SELL) "
+                    "- navázané na lot nebo přes fallback alokaci. "
+                    "Nejprve upravte nebo smažte navázané SELL transakce."
+                )
         
         # Delete transaction
         supabase.table("transactions") \

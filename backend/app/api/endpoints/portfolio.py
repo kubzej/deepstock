@@ -134,10 +134,13 @@ async def update_transaction(
     Update an existing transaction.
     Only certain fields can be updated: shares, price, currency, fees, notes, date.
     """
-    result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
-    if not result:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    return result
+    try:
+        result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
+        if not result:
+            raise HTTPException(status_code=404, detail="Transakce nenalezena")
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/{portfolio_id}/transactions/{transaction_id}")

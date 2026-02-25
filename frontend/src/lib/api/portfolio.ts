@@ -465,6 +465,10 @@ export async function updateTransaction(
     if (response.status === 404) {
       throw new Error('Transakce nenalezena');
     }
+    if (response.status === 400) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Nelze upravit transakci');
+    }
     throw new Error('Nepodařilo se upravit transakci');
   }
   
