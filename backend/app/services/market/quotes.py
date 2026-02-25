@@ -9,10 +9,36 @@ import yfinance as yf
 import pandas as pd
 import json
 import logging
-from typing import List, Dict
+import math
+from typing import List, Dict, Optional, Union
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def safe_float(value, decimals: int = 2) -> Optional[float]:
+    """Safely convert a value to float, handling NaN/inf/None -> None for JSON serialization."""
+    if value is None:
+        return None
+    try:
+        f = float(value)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return round(f, decimals)
+    except (ValueError, TypeError):
+        return None
+
+
+def safe_int(value) -> Optional[int]:
+    """Safely convert a value to int, handling NaN/inf/None -> None for JSON serialization."""
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+        return int(value)
+    except (ValueError, TypeError):
+        return None
 
 # Cache TTLs
 BASIC_QUOTE_TTL = 300      # 5 minutes for prices
@@ -66,24 +92,30 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                         
                         # Get latest row
                         latest = ticker_data.iloc[-1]
-                        price = float(latest["Close"])
-                        volume = int(latest["Volume"]) if pd.notna(latest["Volume"]) else 0
+                        price = safe_float(latest["Close"])
+                        volume = safe_int(latest["Volume"]) or 0
+                        
+                        # Skip if we couldn't get a valid price
+                        if price is None:
+                            logger.warning(f"No valid price for {t}, skipping")
+                            continue
                         
                         # Get previous close from second-to-last row
                         prev_close = None
                         change = 0
                         change_percent = 0
                         if len(ticker_data) >= 2:
-                            prev_close = float(ticker_data.iloc[-2]["Close"])
-                            change = price - prev_close
-                            change_percent = (change / prev_close * 100) if prev_close else 0
+                            prev_close = safe_float(ticker_data.iloc[-2]["Close"])
+                            if prev_close is not None:
+                                change = safe_float(price - prev_close)
+                                change_percent = safe_float((price - prev_close) / prev_close * 100)
                         
                         quote = {
                             "symbol": t,
-                            "price": round(price, 2),
-                            "previousClose": round(prev_close, 2) if prev_close else None,
-                            "change": round(change, 2),
-                            "changePercent": round(change_percent, 2),
+                            "price": price,
+                            "previousClose": prev_close,
+                            "change": change or 0,
+                            "changePercent": change_percent or 0,
                             "volume": volume,
                             "lastUpdated": str(pd.Timestamp.now())
                         }
@@ -129,26 +161,28 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                     ext_data = {}
                     
                     # Average volume
-                    avg_volume = info.get("averageDailyVolume10Day")
+                    avg_volume = safe_int(info.get("averageDailyVolume10Day"))
                     if avg_volume:
-                        ext_data["avgVolume"] = int(avg_volume)
+                        ext_data["avgVolume"] = avg_volume
                     
                     # Pre-market
-                    pre_market_price = info.get("preMarketPrice")
-                    if pre_market_price:
-                        ext_data["preMarketPrice"] = round(pre_market_price, 2)
+                    pre_market_price = safe_float(info.get("preMarketPrice"))
+                    if pre_market_price is not None:
+                        ext_data["preMarketPrice"] = pre_market_price
                         # Calculate pre-market change vs regular close
                         if results[t].get("price"):
-                            pct = ((pre_market_price - results[t]["price"]) / results[t]["price"]) * 100
-                            ext_data["preMarketChangePercent"] = round(pct, 2)
+                            pct = safe_float(((pre_market_price - results[t]["price"]) / results[t]["price"]) * 100)
+                            if pct is not None:
+                                ext_data["preMarketChangePercent"] = pct
                     
                     # Post-market
-                    post_market_price = info.get("postMarketPrice")
-                    if post_market_price:
-                        ext_data["postMarketPrice"] = round(post_market_price, 2)
+                    post_market_price = safe_float(info.get("postMarketPrice"))
+                    if post_market_price is not None:
+                        ext_data["postMarketPrice"] = post_market_price
                         if results[t].get("price"):
-                            pct = ((post_market_price - results[t]["price"]) / results[t]["price"]) * 100
-                            ext_data["postMarketChangePercent"] = round(pct, 2)
+                            pct = safe_float(((post_market_price - results[t]["price"]) / results[t]["price"]) * 100)
+                            if pct is not None:
+                                ext_data["postMarketChangePercent"] = pct
                     
                     # Earnings date
                     earnings_ts = info.get("earningsTimestamp")
@@ -166,8 +200,6 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                     
         except Exception as e:
             logger.error(f"Error in extended data batch: {e}")
-    
-    return results
     
     return results
 
@@ -202,13 +234,17 @@ async def get_price_history(redis, ticker: str, period: str = "1mo") -> List[dic
         # Convert to list of dicts for JSON
         result = []
         for idx, row in hist.iterrows():
+            close_price = safe_float(row["Close"])
+            # Skip rows with invalid close price
+            if close_price is None:
+                continue
             result.append({
                 "date": idx.isoformat(),
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else 0
+                "open": safe_float(row["Open"]) or close_price,
+                "high": safe_float(row["High"]) or close_price,
+                "low": safe_float(row["Low"]) or close_price,
+                "close": close_price,
+                "volume": safe_int(row["Volume"]) or 0
             })
         
         # Cache based on period (shorter periods = shorter TTL)
