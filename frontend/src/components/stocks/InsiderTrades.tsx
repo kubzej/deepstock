@@ -36,9 +36,11 @@ function formatShares(n: number): string {
   return n.toLocaleString('cs-CZ');
 }
 
+const INITIAL_COUNT = 3;
+
 export function InsiderTrades({ ticker }: InsiderTradesProps) {
   const { data, isLoading } = useInsiderTrades(ticker);
-  const [showAll, setShowAll] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
 
   // Don't render anything if loading or no data (non-US stock)
   if (isLoading) {
@@ -66,9 +68,8 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
   const sellCount = trades.filter((t) => t.trade_type === 'Sale').length;
 
   // Show limited rows unless expanded
-  const INITIAL_COUNT = 3;
-  const visible = showAll ? trades : trades.slice(0, INITIAL_COUNT);
-  const hasMore = trades.length > INITIAL_COUNT;
+  const visible = trades.slice(0, visibleCount);
+  const hasMore = visibleCount < trades.length;
 
   return (
     <div>
@@ -158,11 +159,11 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
           variant="ghost"
           size="sm"
           className="w-full mt-2 text-xs text-muted-foreground"
-          onClick={() => setShowAll(!showAll)}
+          onClick={() =>
+            setVisibleCount((prev) => Math.min(prev + 10, trades.length))
+          }
         >
-          {showAll
-            ? 'Zobrazit méně'
-            : `Zobrazit dalších ${trades.length - INITIAL_COUNT}`}
+          Zobrazit dalších {Math.min(10, trades.length - visibleCount)}
         </Button>
       )}
     </div>

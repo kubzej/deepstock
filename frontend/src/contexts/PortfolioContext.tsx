@@ -119,8 +119,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   } = useOpenLots(portfolioIdForQuery);
 
   // Fetch exchange rates
-  const { data: ratesData = DEFAULT_RATES, dataUpdatedAt: ratesUpdatedAt } =
-    useExchangeRates();
+  const {
+    data: ratesData = DEFAULT_RATES,
+    isLoading: ratesLoading,
+    isFetching: ratesFetching,
+    dataUpdatedAt: ratesUpdatedAt,
+  } = useExchangeRates();
 
   // Prefetch: Get all watchlist tickers for background prefetching
   const { data: watchlistTickers = [] } = useAllWatchlistTickers();
@@ -152,14 +156,19 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   // Initial loading state (no data yet - show skeleton)
   const isInitialLoading =
-    portfoliosLoading || holdingsLoading || openLotsLoading || quotesLoading;
+    portfoliosLoading ||
+    holdingsLoading ||
+    openLotsLoading ||
+    quotesLoading ||
+    ratesLoading;
 
   // Fetching state (may have stale data - show spinner)
   const isFetching =
     portfoliosFetching ||
     holdingsFetching ||
     openLotsFetching ||
-    quotesFetching;
+    quotesFetching ||
+    ratesFetching;
 
   // Combined loading state (deprecated, kept for backwards compatibility)
   const loading = isInitialLoading;

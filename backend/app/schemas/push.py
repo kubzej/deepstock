@@ -14,8 +14,6 @@ class NotificationSettings(BaseModel):
     alert_buy_enabled: bool
     alert_sell_enabled: bool
     alert_earnings_enabled: bool
-    alert_insider_enabled: bool
-    insider_min_value: int
 
 
 class NotificationSettingsUpdate(BaseModel):
@@ -24,8 +22,6 @@ class NotificationSettingsUpdate(BaseModel):
     alert_buy_enabled: Optional[bool] = None
     alert_sell_enabled: Optional[bool] = None
     alert_earnings_enabled: Optional[bool] = None
-    alert_insider_enabled: Optional[bool] = None
-    insider_min_value: Optional[int] = None
 
 
 class TestNotification(BaseModel):

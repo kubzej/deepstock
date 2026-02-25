@@ -6,10 +6,36 @@ import pandas as pd
 import json
 import asyncio
 import logging
+import math
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
+
+
+def safe_float(value, decimals: int = 2) -> Optional[float]:
+    """Safely convert a value to float, handling NaN/inf/None -> None for JSON serialization."""
+    if value is None:
+        return None
+    try:
+        f = float(value)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return round(f, decimals)
+    except (ValueError, TypeError):
+        return None
+
+
+def safe_int(value) -> Optional[int]:
+    """Safely convert a value to int, handling NaN/inf/None -> None for JSON serialization."""
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+        return int(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _fetch_option_quotes_batch(occ_symbols: List[str]) -> Dict[str, Optional[dict]]:
@@ -43,23 +69,26 @@ def _fetch_option_quotes_batch(occ_symbols: List[str]) -> Dict[str, Optional[dic
                     results[occ] = None
                     continue
                 
+                price = safe_float(info.get("regularMarketPrice"), 4)
+                previous_close = safe_float(info.get("regularMarketPreviousClose"), 4)
+                
                 quote = {
                     "symbol": occ,
-                    "price": info.get("regularMarketPrice"),
-                    "bid": info.get("bid"),
-                    "ask": info.get("ask"),
-                    "previousClose": info.get("regularMarketPreviousClose"),
-                    "volume": info.get("volume") or 0,
-                    "openInterest": info.get("openInterest"),
-                    "impliedVolatility": info.get("impliedVolatility"),
+                    "price": price,
+                    "bid": safe_float(info.get("bid"), 4),
+                    "ask": safe_float(info.get("ask"), 4),
+                    "previousClose": previous_close,
+                    "volume": safe_int(info.get("volume")) or 0,
+                    "openInterest": safe_int(info.get("openInterest")),
+                    "impliedVolatility": safe_float(info.get("impliedVolatility"), 4),
                     "lastUpdated": str(pd.Timestamp.now()),
                 }
                 
                 # Calculate change from previous close
-                if quote["price"] and quote.get("previousClose"):
-                    quote["change"] = round(quote["price"] - quote["previousClose"], 4)
-                    quote["changePercent"] = round(
-                        (quote["change"] / quote["previousClose"]) * 100, 2
+                if price is not None and previous_close is not None:
+                    quote["change"] = safe_float(price - previous_close, 4)
+                    quote["changePercent"] = safe_float(
+                        ((price - previous_close) / previous_close) * 100, 2
                     )
                 else:
                     quote["change"] = 0
