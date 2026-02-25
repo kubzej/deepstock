@@ -88,7 +88,7 @@ export function StockDetail({
   const [deletingTransaction, setDeletingTransaction] =
     useState<Transaction | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showAllTx, setShowAllTx] = useState(false);
+  const [visibleTxCount, setVisibleTxCount] = useState(3);
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
 
   // Get optional holding (position) from portfolio
@@ -438,254 +438,252 @@ export function StockDetail({
         ) : (
           <>
             <div className="space-y-1">
-              {(showAllTx ? transactions : transactions.slice(0, 3)).map(
-                (tx) => {
-                  const isBuy = tx.type === 'BUY';
-                  const lotStatus = isBuy
-                    ? getLotStatus(tx.id, tx.shares)
-                    : null;
+              {transactions.slice(0, visibleTxCount).map((tx) => {
+                const isBuy = tx.type === 'BUY';
+                const lotStatus = isBuy ? getLotStatus(tx.id, tx.shares) : null;
 
-                  let pnl: number | null = null;
-                  let pnlPercent: number | null = null;
-                  let pnlCzk: number | null = null;
+                let pnl: number | null = null;
+                let pnlPercent: number | null = null;
+                let pnlCzk: number | null = null;
 
-                  // Realized P/L for SELL transactions
-                  if (!isBuy && tx.sourceTransaction) {
-                    const srcPrice = tx.sourceTransaction.price;
-                    pnl = (tx.price - srcPrice) * tx.shares;
-                    pnlPercent = ((tx.price - srcPrice) / srcPrice) * 100;
-                    pnlCzk = pnl * (tx.exchangeRate || 1);
+                // Realized P/L for SELL transactions
+                if (!isBuy && tx.sourceTransaction) {
+                  const srcPrice = tx.sourceTransaction.price;
+                  pnl = (tx.price - srcPrice) * tx.shares;
+                  pnlPercent = ((tx.price - srcPrice) / srcPrice) * 100;
+                  pnlCzk = pnl * (tx.exchangeRate || 1);
+                }
+
+                // Unrealized P/L for BUY transactions (open lots)
+                if (
+                  isBuy &&
+                  lotStatus &&
+                  lotStatus.remaining > 0 &&
+                  quote?.price
+                ) {
+                  const priceScale = stock?.price_scale ?? 1;
+                  const currentPriceScaled = quote.price * priceScale;
+                  pnl = (currentPriceScaled - tx.price) * lotStatus.remaining;
+                  pnlPercent =
+                    tx.price > 0
+                      ? ((currentPriceScaled - tx.price) / tx.price) * 100
+                      : 0;
+                  // Use historical exchange rate for cost, current rate for value
+                  // This matches the main position P/L calculation
+                  const costBasisCzk = tx.exchangeRate
+                    ? tx.price * lotStatus.remaining * tx.exchangeRate
+                    : toCZK(tx.price * lotStatus.remaining, tx.currency, rates);
+                  const currentValueCzk = toCZK(
+                    currentPriceScaled * lotStatus.remaining,
+                    tx.currency,
+                    rates,
+                  );
+                  pnlCzk = currentValueCzk - costBasisCzk;
+                }
+
+                // Lot number for BUY, or source lot number for SELL
+                const lotNum = isBuy
+                  ? lotNumbers.get(tx.id)
+                  : tx.sourceTransactionId
+                    ? lotNumbers.get(tx.sourceTransactionId)
+                    : undefined;
+
+                // Lot link description (right side)
+                let lotInfo: string | null = null;
+                if (isBuy && lotStatus) {
+                  if (lotStatus.isFullySold) {
+                    lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
+                  } else if (lotStatus.sold > 0) {
+                    lotInfo = `zbývá ${lotStatus.remaining}/${tx.shares}`;
                   }
+                } else if (!isBuy && tx.sourceTransaction) {
+                  lotInfo = `z lotu #${lotNum ?? '?'} (${formatPrice(tx.sourceTransaction.price, tx.sourceTransaction.currency)})`;
+                }
 
-                  // Unrealized P/L for BUY transactions (open lots)
-                  if (
-                    isBuy &&
-                    lotStatus &&
-                    lotStatus.remaining > 0 &&
-                    quote?.price
-                  ) {
-                    const priceScale = stock?.price_scale ?? 1;
-                    const currentPriceScaled = quote.price * priceScale;
-                    pnl = (currentPriceScaled - tx.price) * lotStatus.remaining;
-                    pnlPercent =
-                      tx.price > 0
-                        ? ((currentPriceScaled - tx.price) / tx.price) * 100
-                        : 0;
-                    // Use historical exchange rate for cost, current rate for value
-                    // This matches the main position P/L calculation
-                    const costBasisCzk = tx.exchangeRate
-                      ? tx.price * lotStatus.remaining * tx.exchangeRate
-                      : toCZK(
-                          tx.price * lotStatus.remaining,
-                          tx.currency,
-                          rates,
-                        );
-                    const currentValueCzk = toCZK(
-                      currentPriceScaled * lotStatus.remaining,
-                      tx.currency,
-                      rates,
-                    );
-                    pnlCzk = currentValueCzk - costBasisCzk;
-                  }
+                const isExpanded = expandedTxId === tx.id;
+                const isClosed = (isBuy && lotStatus?.isFullySold) || !isBuy;
 
-                  // Lot number for BUY, or source lot number for SELL
-                  const lotNum = isBuy
-                    ? lotNumbers.get(tx.id)
-                    : tx.sourceTransactionId
-                      ? lotNumbers.get(tx.sourceTransactionId)
-                      : undefined;
-
-                  // Lot link description (right side)
-                  let lotInfo: string | null = null;
-                  if (isBuy && lotStatus) {
-                    if (lotStatus.isFullySold) {
-                      lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
-                    } else if (lotStatus.sold > 0) {
-                      lotInfo = `zbývá ${lotStatus.remaining}/${tx.shares}`;
-                    }
-                  } else if (!isBuy && tx.sourceTransaction) {
-                    lotInfo = `z lotu #${lotNum ?? '?'} (${formatPrice(tx.sourceTransaction.price, tx.sourceTransaction.currency)})`;
-                  }
-
-                  const isExpanded = expandedTxId === tx.id;
-
-                  return (
-                    <div
-                      key={tx.id}
-                      className="group bg-muted/30 rounded-xl cursor-pointer active:scale-[0.99] transition-transform"
-                      onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
-                    >
-                      <div className="px-3 py-2.5">
-                        {/* Header Row */}
-                        <div className="flex items-center justify-between">
-                          {/* Left: Badge + lot# + date */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
-                              >
-                                {isBuy ? 'NÁKUP' : 'PRODEJ'}
-                              </Badge>
-                              {lotNum && (
-                                <span className="text-[10px] font-mono-price text-muted-foreground">
-                                  #{lotNum}
-                                </span>
-                              )}
-                              <span className="text-[11px] text-muted-foreground">
-                                {formatDateCzech(tx.date)}
+                return (
+                  <div
+                    key={tx.id}
+                    className={`group rounded-xl cursor-pointer active:scale-[0.99] transition-transform ${
+                      isClosed ? 'bg-muted/15 opacity-50' : 'bg-muted/30'
+                    }`}
+                    onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
+                  >
+                    <div className="px-3 py-2.5">
+                      {/* Header Row */}
+                      <div className="flex items-center justify-between">
+                        {/* Left: Badge + lot# + date */}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
+                            >
+                              {isBuy ? 'NÁKUP' : 'PRODEJ'}
+                            </Badge>
+                            {lotNum && (
+                              <span className="text-[10px] font-mono-price text-muted-foreground">
+                                #{lotNum}
                               </span>
-                              {isAllPortfolios && tx.portfolioName && (
-                                <span className="text-[11px] text-muted-foreground">
-                                  · {tx.portfolioName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Right: Investment + P/L for BUY, just P/L for SELL */}
-                          <div className="flex flex-col items-end flex-shrink-0">
-                            {isBuy && lotStatus && lotStatus.remaining > 0 ? (
-                              <>
-                                {/* Investment amount */}
-                                <span className="font-mono-price text-sm font-medium">
-                                  {formatCurrency(tx.totalCzk)}
-                                </span>
-                                {/* Unrealized P/L */}
-                                {pnlCzk !== null && (
-                                  <div className="flex items-baseline gap-1">
-                                    <span
-                                      className={`font-mono-price text-[11px] ${
-                                        pnlCzk >= 0
-                                          ? 'text-positive'
-                                          : 'text-negative'
-                                      }`}
-                                    >
-                                      {pnlCzk >= 0 ? '+' : ''}
-                                      {formatCurrency(pnlCzk)}
-                                    </span>
-                                    <span
-                                      className={`text-[10px] font-mono-price ${
-                                        pnlPercent! >= 0
-                                          ? 'text-positive/60'
-                                          : 'text-negative/60'
-                                      }`}
-                                    >
-                                      {formatPercent(pnlPercent!, 1, true)}
-                                    </span>
-                                  </div>
-                                )}
-                              </>
-                            ) : pnlCzk !== null ? (
-                              <>
-                                <span
-                                  className={`font-mono-price text-sm font-medium ${
-                                    pnlCzk >= 0
-                                      ? 'text-positive'
-                                      : 'text-negative'
-                                  }`}
-                                >
-                                  {formatCurrency(pnlCzk)}
-                                </span>
-                                <span
-                                  className={`text-[10px] font-mono-price ${
-                                    pnlPercent! >= 0
-                                      ? 'text-positive/60'
-                                      : 'text-negative/60'
-                                  }`}
-                                >
-                                  {formatPercent(pnlPercent!, 1, true)}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="font-mono-price text-sm font-medium">
-                                {formatCurrency(tx.totalCzk)}
+                            )}
+                            <span className="text-[11px] text-muted-foreground">
+                              {formatDateCzech(tx.date)}
+                            </span>
+                            {isAllPortfolios && tx.portfolioName && (
+                              <span className="text-[11px] text-muted-foreground">
+                                · {tx.portfolioName}
                               </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Subrow: shares × price → current price */}
-                        <div className="flex items-center justify-between mt-0.5">
-                          <span className="text-[11px] text-muted-foreground font-mono-price">
-                            {isBuy && lotStatus && lotStatus.remaining > 0
-                              ? `${lotStatus.remaining} ks × ${formatPrice(tx.price, tx.currency)}`
-                              : `${tx.shares} ks × ${formatPrice(tx.price, tx.currency)}`}
-                            {isBuy &&
-                              lotStatus &&
-                              lotStatus.remaining > 0 &&
-                              quote?.price && (
-                                <span className="ml-1">
-                                  →{' '}
-                                  {formatPrice(
-                                    quote.price * (stock?.price_scale ?? 1),
-                                    tx.currency,
-                                  )}
-                                </span>
+                        {/* Right: Investment + P/L for BUY, just P/L for SELL */}
+                        <div className="flex flex-col items-end flex-shrink-0">
+                          {isBuy && lotStatus && lotStatus.remaining > 0 ? (
+                            <>
+                              {/* Investment amount */}
+                              <span className="font-mono-price text-sm font-medium">
+                                {formatCurrency(tx.totalCzk)}
+                              </span>
+                              {/* Unrealized P/L */}
+                              {pnlCzk !== null && (
+                                <div className="flex items-baseline gap-1">
+                                  <span
+                                    className={`font-mono-price text-[11px] ${
+                                      pnlCzk >= 0
+                                        ? 'text-positive'
+                                        : 'text-negative'
+                                    }`}
+                                  >
+                                    {pnlCzk >= 0 ? '+' : ''}
+                                    {formatCurrency(pnlCzk)}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-mono-price ${
+                                      pnlPercent! >= 0
+                                        ? 'text-positive/60'
+                                        : 'text-negative/60'
+                                    }`}
+                                  >
+                                    {formatPercent(pnlPercent!, 1, true)}
+                                  </span>
+                                </div>
                               )}
-                          </span>
-                          {lotInfo && (
-                            <span className="text-[11px] text-muted-foreground">
-                              {lotInfo}
+                            </>
+                          ) : pnlCzk !== null ? (
+                            <>
+                              <span
+                                className={`font-mono-price text-sm font-medium ${
+                                  pnlCzk >= 0
+                                    ? 'text-positive'
+                                    : 'text-negative'
+                                }`}
+                              >
+                                {formatCurrency(pnlCzk)}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono-price ${
+                                  pnlPercent! >= 0
+                                    ? 'text-positive/60'
+                                    : 'text-negative/60'
+                                }`}
+                              >
+                                {formatPercent(pnlPercent!, 1, true)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-mono-price text-sm font-medium">
+                              {formatCurrency(tx.totalCzk)}
                             </span>
                           )}
                         </div>
+                      </div>
 
-                        {/* Expanded Details */}
-                        <div
-                          className={`grid transition-all duration-200 ease-out ${
-                            isExpanded
-                              ? 'grid-rows-[1fr] opacity-100 mt-3'
-                              : 'grid-rows-[0fr] opacity-0'
-                          }`}
-                        >
-                          <div className="overflow-hidden">
-                            {/* Action buttons */}
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs gap-1.5"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingTransaction(tx);
-                                }}
-                              >
-                                <Pencil className="h-3 w-3" />
-                                Upravit
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingTransaction(tx);
-                                }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Smazat
-                              </Button>
-                            </div>
+                      {/* Subrow: shares × price → current price */}
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[11px] text-muted-foreground font-mono-price">
+                          {isBuy && lotStatus && lotStatus.remaining > 0
+                            ? `${lotStatus.remaining} ks × ${formatPrice(tx.price, tx.currency)}`
+                            : `${tx.shares} ks × ${formatPrice(tx.price, tx.currency)}`}
+                          {isBuy &&
+                            lotStatus &&
+                            lotStatus.remaining > 0 &&
+                            quote?.price && (
+                              <span className="ml-1">
+                                →{' '}
+                                {formatPrice(
+                                  quote.price * (stock?.price_scale ?? 1),
+                                  tx.currency,
+                                )}
+                              </span>
+                            )}
+                        </span>
+                        {lotInfo && (
+                          <span className="text-[11px] text-muted-foreground">
+                            {lotInfo}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Expanded Details */}
+                      <div
+                        className={`grid transition-all duration-200 ease-out ${
+                          isExpanded
+                            ? 'grid-rows-[1fr] opacity-100 mt-3'
+                            : 'grid-rows-[0fr] opacity-0'
+                        }`}
+                      >
+                        <div className="overflow-hidden">
+                          {/* Action buttons */}
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs gap-1.5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTransaction(tx);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Upravit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingTransaction(tx);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Smazat
+                            </Button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  );
-                },
-              )}
+                  </div>
+                );
+              })}
             </div>
 
-            {transactions.length > 3 && (
+            {visibleTxCount < transactions.length && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="w-full mt-2 text-xs text-muted-foreground"
-                onClick={() => setShowAllTx(!showAllTx)}
+                onClick={() =>
+                  setVisibleTxCount((prev) =>
+                    Math.min(prev + 10, transactions.length),
+                  )
+                }
               >
-                {showAllTx
-                  ? 'Zobrazit méně'
-                  : `Zobrazit dalších ${transactions.length - 3}`}
+                Zobrazit dalších{' '}
+                {Math.min(10, transactions.length - visibleTxCount)}
               </Button>
             )}
           </>
