@@ -7,12 +7,14 @@ import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Hook for fetching open lots for a specific portfolio.
+ * 
+ * @param portfolioId - Portfolio ID, null for all portfolios, undefined to disable query
  */
-export function useOpenLots(portfolioId: string | null) {
+export function useOpenLots(portfolioId: string | null | undefined) {
   return useQuery({
     queryKey: portfolioId ? queryKeys.openLots(portfolioId) : queryKeys.allOpenLots(),
     queryFn: () => portfolioId ? fetchOpenLots(portfolioId) : fetchAllOpenLots(),
-    enabled: portfolioId !== undefined,
+    enabled: portfolioId !== undefined, // undefined = loading, wait
     staleTime: STALE_TIMES.openLots,
     gcTime: GC_TIMES.medium,
   });

@@ -98,10 +98,14 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     return portfoliosData[0] || null;
   }, [portfoliosData, selectedPortfolioId, isAllPortfolios]);
 
-  // Fetch holdings based on selection
-  const portfolioIdForQuery = isAllPortfolios
-    ? null
-    : (activePortfolio?.id ?? null);
+  // Compute portfolio ID for queries - wait for portfolios to load first
+  // to avoid fetching "all" first and then specific portfolio
+  const portfolioIdForQuery = useMemo(() => {
+    if (isAllPortfolios) return null; // Explicitly all portfolios
+    if (portfoliosLoading) return undefined; // Still loading - wait
+    return activePortfolio?.id ?? null;
+  }, [isAllPortfolios, portfoliosLoading, activePortfolio?.id]);
+
   const {
     data: holdingsData = [],
     isLoading: holdingsLoading,

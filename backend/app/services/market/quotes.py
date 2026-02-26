@@ -3,17 +3,22 @@ Quote fetching logic - stock quotes and price history
 
 Hybrid approach for efficiency:
 1. Basic prices via yf.download() - 1 HTTP request for all tickers, TTL 5min
-2. Extended data via .info - N requests but TTL 15min (pre/post market, avgVolume, earnings)
+2. Extended data via .info - runs in background, TTL 1h (pre/post market, avgVolume, earnings)
 """
 import yfinance as yf
 import pandas as pd
 import json
 import logging
 import math
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Union
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Thread pool for background .info fetches (avoid blocking)
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 def safe_float(value, decimals: int = 2) -> Optional[float]:
@@ -42,7 +47,69 @@ def safe_int(value) -> Optional[int]:
 
 # Cache TTLs
 BASIC_QUOTE_TTL = 300      # 5 minutes for prices
-EXTENDED_DATA_TTL = 900    # 15 minutes for pre/post market, avgVolume, earnings
+EXTENDED_DATA_TTL = 3600   # 1 hour for pre/post market, avgVolume, earnings
+
+
+def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
+    """
+    Synchronous function to fetch extended data for a single ticker.
+    Runs in thread pool to avoid blocking async event loop.
+    """
+    try:
+        t = yf.Ticker(ticker)
+        info = t.info
+        
+        ext_data = {}
+        
+        # Average volume
+        avg_volume = safe_int(info.get("averageDailyVolume10Day"))
+        if avg_volume:
+            ext_data["avgVolume"] = avg_volume
+        
+        # Pre-market
+        pre_market_price = safe_float(info.get("preMarketPrice"))
+        if pre_market_price is not None:
+            ext_data["preMarketPrice"] = pre_market_price
+            pre_market_change = safe_float(info.get("preMarketChangePercent"))
+            if pre_market_change is not None:
+                # Yahoo returns percent already (e.g., 1.25 = 1.25%), no multiplication needed
+                ext_data["preMarketChangePercent"] = pre_market_change
+        
+        # Post-market
+        post_market_price = safe_float(info.get("postMarketPrice"))
+        if post_market_price is not None:
+            ext_data["postMarketPrice"] = post_market_price
+            post_market_change = safe_float(info.get("postMarketChangePercent"))
+            if post_market_change is not None:
+                # Yahoo returns percent already (e.g., -1.25 = -1.25%), no multiplication needed
+                ext_data["postMarketChangePercent"] = post_market_change
+        
+        # Earnings date
+        earnings_ts = info.get("earningsTimestamp")
+        if earnings_ts:
+            ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts).date().isoformat()
+        
+        return ext_data if ext_data else None
+        
+    except Exception as e:
+        logger.warning(f"Error fetching extended data for {ticker}: {e}")
+        return None
+
+
+async def _fetch_and_cache_extended_data(redis, ticker: str):
+    """
+    Fetch extended data in background and cache it.
+    Fire-and-forget - errors are logged but don't propagate.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        ext_data = await loop.run_in_executor(_executor, _fetch_extended_data_sync, ticker)
+        
+        if ext_data:
+            await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=EXTENDED_DATA_TTL)
+            logger.debug(f"Cached extended data for {ticker}")
+    except Exception as e:
+        logger.warning(f"Background fetch failed for {ticker}: {e}")
 
 
 async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
@@ -131,6 +198,7 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
     
     # ========================================
     # TIER 2: Extended data via .info (longer TTL)
+    # Check cache first, schedule background fetch for missing
     # ========================================
     missing_extended = []
     
@@ -139,67 +207,19 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
             continue
         cached_ext = await redis.get(f"quote_ext:{t}")
         if cached_ext:
-            # Merge extended data into results
+            # Merge cached extended data into results
             ext_data = json.loads(cached_ext)
             results[t].update(ext_data)
         else:
             missing_extended.append(t)
     
+    # Fire-and-forget: schedule background fetch for missing extended data
+    # This doesn't block the response - data will be in cache for next request
     if missing_extended:
-        try:
-            batch = yf.Tickers(" ".join(missing_extended))
-            
-            for t in missing_extended:
-                try:
-                    ticker_obj = batch.tickers.get(t)
-                    if not ticker_obj:
-                        continue
-                    
-                    info = ticker_obj.info
-                    
-                    # Extended data only
-                    ext_data = {}
-                    
-                    # Average volume
-                    avg_volume = safe_int(info.get("averageDailyVolume10Day"))
-                    if avg_volume:
-                        ext_data["avgVolume"] = avg_volume
-                    
-                    # Pre-market
-                    pre_market_price = safe_float(info.get("preMarketPrice"))
-                    if pre_market_price is not None:
-                        ext_data["preMarketPrice"] = pre_market_price
-                        # Calculate pre-market change vs regular close
-                        if results[t].get("price"):
-                            pct = safe_float(((pre_market_price - results[t]["price"]) / results[t]["price"]) * 100)
-                            if pct is not None:
-                                ext_data["preMarketChangePercent"] = pct
-                    
-                    # Post-market
-                    post_market_price = safe_float(info.get("postMarketPrice"))
-                    if post_market_price is not None:
-                        ext_data["postMarketPrice"] = post_market_price
-                        if results[t].get("price"):
-                            pct = safe_float(((post_market_price - results[t]["price"]) / results[t]["price"]) * 100)
-                            if pct is not None:
-                                ext_data["postMarketChangePercent"] = pct
-                    
-                    # Earnings date
-                    earnings_ts = info.get("earningsTimestamp")
-                    if earnings_ts:
-                        ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts).date().isoformat()
-                    
-                    # Merge into results
-                    results[t].update(ext_data)
-                    
-                    # Cache extended data separately with longer TTL
-                    await redis.set(f"quote_ext:{t}", json.dumps(ext_data), ex=EXTENDED_DATA_TTL)
-                    
-                except Exception as e:
-                    logger.warning(f"Error fetching extended data for {t}: {e}")
-                    
-        except Exception as e:
-            logger.error(f"Error in extended data batch: {e}")
+        for t in missing_extended:
+            # Create background task that won't block response
+            asyncio.create_task(_fetch_and_cache_extended_data(redis, t))
+        logger.debug(f"Scheduled background fetch for {len(missing_extended)} tickers")
     
     return results
 
