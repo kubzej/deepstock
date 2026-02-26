@@ -216,42 +216,82 @@ export function calculateOptionPerformance(
     totalTrades: transactions.length,
   };
 
-  // Simpler logic: categorize by action type
-  // Opening transactions (STO, BTO) go to "open"
-  // Closing transactions (STC, BTC, EXPIRATION, ASSIGNMENT, EXERCISE) go to "closed"
+  // Group by option_symbol to match opening and closing transactions
+  const bySymbol: Record<string, OptionTransaction[]> = {};
   transactions.forEach((tx) => {
-    const premium = Math.abs(tx.total_premium || 0) * (tx.exchange_rate_to_czk || 1);
-    const fees = (tx.fees || 0) * (tx.exchange_rate_to_czk || 1);
-
-    switch (tx.action) {
-      case 'STO': // Sell to Open - received premium
-        result.open.premiumReceived += premium;
-        result.open.netPremium += premium - fees;
-        break;
-      case 'BTO': // Buy to Open - paid premium
-        result.open.premiumPaid += premium;
-        result.open.netPremium -= premium + fees;
-        break;
-      case 'STC': // Sell to Close - received premium (closing long position)
-        result.closed.premiumReceived += premium;
-        result.closed.realizedPL += premium - fees;
-        break;
-      case 'BTC': // Buy to Close - paid premium (closing short position)
-        result.closed.premiumPaid += premium;
-        result.closed.realizedPL -= premium + fees;
-        break;
-      case 'EXPIRATION':
-        // No premium movement, but position is closed
-        // If we know the original position, we could count full profit/loss
-        break;
-      case 'ASSIGNMENT':
-      case 'EXERCISE':
-        // Premium movement depends on the stock transaction
-        // For now, just track the fees
-        result.closed.realizedPL -= fees;
-        break;
-    }
+    if (!bySymbol[tx.option_symbol]) bySymbol[tx.option_symbol] = [];
+    bySymbol[tx.option_symbol].push(tx);
   });
+
+  for (const symbol in bySymbol) {
+    // Sort by date ascending to process in order
+    const txs = bySymbol[symbol].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    let openContracts = 0;
+    let totalCostBasis = 0; // Positive = we paid (long), Negative = we received (short)
+
+    for (const tx of txs) {
+      const premium = Math.abs(tx.total_premium || 0) * (tx.exchange_rate_to_czk || 1);
+      const fees = (tx.fees || 0) * (tx.exchange_rate_to_czk || 1);
+
+      if (tx.action === 'BTO') {
+        result.open.premiumPaid += premium;
+        openContracts += tx.contracts;
+        totalCostBasis += premium;
+      } else if (tx.action === 'STO') {
+        result.open.premiumReceived += premium;
+        openContracts -= tx.contracts;
+        totalCostBasis -= premium; // Negative cost basis
+      } else if (tx.action === 'STC') {
+        result.closed.premiumReceived += premium;
+        
+        // Calculate realized P/L for closing a long position
+        const avgCost = openContracts > 0 ? totalCostBasis / openContracts : 0;
+        const costOfClosed = avgCost * tx.contracts;
+        
+        // Profit = Received (premium) - Paid (costOfClosed) - fees
+        const realizedPL = premium - costOfClosed - fees;
+        result.closed.realizedPL += realizedPL;
+        
+        openContracts -= tx.contracts;
+        totalCostBasis -= costOfClosed;
+      } else if (tx.action === 'BTC') {
+        result.closed.premiumPaid += premium;
+        
+        // Calculate realized P/L for closing a short position
+        const avgCost = openContracts < 0 ? totalCostBasis / Math.abs(openContracts) : 0;
+        const costOfClosed = avgCost * tx.contracts; // This is negative
+        
+        // Profit = Received initially (abs(costOfClosed)) - Paid to close (premium) - fees
+        const realizedPL = Math.abs(costOfClosed) - premium - fees;
+        result.closed.realizedPL += realizedPL;
+        
+        openContracts += tx.contracts;
+        totalCostBasis -= costOfClosed; // Subtracting negative adds to totalCostBasis
+      } else if (
+        tx.action === 'EXPIRATION' ||
+        tx.action === 'ASSIGNMENT' ||
+        tx.action === 'EXERCISE'
+      ) {
+        // Closing the entire remaining position
+        if (openContracts > 0) {
+          // Long position expired/exercised -> we lose the premium paid
+          const realizedPL = -totalCostBasis - fees;
+          result.closed.realizedPL += realizedPL;
+        } else if (openContracts < 0) {
+          // Short position expired/assigned -> we keep the premium received
+          const realizedPL = Math.abs(totalCostBasis) - fees;
+          result.closed.realizedPL += realizedPL;
+        } else {
+          result.closed.realizedPL -= fees;
+        }
+        openContracts = 0;
+        totalCostBasis = 0;
+      }
+    }
+  }
 
   return result;
 }

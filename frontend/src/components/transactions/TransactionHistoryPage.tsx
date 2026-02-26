@@ -410,7 +410,7 @@ export function TransactionHistoryPage() {
                           {formatPrice(tx.price, tx.currency)}
                         </TableCell>
                         <TableCell className="text-right font-mono-price text-muted-foreground">
-                          {tx.fees ? formatPrice(tx.fees, 'CZK') : '—'}
+                          {tx.fees ? formatPrice(tx.fees, tx.currency) : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono-price">
                           {formatPrice(
@@ -589,7 +589,7 @@ export function TransactionHistoryPage() {
                               : '—'}
                           </TableCell>
                           <TableCell className="text-right font-mono-price text-muted-foreground">
-                            {tx.fees ? formatPrice(tx.fees, 'CZK') : '—'}
+                            {tx.fees ? formatPrice(tx.fees, tx.currency) : '—'}
                           </TableCell>
                           <TableCell className="text-right font-mono-price">
                             {formatPrice(totalCzk, 'CZK')}

@@ -1,13 +1,16 @@
 /**
  * Options Trades - Compact modern card list
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { OptionHolding } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { cn } from '@/lib/utils';
 import { formatPercent } from '@/lib/format';
 import { X, Trash2, TrendingUp, MessageSquare } from 'lucide-react';
+
+type FilterType = 'all' | 'long-call' | 'long-put' | 'short-call' | 'short-put';
 
 interface OptionsTradesProps {
   holdings: OptionHolding[];
@@ -56,6 +59,8 @@ export function OptionsTrades({
   onDelete,
   onAddOption,
 }: OptionsTradesProps) {
+  const [filter, setFilter] = useState<FilterType>('all');
+
   const enrichedHoldings = useMemo(() => {
     return holdings.map((h) => {
       const isShort = h.position === 'short';
@@ -139,6 +144,41 @@ export function OptionsTrades({
     });
   }, [holdings]);
 
+  const filteredHoldings = useMemo(() => {
+    if (filter === 'all') return enrichedHoldings;
+    return enrichedHoldings.filter((h) => {
+      if (filter === 'long-call')
+        return h.position === 'long' && h.option_type === 'call';
+      if (filter === 'long-put')
+        return h.position === 'long' && h.option_type === 'put';
+      if (filter === 'short-call')
+        return h.position === 'short' && h.option_type === 'call';
+      if (filter === 'short-put')
+        return h.position === 'short' && h.option_type === 'put';
+      return true;
+    });
+  }, [enrichedHoldings, filter]);
+
+  // Count per category for badges
+  const counts = useMemo(
+    () => ({
+      all: enrichedHoldings.length,
+      'long-call': enrichedHoldings.filter(
+        (h) => h.position === 'long' && h.option_type === 'call',
+      ).length,
+      'long-put': enrichedHoldings.filter(
+        (h) => h.position === 'long' && h.option_type === 'put',
+      ).length,
+      'short-call': enrichedHoldings.filter(
+        (h) => h.position === 'short' && h.option_type === 'call',
+      ).length,
+      'short-put': enrichedHoldings.filter(
+        (h) => h.position === 'short' && h.option_type === 'put',
+      ).length,
+    }),
+    [enrichedHoldings],
+  );
+
   if (holdings.length === 0) {
     return (
       <EmptyState
@@ -155,207 +195,282 @@ export function OptionsTrades({
   }
 
   return (
-    <div className="space-y-3">
-      {enrichedHoldings.map((h) => {
-        const isShort = h.position === 'short';
-        const isITM = h.moneyness === 'ITM';
+    <div className="space-y-4">
+      {/* Filter pills */}
+      <PillGroup>
+        <PillButton
+          active={filter === 'all'}
+          onClick={() => setFilter('all')}
+          size="md"
+        >
+          Vše <span className="ml-1 text-muted-foreground">{counts.all}</span>
+        </PillButton>
+        {counts['long-call'] > 0 && (
+          <PillButton
+            active={filter === 'long-call'}
+            onClick={() => setFilter('long-call')}
+            size="md"
+          >
+            Long Call{' '}
+            <span className="ml-1 text-muted-foreground">
+              {counts['long-call']}
+            </span>
+          </PillButton>
+        )}
+        {counts['long-put'] > 0 && (
+          <PillButton
+            active={filter === 'long-put'}
+            onClick={() => setFilter('long-put')}
+            size="md"
+          >
+            Long Put{' '}
+            <span className="ml-1 text-muted-foreground">
+              {counts['long-put']}
+            </span>
+          </PillButton>
+        )}
+        {counts['short-call'] > 0 && (
+          <PillButton
+            active={filter === 'short-call'}
+            onClick={() => setFilter('short-call')}
+            size="md"
+          >
+            Short Call{' '}
+            <span className="ml-1 text-muted-foreground">
+              {counts['short-call']}
+            </span>
+          </PillButton>
+        )}
+        {counts['short-put'] > 0 && (
+          <PillButton
+            active={filter === 'short-put'}
+            onClick={() => setFilter('short-put')}
+            size="md"
+          >
+            Short Put{' '}
+            <span className="ml-1 text-muted-foreground">
+              {counts['short-put']}
+            </span>
+          </PillButton>
+        )}
+      </PillGroup>
 
-        return (
-          <div key={h.option_symbol} className="rounded-lg bg-muted/30 p-4">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="font-mono-price text-lg font-semibold">
-                  {h.symbol}
-                </span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">
-                  {isShort ? 'Short' : 'Long'}{' '}
-                  {h.option_type === 'call' ? 'Call' : 'Put'} · {h.contracts}×
-                </span>
-              </div>
+      {/* List */}
+      {filteredHoldings.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          Žádné pozice v tomto filtru
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {filteredHoldings.map((h) => {
+            const isShort = h.position === 'short';
+            const isITM = h.moneyness === 'ITM';
 
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() => onClose?.(h)}
-                  title="Zavřít pozici"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
-                  onClick={() => onDelete?.(h)}
-                  title="Smazat"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Data Grid */}
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-4 text-sm">
-              {/* Strike + Underlying */}
-              <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  Strike
-                </div>
-                <div className="font-mono-price font-medium">
-                  {formatUSD(h.strike_price)}
-                </div>
-                {h.underlying_price !== null && (
-                  <div className="text-[10px] text-muted-foreground">
-                    {formatUSD(h.underlying_price)}
-                    {h.buffer_percent !== null && (
-                      <span
-                        className={cn(
-                          'ml-1',
-                          isITM
-                            ? 'text-rose-500'
-                            : h.buffer_percent > 10
-                              ? 'text-emerald-500'
-                              : 'text-amber-500',
-                        )}
-                      >
-                        {formatPercent(
-                          isShort ? h.buffer_percent : -h.buffer_percent,
-                          1,
-                          true,
-                        )}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Premium + Current */}
-              <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  Premium
-                </div>
-                <div className="font-mono-price font-medium">
-                  {formatUSD(h.avg_premium)}
-                </div>
-                {h.current_price !== null && (
-                  <div className="text-[10px]">
-                    <span className="text-muted-foreground">
-                      {formatUSD(h.current_price)}
+            return (
+              <div key={h.option_symbol} className="rounded-lg bg-muted/30 p-4">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono-price text-lg font-semibold">
+                      {h.symbol}
                     </span>
-                    {h.priceChangePercent !== null && (
-                      <span
-                        className={cn(
-                          'ml-1',
-                          (
-                            isShort
-                              ? h.priceChangePercent <= 0
-                              : h.priceChangePercent >= 0
-                          )
-                            ? 'text-emerald-500'
-                            : 'text-rose-500',
-                        )}
-                      >
-                        {formatPercent(h.priceChangePercent, 1, true)}
-                      </span>
-                    )}
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {isShort ? 'Short' : 'Long'}{' '}
+                      {h.option_type === 'call' ? 'Call' : 'Put'} ·{' '}
+                      {h.contracts}×
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Expiration */}
-              <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  Expirace
-                </div>
-                <div
-                  className={cn(
-                    'font-mono-price font-medium',
-                    h.dte < 0
-                      ? 'text-muted-foreground'
-                      : h.dte <= 7
-                        ? 'text-rose-500'
-                        : h.dte <= 21
-                          ? 'text-amber-500'
-                          : '',
-                  )}
-                >
-                  {h.dte < 0 ? 'Exp.' : `${h.dte} dní`}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {formatDate(h.expiration_date)}
-                  {h.totalDays > 0 && <span> · z {h.totalDays} dní</span>}
-                </div>
-              </div>
-
-              {/* P/L */}
-              <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  P/L
-                </div>
-                {h.pl !== null ? (
-                  <div
-                    className={cn(
-                      'font-mono-price font-medium',
-                      h.pl >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                    )}
-                  >
-                    {h.pl >= 0 ? '+' : ''}
-                    {formatUSD(h.pl)}
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => onClose?.(h)}
+                      title="Zavřít pozici"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive/80"
+                      onClick={() => onDelete?.(h)}
+                      title="Smazat"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                ) : (
-                  <div className="text-muted-foreground">—</div>
-                )}
-                <div className="text-[10px] text-muted-foreground">
-                  {h.moneyness || 'OTM'}
                 </div>
-              </div>
 
-              {/* Break-even */}
-              <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                  Break-even
-                </div>
-                {h.breakeven !== null ? (
-                  <>
-                    <div className="font-mono-price font-medium">
-                      {formatUSD(h.breakeven)}
+                {/* Data Grid */}
+                <div className="grid grid-cols-3 md:grid-cols-5 gap-4 text-sm">
+                  {/* Strike + Underlying */}
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      Strike
                     </div>
-                    {h.breakevenDistance !== null && (
-                      <div className="text-[10px]">
-                        <span
-                          className={cn(
-                            isShort
-                              ? h.breakevenDistance >= 0
-                                ? 'text-emerald-500'
-                                : 'text-rose-500'
-                              : h.breakevenDistance <= 0
-                                ? 'text-emerald-500'
-                                : 'text-rose-500',
-                          )}
-                        >
-                          {formatPercent(h.breakevenDistance, 1, true)}
-                        </span>
+                    <div className="font-mono-price font-medium">
+                      {formatUSD(h.strike_price)}
+                    </div>
+                    {h.underlying_price !== null && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {formatUSD(h.underlying_price)}
+                        {h.buffer_percent !== null && (
+                          <span
+                            className={cn(
+                              'ml-1',
+                              isShort
+                                ? // Short: ITM is bad, OTM with buffer is good
+                                  isITM
+                                  ? 'text-rose-500'
+                                  : h.buffer_percent > 10
+                                    ? 'text-emerald-500'
+                                    : 'text-amber-500'
+                                : // Long: ITM is good, OTM is bad
+                                  isITM
+                                  ? 'text-emerald-500'
+                                  : 'text-rose-500',
+                            )}
+                          >
+                            {formatPercent(
+                              isShort ? h.buffer_percent : -h.buffer_percent,
+                              1,
+                              true,
+                            )}
+                          </span>
+                        )}
                       </div>
                     )}
-                  </>
-                ) : (
-                  <div className="text-muted-foreground">—</div>
+                  </div>
+
+                  {/* Premium + Current */}
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      Premium
+                    </div>
+                    <div className="font-mono-price font-medium">
+                      {formatUSD(h.avg_premium)}
+                    </div>
+                    {h.current_price !== null && (
+                      <div className="text-[10px]">
+                        <span className="text-muted-foreground">
+                          {formatUSD(h.current_price)}
+                        </span>
+                        {h.priceChangePercent !== null && (
+                          <span
+                            className={cn(
+                              'ml-1',
+                              (
+                                isShort
+                                  ? h.priceChangePercent <= 0
+                                  : h.priceChangePercent >= 0
+                              )
+                                ? 'text-emerald-500'
+                                : 'text-rose-500',
+                            )}
+                          >
+                            {formatPercent(h.priceChangePercent, 1, true)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Expiration */}
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      Expirace
+                    </div>
+                    <div
+                      className={cn(
+                        'font-mono-price font-medium',
+                        h.dte < 0
+                          ? 'text-muted-foreground'
+                          : h.dte <= 7
+                            ? 'text-rose-500'
+                            : h.dte <= 21
+                              ? 'text-amber-500'
+                              : '',
+                      )}
+                    >
+                      {h.dte < 0 ? 'Exp.' : `${h.dte} dní`}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {formatDate(h.expiration_date)}
+                      {h.totalDays > 0 && <span> · z {h.totalDays} dní</span>}
+                    </div>
+                  </div>
+
+                  {/* P/L */}
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      P/L
+                    </div>
+                    {h.pl !== null ? (
+                      <div
+                        className={cn(
+                          'font-mono-price font-medium',
+                          h.pl >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        )}
+                      >
+                        {h.pl >= 0 ? '+' : ''}
+                        {formatUSD(h.pl)}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">—</div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground">
+                      {h.moneyness || 'OTM'}
+                    </div>
+                  </div>
+
+                  {/* Break-even */}
+                  <div>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      Break-even
+                    </div>
+                    {h.breakeven !== null ? (
+                      <>
+                        <div className="font-mono-price font-medium">
+                          {formatUSD(h.breakeven)}
+                        </div>
+                        {h.breakevenDistance !== null && (
+                          <div className="text-[10px]">
+                            <span
+                              className={cn(
+                                isShort
+                                  ? h.breakevenDistance >= 0
+                                    ? 'text-emerald-500'
+                                    : 'text-rose-500'
+                                  : h.breakevenDistance <= 0
+                                    ? 'text-emerald-500'
+                                    : 'text-rose-500',
+                              )}
+                            >
+                              {formatPercent(h.breakevenDistance, 1, true)}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-muted-foreground">—</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {h.notes && (
+                  <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs text-muted-foreground">
+                    <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span className="line-clamp-2">{h.notes}</span>
+                  </div>
                 )}
               </div>
-            </div>
-
-            {/* Notes */}
-            {h.notes && (
-              <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs text-muted-foreground">
-                <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span className="line-clamp-2">{h.notes}</span>
-              </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

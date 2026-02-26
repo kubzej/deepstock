@@ -11,32 +11,31 @@ interface OptionPerformanceProps {
 export function OptionPerformance({ data }: OptionPerformanceProps) {
   return (
     <div className="space-y-6">
-      {/* Open Positions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+      {/* Main Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
         <Metric
-          label="Vybrané prémie (otevřené)"
+          label="Vybrané prémie (Short)"
           value={data.open.premiumReceived}
           colored={false}
         />
         <Metric
-          label="Zaplacené prémie (otevřené)"
+          label="Náklady na opce (Long)"
           value={data.open.premiumPaid}
           colored={false}
         />
-        <Metric label="Čisté prémie (otevřené)" value={data.open.netPremium} />
         <Metric label="Realizovaný P/L" value={data.closed.realizedPL} />
       </div>
 
-      {/* Closed Positions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+      {/* Secondary Metrics (Closing transactions) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 pt-4">
         <Metric
-          label="Přijaté prémie (zavřené)"
-          value={data.closed.premiumReceived}
+          label="Zpětný odkup (BTC)"
+          value={data.closed.premiumPaid}
           colored={false}
         />
         <Metric
-          label="Zaplacené prémie (zavřené)"
-          value={data.closed.premiumPaid}
+          label="Prodej opcí (STC)"
+          value={data.closed.premiumReceived}
           colored={false}
         />
       </div>

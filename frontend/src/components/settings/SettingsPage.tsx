@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { List, Tag, ChevronRight, Briefcase, Bell } from 'lucide-react';
+import { List, Tag, ChevronRight, Briefcase, Bell, Info } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { WatchlistSettings } from '@/components/settings/WatchlistSettings';
 import { WatchlistTagSettings } from '@/components/settings/WatchlistTagSettings';
@@ -129,6 +129,22 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </button>
+      </div>
+
+      {/* Verze aplikace */}
+      <div className="pt-4 border-t border-border">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5" />
+          <span className="font-mono">{__APP_COMMIT__}</span>
+          <span className="text-zinc-600">·</span>
+          <span>
+            {new Date(__BUILD_DATE__).toLocaleDateString('cs-CZ', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+          </span>
+        </div>
       </div>
     </div>
   );
