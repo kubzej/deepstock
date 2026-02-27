@@ -108,3 +108,57 @@ async def toggle_alert(
         PriceAlertUpdate(is_enabled=new_state)
     )
     return result
+
+
+# ==========================================
+# GROUP OPERATIONS (for price range alerts)
+# ==========================================
+
+
+@router.get("/group/{group_id}")
+async def get_group_alerts(
+    group_id: str,
+    user_id: str = Depends(get_current_user_id)
+) -> List[dict]:
+    """Get all alerts in a group."""
+    return await price_alert_service.get_alerts_by_group(group_id, user_id)
+
+
+@router.put("/group/{group_id}")
+async def update_group(
+    group_id: str,
+    data: PriceAlertUpdate,
+    user_id: str = Depends(get_current_user_id)
+) -> List[dict]:
+    """Update all alerts in a group (shared settings only)."""
+    return await price_alert_service.update_group(group_id, user_id, data)
+
+
+@router.delete("/group/{group_id}")
+async def delete_group(
+    group_id: str,
+    user_id: str = Depends(get_current_user_id)
+) -> dict:
+    """Delete all alerts in a group."""
+    success = await price_alert_service.delete_group(group_id, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Skupina nenalezena")
+    return {"success": True}
+
+
+@router.post("/group/{group_id}/reset")
+async def reset_group(
+    group_id: str,
+    user_id: str = Depends(get_current_user_id)
+) -> List[dict]:
+    """Reset all triggered alerts in a group."""
+    return await price_alert_service.reset_group(group_id, user_id)
+
+
+@router.post("/group/{group_id}/toggle")
+async def toggle_group(
+    group_id: str,
+    user_id: str = Depends(get_current_user_id)
+) -> List[dict]:
+    """Toggle all alerts in a group enabled/disabled."""
+    return await price_alert_service.toggle_group(group_id, user_id)

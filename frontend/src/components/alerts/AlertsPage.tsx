@@ -29,8 +29,10 @@ import {
   useDeleteAlert,
   useResetAlert,
   useToggleAlert,
+  useDeleteGroup,
+  useResetGroup,
+  useToggleGroup,
   type PriceAlert,
-  type PriceAlertCreate,
 } from '@/hooks/useAlerts';
 import { queryKeys } from '@/lib/queryClient';
 import type { AlertConditionType } from '@/lib/api';
@@ -41,6 +43,7 @@ import {
   RotateCcw,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
   Percent,
   Check,
   Pencil,
@@ -54,10 +57,16 @@ const CONDITION_ICONS: Record<AlertConditionType, React.ReactNode> = {
   percent_change_day: <Percent className="h-4 w-4 text-blue-500" />,
 };
 
+// Extended type to include "both" option for creating 2 alerts at once
+type FormConditionType = AlertConditionType | 'price_both';
+
 interface AlertFormData {
   stock_id: string;
-  condition_type: AlertConditionType;
+  condition_type: FormConditionType;
   condition_value: string;
+  // For "both" mode - separate values for above/below
+  price_above_value: string;
+  price_below_value: string;
   is_enabled: boolean;
   repeat_after_trigger: boolean;
   notes: string;
@@ -67,6 +76,8 @@ const EMPTY_FORM: AlertFormData = {
   stock_id: '',
   condition_type: 'price_above',
   condition_value: '',
+  price_above_value: '',
+  price_below_value: '',
   is_enabled: true,
   repeat_after_trigger: false,
   notes: '',
@@ -81,6 +92,34 @@ function formatConditionValue(
   }
   return `$${value.toFixed(2)}`;
 }
+
+// Czech pluralization for "alert"
+function pluralizeAlert(count: number): string {
+  if (count === 1) return 'alert';
+  if (count >= 2 && count <= 4) return 'alerty';
+  return 'alertů';
+}
+
+// Display item type - either a single alert or a grouped range alert
+interface SingleAlertItem {
+  type: 'single';
+  alert: PriceAlert;
+}
+
+interface RangeAlertItem {
+  type: 'range';
+  groupId: string;
+  aboveAlert: PriceAlert;
+  belowAlert: PriceAlert;
+  // Aggregate state from both alerts
+  is_enabled: boolean;
+  is_triggered: boolean;
+  repeat_after_trigger: boolean;
+  notes: string | null;
+  stocks: { ticker: string; name: string };
+}
+
+type AlertDisplayItem = SingleAlertItem | RangeAlertItem;
 
 export function AlertsPage() {
   const queryClient = useQueryClient();
@@ -110,12 +149,21 @@ export function AlertsPage() {
   const resetMutation = useResetAlert();
   const toggleMutation = useToggleAlert();
 
+  // Group mutations
+  const deleteGroupMutation = useDeleteGroup();
+  const resetGroupMutation = useResetGroup();
+  const toggleGroupMutation = useToggleGroup();
+
   // Local state
   const [filterView, setFilterView] = useState<FilterView>('active');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
+  const [editingRangeAlert, setEditingRangeAlert] =
+    useState<RangeAlertItem | null>(null);
   const [formData, setFormData] = useState<AlertFormData>(EMPTY_FORM);
-  const [deleteConfirm, setDeleteConfirm] = useState<PriceAlert | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<AlertDisplayItem | null>(
+    null,
+  );
   const [stockSearch, setStockSearch] = useState('');
 
   // Filter alerts based on view
@@ -130,32 +178,96 @@ export function AlertsPage() {
     }
   }, [alerts, filterView]);
 
-  // Group alerts by ticker
-  const groupedAlerts = useMemo(() => {
-    const groups: Record<string, PriceAlert[]> = {};
+  // Group alerts by ticker and create display items (merging range alerts)
+  const groupedDisplayItems = useMemo(() => {
+    // First, identify grouped alerts by group_id
+    const groupMap = new Map<string, PriceAlert[]>();
+    const ungroupedAlerts: PriceAlert[] = [];
+
     for (const alert of filteredAlerts) {
-      const ticker = alert.stocks?.ticker || 'N/A';
-      if (!groups[ticker]) {
-        groups[ticker] = [];
+      if (alert.group_id) {
+        const existing = groupMap.get(alert.group_id) || [];
+        existing.push(alert);
+        groupMap.set(alert.group_id, existing);
+      } else {
+        ungroupedAlerts.push(alert);
       }
-      groups[ticker].push(alert);
     }
 
-    // Sort alerts within each group: price alerts by value, then percent alerts
-    for (const ticker of Object.keys(groups)) {
-      groups[ticker].sort((a, b) => {
-        const aIsPercent = a.condition_type === 'percent_change_day';
-        const bIsPercent = b.condition_type === 'percent_change_day';
-        // Percent alerts go to the end
-        if (aIsPercent && !bIsPercent) return 1;
-        if (!aIsPercent && bIsPercent) return -1;
-        // Both same type - sort by value ascending
-        return a.condition_value - b.condition_value;
+    // Create display items
+    const displayItems: AlertDisplayItem[] = [];
+
+    // Process grouped alerts (range alerts)
+    for (const [groupId, groupAlerts] of groupMap) {
+      const aboveAlert = groupAlerts.find(
+        (a) => a.condition_type === 'price_above',
+      );
+      const belowAlert = groupAlerts.find(
+        (a) => a.condition_type === 'price_below',
+      );
+
+      if (aboveAlert && belowAlert) {
+        // Valid range - create merged display
+        displayItems.push({
+          type: 'range',
+          groupId,
+          aboveAlert,
+          belowAlert,
+          is_enabled: aboveAlert.is_enabled && belowAlert.is_enabled,
+          is_triggered: aboveAlert.is_triggered || belowAlert.is_triggered,
+          repeat_after_trigger: aboveAlert.repeat_after_trigger,
+          notes: aboveAlert.notes,
+          stocks: aboveAlert.stocks,
+        });
+      } else {
+        // Incomplete group - show as singles
+        groupAlerts.forEach((a) =>
+          displayItems.push({ type: 'single', alert: a }),
+        );
+      }
+    }
+
+    // Add ungrouped alerts
+    for (const alert of ungroupedAlerts) {
+      displayItems.push({ type: 'single', alert });
+    }
+
+    // Group by ticker for display
+    const tickerGroups: Record<string, AlertDisplayItem[]> = {};
+    for (const item of displayItems) {
+      const ticker =
+        item.type === 'single'
+          ? item.alert.stocks?.ticker || 'N/A'
+          : item.stocks?.ticker || 'N/A';
+      if (!tickerGroups[ticker]) {
+        tickerGroups[ticker] = [];
+      }
+      tickerGroups[ticker].push(item);
+    }
+
+    // Sort items within each ticker
+    for (const ticker of Object.keys(tickerGroups)) {
+      tickerGroups[ticker].sort((a, b) => {
+        const aValue =
+          a.type === 'single'
+            ? a.alert.condition_value
+            : Math.min(
+                a.aboveAlert.condition_value,
+                a.belowAlert.condition_value,
+              );
+        const bValue =
+          b.type === 'single'
+            ? b.alert.condition_value
+            : Math.min(
+                b.aboveAlert.condition_value,
+                b.belowAlert.condition_value,
+              );
+        return aValue - bValue;
       });
     }
 
-    // Sort groups by ticker alphabetically
-    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    // Sort by ticker
+    return Object.entries(tickerGroups).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredAlerts]);
 
   // Filtered stocks for dropdown
@@ -178,6 +290,7 @@ export function AlertsPage() {
 
   const openCreateForm = () => {
     setEditingAlert(null);
+    setEditingRangeAlert(null);
     setFormData(EMPTY_FORM);
     setStockSearch('');
     setIsFormOpen(true);
@@ -185,10 +298,13 @@ export function AlertsPage() {
 
   const openEditForm = (alert: PriceAlert) => {
     setEditingAlert(alert);
+    setEditingRangeAlert(null);
     setFormData({
       stock_id: alert.stock_id,
       condition_type: alert.condition_type,
       condition_value: String(alert.condition_value),
+      price_above_value: '',
+      price_below_value: '',
       is_enabled: alert.is_enabled,
       repeat_after_trigger: alert.repeat_after_trigger,
       notes: alert.notes || '',
@@ -196,34 +312,110 @@ export function AlertsPage() {
     setIsFormOpen(true);
   };
 
-  const handleSubmit = async () => {
-    const value = parseFloat(formData.condition_value);
-    if (isNaN(value) || value <= 0) return;
-    if (!formData.stock_id) return;
+  const openEditRangeForm = (range: RangeAlertItem) => {
+    setEditingAlert(null);
+    setEditingRangeAlert(range);
+    setFormData({
+      stock_id: range.aboveAlert.stock_id,
+      condition_type: 'price_both',
+      condition_value: '',
+      price_above_value: String(range.aboveAlert.condition_value),
+      price_below_value: String(range.belowAlert.condition_value),
+      is_enabled: range.is_enabled,
+      repeat_after_trigger: range.repeat_after_trigger,
+      notes: range.notes || '',
+    });
+    setIsFormOpen(true);
+  };
 
-    const data: PriceAlertCreate = {
-      stock_id: formData.stock_id,
-      condition_type: formData.condition_type,
-      condition_value: value,
-      is_enabled: formData.is_enabled,
-      repeat_after_trigger: formData.repeat_after_trigger,
-      notes: formData.notes || null,
-    };
+  const handleSubmit = async () => {
+    if (!formData.stock_id && !editingAlert && !editingRangeAlert) return;
+
+    // Validate values based on mode
+    if (formData.condition_type === 'price_both') {
+      const aboveValue = parseFloat(formData.price_above_value);
+      const belowValue = parseFloat(formData.price_below_value);
+      if (isNaN(aboveValue) || aboveValue <= 0) return;
+      if (isNaN(belowValue) || belowValue <= 0) return;
+    } else {
+      const value = parseFloat(formData.condition_value);
+      if (isNaN(value) || value <= 0) return;
+    }
 
     try {
-      if (editingAlert) {
+      if (editingRangeAlert) {
+        // Edit mode - update both alerts in the range
+        const aboveValue = parseFloat(formData.price_above_value);
+        const belowValue = parseFloat(formData.price_below_value);
+        await Promise.all([
+          updateMutation.mutateAsync({
+            id: editingRangeAlert.aboveAlert.id,
+            data: {
+              condition_value: aboveValue,
+              is_enabled: formData.is_enabled,
+              repeat_after_trigger: formData.repeat_after_trigger,
+              notes: formData.notes || null,
+            },
+          }),
+          updateMutation.mutateAsync({
+            id: editingRangeAlert.belowAlert.id,
+            data: {
+              condition_value: belowValue,
+              is_enabled: formData.is_enabled,
+              repeat_after_trigger: formData.repeat_after_trigger,
+              notes: formData.notes || null,
+            },
+          }),
+        ]);
+      } else if (editingAlert) {
+        // Edit mode - single update
+        const value = parseFloat(formData.condition_value);
         await updateMutation.mutateAsync({
           id: editingAlert.id,
           data: {
-            condition_type: data.condition_type,
-            condition_value: data.condition_value,
-            is_enabled: data.is_enabled,
-            repeat_after_trigger: data.repeat_after_trigger,
-            notes: data.notes,
+            condition_type: formData.condition_type as AlertConditionType,
+            condition_value: value,
+            is_enabled: formData.is_enabled,
+            repeat_after_trigger: formData.repeat_after_trigger,
+            notes: formData.notes || null,
           },
         });
+      } else if (formData.condition_type === 'price_both') {
+        // Create 2 alerts with different prices: above and below
+        // Generate shared group_id for linking them
+        const groupId = crypto.randomUUID();
+        const aboveValue = parseFloat(formData.price_above_value);
+        const belowValue = parseFloat(formData.price_below_value);
+        const baseData = {
+          stock_id: formData.stock_id,
+          is_enabled: formData.is_enabled,
+          repeat_after_trigger: formData.repeat_after_trigger,
+          notes: formData.notes || null,
+          group_id: groupId,
+        };
+        await Promise.all([
+          createMutation.mutateAsync({
+            ...baseData,
+            condition_type: 'price_above',
+            condition_value: aboveValue,
+          }),
+          createMutation.mutateAsync({
+            ...baseData,
+            condition_type: 'price_below',
+            condition_value: belowValue,
+          }),
+        ]);
       } else {
-        await createMutation.mutateAsync(data);
+        // Single alert creation
+        const value = parseFloat(formData.condition_value);
+        await createMutation.mutateAsync({
+          stock_id: formData.stock_id,
+          condition_type: formData.condition_type as AlertConditionType,
+          condition_value: value,
+          is_enabled: formData.is_enabled,
+          repeat_after_trigger: formData.repeat_after_trigger,
+          notes: formData.notes || null,
+        });
       }
       setIsFormOpen(false);
     } catch {
@@ -234,19 +426,31 @@ export function AlertsPage() {
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      await deleteMutation.mutateAsync(deleteConfirm.id);
+      if (deleteConfirm.type === 'range') {
+        await deleteGroupMutation.mutateAsync(deleteConfirm.groupId);
+      } else {
+        await deleteMutation.mutateAsync(deleteConfirm.alert.id);
+      }
       setDeleteConfirm(null);
     } catch {
       // Error handled by mutation
     }
   };
 
-  const handleToggle = async (alert: PriceAlert) => {
-    await toggleMutation.mutateAsync(alert.id);
+  const handleToggle = async (item: AlertDisplayItem) => {
+    if (item.type === 'range') {
+      await toggleGroupMutation.mutateAsync(item.groupId);
+    } else {
+      await toggleMutation.mutateAsync(item.alert.id);
+    }
   };
 
-  const handleReset = async (alert: PriceAlert) => {
-    await resetMutation.mutateAsync(alert.id);
+  const handleReset = async (item: AlertDisplayItem) => {
+    if (item.type === 'range') {
+      await resetGroupMutation.mutateAsync(item.groupId);
+    } else {
+      await resetMutation.mutateAsync(item.alert.id);
+    }
   };
 
   // Count stats
@@ -334,10 +538,14 @@ export function AlertsPage() {
       {/* Alerts list - grouped by ticker */}
       {!alertsLoading && filteredAlerts.length > 0 && (
         <div className="space-y-4">
-          {groupedAlerts.map(([ticker, tickerAlerts]) => {
+          {groupedDisplayItems.map(([ticker, items]) => {
             const quote = quotes[ticker];
             const currentPrice = quote?.price;
-            const stockName = tickerAlerts[0]?.stocks?.name;
+            const firstItem = items[0];
+            const stockName =
+              firstItem?.type === 'single'
+                ? firstItem.alert.stocks?.name
+                : firstItem?.stocks?.name;
 
             return (
               <div key={ticker} className="space-y-1.5">
@@ -352,103 +560,199 @@ export function AlertsPage() {
                     {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
-                    {tickerAlerts.length}{' '}
-                    {tickerAlerts.length === 1 ? 'alert' : 'alertů'}
+                    {items.length} {pluralizeAlert(items.length)}
                   </span>
                 </div>
 
                 {/* Alerts for this ticker */}
                 <div className="space-y-1">
-                  {tickerAlerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={`rounded-lg px-3 py-2 ${
-                        alert.is_triggered
-                          ? 'bg-amber-500/10'
-                          : alert.is_enabled
-                            ? 'bg-muted/30'
-                            : 'bg-muted/20 opacity-60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Condition */}
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            {CONDITION_ICONS[alert.condition_type]}
-                            <span className="font-mono-price text-sm">
-                              {formatConditionValue(
-                                alert.condition_type,
-                                alert.condition_value,
+                  {items.map((item) => {
+                    if (item.type === 'range') {
+                      // Range alert (grouped above + below)
+                      return (
+                        <div
+                          key={item.groupId}
+                          className={`rounded-lg px-3 py-2 ${
+                            item.is_triggered
+                              ? 'bg-amber-500/10'
+                              : item.is_enabled
+                                ? 'bg-muted/30'
+                                : 'bg-muted/20 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Range condition */}
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <ArrowUpDown className="h-4 w-4 text-violet-500" />
+                                <span className="font-mono-price text-sm">
+                                  ${item.belowAlert.condition_value.toFixed(2)}{' '}
+                                  – $
+                                  {item.aboveAlert.condition_value.toFixed(2)}
+                                </span>
+                              </div>
+                              {item.repeat_after_trigger && (
+                                <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                  <RotateCcw className="h-3 w-3" />
+                                  opakující
+                                </span>
                               )}
-                            </span>
-                          </div>
-                          {alert.repeat_after_trigger && (
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                              <RotateCcw className="h-3 w-3" />
-                              opakující
-                            </span>
-                          )}
-                          {alert.is_triggered && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30"
-                            >
-                              <Check className="h-3 w-3 mr-0.5" />
-                              Dokončeno
-                            </Badge>
-                          )}
-                          {!alert.is_enabled && !alert.is_triggered && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-[18px] text-muted-foreground"
-                            >
-                              Vypnuto
-                            </Badge>
-                          )}
-                        </div>
+                              {item.is_triggered && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30"
+                                >
+                                  <Check className="h-3 w-3 mr-0.5" />
+                                  Dokončeno
+                                </Badge>
+                              )}
+                              {!item.is_enabled && !item.is_triggered && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-[18px] text-muted-foreground"
+                                >
+                                  Vypnuto
+                                </Badge>
+                              )}
+                            </div>
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          {alert.is_triggered ? (
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {item.is_triggered ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleReset(item)}
+                                  disabled={resetGroupMutation.isPending}
+                                  title="Reset"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </Button>
+                              ) : (
+                                <Switch
+                                  checked={item.is_enabled}
+                                  onCheckedChange={() => handleToggle(item)}
+                                  disabled={toggleGroupMutation.isPending}
+                                />
+                              )}
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => openEditRangeForm(item)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setDeleteConfirm(item)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // Single alert
+                    const alert = item.alert;
+                    return (
+                      <div
+                        key={alert.id}
+                        className={`rounded-lg px-3 py-2 ${
+                          alert.is_triggered
+                            ? 'bg-amber-500/10'
+                            : alert.is_enabled
+                              ? 'bg-muted/30'
+                              : 'bg-muted/20 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          {/* Condition */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              {CONDITION_ICONS[alert.condition_type]}
+                              <span className="font-mono-price text-sm">
+                                {formatConditionValue(
+                                  alert.condition_type,
+                                  alert.condition_value,
+                                )}
+                              </span>
+                            </div>
+                            {alert.repeat_after_trigger && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                <RotateCcw className="h-3 w-3" />
+                                opakující
+                              </span>
+                            )}
+                            {alert.is_triggered && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30"
+                              >
+                                <Check className="h-3 w-3 mr-0.5" />
+                                Dokončeno
+                              </Badge>
+                            )}
+                            {!alert.is_enabled && !alert.is_triggered && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-[18px] text-muted-foreground"
+                              >
+                                Vypnuto
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {alert.is_triggered ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleReset(item)}
+                                disabled={resetMutation.isPending}
+                                title="Reset"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Switch
+                                checked={alert.is_enabled}
+                                onCheckedChange={() => handleToggle(item)}
+                                disabled={toggleMutation.isPending}
+                              />
+                            )}
+
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              onClick={() => handleReset(alert)}
-                              disabled={resetMutation.isPending}
-                              title="Reset"
+                              onClick={() => openEditForm(alert)}
                             >
-                              <RotateCcw className="h-3.5 w-3.5" />
+                              <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                          ) : (
-                            <Switch
-                              checked={alert.is_enabled}
-                              onCheckedChange={() => handleToggle(alert)}
-                              disabled={toggleMutation.isPending}
-                            />
-                          )}
 
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => openEditForm(alert)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setDeleteConfirm(alert)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setDeleteConfirm(item)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -461,13 +765,17 @@ export function AlertsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingAlert ? 'Upravit alert' : 'Nový cenový alert'}
+              {editingRangeAlert
+                ? 'Upravit cenové pásmo'
+                : editingAlert
+                  ? 'Upravit alert'
+                  : 'Nový cenový alert'}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Stock selection */}
-            {!editingAlert && (
+            {!editingAlert && !editingRangeAlert && (
               <div className="space-y-2">
                 <Label>Akcie</Label>
                 <Input
@@ -508,71 +816,152 @@ export function AlertsPage() {
               </div>
             )}
 
-            {/* Condition type */}
-            <div className="space-y-2">
-              <Label>Podmínka</Label>
-              <ToggleGroup
-                type="single"
-                value={formData.condition_type}
-                onValueChange={(v) =>
-                  v &&
-                  setFormData({
-                    ...formData,
-                    condition_type: v as AlertConditionType,
-                  })
-                }
-                className="w-full"
-              >
-                <ToggleGroupItem
-                  value="price_above"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
-                >
-                  <ArrowUp className="h-3.5 w-3.5" />
-                  Nad
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="price_below"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                  Pod
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="percent_change_day"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-blue-600 data-[state=on]:text-white"
-                >
-                  <Percent className="h-3.5 w-3.5" />
-                  ±%
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+            {editingRangeAlert && (
+              <div className="text-sm text-muted-foreground">
+                {editingRangeAlert.stocks?.ticker} -{' '}
+                {editingRangeAlert.stocks?.name}
+              </div>
+            )}
 
-            {/* Condition value */}
-            <div className="space-y-2">
-              <Label>
-                {formData.condition_type === 'percent_change_day'
-                  ? 'Práh změny (%)'
-                  : 'Cílová cena ($)'}
-              </Label>
-              <Input
-                type="number"
-                step={
-                  formData.condition_type === 'percent_change_day'
-                    ? '0.1'
-                    : '0.01'
-                }
-                min="0"
-                placeholder={
-                  formData.condition_type === 'percent_change_day'
-                    ? '5'
-                    : '100.00'
-                }
-                value={formData.condition_value}
-                onChange={(e) =>
-                  setFormData({ ...formData, condition_value: e.target.value })
-                }
-              />
-            </div>
+            {/* Condition type */}
+            {editingRangeAlert ? (
+              // Range edit - show fixed badge
+              <div className="space-y-2">
+                <Label>Podmínka</Label>
+                <div className="flex items-center gap-2 p-2 bg-violet-600/10 rounded-md border border-violet-600/30">
+                  <ArrowUpDown className="h-4 w-4 text-violet-500" />
+                  <span className="text-sm">Cenové pásmo</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Podmínka</Label>
+                <ToggleGroup
+                  type="single"
+                  value={formData.condition_type}
+                  onValueChange={(v) =>
+                    v &&
+                    setFormData({
+                      ...formData,
+                      condition_type: v as FormConditionType,
+                    })
+                  }
+                  className="w-full"
+                >
+                  <ToggleGroupItem
+                    value="price_above"
+                    className="flex-1 gap-1.5 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                    Nad
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="price_below"
+                    className="flex-1 gap-1.5 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                    Pod
+                  </ToggleGroupItem>
+                  {/* "Both" option only for create mode */}
+                  {!editingAlert && (
+                    <ToggleGroupItem
+                      value="price_both"
+                      className="flex-1 gap-1.5 data-[state=on]:bg-violet-600 data-[state=on]:text-white"
+                    >
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                      Obě
+                    </ToggleGroupItem>
+                  )}
+                  <ToggleGroupItem
+                    value="percent_change_day"
+                    className="flex-1 gap-1.5 data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                  >
+                    <Percent className="h-3.5 w-3.5" />
+                    ±%
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                {formData.condition_type === 'price_both' &&
+                  !editingRangeAlert && (
+                    <p className="text-xs text-muted-foreground">
+                      Vytvoří cenové pásmo: dostanete alert když cena opustí
+                      rozmezí.
+                    </p>
+                  )}
+              </div>
+            )}
+
+            {/* Condition value(s) */}
+            {formData.condition_type === 'price_both' ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <ArrowDown className="h-3.5 w-3.5 text-rose-500" />
+                    Dolní hranice - pod ($)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="90.00"
+                    value={formData.price_below_value}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        price_below_value: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <ArrowUp className="h-3.5 w-3.5 text-emerald-500" />
+                    Horní hranice - nad ($)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="110.00"
+                    value={formData.price_above_value}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        price_above_value: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>
+                  {formData.condition_type === 'percent_change_day'
+                    ? 'Práh změny (%)'
+                    : 'Cílová cena ($)'}
+                </Label>
+                <Input
+                  type="number"
+                  step={
+                    formData.condition_type === 'percent_change_day'
+                      ? '0.1'
+                      : '0.01'
+                  }
+                  min="0"
+                  placeholder={
+                    formData.condition_type === 'percent_change_day'
+                      ? '5'
+                      : '100.00'
+                  }
+                  value={formData.condition_value}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      condition_value: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
 
             {/* Options */}
             <div className="flex items-center justify-between">
@@ -607,7 +996,9 @@ export function AlertsPage() {
               onClick={handleSubmit}
               disabled={
                 !formData.stock_id ||
-                !formData.condition_value ||
+                (formData.condition_type === 'price_both'
+                  ? !formData.price_above_value || !formData.price_below_value
+                  : !formData.condition_value) ||
                 createMutation.isPending ||
                 updateMutation.isPending
               }
@@ -622,8 +1013,16 @@ export function AlertsPage() {
       <ConfirmDialog
         open={!!deleteConfirm}
         onOpenChange={(open) => !open && setDeleteConfirm(null)}
-        title="Smazat alert?"
-        description={`Opravdu chcete smazat alert pro ${deleteConfirm?.stocks?.ticker}?`}
+        title={
+          deleteConfirm?.type === 'range'
+            ? 'Smazat cenové pásmo?'
+            : 'Smazat alert?'
+        }
+        description={
+          deleteConfirm?.type === 'range'
+            ? `Opravdu chcete smazat cenové pásmo pro ${deleteConfirm.stocks?.ticker}?`
+            : `Opravdu chcete smazat alert pro ${deleteConfirm?.type === 'single' ? deleteConfirm.alert.stocks?.ticker : ''}?`
+        }
         confirmLabel="Smazat"
         onConfirm={handleDelete}
         variant="destructive"

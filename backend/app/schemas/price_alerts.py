@@ -16,6 +16,7 @@ class PriceAlertBase(BaseModel):
     is_enabled: bool = True
     repeat_after_trigger: bool = False
     notes: Optional[str] = None
+    group_id: Optional[str] = Field(None, description="UUID to link alerts together (e.g., price range)")
 
 
 class PriceAlertCreate(PriceAlertBase):
@@ -47,6 +48,7 @@ class PriceAlertResponse(BaseModel):
     triggered_at: Optional[datetime] = None
     repeat_after_trigger: bool
     notes: Optional[str] = None
+    group_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

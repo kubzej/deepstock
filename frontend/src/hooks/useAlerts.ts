@@ -7,6 +7,9 @@ import {
   deleteAlert,
   resetAlert,
   toggleAlert,
+  deleteGroup,
+  resetGroup,
+  toggleGroup,
   type PriceAlert,
   type PriceAlertCreate,
   type PriceAlertUpdate,
@@ -106,6 +109,55 @@ export function useToggleAlert() {
   
   return useMutation({
     mutationFn: (id: string) => toggleAlert(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });
+    },
+  });
+}
+
+// ==========================================
+// GROUP OPERATIONS (for price range alerts)
+// ==========================================
+
+/**
+ * Delete all alerts in a group.
+ */
+export function useDeleteGroup() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (groupId: string) => deleteGroup(groupId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });
+    },
+  });
+}
+
+/**
+ * Reset all triggered alerts in a group.
+ */
+export function useResetGroup() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (groupId: string) => resetGroup(groupId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });
+    },
+  });
+}
+
+/**
+ * Toggle all alerts in a group enabled/disabled.
+ */
+export function useToggleGroup() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: (groupId: string) => toggleGroup(groupId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
       queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });

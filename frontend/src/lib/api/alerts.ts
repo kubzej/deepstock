@@ -18,6 +18,7 @@ export interface PriceAlert {
   triggered_at: string | null;
   repeat_after_trigger: boolean;
   notes: string | null;
+  group_id: string | null;
   created_at: string;
   updated_at: string | null;
   stocks: {
@@ -33,6 +34,7 @@ export interface PriceAlertCreate {
   is_enabled?: boolean;
   repeat_after_trigger?: boolean;
   notes?: string | null;
+  group_id?: string | null;
 }
 
 export interface PriceAlertUpdate {
@@ -186,6 +188,61 @@ export async function toggleAlert(alertId: string): Promise<PriceAlert> {
     if (response.status === 401) throw new Error('Unauthorized');
     if (response.status === 404) throw new Error('Alert nenalezen');
     throw new Error('Nepodařilo se přepnout alert');
+  }
+  
+  return response.json();
+}
+
+// ============ Group Operations ============
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/alerts/group/${groupId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    if (response.status === 404) throw new Error('Skupina nenalezena');
+    throw new Error('Nepodařilo se smazat skupinu');
+  }
+}
+
+export async function resetGroup(groupId: string): Promise<PriceAlert[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/alerts/group/${groupId}/reset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    throw new Error('Nepodařilo se resetovat skupinu');
+  }
+  
+  return response.json();
+}
+
+export async function toggleGroup(groupId: string): Promise<PriceAlert[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/alerts/group/${groupId}/toggle`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+  
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    throw new Error('Nepodařilo se přepnout skupinu');
   }
   
   return response.json();

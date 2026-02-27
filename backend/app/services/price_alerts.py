@@ -270,6 +270,9 @@ class PriceAlertService:
         if data.notes is not None:
             insert_data["notes"] = data.notes
         
+        if data.group_id is not None:
+            insert_data["group_id"] = data.group_id
+        
         response = supabase.table("price_alerts") \
             .insert(insert_data) \
             .execute()
@@ -330,6 +333,80 @@ class PriceAlertService:
             return None
         
         return await self.get_alert(alert_id, user_id)
+
+    # ==========================================
+    # GROUP OPERATIONS (for price range alerts)
+    # ==========================================
+
+    async def get_alerts_by_group(self, group_id: str, user_id: str) -> List[dict]:
+        """Get all alerts in a group."""
+        response = supabase.table("price_alerts") \
+            .select("*, stocks(ticker, name)") \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return response.data
+
+    async def update_group(self, group_id: str, user_id: str, data: PriceAlertUpdate) -> List[dict]:
+        """Update all alerts in a group with shared settings."""
+        update_data = {}
+        
+        if data.is_enabled is not None:
+            update_data["is_enabled"] = data.is_enabled
+        if data.repeat_after_trigger is not None:
+            update_data["repeat_after_trigger"] = data.repeat_after_trigger
+        if data.notes is not None:
+            update_data["notes"] = data.notes
+        
+        if not update_data:
+            return await self.get_alerts_by_group(group_id, user_id)
+        
+        supabase.table("price_alerts") \
+            .update(update_data) \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        return await self.get_alerts_by_group(group_id, user_id)
+
+    async def delete_group(self, group_id: str, user_id: str) -> bool:
+        """Delete all alerts in a group."""
+        response = supabase.table("price_alerts") \
+            .delete() \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
+
+    async def reset_group(self, group_id: str, user_id: str) -> List[dict]:
+        """Reset all triggered alerts in a group."""
+        supabase.table("price_alerts") \
+            .update({
+                "is_triggered": False,
+                "triggered_at": None,
+            }) \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        return await self.get_alerts_by_group(group_id, user_id)
+
+    async def toggle_group(self, group_id: str, user_id: str) -> List[dict]:
+        """Toggle all alerts in a group enabled/disabled."""
+        # Get current state from first alert in group
+        alerts = await self.get_alerts_by_group(group_id, user_id)
+        if not alerts:
+            return []
+        
+        new_state = not alerts[0].get("is_enabled", True)
+        
+        supabase.table("price_alerts") \
+            .update({"is_enabled": new_state}) \
+            .eq("group_id", group_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        
+        return await self.get_alerts_by_group(group_id, user_id)
 
     # ==========================================
     # CUSTOM ALERT CHECKING (for cron job)
