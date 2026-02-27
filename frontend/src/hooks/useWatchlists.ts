@@ -14,7 +14,7 @@ import {
   reorderWatchlists,
   type Watchlist,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Fetch all user watchlists.
@@ -23,8 +23,8 @@ export function useWatchlists() {
   return useQuery({
     queryKey: queryKeys.watchlists(),
     queryFn: fetchWatchlists,
-    staleTime: Infinity, // Only invalidate manually on CRUD
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.watchlists,
+    gcTime: GC_TIMES.medium,
   });
 }
 
@@ -36,8 +36,8 @@ export function useAllWatchlistTickers() {
   return useQuery({
     queryKey: queryKeys.watchlistTickers(),
     queryFn: fetchAllWatchlistTickers,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.watchlistTickers,
+    gcTime: GC_TIMES.medium,
   });
 }
 
@@ -47,10 +47,10 @@ export function useAllWatchlistTickers() {
  */
 export function useAllWatchlistItems() {
   return useQuery({
-    queryKey: ['allWatchlistItems'],
+    queryKey: queryKeys.allWatchlistItems(),
     queryFn: fetchAllWatchlistItems,
-    staleTime: Infinity, // Only invalidate manually
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.watchlistItems,
+    gcTime: GC_TIMES.medium,
   });
 }
 
@@ -62,8 +62,8 @@ export function useWatchlistItems(watchlistId: string | null) {
     queryKey: queryKeys.watchlistItems(watchlistId || ''),
     queryFn: () => fetchWatchlistItems(watchlistId!),
     enabled: !!watchlistId,
-    staleTime: Infinity, // Only invalidate manually
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.watchlistItems,
+    gcTime: GC_TIMES.medium,
   });
 }
 

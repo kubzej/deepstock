@@ -17,6 +17,7 @@ from datetime import date, timedelta
 
 import httpx
 import redis.asyncio as redis
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,7 @@ SEC_BASE = "https://efts.sec.gov/LATEST"
 EDGAR_BASE = "https://www.sec.gov"
 EDGAR_DATA = "https://data.sec.gov"
 
-# Cache TTLs
-CIK_MAP_TTL = 7 * 24 * 3600  # 7 days — CIK mappings rarely change
-INSIDER_TTL = 12 * 3600  # 12 hours — filings update infrequently
+# Cache TTLs — defined centrally in app.core.cache
 
 # Transaction type codes from Form 4
 TRANSACTION_CODES = {
@@ -71,7 +70,7 @@ async def _get_cik_map(r: redis.Redis) -> dict[str, str]:
         if ticker and cik:
             cik_map[ticker] = cik
 
-    await r.set(cache_key, json.dumps(cik_map), ex=CIK_MAP_TTL)
+    await r.set(cache_key, json.dumps(cik_map), ex=CacheTTL.SEC_CIK_MAP)
     logger.info("Cached SEC CIK map (%d tickers)", len(cik_map))
     return cik_map
 
@@ -248,7 +247,7 @@ async def get_insider_trades(
     cik = await _resolve_cik(r, ticker)
     if not cik:
         # Cache empty result briefly so we don't retry constantly
-        await r.set(cache_key, "[]", ex=3600)
+        await r.set(cache_key, "[]", ex=CacheTTL.NEGATIVE_CACHE)
         return []
 
     try:
@@ -256,7 +255,7 @@ async def get_insider_trades(
         filings = await _fetch_form4_index(cik, max_filings=40)
 
         if not filings:
-            await r.set(cache_key, "[]", ex=INSIDER_TTL)
+            await r.set(cache_key, "[]", ex=CacheTTL.INSIDER_TRADES)
             return []
 
         # Filter to last N months
@@ -308,7 +307,7 @@ async def get_insider_trades(
         all_trades.sort(key=lambda t: t["trade_date"], reverse=True)
 
         # Cache
-        await r.set(cache_key, json.dumps(all_trades, default=str), ex=INSIDER_TTL)
+        await r.set(cache_key, json.dumps(all_trades, default=str), ex=CacheTTL.INSIDER_TRADES)
         logger.info(
             "Cached %d insider trades for %s", len(all_trades), ticker.upper()
         )

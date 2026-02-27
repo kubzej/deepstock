@@ -14,7 +14,7 @@ import {
   useOptionHoldings,
   useOptionStats,
   useDeleteOptionTransactionsBySymbol,
-} from '@/lib/optionsHooks';
+} from '@/hooks/useOptions';
 import { useOptionQuotes } from '@/hooks/useOptionQuotes';
 import { useQuotes } from '@/hooks/useQuotes';
 import { usePortfolio } from '@/contexts/PortfolioContext';

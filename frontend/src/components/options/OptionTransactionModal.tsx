@@ -30,7 +30,7 @@ import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   useCreateOptionTransaction,
   useCloseOptionPosition,
-} from '@/lib/optionsHooks';
+} from '@/hooks/useOptions';
 import { formatPrice, formatDate } from '@/lib/format';
 import { API_URL } from '@/lib/api';
 import type { OptionType, OptionAction, OptionHolding } from '@/lib/api';

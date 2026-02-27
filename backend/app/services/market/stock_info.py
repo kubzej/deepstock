@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import logging
 from typing import List, Optional
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -1834,8 +1835,7 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         # Calculate fair value estimates
         result["valuation"] = calculate_valuation(result)
         
-        # Cache for 5 minutes (fundamentals don't change often)
-        await redis.set(cache_key, json.dumps(result), ex=300)
+        await redis.set(cache_key, json.dumps(result), ex=CacheTTL.STOCK_INFO)
         return result
         
     except Exception as e:

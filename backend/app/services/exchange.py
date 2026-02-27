@@ -5,6 +5,7 @@ import logging
 from typing import Dict
 from app.core.config import get_settings
 from app.core.redis import get_redis
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +94,7 @@ class ExchangeRateService:
                     logger.warning(f"Failed to get cross rate for {currency}: {e}")
                     rates[currency] = self.FALLBACK_RATES.get(currency, 1.0)
             
-            # Cache for 1 hour (rates don't change that fast)
-            await self.redis.set("exchange_rates:czk", json.dumps(rates), ex=3600)
+            await self.redis.set("exchange_rates:czk", json.dumps(rates), ex=CacheTTL.EXCHANGE_RATES)
             
         except Exception as e:
             logger.error(f"Error fetching exchange rates: {e}")

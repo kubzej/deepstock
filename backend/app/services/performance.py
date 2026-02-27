@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.core.supabase import supabase
 from app.core.redis import get_redis
 from app.services.exchange import ExchangeRateService
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -294,8 +295,8 @@ async def get_stock_performance(
         benchmark_return_pct=None
     )
     
-    # Cache for 1 hour
-    await redis.set(cache_key, result.model_dump_json(), ex=3600)
+    # Cache stock performance
+    await redis.set(cache_key, result.model_dump_json(), ex=CacheTTL.PERFORMANCE)
     
     return result
 
@@ -436,8 +437,8 @@ async def get_options_performance(
         benchmark_return_pct=None
     )
     
-    # Cache for 1 hour
-    await redis.set(cache_key, result.model_dump_json(), ex=3600)
+    # Cache options performance
+    await redis.set(cache_key, result.model_dump_json(), ex=CacheTTL.PERFORMANCE)
     
     return result
 

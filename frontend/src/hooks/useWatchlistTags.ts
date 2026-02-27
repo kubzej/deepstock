@@ -7,7 +7,7 @@ import {
   fetchItemTags,
   setItemTags,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 
 /**
  * Fetch all watchlist tags for the user
@@ -16,7 +16,7 @@ export function useWatchlistTags() {
   return useQuery({
     queryKey: queryKeys.watchlistTags(),
     queryFn: fetchWatchlistTags,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIMES.watchlistTags,
   });
 }
 
@@ -28,7 +28,7 @@ export function useItemTags(itemId: string | null) {
     queryKey: queryKeys.itemTags(itemId || ''),
     queryFn: () => fetchItemTags(itemId!),
     enabled: !!itemId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: STALE_TIMES.itemTags,
   });
 }
 
@@ -58,7 +58,7 @@ export function useUpdateWatchlistTag() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTags() });
       // Also invalidate all item tags as they include tag info
-      queryClient.invalidateQueries({ queryKey: ['itemTags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.itemTags('') });
     },
   });
 }
@@ -73,7 +73,7 @@ export function useDeleteWatchlistTag() {
     mutationFn: (tagId: string) => deleteWatchlistTag(tagId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTags() });
-      queryClient.invalidateQueries({ queryKey: ['itemTags'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.itemTags('') });
     },
   });
 }

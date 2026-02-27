@@ -8,7 +8,7 @@ import {
   type Transaction,
   type OptionTransaction,
 } from '@/lib/api';
-import { STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Fetch all stock transactions across all portfolios.
@@ -16,7 +16,7 @@ import { STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
  */
 export function useAllTransactions(limit: number = 1000) {
   return useQuery<Transaction[]>({
-    queryKey: ['all-transactions', limit],
+    queryKey: queryKeys.transactionHistory(limit),
     queryFn: () => fetchAllTransactions(limit),
     staleTime: STALE_TIMES.transactions,
     gcTime: GC_TIMES.medium,
@@ -28,7 +28,7 @@ export function useAllTransactions(limit: number = 1000) {
  */
 export function useAllOptionTransactions(limit: number = 500) {
   return useQuery<OptionTransaction[]>({
-    queryKey: ['all-option-transactions', limit],
+    queryKey: queryKeys.optionTransactionHistory(limit),
     queryFn: () => fetchOptionTransactions(undefined, undefined, undefined, limit),
     staleTime: STALE_TIMES.transactions,
     gcTime: GC_TIMES.medium,

@@ -7,7 +7,7 @@ import {
   deleteTransaction,
 } from '@/lib/api';
 import type { Transaction, TransactionUpdateData } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 
 /**
  * Hook for fetching transactions for a specific portfolio.
@@ -21,7 +21,7 @@ export function useTransactions(portfolioId: string | null, limit = 100) {
       ? fetchTransactions(portfolioId, limit) 
       : fetchAllTransactions(limit),
     enabled: portfolioId !== undefined,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: STALE_TIMES.transactions,
   });
 }
 

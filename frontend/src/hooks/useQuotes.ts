@@ -1,9 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchQuotes, type Quote } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
-
-const QUOTE_STALE_TIME = 10 * 60 * 1000; // 10 minutes - refresh manually when needed
-const QUOTE_GC_TIME = 30 * 60 * 1000; // 30 minutes
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Normalized quotes cache - each ticker has its own cache entry.
@@ -37,7 +34,7 @@ export function useQuotes(tickers: string[]) {
         const cached = queryClient.getQueryData<Quote>(['quote', ticker]);
         const state = queryClient.getQueryState(['quote', ticker]);
         
-        if (cached && state && !isStale(state.dataUpdatedAt, QUOTE_STALE_TIME)) {
+        if (cached && state && !isStale(state.dataUpdatedAt, STALE_TIMES.quotes)) {
           result[ticker] = cached;
         } else {
           missing.push(ticker);
@@ -59,8 +56,8 @@ export function useQuotes(tickers: string[]) {
       
       return result;
     },
-    staleTime: QUOTE_STALE_TIME,
-    gcTime: QUOTE_GC_TIME,
+    staleTime: STALE_TIMES.quotes,
+    gcTime: GC_TIMES.medium,
     enabled: uniqueTickers.length > 0,
   });
 }
@@ -84,8 +81,8 @@ export function useQuote(ticker: string) {
       const quotes = await fetchQuotes([ticker]);
       return quotes[ticker] || null;
     },
-    staleTime: QUOTE_STALE_TIME,
-    gcTime: QUOTE_GC_TIME,
+    staleTime: STALE_TIMES.quotes,
+    gcTime: GC_TIMES.medium,
     enabled: !!ticker,
     // Try to get from existing batch queries first
     initialData: () => {

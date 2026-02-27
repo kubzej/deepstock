@@ -9,16 +9,13 @@ import {
 } from '@/lib/api';
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
-// Query key for all stocks
-const stocksKey = ['stocks'] as const;
-
 /**
  * Hook for fetching all stocks (master data).
  * Long stale time - master data rarely changes.
  */
 export function useStocks() {
   return useQuery({
-    queryKey: stocksKey,
+    queryKey: queryKeys.stocks(),
     queryFn: () => fetchStocks(500),
     staleTime: STALE_TIMES.stocks,
     gcTime: GC_TIMES.long,
@@ -47,8 +44,7 @@ export function useCreateStock() {
   return useMutation({
     mutationFn: (data: Omit<Stock, 'id' | 'created_at'>) => createStock(data),
     onSuccess: () => {
-      // Invalidate stocks list to refetch
-      queryClient.invalidateQueries({ queryKey: stocksKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
     },
   });
 }
@@ -60,11 +56,11 @@ export function useUpdateStock() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Stock> }) => 
+    mutationFn: ({ id, data }: { id: string; data: Partial<Stock> }) =>
       updateStock(id, data),
     onSuccess: (updatedStock) => {
       // Update in list cache
-      queryClient.setQueryData<Stock[]>(stocksKey, (old) =>
+      queryClient.setQueryData<Stock[]>(queryKeys.stocks(), (old) =>
         old?.map((s) => (s.id === updatedStock.id ? updatedStock : s))
       );
       // Update individual cache
@@ -86,11 +82,11 @@ export function useDeleteStock() {
     mutationFn: (id: string) => deleteStock(id),
     onSuccess: (_, deletedId) => {
       // Remove from list cache
-      queryClient.setQueryData<Stock[]>(stocksKey, (old) =>
+      queryClient.setQueryData<Stock[]>(queryKeys.stocks(), (old) =>
         old?.filter((s) => s.id !== deletedId)
       );
       // Invalidate to ensure consistency
-      queryClient.invalidateQueries({ queryKey: stocksKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
     },
   });
 }

@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import logging
 from typing import List, Dict, Optional
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +125,8 @@ async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.Dat
         df_for_cache['date'] = df_for_cache['date'].astype(str)
         cache_data = df_for_cache.to_dict(orient='records')
         
-        # Cache for 1 hour (3600 seconds)
-        await redis.set(cache_key, json.dumps(cache_data), ex=3600)
+        # Cache raw OHLCV + indicators
+        await redis.set(cache_key, json.dumps(cache_data), ex=CacheTTL.TECHNICAL_RAW)
         
         return df
         
@@ -601,7 +602,7 @@ async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Op
         }
         
         # Cache for 5 minutes
-        await redis.set(cache_key, json.dumps(result), ex=300)
+        await redis.set(cache_key, json.dumps(result), ex=CacheTTL.TECHNICAL_SIGNALS)
         return result
         
     except Exception as e:

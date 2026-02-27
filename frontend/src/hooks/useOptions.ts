@@ -2,7 +2,7 @@
  * React Query hooks for Options
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from './queryClient';
+import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 import {
   fetchOptionHoldings,
   fetchOptionTransactions,
@@ -16,7 +16,7 @@ import {
   type OptionStats,
   type CreateOptionTransactionInput,
   type OptionAction,
-} from './api';
+} from '@/lib/api';
 
 // ============ Query Hooks ============
 
@@ -28,7 +28,7 @@ export function useOptionHoldings(portfolioId?: string) {
   return useQuery({
     queryKey: queryKeys.optionHoldings(portfolioId),
     queryFn: () => fetchOptionHoldings(portfolioId),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: STALE_TIMES.options,
   });
 }
 
@@ -41,7 +41,7 @@ export function useOptionTransactions(portfolioId?: string, symbol?: string) {
   return useQuery({
     queryKey: [...queryKeys.optionTransactions(portfolioId), symbol].filter(Boolean),
     queryFn: () => fetchOptionTransactions(portfolioId, symbol),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: STALE_TIMES.options,
   });
 }
 
@@ -55,8 +55,8 @@ export function useOptionTransactionsBySymbol(portfolioId?: string, optionSymbol
   return useQuery({
     queryKey: ['optionTransactions', 'bySymbol', portfolioId, optionSymbol].filter(Boolean),
     queryFn: () => fetchOptionTransactions(portfolioId, undefined, optionSymbol),
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    enabled: !!optionSymbol, // Only fetch if optionSymbol is provided
+    staleTime: STALE_TIMES.options,
+    enabled: !!optionSymbol,
   });
 }
 
@@ -68,7 +68,7 @@ export function useOptionStats(portfolioId?: string) {
   return useQuery({
     queryKey: queryKeys.optionStats(portfolioId),
     queryFn: () => fetchOptionStats(portfolioId),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: STALE_TIMES.options,
   });
 }
 
@@ -84,7 +84,6 @@ export function useCreateOptionTransaction() {
     mutationFn: ({ portfolioId, data }: { portfolioId: string; data: CreateOptionTransactionInput }) =>
       createOptionTransaction(portfolioId, data),
     onSuccess: () => {
-      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
@@ -173,7 +172,6 @@ export function useCloseOptionPosition() {
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
       // Also invalidate stock data for ASSIGNMENT/EXERCISE as they create stock transactions
       if (variables.closingAction === 'ASSIGNMENT' || variables.closingAction === 'EXERCISE') {
-        // Invalidate all stock-related queries used by Dashboard
         queryClient.invalidateQueries({ queryKey: ['holdings'] });
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         queryClient.invalidateQueries({ queryKey: ['openLots'] });

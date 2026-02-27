@@ -14,7 +14,7 @@ import {
   type PriceAlertCreate,
   type PriceAlertUpdate,
 } from '@/lib/api';
-import { queryKeys } from '@/lib/queryClient';
+import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
  * Fetch all user price alerts.
@@ -23,8 +23,8 @@ export function useAlerts() {
   return useQuery({
     queryKey: queryKeys.alerts(),
     queryFn: fetchAlerts,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.alerts,
+    gcTime: GC_TIMES.medium,
   });
 }
 
@@ -35,8 +35,8 @@ export function useActiveAlerts() {
   return useQuery({
     queryKey: queryKeys.activeAlerts(),
     queryFn: fetchActiveAlerts,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: STALE_TIMES.alerts,
+    gcTime: GC_TIMES.medium,
   });
 }
 

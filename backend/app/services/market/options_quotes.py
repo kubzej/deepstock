@@ -9,6 +9,7 @@ import logging
 import math
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,8 @@ async def get_option_quotes(redis, occ_symbols: List[str]) -> Dict[str, dict]:
         for occ, quote in fetched.items():
             results[occ] = quote
             
-            # Cache successful fetches (60s TTL for option prices)
+            # Cache successful fetches
             if quote is not None:
-                await redis.set(f"option_quote:{occ}", json.dumps(quote), ex=60)
+                await redis.set(f"option_quote:{occ}", json.dumps(quote), ex=CacheTTL.OPTION_QUOTE)
     
     return results

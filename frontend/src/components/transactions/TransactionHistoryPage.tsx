@@ -169,8 +169,8 @@ export function TransactionHistoryPage() {
   ]);
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['all-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['all-option-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+    queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
   };
 
   // Get portfolio name by ID

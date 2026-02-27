@@ -2,7 +2,7 @@
  * MarketPage - Přehled trhu
  * Zobrazuje klíčové tržní indikátory a sektory
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -27,14 +27,44 @@ export function MarketPage() {
   // Track if any quotes are being fetched
   const isFetching = useIsFetching({ queryKey: ['quotes'] }) > 0;
 
-  // Get dataUpdatedAt from quotes cache
-  const quotesState = queryClient.getQueryState(['quotes']);
-  const dataUpdatedAt = quotesState?.dataUpdatedAt ?? null;
+  // Get the most recent dataUpdatedAt across all 'quotes' queries (keys like ['quotes', 'AAPL,MSFT,...'])
+  const [dataUpdatedAt, setDataUpdatedAt] = useState<number | null>(() => {
+    const queries = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: ['quotes'] });
+    const latest = queries.reduce(
+      (max, q) => Math.max(max, q.state.dataUpdatedAt),
+      0,
+    );
+    return latest > 0 ? latest : null;
+  });
+
+  useEffect(() => {
+    const getLatest = () => {
+      const queries = queryClient
+        .getQueryCache()
+        .findAll({ queryKey: ['quotes'] });
+      const latest = queries.reduce(
+        (max, q) => Math.max(max, q.state.dataUpdatedAt),
+        0,
+      );
+      return latest > 0 ? latest : null;
+    };
+
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'updated' && event.query.queryKey[0] === 'quotes') {
+        setDataUpdatedAt(getLatest());
+      }
+    });
+
+    return unsubscribe;
+  }, [queryClient]);
 
   const handleRefresh = () => {
-    // Invalidate all quote caches
+    // Remove individual quote caches so queryFn sees no cached data and forces API call
+    queryClient.removeQueries({ queryKey: ['quote'] });
+    // Trigger re-run of all batch quote queries
     queryClient.invalidateQueries({ queryKey: ['quotes'] });
-    queryClient.invalidateQueries({ queryKey: ['quote'] });
   };
 
   return (

@@ -14,6 +14,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Union
 from datetime import datetime
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +46,7 @@ def safe_int(value) -> Optional[int]:
     except (ValueError, TypeError):
         return None
 
-# Cache TTLs
-BASIC_QUOTE_TTL = 300      # 5 minutes for prices
-EXTENDED_DATA_TTL = 3600   # 1 hour for pre/post market, avgVolume, earnings
+# Cache TTLs — defined centrally in app.core.cache
 
 
 def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
@@ -106,7 +105,7 @@ async def _fetch_and_cache_extended_data(redis, ticker: str):
         ext_data = await loop.run_in_executor(_executor, _fetch_extended_data_sync, ticker)
         
         if ext_data:
-            await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=EXTENDED_DATA_TTL)
+            await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=CacheTTL.QUOTE_EXTENDED)
             logger.debug(f"Cached extended data for {ticker}")
     except Exception as e:
         logger.warning(f"Background fetch failed for {ticker}: {e}")
@@ -188,7 +187,7 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                         }
                         
                         results[t] = quote
-                        await redis.set(f"quote:{t}", json.dumps(quote), ex=BASIC_QUOTE_TTL)
+                        await redis.set(f"quote:{t}", json.dumps(quote), ex=CacheTTL.QUOTE_BASIC)
                         
                     except Exception as e:
                         logger.warning(f"Error processing {t} from download: {e}")
@@ -268,13 +267,12 @@ async def get_price_history(redis, ticker: str, period: str = "1mo") -> List[dic
             })
         
         # Cache based on period (shorter periods = shorter TTL)
-        ttl = 300  # 5 min default
         if period in ["1d", "5d"]:
-            ttl = 60  # 1 min for intraday
+            ttl = CacheTTL.PRICE_HISTORY_INTRADAY
         elif period in ["1mo", "3mo"]:
-            ttl = 3600  # 1 hour
+            ttl = CacheTTL.PRICE_HISTORY_SHORT
         else:
-            ttl = 86400  # 1 day for longer periods
+            ttl = CacheTTL.PRICE_HISTORY_LONG
         
         await redis.set(cache_key, json.dumps(result), ex=ttl)
         return result

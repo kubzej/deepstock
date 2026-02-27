@@ -7,6 +7,7 @@ from typing import Dict
 from app.core.supabase import supabase
 from app.services.market.quotes import get_quotes
 from app.services.push import send_push_notification
+from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class EarningsAlertService:
             if not already_sent:
                 alerts_to_send.append(stock)
                 # Mark as sent (expires in 24h)
-                await redis.set(cache_key, "1", ex=86400)
+                await redis.set(cache_key, "1", ex=CacheTTL.ALERT_SENT)
         
         if not alerts_to_send:
             return 0
