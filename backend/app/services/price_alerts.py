@@ -424,9 +424,25 @@ class PriceAlertService:
             .execute()
         return response.data
     
-    async def mark_alert_triggered(self, alert_id: str) -> dict:
-        """Mark a custom alert as triggered with timestamp."""
+    async def mark_alert_triggered(self, alert_id: str, group_id: str = None, user_id: str = None) -> dict:
+        """
+        Mark a custom alert as triggered with timestamp.
+        If the alert belongs to a group (group_id), mark ALL alerts in the group as triggered.
+        """
         now = datetime.now(timezone.utc).isoformat()
+        
+        # If alert belongs to a group, trigger the entire group
+        if group_id and user_id:
+            supabase.table("price_alerts") \
+                .update({
+                    "is_triggered": True,
+                    "triggered_at": now,
+                }) \
+                .eq("group_id", group_id) \
+                .eq("user_id", user_id) \
+                .execute()
+        
+        # Always update the specific alert (covers non-grouped alerts)
         response = supabase.table("price_alerts") \
             .update({
                 "is_triggered": True,
@@ -556,8 +572,12 @@ class PriceAlertService:
                     logger.info(f"Alert {alert.get('id')}: is_triggered={trigger_info.is_triggered}")
                     
                     if trigger_info.is_triggered:
-                        # Mark as triggered
-                        await self.mark_alert_triggered(alert["id"])
+                        # Mark as triggered (including group if applicable)
+                        await self.mark_alert_triggered(
+                            alert["id"], 
+                            group_id=alert.get("group_id"),
+                            user_id=alert.get("user_id")
+                        )
                         
                         # Send push notification (don't fail if push fails)
                         try:
@@ -569,9 +589,12 @@ class PriceAlertService:
                         
                         alerts_triggered += 1
                         
-                        # If repeat_after_trigger, reset immediately
+                        # If repeat_after_trigger, reset immediately (entire group if applicable)
                         if alert.get("repeat_after_trigger"):
-                            await self.reset_alert(alert["id"], alert["user_id"])
+                            if alert.get("group_id"):
+                                await self.reset_group(alert["group_id"], alert["user_id"])
+                            else:
+                                await self.reset_alert(alert["id"], alert["user_id"])
                 except Exception as e:
                     logger.error(f"Error processing alert {alert.get('id')}: {e}")
                     continue

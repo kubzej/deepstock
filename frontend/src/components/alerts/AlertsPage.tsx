@@ -453,13 +453,49 @@ export function AlertsPage() {
     }
   };
 
-  // Count stats
-  const activeCount = alerts.filter(
-    (a) => a.is_enabled && !a.is_triggered,
-  ).length;
-  const inactiveCount = alerts.filter(
-    (a) => !a.is_enabled || a.is_triggered,
-  ).length;
+  // Count stats - count groups as 1 item based on combined group state
+  const { activeCount, inactiveCount } = useMemo(() => {
+    // Group alerts by group_id
+    const groupMap = new Map<string, PriceAlert[]>();
+    const ungrouped: PriceAlert[] = [];
+
+    for (const alert of alerts) {
+      if (alert.group_id) {
+        const existing = groupMap.get(alert.group_id) || [];
+        existing.push(alert);
+        groupMap.set(alert.group_id, existing);
+      } else {
+        ungrouped.push(alert);
+      }
+    }
+
+    let active = 0;
+    let inactive = 0;
+
+    // Count grouped alerts - group is active only if ALL alerts are active
+    for (const groupAlerts of groupMap.values()) {
+      const isGroupEnabled = groupAlerts.every((a) => a.is_enabled);
+      const isGroupTriggered = groupAlerts.some((a) => a.is_triggered);
+      const isActive = isGroupEnabled && !isGroupTriggered;
+
+      if (isActive) {
+        active++;
+      } else {
+        inactive++;
+      }
+    }
+
+    // Count ungrouped alerts normally
+    for (const alert of ungrouped) {
+      if (alert.is_enabled && !alert.is_triggered) {
+        active++;
+      } else {
+        inactive++;
+      }
+    }
+
+    return { activeCount: active, inactiveCount: inactive };
+  }, [alerts]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -825,12 +861,14 @@ export function AlertsPage() {
 
             {/* Condition type */}
             {editingRangeAlert ? (
-              // Range edit - show fixed badge
+              // Range edit - show as disabled toggle item
               <div className="space-y-2">
                 <Label>Podmínka</Label>
-                <div className="flex items-center gap-2 p-2 bg-violet-600/10 rounded-md border border-violet-600/30">
-                  <ArrowUpDown className="h-4 w-4 text-violet-500" />
-                  <span className="text-sm">Cenové pásmo</span>
+                <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground w-full">
+                  <div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium flex-1 gap-1.5 bg-violet-600 text-white">
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Cenové pásmo
+                  </div>
                 </div>
               </div>
             ) : (
@@ -880,13 +918,6 @@ export function AlertsPage() {
                     ±%
                   </ToggleGroupItem>
                 </ToggleGroup>
-                {formData.condition_type === 'price_both' &&
-                  !editingRangeAlert && (
-                    <p className="text-xs text-muted-foreground">
-                      Vytvoří cenové pásmo: dostanete alert když cena opustí
-                      rozmezí.
-                    </p>
-                  )}
               </div>
             )}
 
