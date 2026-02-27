@@ -276,7 +276,8 @@ export async function closeOptionPosition(
   premium?: number,
   fees?: number,
   exchangeRateToCzk?: number,
-  notes?: string
+  notes?: string,
+  sourceTransactionId?: string
 ): Promise<OptionTransaction> {
   const authHeader = await getAuthHeader();
   
@@ -291,6 +292,7 @@ export async function closeOptionPosition(
   if (fees !== undefined) params.append('fees', fees.toString());
   if (exchangeRateToCzk !== undefined) params.append('exchange_rate_to_czk', exchangeRateToCzk.toString());
   if (notes) params.append('notes', notes);
+  if (sourceTransactionId) params.append('source_transaction_id', sourceTransactionId);
   
   const response = await fetch(`${API_URL}/api/options/${portfolioId}/close?${params}`, {
     method: 'POST',

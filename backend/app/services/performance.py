@@ -363,15 +363,13 @@ async def get_options_performance(
     start_date = max(start_date, first_tx_date)
     
     # 3. Calculate cumulative P/L by date
-    # Options P/L:
-    # - STO (Sell to Open): +premium received
-    # - BTC (Buy to Close): -premium paid (cost to close)
-    # - BTO (Buy to Open): -premium paid
-    # - STC (Sell to Close): +premium received
-    # - EXPIRE: 0 (option expired worthless - profit if STO, loss if BTO)
+    # Options P/L (IBKR style - P/L only at close):
+    # - STO (Sell to Open): 0 (no P/L at open)
+    # - BTO (Buy to Open): 0 (no P/L at open)
+    # - BTC/STC/EXPIRATION/ASSIGNMENT/EXERCISE: realized P/L stored in total_premium
     
     daily_pnl: Dict[str, float] = {}
-    total_premium_received = 0.0
+    total_realized_pl = 0.0
     
     for tx in transactions:
         tx_date = pd.to_datetime(tx["date"]).date()
@@ -380,21 +378,31 @@ async def get_options_performance(
         
         date_str = tx_date.isoformat()
         action = tx["action"]
-        # Use total_premium if available, otherwise calculate
-        if tx.get("total_premium"):
-            premium = abs(float(tx["total_premium"]))
-        else:
-            contracts = int(tx.get("contracts", 1))
-            price_per = float(tx.get("premium", 0) or 0)
-            premium = price_per * contracts * 100
         
         pnl = 0.0
-        if action in ["STO", "STC"]:
-            pnl = premium  # Received premium
-            total_premium_received += premium
-        elif action in ["BTO", "BTC"]:
-            pnl = -premium  # Paid premium
-        # EXPIRE, ASSIGNMENT, EXERCISE - handle separately if needed
+        
+        # Opening transactions have no P/L
+        if action in ["STO", "BTO"]:
+            pnl = 0
+        # Closing transactions: use total_premium which stores realized P/L
+        elif action in ["BTC", "STC", "EXPIRATION", "ASSIGNMENT", "EXERCISE"]:
+            # total_premium now stores the calculated realized P/L
+            # For older transactions without this, fall back to old calculation
+            if tx.get("total_premium") is not None:
+                pnl = float(tx["total_premium"])  # Can be positive or negative
+            else:
+                # Fallback for old transactions: estimate based on action
+                contracts = int(tx.get("contracts", 1))
+                premium = float(tx.get("premium", 0) or 0)
+                premium_value = premium * contracts * 100
+                if action in ["STC"]:
+                    pnl = premium_value  # Received when closing long
+                elif action in ["BTC"]:
+                    pnl = -premium_value  # Paid when closing short
+                # EXPIRATION/ASSIGNMENT/EXERCISE without total_premium: estimate as 0
+        
+        if pnl != 0:
+            total_realized_pl += pnl
         
         if date_str not in daily_pnl:
             daily_pnl[date_str] = 0

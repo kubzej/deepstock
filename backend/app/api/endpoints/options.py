@@ -159,6 +159,7 @@ async def close_option_position(
     fees: float = 0,
     exchange_rate_to_czk: Optional[float] = None,
     notes: Optional[str] = None,
+    source_transaction_id: Optional[str] = None,
     user_id: str = Depends(get_current_user_id)
 ):
     """
@@ -171,6 +172,9 @@ async def close_option_position(
     
     For long positions: use STC, EXPIRATION, or EXERCISE
     For short positions: use BTC, EXPIRATION, or ASSIGNMENT
+    
+    For ASSIGNMENT (short call) or EXERCISE (long put), provide source_transaction_id
+    to specify which stock lot to sell.
     """
     try:
         return await options_service.close_position(
@@ -183,6 +187,7 @@ async def close_option_position(
             fees=fees,
             exchange_rate_to_czk=exchange_rate_to_czk,
             notes=notes,
+            source_transaction_id=source_transaction_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

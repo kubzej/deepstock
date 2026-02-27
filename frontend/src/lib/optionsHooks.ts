@@ -142,6 +142,7 @@ export function useCloseOptionPosition() {
       fees,
       exchangeRateToCzk,
       notes,
+      sourceTransactionId,
     }: {
       portfolioId: string;
       optionSymbol: string;
@@ -152,6 +153,7 @@ export function useCloseOptionPosition() {
       fees?: number;
       exchangeRateToCzk?: number;
       notes?: string;
+      sourceTransactionId?: string;
     }) =>
       closeOptionPosition(
         portfolioId,
@@ -162,12 +164,22 @@ export function useCloseOptionPosition() {
         premium,
         fees,
         exchangeRateToCzk,
-        notes
+        notes,
+        sourceTransactionId
       ),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
+      // Also invalidate stock data for ASSIGNMENT/EXERCISE as they create stock transactions
+      if (variables.closingAction === 'ASSIGNMENT' || variables.closingAction === 'EXERCISE') {
+        // Invalidate all stock-related queries used by Dashboard
+        queryClient.invalidateQueries({ queryKey: ['holdings'] });
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['openLots'] });
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
+        queryClient.invalidateQueries({ queryKey: ['performance'] });
+      }
     },
   });
 }
