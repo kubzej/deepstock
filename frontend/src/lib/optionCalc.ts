@@ -236,6 +236,9 @@ export interface BuyCallCalculation {
   requiredMove: number;
   leverage: number;
   totalCost: number;
+  intrinsicValue: number;
+  timeValue: number;
+  timeValuePerDay: number;
 }
 
 export function calculateBuyCall(
@@ -257,6 +260,13 @@ export function calculateBuyCall(
   const controlledValue = stockPrice * contracts * 100;
   const leverage = controlledValue / totalCost;
 
+  // Intrinsic value = how much ITM (per share)
+  const intrinsicValue = Math.max(0, stockPrice - strike);
+  // Time value = premium - intrinsic (per share)
+  const timeValue = Math.max(0, premium - intrinsicValue);
+  // Time value per day (per contract)
+  const timeValuePerDay = dte > 0 ? (timeValue * 100) / dte : 0;
+
   return {
     stockPrice,
     strike,
@@ -268,6 +278,9 @@ export function calculateBuyCall(
     requiredMove,
     leverage,
     totalCost,
+    intrinsicValue,
+    timeValue,
+    timeValuePerDay,
   };
 }
 
@@ -286,6 +299,9 @@ export interface BuyPutCalculation {
   breakeven: number;
   requiredMove: number;
   totalCost: number;
+  intrinsicValue: number;
+  timeValue: number;
+  timeValuePerDay: number;
 }
 
 export function calculateBuyPut(
@@ -306,6 +322,13 @@ export function calculateBuyPut(
   // Required move to reach break-even
   const requiredMove = ((stockPrice - breakeven) / stockPrice) * 100;
 
+  // Intrinsic value = how much ITM (per share)
+  const intrinsicValue = Math.max(0, strike - stockPrice);
+  // Time value = premium - intrinsic (per share)
+  const timeValue = Math.max(0, premium - intrinsicValue);
+  // Time value per day (per contract)
+  const timeValuePerDay = dte > 0 ? (timeValue * 100) / dte : 0;
+
   return {
     stockPrice,
     strike,
@@ -317,5 +340,8 @@ export function calculateBuyPut(
     breakeven,
     requiredMove,
     totalCost,
+    intrinsicValue,
+    timeValue,
+    timeValuePerDay,
   };
 }

@@ -61,7 +61,9 @@ function MetricCard({
       ? 'text-emerald-500'
       : sentiment === 'negative'
         ? 'text-rose-500'
-        : 'text-foreground';
+        : sentiment === 'neutral'
+          ? 'text-amber-500'
+          : 'text-foreground';
 
   return (
     <div className="p-4 rounded-lg bg-muted/30">
@@ -524,6 +526,27 @@ export function OptionsCalculator() {
                   value={`${buyCallCalc.leverage.toFixed(1)}×`}
                   subtext="páka oproti akciím"
                   tooltip="Kolikrát větší expozice máš oproti přímému nákupu akcií."
+                  sentiment={
+                    buyCallCalc.leverage >= 5
+                      ? 'positive'
+                      : buyCallCalc.leverage >= 3
+                        ? 'neutral'
+                        : 'negative'
+                  }
+                />
+
+                <MetricCard
+                  label="Čas. hodnota/den"
+                  value={formatPrice(buyCallCalc.timeValuePerDay, 'USD')}
+                  subtext="theta decay"
+                  tooltip="Kolik $ denně ztrácíš na časové hodnotě. Nižší = lepší."
+                  sentiment={
+                    buyCallCalc.timeValuePerDay <= 1
+                      ? 'positive'
+                      : buyCallCalc.timeValuePerDay <= 3
+                        ? 'neutral'
+                        : 'negative'
+                  }
                 />
 
                 <MetricCard
@@ -552,6 +575,20 @@ export function OptionsCalculator() {
                     buyPutCalc.requiredMove <= 5
                       ? 'positive'
                       : buyPutCalc.requiredMove <= 10
+                        ? 'neutral'
+                        : 'negative'
+                  }
+                />
+
+                <MetricCard
+                  label="Čas. hodnota/den"
+                  value={formatPrice(buyPutCalc.timeValuePerDay, 'USD')}
+                  subtext="theta decay"
+                  tooltip="Kolik $ denně ztrácíš na časové hodnotě. Nižší = lepší."
+                  sentiment={
+                    buyPutCalc.timeValuePerDay <= 1
+                      ? 'positive'
+                      : buyPutCalc.timeValuePerDay <= 3
                         ? 'neutral'
                         : 'negative'
                   }
