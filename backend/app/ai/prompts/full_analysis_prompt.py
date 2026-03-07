@@ -37,6 +37,7 @@ def build_user_prompt(
     date: str,
     fundamentals_context: str,
     search_context: str,
+    insider_context: str = "",
 ) -> str:
     return f"""Vypracuj komplexní investiční analýzu společnosti {company_name} ({ticker}).
 
@@ -48,6 +49,12 @@ def build_user_prompt(
 ## FUNDAMENTÁLNÍ DATA Z DATABÁZE
 
 {fundamentals_context}
+
+---
+
+## INSIDER AKTIVITA (SEC Form 4, posledních 6 měsíců)
+
+{insider_context}
 
 ---
 
@@ -72,41 +79,55 @@ Odrážky používej výhradně při dělení, třídění nebo kategorizaci inf
 Detailně popiš, čím se společnost zabývá a jak generuje peníze. Co jsou hlavní revenue streams?
 Jaké jsou strukturální výhody tohoto modelu?
 
-**2. Konkurenční výhoda (moat)**
-V čem se společnost odlišuje od konkurence? Co ji chrání před konkurencí? Proč by si zákazníci
-měli vybrat právě její produkty nebo služby? Je tento moat trvalý nebo dočasný?
+**2. Konkurenční výhoda (moat) a srovnání s peers**
+V čem se společnost odlišuje od konkurence? Co ji chrání? Porovnej ji s klíčovými konkurenty –
+valuačně (P/E, EV/EBITDA, marže) i byznysově. Je prémiové nebo diskontní ocenění oprávněné?
+Kde má firma navrch a kde zaostává?
 
 **3. Hodnocení managementu (1–10)**
 Proveď průzkum o vedení společnosti a ohodnoť je. Zohledni jejich track record, strategická
 rozhodnutí, komunikaci s investory a schopnost realizovat plány. Uveď konkrétní příklady
 úspěchů i selhání.
 
-**4. Analýza trhu**
+**4. Kapitálová alokace**
+Jak management nakládá s volným cash flow? Analyzuj:
+- Buybacky: Jsou aktivní? Nakupuje firma akcie při rozumných valuacích, nebo přeplácí?
+- Dividendy: Politika, udržitelnost payout ratio, historie růstu
+- Akvizice: Disciplinovanost při M&A, historická úspěšnost integrací
+- Organické investice vs. návratnost kapitálu (ROIC vs. WACC)
+Celkové hodnocení: Je management dobrým správcem kapitálu akcionářů?
+
+**5. Insider aktivita – signál zevnitř**
+Na základě SEC Form 4 dat výše: Jsou insider nákupy signifikantní (vysoká hodnota, více
+insiderů najednou, CEO/CFO)? Jsou prodeje rutinní nebo alarmující? Jak koresponduje
+insider chování s aktuální valuací? Pokud data chybí, konstatuj to.
+
+**6. Analýza trhu**
 Popiš trh, na kterém společnost působí – velikost TAM, dynamiku, tempo růstu a klíčové trendy.
 Jaká je pozice firmy v tomto trhu? Roste trh nebo stagnuje?
 
-**5. Riziková analýza**
+**7. Riziková analýza**
 Identifikuj hlavní bear case (největší existenční nebo strukturální riziko) a 2–3 menší rizika.
 Buď konkrétní – ne generické "tržní riziko".
 
-**6. Investiční teze – oba pohledy**
+**8. Investiční teze – oba pohledy**
 *Bull case:* Proč investice při ceně {current_price} USD bude fungovat? Jaké jsou konkrétní
 katalyzátory a na jakém časovém horizontu?
 *Bear case:* Proč nebude fungovat? Jaké scénáře by investici zničily?
 
-**7. Momentum a katalyzátory**
+**9. Momentum a katalyzátory**
 Jaké momentum má firma v krátkodobém až střednědobém horizontu? Jaké katalyzátory ji
 pohánějí? Jak firma těží ze současných tržních a makroekonomických trendů?
 
-**8. Tržní neefektivity (co trh přehlíží)**
+**10. Tržní neefektivity (co trh přehlíží)**
 Identifikuj, co trh může nesprávně oceňovat nebo podceňovat. Kde se skrývá skrytá hodnota?
 Co analytici systematicky přehlížejí?
 
-**9. Souhrn analytických reportů**
+**11. Souhrn analytických reportů**
 Shrň názory, argumenty a projekce analytiků z nejnovějších reportů (po posledním kvartálu).
 Jaký je konsenzus? Kde jsou největší neshody? Průměrný price target a konsenzus Buy/Hold/Sell.
 
-**10. Závěrečné hodnocení – investiční verdikt**
+**12. Závěrečné hodnocení – investiční verdikt**
 Strukturovaný závěr ve 4 bodech:
 
 - **Verdikt:** Koupit / Přikoupit / Čekat / Vyhnout se – a proč. Zahrň valuační kontext:

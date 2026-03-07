@@ -21,8 +21,9 @@ router = APIRouter()
 
 class GenerateReportRequest(BaseModel):
     current_price: float
-    report_type: Literal["briefing", "full_analysis"] = "briefing"
+    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing"
     force_refresh: bool = False
+    period: str = "3mo"  # used only for technical_analysis
 
 
 @router.post("/research/{ticker}")
@@ -58,6 +59,7 @@ async def generate_report(ticker: str, payload: GenerateReportRequest):
             report_type=payload.report_type,
             stock_data=stock_data,
             force_refresh=payload.force_refresh,
+            period=payload.period,
         )
         return result
     except ValueError as e:
@@ -70,8 +72,9 @@ async def generate_report(ticker: str, payload: GenerateReportRequest):
 @router.get("/research/{ticker}/pdf")
 async def download_pdf(
     ticker: str,
-    report_type: Literal["briefing", "full_analysis"] = "briefing",
+    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing",
     current_price: Optional[float] = None,
+    period: str = "3mo",
 ):
     """
     Download the cached AI research report as PDF.
@@ -82,7 +85,8 @@ async def download_pdf(
     from datetime import date
     ticker = ticker.upper()
     today = date.today().isoformat()
-    cache_key = f"ai_research:{ticker}:{report_type}:{today}"
+    cache_suffix = f":{period}" if report_type == "technical_analysis" else ""
+    cache_key = f"ai_research:{ticker}:{report_type}:{today}{cache_suffix}"
 
     redis = get_redis()
     cached = await redis.get(cache_key)
@@ -104,6 +108,7 @@ async def download_pdf(
             current_price=current_price,
             report_type=report_type,
             stock_data=stock_data,
+            period=period,
         )
     else:
         report = json.loads(cached)
@@ -115,7 +120,8 @@ async def download_pdf(
         logger.error(f"PDF generation failed for {ticker}: {e}")
         raise HTTPException(status_code=500, detail="Chyba při generování PDF.")
 
-    type_label = "briefing" if report_type == "briefing" else "analyza"
+    type_labels = {"briefing": "briefing", "full_analysis": "analyza", "technical_analysis": "technicka"}
+    type_label = type_labels.get(report_type, report_type)
     filename = f"{ticker}_{type_label}_{today}.pdf"
 
     return Response(

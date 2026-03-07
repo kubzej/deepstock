@@ -39,7 +39,8 @@ class CacheTTL:
     ALERT_SENT = 86400              # 24 hours — prevent duplicate alert sends
 
     # ── AI Research reports ───────────────────────────────────────
-    AI_RESEARCH_REPORT = 86400      # 24 hours — AI-generated research reports
+    AI_RESEARCH_REPORT = 86400      # 24 hours — AI-generated research reports (fundamental)
+    AI_TA_REPORT = 7200             # 2 hours  — AI technical analysis (TA changes faster)
 
     # ── Negative cache (not-found results) ────────────────────────
     NEGATIVE_CACHE = 3600           # 1 hour — cache "not found" to avoid hammering APIs
