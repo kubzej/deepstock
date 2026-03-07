@@ -15,6 +15,7 @@ import { ValuationSection } from '@/components/research/ValuationSection';
 import { StockHeader } from '@/components/research/sections/StockHeader';
 import { FundamentalsSection } from '@/components/research/sections/FundamentalsSection';
 import { TechnicalSection } from '@/components/research/sections/TechnicalSection';
+import { AIResearchSection } from '@/components/research/sections/AIResearchSection';
 
 // Main component
 export function ResearchPage() {
@@ -114,6 +115,7 @@ export function ResearchPage() {
                 <TabsTrigger value="fundamentals">Fundamenty</TabsTrigger>
                 <TabsTrigger value="valuation">Valuace</TabsTrigger>
                 <TabsTrigger value="technical">Technika</TabsTrigger>
+                <TabsTrigger value="ai">AI Analýza</TabsTrigger>
               </TabsList>
 
               <TabsContent value="fundamentals" className="mt-6">
@@ -128,6 +130,13 @@ export function ResearchPage() {
                 <TechnicalSection
                   ticker={data.symbol}
                   currency={data.currency ?? 'USD'}
+                />
+              </TabsContent>
+
+              <TabsContent value="ai" className="mt-6">
+                <AIResearchSection
+                  ticker={data.symbol}
+                  currentPrice={data.price}
                 />
               </TabsContent>
             </Tabs>

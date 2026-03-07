@@ -18,7 +18,13 @@ class Settings(BaseSettings):
     
     # Cron job authentication
     cron_secret: str = ""
-    
+
+    # AI Research
+    anthropic_api_key: str = ""
+    tavily_api_key: str = ""
+    ai_model: str = "anthropic/claude-sonnet-4-6"
+    ai_max_tokens: int = 8000
+
     # App
     debug: bool = False
     
