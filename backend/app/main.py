@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 import logging
-from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, alerts, ai_research, ai_alerts
+from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, alerts, ai_research, ai_alerts, ai_portfolio
 from app.core.redis import close_redis_pool
 
 # Setup logging
@@ -57,3 +57,4 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Price Alerts"])
 app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])
 app.include_router(ai_research.router, prefix="/api/ai", tags=["AI Research"])
 app.include_router(ai_alerts.router, prefix="/api/ai", tags=["AI Alerts"])
+app.include_router(ai_portfolio.router, prefix="/api/ai", tags=["AI Portfolio"])

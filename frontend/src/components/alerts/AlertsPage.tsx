@@ -47,7 +47,7 @@ import {
   Percent,
   Check,
   Pencil,
-  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { AlertSuggestionsPanel } from './AlertSuggestionsPanel';
 
@@ -542,7 +542,7 @@ export function AlertsPage() {
           size="sm"
           variant="outline"
         >
-          <Sparkles className="h-4 w-4 mr-1" />
+          <Bot className="h-4 w-4 mr-1" />
           Návrhy AI
         </Button>
         <Button onClick={openCreateForm} size="sm">

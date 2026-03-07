@@ -62,6 +62,7 @@ async def call_llm(system_prompt: str, user_prompt: str) -> tuple[str, str]:
             ],
             max_tokens=AI_MAX_TOKENS,
             temperature=0.3,
+            request_timeout=120,
         )
     except litellm.AuthenticationError:
         raise ValueError("Neplatný API klíč pro AI model. Zkontroluj ANTHROPIC_API_KEY v nastavení.")

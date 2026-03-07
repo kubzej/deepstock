@@ -35,7 +35,7 @@ export function Sidebar({
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
     { id: 'opce', icon: Target, label: 'Opce' },
-    { id: 'history', icon: History, label: 'Historie' },
+    { id: 'history', icon: History, label: 'Historie transakcí' },
     { id: 'market', icon: BarChart3, label: 'Trh' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
