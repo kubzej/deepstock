@@ -88,7 +88,7 @@ function formatTimeAgo(date: Date): string {
 
 function MarkdownReport({ content }: { content: string }) {
   return (
-    <div className="space-y-1 text-sm leading-relaxed">
+    <div className="space-y-1 text-sm leading-relaxed bg-muted rounded-xl p-5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -116,17 +116,12 @@ function MarkdownReport({ content }: { content: string }) {
           ol: ({ children }) => (
             <ol className="space-y-1 mb-4 list-decimal list-inside text-sm text-foreground/90 leading-relaxed">{children}</ol>
           ),
-          li: ({ children, ordered }) => {
-            if (ordered) {
-              return <li className="text-sm text-foreground/90 leading-relaxed">{children}</li>;
-            }
-            return (
-              <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
-                <span className="mt-2 w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                <span>{children}</span>
-              </li>
-            );
-          },
+          li: ({ children }) => (
+            <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
+              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+              <span>{children}</span>
+            </li>
+          ),
           strong: ({ children }) => (
             <strong className="font-semibold text-foreground">{children}</strong>
           ),
