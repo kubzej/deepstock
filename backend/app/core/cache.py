@@ -38,5 +38,8 @@ class CacheTTL:
     # ── Dedup / flag keys ─────────────────────────────────────────
     ALERT_SENT = 86400              # 24 hours — prevent duplicate alert sends
 
+    # ── AI Research reports ───────────────────────────────────────
+    AI_RESEARCH_REPORT = 86400      # 24 hours — AI-generated research reports
+
     # ── Negative cache (not-found results) ────────────────────────
     NEGATIVE_CACHE = 3600           # 1 hour — cache "not found" to avoid hammering APIs
