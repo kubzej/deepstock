@@ -42,6 +42,24 @@ export interface StockPerformanceData {
   totalTrades: number;
   winningTrades: number;
   losingTrades: number;
+  closedTrades: ClosedStockTrade[];
+}
+
+export interface ClosedStockTrade {
+  id: string;
+  ticker: string;
+  stockName: string;
+  portfolioName?: string;
+  shares: number;
+  buyDate: string;
+  sellDate: string;
+  buyPrice: number;
+  sellPrice: number;
+  currency: string;
+  costBasisCzk: number;
+  proceedsCzk: number;
+  realizedPLCzk: number;
+  realizedPLPct: number;
 }
 
 export interface OptionPerformanceData {
@@ -56,6 +74,24 @@ export interface OptionPerformanceData {
     realizedPL: number;
   };
   totalTrades: number;
+  closedTrades: ClosedOptionTrade[];
+}
+
+export interface ClosedOptionTrade {
+  id: string;
+  symbol: string;
+  optionSymbol: string;
+  action: OptionTransaction['action'];
+  optionType: OptionTransaction['option_type'];
+  strikePrice: number;
+  expirationDate: string;
+  contracts: number;
+  date: string;
+  currency: string;
+  portfolioName?: string;
+  realizedPLCzk: number;
+  realizedPLPct: number;
+  isPercentMeaningful: boolean;
 }
 
 export interface DistributionItem {
@@ -169,6 +205,7 @@ export function calculateStockPerformance(
   let totalBought = 0;
   let totalSold = 0;
   const trades: number[] = [];
+  const closedTrades: ClosedStockTrade[] = [];
 
   transactions.forEach((tx) => {
     const amount = tx.totalCzk || 0;
@@ -182,9 +219,32 @@ export function calculateStockPerformance(
         const saleAmount = amount;
         const pl = saleAmount - costBasis;
         trades.push(pl);
+
+        const realizedPLPct = costBasis > 0 ? (pl / costBasis) * 100 : 0;
+
+        closedTrades.push({
+          id: tx.id,
+          ticker: tx.ticker,
+          stockName: tx.stockName,
+          portfolioName: tx.portfolioName,
+          shares: tx.shares,
+          buyDate: tx.sourceTransaction.date,
+          sellDate: tx.date,
+          buyPrice: tx.sourceTransaction.price,
+          sellPrice: tx.price,
+          currency: tx.currency,
+          costBasisCzk: costBasis,
+          proceedsCzk: saleAmount,
+          realizedPLCzk: pl,
+          realizedPLPct,
+        });
       }
     }
   });
+
+  closedTrades.sort(
+    (a, b) => new Date(b.sellDate).getTime() - new Date(a.sellDate).getTime()
+  );
 
   const netCashflow = totalSold - totalBought;
   const realizedPL = trades.reduce((sum, pl) => sum + pl, 0);
@@ -204,6 +264,7 @@ export function calculateStockPerformance(
     totalTrades: trades.length,
     winningTrades: winningTrades.length,
     losingTrades: losingTrades.length,
+    closedTrades,
   };
 }
 
@@ -214,6 +275,7 @@ export function calculateOptionPerformance(
     open: { premiumReceived: 0, premiumPaid: 0, netPremium: 0 },
     closed: { premiumReceived: 0, premiumPaid: 0, realizedPL: 0 },
     totalTrades: transactions.length,
+    closedTrades: [],
   };
 
   // Group by option_symbol to match opening and closing transactions
@@ -254,6 +316,25 @@ export function calculateOptionPerformance(
         // Profit = Received (premium) - Paid (costOfClosed) - fees
         const realizedPL = premium - costOfClosed - fees;
         result.closed.realizedPL += realizedPL;
+
+        const base = Math.abs(costOfClosed);
+        const realizedPLPct = base > 0 ? (realizedPL / base) * 100 : 0;
+        result.closedTrades.push({
+          id: tx.id,
+          symbol: tx.symbol,
+          optionSymbol: tx.option_symbol,
+          action: tx.action,
+          optionType: tx.option_type,
+          strikePrice: tx.strike_price,
+          expirationDate: tx.expiration_date,
+          contracts: tx.contracts,
+          date: tx.date,
+          currency: tx.currency,
+          portfolioName: tx.portfolio_name,
+          realizedPLCzk: realizedPL,
+          realizedPLPct,
+          isPercentMeaningful: base > 0,
+        });
         
         openContracts -= tx.contracts;
         totalCostBasis -= costOfClosed;
@@ -267,6 +348,25 @@ export function calculateOptionPerformance(
         // Profit = Received initially (abs(costOfClosed)) - Paid to close (premium) - fees
         const realizedPL = Math.abs(costOfClosed) - premium - fees;
         result.closed.realizedPL += realizedPL;
+
+        const base = Math.abs(costOfClosed);
+        const realizedPLPct = base > 0 ? (realizedPL / base) * 100 : 0;
+        result.closedTrades.push({
+          id: tx.id,
+          symbol: tx.symbol,
+          optionSymbol: tx.option_symbol,
+          action: tx.action,
+          optionType: tx.option_type,
+          strikePrice: tx.strike_price,
+          expirationDate: tx.expiration_date,
+          contracts: tx.contracts,
+          date: tx.date,
+          currency: tx.currency,
+          portfolioName: tx.portfolio_name,
+          realizedPLCzk: realizedPL,
+          realizedPLPct,
+          isPercentMeaningful: base > 0,
+        });
         
         openContracts += tx.contracts;
         totalCostBasis -= costOfClosed; // Subtracting negative adds to totalCostBasis
@@ -276,22 +376,84 @@ export function calculateOptionPerformance(
         tx.action === 'EXERCISE'
       ) {
         // Closing the entire remaining position
+        const contractsClosed = Math.abs(openContracts || tx.contracts || 0);
+        let realizedPLPct = 0;
+
         if (openContracts > 0) {
           // Long position expired/exercised -> we lose the premium paid
           const realizedPL = -totalCostBasis - fees;
           result.closed.realizedPL += realizedPL;
+          const base = Math.abs(totalCostBasis);
+          realizedPLPct = base > 0 ? (realizedPL / base) * 100 : 0;
+
+          result.closedTrades.push({
+            id: tx.id,
+            symbol: tx.symbol,
+            optionSymbol: tx.option_symbol,
+            action: tx.action,
+            optionType: tx.option_type,
+            strikePrice: tx.strike_price,
+            expirationDate: tx.expiration_date,
+            contracts: contractsClosed,
+            date: tx.date,
+            currency: tx.currency,
+            portfolioName: tx.portfolio_name,
+            realizedPLCzk: realizedPL,
+            realizedPLPct,
+            isPercentMeaningful: tx.action === 'EXPIRATION' && base > 0,
+          });
         } else if (openContracts < 0) {
           // Short position expired/assigned -> we keep the premium received
           const realizedPL = Math.abs(totalCostBasis) - fees;
           result.closed.realizedPL += realizedPL;
+          const base = Math.abs(totalCostBasis);
+          realizedPLPct = base > 0 ? (realizedPL / base) * 100 : 0;
+
+          result.closedTrades.push({
+            id: tx.id,
+            symbol: tx.symbol,
+            optionSymbol: tx.option_symbol,
+            action: tx.action,
+            optionType: tx.option_type,
+            strikePrice: tx.strike_price,
+            expirationDate: tx.expiration_date,
+            contracts: contractsClosed,
+            date: tx.date,
+            currency: tx.currency,
+            portfolioName: tx.portfolio_name,
+            realizedPLCzk: realizedPL,
+            realizedPLPct,
+            isPercentMeaningful: tx.action === 'EXPIRATION' && base > 0,
+          });
         } else {
           result.closed.realizedPL -= fees;
+
+          result.closedTrades.push({
+            id: tx.id,
+            symbol: tx.symbol,
+            optionSymbol: tx.option_symbol,
+            action: tx.action,
+            optionType: tx.option_type,
+            strikePrice: tx.strike_price,
+            expirationDate: tx.expiration_date,
+            contracts: contractsClosed,
+            date: tx.date,
+            currency: tx.currency,
+            portfolioName: tx.portfolio_name,
+            realizedPLCzk: -fees,
+            realizedPLPct: 0,
+            isPercentMeaningful: false,
+          });
         }
         openContracts = 0;
         totalCostBasis = 0;
       }
     }
   }
+
+  result.closedTrades.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   return result;
 }
