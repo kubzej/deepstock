@@ -3,7 +3,7 @@
  */
 import { API_URL } from './client';
 
-export type ReportType = 'briefing' | 'full_analysis';
+export type ReportType = 'briefing' | 'full_analysis' | 'technical_analysis';
 
 export interface AIResearchReport {
   markdown: string;
@@ -21,6 +21,7 @@ export async function generateReport(
   currentPrice: number,
   reportType: ReportType,
   forceRefresh = false,
+  period = '3mo',
 ): Promise<AIResearchReport> {
   const response = await fetch(`${API_URL}/api/ai/research/${ticker}`, {
     method: 'POST',
@@ -29,6 +30,7 @@ export async function generateReport(
       current_price: currentPrice,
       report_type: reportType,
       force_refresh: forceRefresh,
+      period,
     }),
   });
 
@@ -44,10 +46,14 @@ export async function downloadPDF(
   ticker: string,
   reportType: ReportType,
   currentPrice?: number,
+  period = '3mo',
 ): Promise<void> {
   const params = new URLSearchParams({ report_type: reportType });
   if (currentPrice !== undefined) {
     params.set('current_price', String(currentPrice));
+  }
+  if (reportType === 'technical_analysis') {
+    params.set('period', period);
   }
 
   const response = await fetch(`${API_URL}/api/ai/research/${ticker}/pdf?${params}`);
@@ -61,7 +67,12 @@ export async function downloadPDF(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const today = new Date().toISOString().slice(0, 10);
-  const label = reportType === 'briefing' ? 'briefing' : 'analyza';
+  const labelMap: Record<ReportType, string> = {
+    briefing: 'briefing',
+    full_analysis: 'analyza',
+    technical_analysis: 'technicka',
+  };
+  const label = labelMap[reportType] ?? reportType;
   a.href = url;
   a.download = `${ticker}_${label}_${today}.pdf`;
   a.click();

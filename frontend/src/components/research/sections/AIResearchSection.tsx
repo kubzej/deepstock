@@ -16,13 +16,17 @@ interface AIResearchSectionProps {
   currentPrice: number | null | undefined;
 }
 
-function LoadingState() {
+function LoadingState({ isTechnical = false }: { isTechnical?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
       <Loader2 className="w-8 h-8 animate-spin" />
       <div className="text-center space-y-1">
         <p className="font-medium">Generuji report...</p>
-        <p className="text-sm">Vyhledávám zprávy a analyzuji data. Může trvat 30–60 sekund.</p>
+        <p className="text-sm">
+          {isTechnical
+            ? 'Analyzuji technické indikátory. Může trvat 10–20 sekund.'
+            : 'Vyhledávám zprávy a analyzuji data. Může trvat 30–60 sekund.'}
+        </p>
       </div>
     </div>
   );
@@ -84,7 +88,7 @@ function formatTimeAgo(date: Date): string {
 
 function MarkdownReport({ content }: { content: string }) {
   return (
-    <div className="space-y-1 text-sm leading-relaxed">
+    <div className="space-y-1 text-sm leading-relaxed bg-muted rounded-xl p-5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -110,7 +114,7 @@ function MarkdownReport({ content }: { content: string }) {
             <ul className="space-y-1.5 mb-4">{children}</ul>
           ),
           ol: ({ children }) => (
-            <ol className="space-y-1.5 mb-4 list-decimal list-inside">{children}</ol>
+            <ol className="space-y-1 mb-4 list-decimal list-inside text-sm text-foreground/90 leading-relaxed">{children}</ol>
           ),
           li: ({ children }) => (
             <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
@@ -162,8 +166,16 @@ function MarkdownReport({ content }: { content: string }) {
   );
 }
 
+const TA_PERIODS = [
+  { value: '1mo', label: '1M' },
+  { value: '3mo', label: '3M' },
+  { value: '6mo', label: '6M' },
+  { value: '1y', label: '1R' },
+] as const;
+
 export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionProps) {
-  const [activeReportType, setActiveReportType] = useState<ReportType>('briefing');
+  const [activeReportType, setActiveReportType] = useState<ReportType>('full_analysis');
+  const [taPeriod, setTaPeriod] = useState('3mo');
   const [reports, setReports] = useState<Partial<Record<ReportType, AIResearchReport>>>({});
   const [loading, setLoading] = useState<ReportType | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -177,7 +189,8 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
     setError(null);
 
     try {
-      const report = await generateReport(ticker, currentPrice, activeReportType, forceRefresh);
+      const period = activeReportType === 'technical_analysis' ? taPeriod : '3mo';
+      const report = await generateReport(ticker, currentPrice, activeReportType, forceRefresh, period);
       setReports((prev) => ({ ...prev, [activeReportType]: report }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
@@ -189,7 +202,7 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
   async function handleDownloadPdf() {
     setDownloadingPdf(true);
     try {
-      await downloadPDF(ticker, activeReportType, currentPrice ?? undefined);
+      await downloadPDF(ticker, activeReportType, currentPrice ?? undefined, taPeriod);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Chyba při stahování PDF');
     } finally {
@@ -201,13 +214,34 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
 
   return (
     <div className="space-y-4">
-      {/* Report type selector */}
       <Tabs value={activeReportType} onValueChange={(v) => setActiveReportType(v as ReportType)}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList>
-            <TabsTrigger value="briefing">Kvartální briefing</TabsTrigger>
-            <TabsTrigger value="full_analysis">Plná analýza</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-3">
+            <TabsList>
+              <TabsTrigger value="full_analysis">Plná analýza</TabsTrigger>
+              <TabsTrigger value="technical_analysis">Technická analýza</TabsTrigger>
+              <TabsTrigger value="briefing">Kvartální briefing</TabsTrigger>
+            </TabsList>
+
+            {/* Period selector — only for technical_analysis */}
+            {activeReportType === 'technical_analysis' && (
+              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                {TA_PERIODS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTaPeriod(value)}
+                    className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                      taPeriod === value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {currentReport && (
             <div className="flex items-center gap-2">
@@ -239,23 +273,16 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
         </div>
 
         {/* Report content area */}
-        <TabsContent value="briefing" className="mt-6">
-          {isLoading && <LoadingState />}
-          {error && !isLoading && <ErrorState message={error} />}
-          {!isLoading && !error && !currentReport && (
-            <EmptyState onGenerate={() => handleGenerate()} />
-          )}
-          {!isLoading && currentReport && <MarkdownReport content={currentReport.markdown} />}
-        </TabsContent>
-
-        <TabsContent value="full_analysis" className="mt-6">
-          {isLoading && <LoadingState />}
-          {error && !isLoading && <ErrorState message={error} />}
-          {!isLoading && !error && !currentReport && (
-            <EmptyState onGenerate={() => handleGenerate()} />
-          )}
-          {!isLoading && currentReport && <MarkdownReport content={currentReport.markdown} />}
-        </TabsContent>
+        {(['full_analysis', 'technical_analysis', 'briefing'] as ReportType[]).map((type) => (
+          <TabsContent key={type} value={type} className="mt-6">
+            {isLoading && <LoadingState isTechnical={type === 'technical_analysis'} />}
+            {error && !isLoading && <ErrorState message={error} />}
+            {!isLoading && !error && !currentReport && (
+              <EmptyState onGenerate={() => handleGenerate()} />
+            )}
+            {!isLoading && currentReport && <MarkdownReport content={currentReport.markdown} />}
+          </TabsContent>
+        ))}
       </Tabs>
     </div>
   );

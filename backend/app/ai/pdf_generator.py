@@ -3,6 +3,7 @@ PDF generator — converts AI research report markdown to a styled PDF.
 
 Pipeline: markdown → HTML (Jinja2 template + CSS) → PDF (WeasyPrint)
 """
+import re
 import markdown2
 from weasyprint import HTML as WeasyprintHTML
 from datetime import datetime
@@ -202,6 +203,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 REPORT_TYPE_LABELS = {
     "briefing": "Kvartální briefing",
     "full_analysis": "Komplexní analýza",
+    "technical_analysis": "Technická analýza",
 }
 
 
@@ -216,7 +218,6 @@ def generate_pdf(report: dict) -> bytes:
     Returns:
         PDF as bytes
     """
-    import re
     md = report["markdown"]
     # Remove all emoji (WeasyPrint can't render them)
     md = re.sub(r'[\U00002600-\U000027BF]', '', md)  # misc symbols

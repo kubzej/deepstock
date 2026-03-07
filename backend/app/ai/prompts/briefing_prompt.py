@@ -33,6 +33,7 @@ def build_user_prompt(
     date: str,
     fundamentals_context: str,
     search_context: str,
+    insider_context: str = "",
 ) -> str:
     return f"""Připrav kvartální briefing pro akciu {ticker} ({company_name}).
 
@@ -47,6 +48,12 @@ def build_user_prompt(
 
 ---
 
+## INSIDER AKTIVITA (SEC Form 4, posledních 3 měsíce)
+
+{insider_context}
+
+---
+
 ## AKTUÁLNÍ ZPRÁVY A ANALYTICKÉ REPORTY (z webu)
 
 {search_context}
@@ -56,7 +63,7 @@ def build_user_prompt(
 ## INSTRUKCE
 
 Připrav koncentrovaný briefing. Jdi přímo k věci – žádné rozsáhlé úvody, žádná zbytečná
-historie. Každá sekce musí být actionable. Vychazej z výše uvedených dat a zpráv.
+historie. Každá sekce musí být actionable. Vycházej z výše uvedených dat a zpráv.
 
 ### Struktura briefingu:
 
@@ -75,24 +82,31 @@ Co je teď středobodem pozornosti investorů?
 - Zvýšili, snížili nebo potvrdili guidance?
 - Jaké jsou klíčové předpoklady, na kterých výhled stojí?
 
-**4. Co sledovat – klíčové metriky a milníky**
+**4. Valuace – je akcie levná nebo drahá?**
+Posuď, zda je cena {current_price} USD atraktivní. Srovnej P/E a EV/EBITDA s odvětvovým
+průměrem (pokud jsou dostupné ve zdrojích) a s historickými průměry firmy. Kde stojí akcie
+vůči analytickým price targetům? Je ocenění napjaté, nebo existuje prostor k růstu?
+
+**5. Insider aktivita – co říkají lidé uvnitř firmy**
+Posuď insider nákupy a prodeje z dat výše. Jsou nákupy signifikantní (vysoká hodnota,
+více insiderů najednou, nebo CEO/CFO)? Jsou prodeje rutinní (scheduled) nebo alarmující?
+Pokud žádná data nejsou, konstatuj to.
+
+**6. Co sledovat – klíčové metriky a milníky**
 Vyber 3–5 konkrétních věcí, které rozhodnou o směřování akcie v příštích 6–12 měsících.
 Ne obecné trendy – konkrétní milníky, s daty nebo čísly.
 
-**5. Bull case – co může cenu poslat nahoru**
-Identifikuj 3 konkrétní katalyzátory, které by mohly cenu výrazně zvednout. Ke každému
-uveď, jak realistický je a v jakém časovém horizontu.
+**7. Bull case / Bear case**
+- Bull: 3 konkrétní katalyzátory, reálnost a časový horizont
+- Bear: 3 konkrétní rizika, pravděpodobnost a potenciální dopad
+- Peer context: Jak si firma vede vůči konkurenci? Je prémiové ocenění oprávněné?
 
-**6. Bear case – co může cenu stlačit dolů**
-Identifikuj 3 konkrétní rizika, která by mohla cenu výrazně stlačit. Ke každému uveď
-pravděpodobnost a potenciální dopad.
-
-**7. Doporučení analytiků po posledních výsledcích**
+**8. Doporučení analytiků po posledních výsledcích**
 - Aktuální konsenzus (Buy/Hold/Sell) a průměrný price target
 - Kdo po výsledcích změnil rating nebo target nahoru/dolů a proč?
 - Existuje výrazná shoda nebo rozkol mezi analytiky?
 
-**8. Závěr – investiční verdikt**
+**9. Závěr – investiční verdikt**
 Strukturovaný závěr ve 4 bodech:
 
 - **Verdikt:** Koupit / Přikoupit / Čekat / Vyhnout se – a v 2–3 větách proč. Buď konkrétní,
