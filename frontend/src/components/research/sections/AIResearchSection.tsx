@@ -5,10 +5,12 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Bot, RefreshCw, Download, Loader2, AlertTriangle, Clock } from 'lucide-react';
+import { Sparkles, RefreshCw, Download, Loader2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { generateReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
 
 interface AIResearchSectionProps {
@@ -34,26 +36,22 @@ function LoadingState({ isTechnical = false }: { isTechnical?: boolean }) {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-3 p-4 bg-destructive/10 text-destructive rounded-lg">
-      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-      <div className="space-y-1">
-        <p className="font-medium">Chyba při generování reportu</p>
-        <p className="text-sm opacity-80">{message}</p>
-      </div>
-    </div>
+    <Alert variant="destructive">
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
   );
 }
 
 function EmptyState({ onGenerate }: { onGenerate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-      <Bot className="w-12 h-12 opacity-30" />
+      <Sparkles className="w-12 h-12 opacity-30" />
       <div className="text-center space-y-1">
         <p className="font-medium text-foreground">AI analýza ještě nebyla vygenerována</p>
         <p className="text-sm">Klikni na tlačítko níže pro spuštění analýzy.</p>
       </div>
       <Button onClick={onGenerate} className="mt-2">
-        <Bot className="w-4 h-4 mr-2" />
+        <Sparkles className="w-4 h-4 mr-2" />
         Vygenerovat report
       </Button>
     </div>
@@ -88,7 +86,7 @@ function formatTimeAgo(date: Date): string {
 
 function MarkdownReport({ content }: { content: string }) {
   return (
-    <div className="space-y-1 text-sm leading-relaxed bg-muted rounded-xl p-5">
+    <div className="space-y-1 text-sm leading-relaxed bg-muted rounded-lg p-5">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -116,12 +114,21 @@ function MarkdownReport({ content }: { content: string }) {
           ol: ({ children }) => (
             <ol className="space-y-1 mb-4 list-decimal list-inside text-sm text-foreground/90 leading-relaxed">{children}</ol>
           ),
-          li: ({ children }) => (
-            <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
-              <span className="mt-2 w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-              <span>{children}</span>
-            </li>
-          ),
+          li: ({ ordered, children }) => {
+            if (ordered) {
+              return (
+                <li className="text-sm text-foreground/90 leading-relaxed">
+                  {children}
+                </li>
+              );
+            }
+            return (
+              <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
+                <span className="mt-2 w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+                <span>{children}</span>
+              </li>
+            );
+          },
           strong: ({ children }) => (
             <strong className="font-semibold text-foreground">{children}</strong>
           ),
@@ -225,21 +232,18 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
 
             {/* Period selector — only for technical_analysis */}
             {activeReportType === 'technical_analysis' && (
-              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+              <ToggleGroup
+                type="single"
+                value={taPeriod}
+                onValueChange={(v) => v && setTaPeriod(v)}
+                size="sm"
+              >
                 {TA_PERIODS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setTaPeriod(value)}
-                    className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                      taPeriod === value
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
+                  <ToggleGroupItem key={value} value={value}>
                     {label}
-                  </button>
+                  </ToggleGroupItem>
                 ))}
-              </div>
+              </ToggleGroup>
             )}
           </div>
 

@@ -632,6 +632,11 @@ class PriceAlertService:
         else:
             title = f"🔔 Alert: {ticker}"
             body = f"Cena: ${current_price:.2f}"
+
+        # Append AI reason from notes if present
+        notes = alert.get("notes")
+        if notes:
+            body = f"{body}\n{notes}"
         
         sent = send_push_notification(
             user_id=user_id,
