@@ -55,7 +55,7 @@ export function ResearchPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Zadejte ticker (AAPL, MSFT, ...)"
+              placeholder="Zadejte ticker..."
               value={ticker}
               onChange={(e) => setTicker(e.target.value.toUpperCase())}
               className="pl-10"

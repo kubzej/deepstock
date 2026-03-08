@@ -11,6 +11,7 @@ import {
   Search,
   BarChart3,
   Bell,
+  Rss,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,11 +36,12 @@ export function Sidebar({
     { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
     { id: 'stocks', icon: Database, label: 'Akcie' },
     { id: 'opce', icon: Target, label: 'Opce' },
-    { id: 'history', icon: History, label: 'Historie' },
+    { id: 'history', icon: History, label: 'Historie transakcí' },
     { id: 'market', icon: BarChart3, label: 'Trh' },
     { id: 'analysis', icon: LineChart, label: 'Analýza' },
     { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
     { id: 'alerts', icon: Bell, label: 'Alerty' },
+    { id: 'feed', icon: Rss, label: 'Feeds' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];

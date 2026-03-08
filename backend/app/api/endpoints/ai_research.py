@@ -1,11 +1,13 @@
 """
 AI Research endpoints.
 
-POST /api/ai/research/{ticker}    — generate report (markdown)
+GET  /api/ai/research/{ticker}     — return cached report (today) or 404
+POST /api/ai/research/{ticker}     — generate report (markdown)
 GET  /api/ai/research/{ticker}/pdf — download report as PDF
 """
 import json
 import logging
+from datetime import date
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -24,6 +26,25 @@ class GenerateReportRequest(BaseModel):
     report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing"
     force_refresh: bool = False
     period: str = "3mo"  # used only for technical_analysis
+
+
+@router.get("/research/{ticker}")
+async def get_cached_research_report(
+    ticker: str,
+    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "full_analysis",
+    period: str = "3mo",
+):
+    ticker = ticker.upper()
+    today = date.today().isoformat()
+    cache_suffix = f":{period}" if report_type == "technical_analysis" else ""
+    cache_key = f"ai_research:{ticker}:{report_type}:{today}{cache_suffix}"
+    redis = get_redis()
+    cached = await redis.get(cache_key)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Žádný uložený report.")
+    result = json.loads(cached)
+    result["cached"] = True
+    return result
 
 
 @router.post("/research/{ticker}")

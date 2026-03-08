@@ -47,7 +47,9 @@ import {
   Percent,
   Check,
   Pencil,
+  Bot,
 } from 'lucide-react';
+import { AlertSuggestionsPanel } from './AlertSuggestionsPanel';
 
 type FilterView = 'active' | 'inactive';
 
@@ -157,6 +159,7 @@ export function AlertsPage() {
   // Local state
   const [filterView, setFilterView] = useState<FilterView>('active');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSuggestionsPanelOpen, setIsSuggestionsPanelOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
   const [editingRangeAlert, setEditingRangeAlert] =
     useState<RangeAlertItem | null>(null);
@@ -534,6 +537,14 @@ export function AlertsPage() {
           </PillButton>
         </PillGroup>
         <div className="flex-1" />
+        <Button
+          onClick={() => setIsSuggestionsPanelOpen(true)}
+          size="sm"
+          variant="outline"
+        >
+          <Bot className="h-4 w-4 mr-1" />
+          Návrhy AI
+        </Button>
         <Button onClick={openCreateForm} size="sm">
           <Plus className="h-4 w-4 mr-1" />
           Nový alert
@@ -692,6 +703,11 @@ export function AlertsPage() {
                               </Button>
                             </div>
                           </div>
+                          {item.notes && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                              {item.notes}
+                            </p>
+                          )}
                         </div>
                       );
                     }
@@ -786,6 +802,11 @@ export function AlertsPage() {
                             </Button>
                           </div>
                         </div>
+                        {alert.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {alert.notes}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -1039,6 +1060,13 @@ export function AlertsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Suggestions Panel */}
+      <AlertSuggestionsPanel
+        open={isSuggestionsPanelOpen}
+        onClose={() => setIsSuggestionsPanelOpen(false)}
+        stocks={stocks}
+      />
 
       {/* Delete confirm */}
       <ConfirmDialog

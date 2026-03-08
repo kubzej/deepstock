@@ -37,8 +37,9 @@ import type {
   Stock,
   PerformancePeriod,
 } from '@/lib/api';
+import { AIPortfolioAdvisorSection } from '@/components/analysis/AIPortfolioAdvisorSection';
 
-type TabType = 'overview' | 'stocks' | 'options';
+type TabType = 'overview' | 'stocks' | 'options' | 'ai';
 type ValueMode = 'current' | 'invested';
 
 export function AnalysisPage() {
@@ -271,6 +272,7 @@ export function AnalysisPage() {
           <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
           <TabsTrigger value="stocks">Akcie</TabsTrigger>
           <TabsTrigger value="options">Opce</TabsTrigger>
+          <TabsTrigger value="ai">AI Poradce</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
@@ -341,6 +343,10 @@ export function AnalysisPage() {
           ) : (
             <StockPerformance data={stockPerf} />
           )}
+        </TabsContent>
+
+        <TabsContent value="ai" className="mt-6">
+          <AIPortfolioAdvisorSection />
         </TabsContent>
 
         <TabsContent value="options" className="mt-6 space-y-6">

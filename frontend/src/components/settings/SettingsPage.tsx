@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { List, Tag, ChevronRight, Briefcase, Bell, Info } from 'lucide-react';
+import { List, Tag, ChevronRight, Briefcase, Bell, Info, Rss } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { WatchlistSettings } from '@/components/settings/WatchlistSettings';
 import { WatchlistTagSettings } from '@/components/settings/WatchlistTagSettings';
 import { PortfolioSettings } from '@/components/settings/PortfolioSettings';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
+import { FeedListSettings } from '@/components/settings/FeedListSettings';
 
 type SettingsSection =
   | 'menu'
   | 'portfolios'
   | 'watchlists'
   | 'watchlist-tags'
-  | 'notifications';
+  | 'notifications'
+  | 'feed-lists';
 
 interface SettingsPageProps {
   initialSection?: SettingsSection;
@@ -36,6 +38,10 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
 
   if (activeSection === 'notifications') {
     return <NotificationSettings onBack={() => setActiveSection('menu')} />;
+  }
+
+  if (activeSection === 'feed-lists') {
+    return <FeedListSettings onBack={() => setActiveSection('menu')} />;
   }
 
   // Main menu
@@ -126,6 +132,24 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             <div className="text-sm text-muted-foreground">
               Push notifikace a cenové alerty
             </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Feed */}
+      <div className="space-y-1">
+        <h2 className="text-sm font-medium text-muted-foreground px-2 mb-2">Feed</h2>
+        <button
+          onClick={() => setActiveSection('feed-lists')}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
+        >
+          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+            <Rss className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">X.com Feed listy</div>
+            <div className="text-sm text-muted-foreground">Seznamy X účtů pro AI přehled příspěvků</div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </button>
