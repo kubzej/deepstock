@@ -72,7 +72,7 @@ function FeedListCard({ list }: { list: FeedList }) {
             </Button>
           )}
           {!summary && (
-            <Button size="sm" onClick={handleGenerate} disabled={loading || accounts.length === 0} className="gap-2">
+            <Button size="sm" onClick={() => handleGenerate()} disabled={loading || accounts.length === 0} className="gap-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
               {loading ? 'Analyzuji...' : 'Generovat přehled'}
             </Button>

@@ -74,12 +74,13 @@ export function MarkdownReport({ content }: { content: string }) {
               {children}
             </ol>
           ),
-          li: ({ ordered, children }) => {
-            if (ordered) {
-              return <li className="text-sm text-foreground/90 leading-relaxed">{children}</li>;
+          li: ({ node, children, ...props }) => {
+            const isOrdered = node?.parent?.type === 'element' && (node.parent as { tagName?: string }).tagName === 'ol';
+            if (isOrdered) {
+              return <li className="text-sm text-foreground/90 leading-relaxed" {...props}>{children}</li>;
             }
             return (
-              <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none">
+              <li className="text-sm text-foreground/90 leading-relaxed flex items-start gap-2 list-none" {...props}>
                 <span className="mt-2 w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
                 <span>{children}</span>
               </li>

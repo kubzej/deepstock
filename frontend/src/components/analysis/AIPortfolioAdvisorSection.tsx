@@ -92,7 +92,7 @@ export function AIPortfolioAdvisorSection() {
               )}
             </p>
           </div>
-          <Button onClick={handleGenerate} className="mt-2">
+          <Button onClick={() => handleGenerate()} className="mt-2">
             <Bot className="w-4 h-4 mr-2" />
             Analyzovat portfolio
           </Button>
