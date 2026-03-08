@@ -3,12 +3,15 @@
  * Requires: npm install react-markdown
  */
 import { useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
 import { Bot, RefreshCw, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { generateReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
+import { generateReport, getCachedReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
+
+const REPORT_TYPES: ReportType[] = ['full_analysis', 'technical_analysis', 'briefing'];
 
 interface AIResearchSectionProps {
   ticker: string;
@@ -58,12 +61,25 @@ function EmptyState({ onGenerate }: { onGenerate: () => void }) {
 
 export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionProps) {
   const [activeReportType, setActiveReportType] = useState<ReportType>('full_analysis');
-  const [reports, setReports] = useState<Partial<Record<ReportType, AIResearchReport>>>({});
+  const [generated, setGenerated] = useState<Partial<Record<ReportType, AIResearchReport>>>({});
   const [loading, setLoading] = useState<ReportType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
-  const currentReport = reports[activeReportType];
+  const cachedQueries = useQueries({
+    queries: REPORT_TYPES.map((type) => ({
+      queryKey: ['ai-research-cache', ticker, type],
+      queryFn: () => getCachedReport(ticker, type),
+      retry: false,
+      staleTime: Infinity,
+    })),
+  });
+
+  const cached = Object.fromEntries(
+    REPORT_TYPES.map((type, i) => [type, cachedQueries[i].data ?? null])
+  ) as Partial<Record<ReportType, AIResearchReport>>;
+
+  const currentReport = generated[activeReportType] ?? cached[activeReportType] ?? null;
 
   async function handleGenerate(forceRefresh = false) {
     if (!currentPrice) return;
@@ -73,7 +89,7 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
     try {
       const period = '3mo';
       const report = await generateReport(ticker, currentPrice, activeReportType, forceRefresh, period);
-      setReports((prev) => ({ ...prev, [activeReportType]: report }));
+      setGenerated((prev) => ({ ...prev, [activeReportType]: report }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {
@@ -137,7 +153,7 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
         </div>
 
         {/* Report content area */}
-        {(['full_analysis', 'technical_analysis', 'briefing'] as ReportType[]).map((type) => (
+        {REPORT_TYPES.map((type) => (
           <TabsContent key={type} value={type} className="mt-6">
             {isLoading && <LoadingState isTechnical={type === 'technical_analysis'} />}
             {error && !isLoading && <ErrorState message={error} />}

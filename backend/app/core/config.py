@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     ai_model: str = "anthropic/claude-sonnet-4-6"
     ai_max_tokens: int = 8000
 
+    # Apify
+    apify_api_token: str = ""
+
     # App
     debug: bool = False
     

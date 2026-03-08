@@ -16,6 +16,21 @@ export interface AIResearchReport {
   cached: boolean;
 }
 
+export async function getCachedReport(
+  ticker: string,
+  reportType: ReportType,
+  period = '3mo',
+): Promise<AIResearchReport> {
+  const params = new URLSearchParams({ report_type: reportType });
+  if (reportType === 'technical_analysis') params.set('period', period);
+  const response = await fetch(`${API_URL}/api/ai/research/${ticker}?${params}`);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function generateReport(
   ticker: string,
   currentPrice: number,

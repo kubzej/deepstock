@@ -1,34 +1,38 @@
 /**
  * AI Portfolio Advisor Section — generates and displays a portfolio analysis report.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Bot, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { generatePortfolioAdvisor, type PortfolioAdvisorResponse } from '@/lib/api/ai_portfolio';
+import { generatePortfolioAdvisor, getCachedPortfolioAdvisor, type PortfolioAdvisorResponse } from '@/lib/api/ai_portfolio';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 
 export function AIPortfolioAdvisorSection() {
   const { activePortfolio } = usePortfolio();
   const portfolioId = activePortfolio?.id;
 
-  const [report, setReport] = useState<PortfolioAdvisorResponse | null>(null);
+  const [generated, setGenerated] = useState<PortfolioAdvisorResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset when active portfolio changes
-  useEffect(() => {
-    setReport(null);
-    setError(null);
-  }, [portfolioId]);
+  const { data: cached } = useQuery({
+    queryKey: ['ai-portfolio-cache', portfolioId ?? 'all'],
+    queryFn: () => getCachedPortfolioAdvisor(portfolioId),
+    retry: false,
+    staleTime: Infinity,
+  });
 
-  async function handleGenerate() {
+  const report = generated ?? cached ?? null;
+
+  async function handleGenerate(force = false) {
     setLoading(true);
     setError(null);
     try {
-      const result = await generatePortfolioAdvisor(portfolioId);
-      setReport(result);
+      const result = await generatePortfolioAdvisor(portfolioId, force);
+      setGenerated(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {
@@ -48,7 +52,7 @@ export function AIPortfolioAdvisorSection() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleGenerate}
+            onClick={() => handleGenerate(true)}
             disabled={loading}
             title="Obnovit (ignorovat cache)"
           >

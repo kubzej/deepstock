@@ -25,6 +25,7 @@ router = APIRouter()
 
 class PortfolioAdvisorRequest(BaseModel):
     portfolio_id: Optional[str] = None
+    force_refresh: bool = False
 
 
 class PortfolioAdvisorResponse(BaseModel):
@@ -32,6 +33,22 @@ class PortfolioAdvisorResponse(BaseModel):
     cached: bool = False
     generated_at: str
     model_used: str = ""
+
+
+@router.get("/portfolio-advisor", response_model=PortfolioAdvisorResponse)
+async def get_cached_portfolio_advisor(
+    portfolio_id: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id),
+):
+    redis = get_redis()
+    today = date.today().isoformat()
+    scope = portfolio_id or "all"
+    cache_key = f"ai_portfolio_advisor:{user_id}:{scope}:{today}"
+    cached = await redis.get(cache_key)
+    if not cached:
+        raise HTTPException(status_code=404, detail="Žádný uložený report.")
+    data = json.loads(cached)
+    return PortfolioAdvisorResponse(**data, cached=True)
 
 
 @router.post("/portfolio-advisor", response_model=PortfolioAdvisorResponse)
@@ -48,6 +65,7 @@ async def generate_portfolio_advisor(
     Results are cached 24h per user+portfolio.
     """
     portfolio_id = payload.portfolio_id
+    force_refresh = payload.force_refresh
 
     # Verify portfolio ownership if specific portfolio requested
     if portfolio_id:
@@ -60,10 +78,11 @@ async def generate_portfolio_advisor(
     scope = portfolio_id or "all"
     cache_key = f"ai_portfolio_advisor:{user_id}:{scope}:{today}"
 
-    cached = await redis.get(cache_key)
-    if cached:
-        data = json.loads(cached)
-        return PortfolioAdvisorResponse(**data, cached=True)
+    if not force_refresh:
+        cached = await redis.get(cache_key)
+        if cached:
+            data = json.loads(cached)
+            return PortfolioAdvisorResponse(**data, cached=True)
 
     # Fetch holdings
     if portfolio_id:
