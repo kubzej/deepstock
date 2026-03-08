@@ -115,9 +115,10 @@ Buď konkrétní – ne generické "tržní riziko".
 katalyzátory a na jakém časovém horizontu?
 *Bear case:* Proč nebude fungovat? Jaké scénáře by investici zničily?
 
-**9. Momentum a katalyzátory**
-Jaké momentum má firma v krátkodobém až střednědobém horizontu? Jaké katalyzátory ji
-pohánějí? Jak firma těží ze současných tržních a makroekonomických trendů?
+**9. Makro kontext a katalyzátory**
+Jaké jsou aktuální makroekonomické podmínky (Fed sazby, stav S&P 500, inflace) z výsledků
+vyhledávání — jsou tailwind nebo headwind pro tento titul nebo sektor? Jaké momentum má firma
+v krátkodobém až střednědobém horizontu? Jaké specifické katalyzátory ji pohánějí nebo brzdí?
 
 **10. Tržní neefektivity (co trh přehlíží)**
 Identifikuj, co trh může nesprávně oceňovat nebo podceňovat. Kde se skrývá skrytá hodnota?

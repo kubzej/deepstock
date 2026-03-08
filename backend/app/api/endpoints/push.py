@@ -1,8 +1,11 @@
 """
 Push Notification API endpoints
 """
+import logging
 from fastapi import APIRouter, HTTPException, Depends
 from app.core.auth import get_current_user_id
+
+logger = logging.getLogger(__name__)
 from app.core.config import get_settings
 from app.schemas.push import (
     PushSubscription, 
@@ -45,7 +48,8 @@ async def subscribe(
         )
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Push subscribe failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Nepodařilo se uložit odběr notifikací.")
 
 
 @router.post("/unsubscribe")
@@ -58,7 +62,8 @@ async def unsubscribe(
         unsubscribe_user(user_id=user_id, endpoint=subscription.endpoint)
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Push unsubscribe failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Nepodařilo se odebrat odběr notifikací.")
 
 
 @router.get("/settings", response_model=NotificationSettings)

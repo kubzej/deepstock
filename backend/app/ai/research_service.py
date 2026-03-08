@@ -294,6 +294,7 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
         (f"{ticker} {short_name} stock news latest", 30),
         (f"{ticker} CEO guidance outlook forecast {year}", 60),
         (f"{ticker} reddit investors discussion sentiment", 30),
+        (f"Federal Reserve interest rates S&P 500 stock market outlook {year}", 30),
     ]
 
     queries += [

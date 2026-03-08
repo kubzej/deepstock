@@ -1,12 +1,15 @@
 """
 Cron job endpoints - called by Railway cron scheduler
 """
+import logging
 from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 from app.core.config import get_settings
 from app.core.redis import get_redis
 from app.services.price_alerts import price_alert_service
 from app.services.earnings_alerts import earnings_alert_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -28,8 +31,8 @@ async def check_price_alerts(x_cron_secret: Optional[str] = Header(None)):
     """
     await verify_cron_secret(x_cron_secret)
     
-    redis = await get_redis()
-    
+    redis = get_redis()
+
     try:
         result = await price_alert_service.check_all_users(redis)
         return {
@@ -38,7 +41,8 @@ async def check_price_alerts(x_cron_secret: Optional[str] = Header(None)):
             "alerts_sent": result["alerts_sent"]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"check-price-alerts failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při kontrole cenových alertů.")
 
 
 @router.post("/check-custom-alerts")
@@ -49,8 +53,8 @@ async def check_custom_alerts(x_cron_secret: Optional[str] = Header(None)):
     """
     await verify_cron_secret(x_cron_secret)
     
-    redis = await get_redis()
-    
+    redis = get_redis()
+
     try:
         result = await price_alert_service.check_custom_alerts(redis)
         return {
@@ -59,7 +63,8 @@ async def check_custom_alerts(x_cron_secret: Optional[str] = Header(None)):
             "alerts_triggered": result["alerts_triggered"]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"check-custom-alerts failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při kontrole vlastních alertů.")
 
 
 @router.get("/health")
@@ -76,8 +81,8 @@ async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
     """
     await verify_cron_secret(x_cron_secret)
     
-    redis = await get_redis()
-    
+    redis = get_redis()
+
     try:
         result = await earnings_alert_service.check_all_users(redis)
         return {
@@ -86,4 +91,5 @@ async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
             "alerts_sent": result["alerts_sent"]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"check-earnings-alerts failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při kontrole earnings alertů.")

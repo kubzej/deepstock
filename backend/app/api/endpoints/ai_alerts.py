@@ -6,6 +6,7 @@ POST /api/ai/alert-suggestions — generate technical price alert suggestions
 import asyncio
 import json
 import logging
+import re
 from datetime import date
 from typing import Optional
 
@@ -116,15 +117,11 @@ async def generate_alert_suggestions(
 
         content, _ = await call_llm(SYSTEM_PROMPT, user_prompt)
 
-        # Strip any markdown code blocks the model might add despite instructions
+        # Extract JSON from response — handle markdown code blocks or bare JSON
         content = content.strip()
-        if content.startswith("```"):
-            parts = content.split("```")
-            # Take the content between the first pair of backticks
-            content = parts[1] if len(parts) > 1 else content
-            if content.startswith("json"):
-                content = content[4:]
-            content = content.strip()
+        match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        if match:
+            content = match.group(1)
 
         result = json.loads(content)
         suggestions_raw = result.get("suggestions", [])

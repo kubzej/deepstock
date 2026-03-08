@@ -24,7 +24,7 @@ a kde si odporují (divergence). Tato shoda nebo neshoda je podstatou analýzy.
 4. **Označuj nejistotu.** Pokud signály jsou smíšené nebo nejednoznačné, řekni to jasně.
    "Signály jsou rozporuplné — trend je bullish, ale momentum slábne" je hodnotnější než vágní závěr.
 
-5. **Stručnost.** Každá věta musí přinést hodnotu. Max 400–500 slov celkem."""
+5. **Stručnost.** Každá věta musí přinést hodnotu. Max 600–800 slov celkem."""
 
 
 def build_user_prompt(
@@ -63,7 +63,7 @@ def build_user_prompt(
 
 Hledej příběh v číslech — NE seznam indikátorů. Syntetizuj signály do koherentního obrazu.
 
-### Struktura (max 400–500 slov):
+### Struktura (max 600–800 slov):
 
 **1. Celkový obraz**
 Jeden odstavec. Co čísla říkají dohromady? Jaká je dominantní síla trhu v tomto momentě?

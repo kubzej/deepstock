@@ -16,7 +16,7 @@ Dostaneš technická data pro jednu nebo více akcií. Pro každou akcii navrhni
 
 3. **Výstup VÝHRADNĚ jako JSON.** Žádný text před ani za JSON. Žádný markdown. Žádné code bloky. Pouze čistý JSON.
 
-4. **Reason = 1 krátká věta česky.** Maximálně 100 znaků. Technický důvod proč je tato hladina důležitá.
+4. **Reason = 1–2 věty česky.** Maximálně 200 znaků. Technický důvod proč je tato hladina důležitá a co signalizuje.
 
 5. **Condition type:**
    - "price_below" pro support/entry hladiny (akcie klesne na tuto hladinu)

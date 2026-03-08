@@ -17,6 +17,7 @@ from app.core.redis import get_redis
 from app.services.market import market_service
 from app.services.options import options_service
 from app.services.portfolio import portfolio_service
+from app.ai.search import tavily_client
 
 logger = logging.getLogger(__name__)
 
@@ -102,15 +103,20 @@ async def generate_portfolio_advisor(
         if (h.get("stocks") or {}).get("ticker") or h.get("ticker")
     })
 
-    # Fetch quotes + tech indicators in parallel
+    # Fetch quotes + tech indicators + macro context in parallel
+    year = date.today().year
     quotes_task = market_service.get_quotes(tickers)
     tech_tasks = [market_service.get_technical_indicators(ticker, "3mo") for ticker in tickers]
+    macro_task = tavily_client.search(
+        f"Federal Reserve interest rates S&P 500 stock market outlook {year}", max_results=3, days=30
+    )
 
-    results = await asyncio.gather(quotes_task, *tech_tasks, return_exceptions=True)
+    results = await asyncio.gather(quotes_task, *tech_tasks, macro_task, return_exceptions=True)
     quotes: dict = results[0] if not isinstance(results[0], Exception) else {}
+    macro_results = results[-1] if not isinstance(results[-1], Exception) else []
 
     tech_data: dict[str, dict] = {}
-    for ticker, result in zip(tickers, results[1:]):
+    for ticker, result in zip(tickers, results[1:-1]):
         if isinstance(result, Exception) or not result:
             logger.warning(f"No tech data for {ticker}")
         else:
@@ -140,7 +146,8 @@ async def generate_portfolio_advisor(
     portfolio_context = format_portfolio_context(holdings, quotes, tech_data)
     transactions_context = format_transactions_context(transactions or [])
     options_context = format_options_context(option_holdings or [])
-    user_prompt = build_user_prompt(portfolio_context, transactions_context, options_context)
+    macro_context = tavily_client.format_results(macro_results) if macro_results else ""
+    user_prompt = build_user_prompt(portfolio_context, transactions_context, options_context, macro_context)
 
     try:
         from app.ai.providers.litellm_client import call_llm
