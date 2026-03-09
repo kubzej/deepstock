@@ -5,6 +5,7 @@ import {
   createAlert,
   updateAlert,
   deleteAlert,
+  deleteBulkAlerts,
   resetAlert,
   toggleAlert,
   deleteGroup,
@@ -109,6 +110,21 @@ export function useToggleAlert() {
   
   return useMutation({
     mutationFn: (id: string) => toggleAlert(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });
+    },
+  });
+}
+
+/**
+ * Delete multiple alerts at once.
+ */
+export function useDeleteBulkAlerts() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: string[]) => deleteBulkAlerts(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.alerts() });
       queryClient.invalidateQueries({ queryKey: queryKeys.activeAlerts() });

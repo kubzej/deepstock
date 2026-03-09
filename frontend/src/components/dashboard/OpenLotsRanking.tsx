@@ -23,6 +23,8 @@ export interface OpenLot {
   priceScale?: number;
   exchangeRate?: number;
   portfolioName?: string;
+  preMarketPrice?: number | null;
+  postMarketPrice?: number | null;
 }
 
 type SortKey =
@@ -55,6 +57,7 @@ function LotRow({
     costBasisCzk: number;
     currentValueCzk: number;
     portfolioName?: string;
+    extendedHoursType: 'pre' | 'post' | null;
   };
   showPortfolio: boolean;
   onClick?: () => void;
@@ -122,20 +125,27 @@ function LotRow({
           </div>
         </div>
 
-        {/* Subrow: Shares × Buy Price → Current Price | Cost → Value (desktop) */}
+        {/* Subrow: Shares × Buy Price → Current Price | Cost → Value */}
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[11px] text-muted-foreground font-mono-price">
             {lot.shares} ks × {formatPrice(lot.buyPrice, lot.currency)}
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-muted-foreground font-mono-price">
+            {' '}
+            <span
+              className={
+                lot.extendedHoursType === 'pre'
+                  ? 'text-orange-500'
+                  : lot.extendedHoursType === 'post'
+                    ? 'text-violet-500'
+                    : ''
+              }
+            >
               → {formatPrice(lot.currentPriceScaled, lot.currency)}
             </span>
-            <span className="hidden md:inline text-[11px] text-muted-foreground font-mono-price">
-              {formatCurrency(lot.costBasisCzk)} →{' '}
-              {formatCurrency(lot.currentValueCzk)}
-            </span>
-          </div>
+          </span>
+          <span className="text-[11px] text-muted-foreground font-mono-price">
+            {formatCurrency(lot.costBasisCzk)} →{' '}
+            {formatCurrency(lot.currentValueCzk)}
+          </span>
         </div>
 
         {/* Expanded Details (mobile only — desktop shows inline) */}
@@ -204,15 +214,22 @@ export function OpenLotsRanking({
   const [sortKey, setSortKey] = useState<SortKey>('plPercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Calculate P/L for each lot
+  // Calculate P/L for each lot, preferring pre/post market price when available
   const lotsWithPL = useMemo(
     () =>
       lots.map((lot) => {
         const scale = lot.priceScale ?? 1;
+
+        // Pick effective price: pre-market > post-market > regular
+        const extendedHoursType: 'pre' | 'post' | null =
+          lot.preMarketPrice ? 'pre' : lot.postMarketPrice ? 'post' : null;
+        const effectivePrice =
+          lot.preMarketPrice ?? lot.postMarketPrice ?? lot.currentPrice;
+
         // buyPrice is stored in actual currency (e.g., GBP for LSE stocks)
-        // currentPrice from quotes is in quoted units (e.g., pence) - needs scale
+        // effectivePrice from quotes is in quoted units (e.g., pence) - needs scale
         const costBasis = lot.buyPrice * lot.shares;
-        const currentPriceScaled = lot.currentPrice * scale;
+        const currentPriceScaled = effectivePrice * scale;
         const currentValue = currentPriceScaled * lot.shares;
         const plAmount = currentValue - costBasis;
         const plPercent = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
@@ -232,6 +249,7 @@ export function OpenLotsRanking({
           costBasisCzk,
           currentValueCzk,
           currentPriceScaled,
+          extendedHoursType,
         };
       }),
     [lots, rates],

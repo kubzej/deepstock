@@ -3,6 +3,7 @@ Price Alerts API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
+from pydantic import BaseModel
 from app.services.price_alerts import price_alert_service
 from app.schemas.price_alerts import (
     PriceAlertCreate,
@@ -14,6 +15,10 @@ from app.core.auth import get_current_user_id
 
 
 router = APIRouter()
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
 
 
 @router.get("/")
@@ -30,6 +35,18 @@ async def get_active_alerts(
 ) -> List[dict]:
     """Get only active (enabled, non-triggered) alerts."""
     return await price_alert_service.get_active_alerts(user_id)
+
+
+@router.delete("/bulk")
+async def delete_bulk_alerts(
+    data: BulkDeleteRequest,
+    user_id: str = Depends(get_current_user_id)
+) -> dict:
+    """Delete multiple alerts by ID in a single request."""
+    if not data.ids:
+        raise HTTPException(status_code=400, detail="Žádné alerty k smazání")
+    deleted = await price_alert_service.delete_bulk(data.ids, user_id)
+    return {"deleted": deleted}
 
 
 @router.get("/{alert_id}")
