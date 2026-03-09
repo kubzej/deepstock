@@ -193,6 +193,25 @@ export async function toggleAlert(alertId: string): Promise<PriceAlert> {
   return response.json();
 }
 
+export async function deleteBulkAlerts(ids: string[]): Promise<{ deleted: number }> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/alerts/bulk`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+    body: JSON.stringify({ ids }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    throw new Error('Nepodařilo se smazat alerty');
+  }
+
+  return response.json();
+}
+
 // ============ Group Operations ============
 
 export async function deleteGroup(groupId: string): Promise<void> {

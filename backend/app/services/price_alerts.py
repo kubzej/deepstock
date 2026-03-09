@@ -317,6 +317,17 @@ class PriceAlertService:
             .eq("user_id", user_id) \
             .execute()
         return len(response.data) > 0
+
+    async def delete_bulk(self, alert_ids: list[str], user_id: str) -> int:
+        """Delete multiple alerts by ID. Returns count of deleted alerts."""
+        if not alert_ids:
+            return 0
+        response = supabase.table("price_alerts") \
+            .delete() \
+            .in_("id", alert_ids) \
+            .eq("user_id", user_id) \
+            .execute()
+        return len(response.data)
     
     async def reset_alert(self, alert_id: str, user_id: str) -> Optional[dict]:
         """Reset a triggered alert to active state."""

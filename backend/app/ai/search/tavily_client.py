@@ -44,11 +44,15 @@ FINANCIAL_DOMAINS = [
 ]
 
 
+SEARCH_TIMEOUT = 30  # seconds per individual search query
+
+
 async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]:
     """
     Search the web for the given query.
     Returns list of {title, url, content} dicts.
     Runs synchronous Tavily client in thread pool to avoid blocking.
+    Times out after SEARCH_TIMEOUT seconds to prevent hanging requests.
     """
     def _sync_search():
         client = _get_client()
@@ -60,12 +64,12 @@ async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]
             days=days,
             include_domains=FINANCIAL_DOMAINS,
         )
-        # If no results from trusted domains, retry without domain filter
+        # If no results from trusted domains, retry without domain filter (basic = faster fallback)
         if not result.get("results"):
             result = client.search(
                 query=query,
                 max_results=max_results,
-                search_depth="advanced",
+                search_depth="basic",
                 include_raw_content=False,
                 days=days,
             )
@@ -73,9 +77,15 @@ async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]
 
     try:
         loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, _sync_search)
+        results = await asyncio.wait_for(
+            loop.run_in_executor(None, _sync_search),
+            timeout=SEARCH_TIMEOUT,
+        )
         logger.info(f"Tavily search '{query[:50]}...' returned {len(results)} results")
         return results
+    except asyncio.TimeoutError:
+        logger.warning(f"Tavily search timed out after {SEARCH_TIMEOUT}s for '{query[:50]}'")
+        return []
     except Exception as e:
         msg = str(e).lower()
         if "usage limit" in msg or "quota" in msg or "limit exceeded" in msg or "402" in msg:

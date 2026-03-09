@@ -14,6 +14,7 @@ Supported providers (examples):
 Each provider needs its own API key env var:
   ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.
 """
+import asyncio
 import os
 import logging
 import litellm
@@ -40,7 +41,7 @@ def _get_api_key() -> str | None:
     return None
 
 
-async def call_llm(system_prompt: str, user_prompt: str) -> tuple[str, str]:
+async def call_llm(system_prompt: str, user_prompt: str, request_timeout: int = 300) -> tuple[str, str]:
     """
     Call the configured LLM model with system + user prompt.
     Returns (content, model_used).
@@ -50,7 +51,7 @@ async def call_llm(system_prompt: str, user_prompt: str) -> tuple[str, str]:
     if not api_key:
         raise ValueError(f"API key not found for model '{AI_MODEL}'. Zkontroluj env vars.")
 
-    logger.info(f"Calling LLM model: {AI_MODEL}")
+    logger.info(f"Calling LLM model: {AI_MODEL} (timeout={request_timeout}s)")
 
     try:
         response = await litellm.acompletion(
@@ -62,7 +63,7 @@ async def call_llm(system_prompt: str, user_prompt: str) -> tuple[str, str]:
             ],
             max_tokens=AI_MAX_TOKENS,
             temperature=0.3,
-            request_timeout=120,
+            request_timeout=request_timeout,
         )
     except litellm.AuthenticationError:
         raise ValueError("Neplatný API klíč pro AI model. Zkontroluj ANTHROPIC_API_KEY v nastavení.")
@@ -70,12 +71,19 @@ async def call_llm(system_prompt: str, user_prompt: str) -> tuple[str, str]:
         raise ValueError("Překročen rate limit AI modelu. Zkus to za chvíli znovu.")
     except litellm.InsufficientCreditsError:
         raise ValueError("Došly kredity na AI API (Anthropic). Dobij kredit na console.anthropic.com.")
+    except litellm.Timeout:
+        raise ValueError("AI model nereagoval včas (timeout). Zkus to znovu.")
+    except (TimeoutError, asyncio.TimeoutError):
+        raise ValueError("AI model nereagoval včas (timeout). Zkus to znovu.")
     except litellm.APIError as e:
         # Catch credit/billing errors that come as generic APIError
         msg = str(e).lower()
         if "credit" in msg or "billing" in msg or "quota" in msg or "insufficient" in msg:
             raise ValueError("Došly kredity na AI API. Dobij kredit na console.anthropic.com.")
         raise ValueError(f"Chyba AI API: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected LLM error: {type(e).__name__}: {e}")
+        raise ValueError(f"Neočekávaná chyba AI modelu ({type(e).__name__}). Zkus to znovu.")
 
     content = response.choices[0].message.content
     model_used = response.model or AI_MODEL

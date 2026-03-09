@@ -162,6 +162,7 @@ export {
   createAlert,
   updateAlert,
   deleteAlert,
+  deleteBulkAlerts,
   resetAlert,
   toggleAlert,
   // Group operations

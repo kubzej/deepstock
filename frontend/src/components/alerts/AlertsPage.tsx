@@ -13,6 +13,7 @@ import {
   useCreateAlert,
   useUpdateAlert,
   useDeleteAlert,
+  useDeleteBulkAlerts,
   useResetAlert,
   useToggleAlert,
   useDeleteGroup,
@@ -22,7 +23,7 @@ import {
 } from '@/hooks/useAlerts';
 import { queryKeys } from '@/lib/queryClient';
 import type { AlertConditionType } from '@/lib/api';
-import { Plus, Bell, Bot, Search, X } from 'lucide-react';
+import { Plus, Bell, Bot, Search, X, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { AlertSuggestionsPanel } from './AlertSuggestionsPanel';
 import { SingleAlertCard, RangeAlertCard } from './AlertCard';
@@ -57,6 +58,7 @@ export function AlertsPage() {
   const createMutation = useCreateAlert();
   const updateMutation = useUpdateAlert();
   const deleteMutation = useDeleteAlert();
+  const deleteBulkMutation = useDeleteBulkAlerts();
   const resetMutation = useResetAlert();
   const toggleMutation = useToggleAlert();
   const deleteGroupMutation = useDeleteGroup();
@@ -64,6 +66,8 @@ export function AlertsPage() {
   const toggleGroupMutation = useToggleGroup();
 
   const [filterView, setFilterView] = useState<FilterView>('active');
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSuggestionsPanelOpen, setIsSuggestionsPanelOpen] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
@@ -220,6 +224,44 @@ export function AlertsPage() {
     else await resetMutation.mutateAsync(item.alert.id);
   };
 
+  const getItemKey = (item: AlertDisplayItem) =>
+    item.type === 'range' ? item.groupId : item.alert.id;
+
+  const toggleSelectItem = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedKeys(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    // Collect all alert IDs for selected items
+    const allItems = groupedDisplayItems.flatMap(([, items]) => items);
+    const idsToDelete: string[] = [];
+    for (const item of allItems) {
+      if (!selectedKeys.has(getItemKey(item))) continue;
+      if (item.type === 'range') {
+        idsToDelete.push(item.aboveAlert.id, item.belowAlert.id);
+      } else {
+        idsToDelete.push(item.alert.id);
+      }
+    }
+    if (idsToDelete.length === 0) return;
+    try {
+      await deleteBulkMutation.mutateAsync(idsToDelete);
+      exitSelectMode();
+    } catch {
+      // Error handled by mutation
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -249,14 +291,21 @@ export function AlertsPage() {
           </PillGroup>
         </div>
         <div className="flex items-center justify-between md:order-last md:justify-end md:gap-2">
-          <Button onClick={() => setIsSuggestionsPanelOpen(true)} size="sm" variant="outline">
-            <Bot className="h-4 w-4 mr-1" />
-            Návrhy AI
-          </Button>
-          <Button onClick={openCreateForm} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
-            Nový alert
-          </Button>
+          {!isSelectMode && (
+            <>
+              <Button onClick={() => setIsSuggestionsPanelOpen(true)} size="sm" variant="outline">
+                <Bot className="h-4 w-4 mr-1" />
+                Návrhy AI
+              </Button>
+              <Button onClick={() => setIsSelectMode(true)} size="sm" variant="outline">
+                Vybrat
+              </Button>
+              <Button onClick={openCreateForm} size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Nový alert
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -331,31 +380,58 @@ export function AlertsPage() {
                 </div>
 
                 <div className="space-y-1">
-                  {items.map((item) =>
-                    item.type === 'range' ? (
-                      <RangeAlertCard
-                        key={item.groupId}
-                        item={item}
-                        onEditRange={openEditRangeForm}
-                        onDelete={handleDelete}
-                        onToggle={handleToggle}
-                        onReset={handleReset}
-                        resetPending={resetGroupMutation.isPending}
-                        togglePending={toggleGroupMutation.isPending}
-                      />
-                    ) : (
-                      <SingleAlertCard
-                        key={item.alert.id}
-                        item={item}
-                        onEdit={openEditForm}
-                        onDelete={handleDelete}
-                        onToggle={handleToggle}
-                        onReset={handleReset}
-                        resetPending={resetMutation.isPending}
-                        togglePending={toggleMutation.isPending}
-                      />
-                    ),
-                  )}
+                  {items.map((item) => {
+                    const key = getItemKey(item);
+                    const isSelected = selectedKeys.has(key);
+                    return (
+                      <div
+                        key={key}
+                        className={`flex items-center gap-2 ${isSelectMode ? 'cursor-pointer' : ''}`}
+                        onClick={isSelectMode ? () => toggleSelectItem(key) : undefined}
+                      >
+                        {isSelectMode && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleSelectItem(key); }}
+                            className={`flex-shrink-0 w-5 h-5 rounded border-2 transition-colors ${
+                              isSelected
+                                ? 'bg-primary border-primary'
+                                : 'border-muted-foreground/40 hover:border-primary/60'
+                            }`}
+                            aria-label={isSelected ? 'Zrušit výběr' : 'Vybrat'}
+                          >
+                            {isSelected && (
+                              <svg viewBox="0 0 10 8" fill="none" className="w-full p-0.5">
+                                <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {item.type === 'range' ? (
+                            <RangeAlertCard
+                              item={item}
+                              onEditRange={isSelectMode ? () => {} : openEditRangeForm}
+                              onDelete={isSelectMode ? () => {} : handleDelete}
+                              onToggle={isSelectMode ? () => {} : handleToggle}
+                              onReset={isSelectMode ? () => {} : handleReset}
+                              resetPending={resetGroupMutation.isPending}
+                              togglePending={toggleGroupMutation.isPending}
+                            />
+                          ) : (
+                            <SingleAlertCard
+                              item={item}
+                              onEdit={isSelectMode ? () => {} : openEditForm}
+                              onDelete={isSelectMode ? () => {} : handleDelete}
+                              onToggle={isSelectMode ? () => {} : handleToggle}
+                              onReset={isSelectMode ? () => {} : handleReset}
+                              resetPending={resetMutation.isPending}
+                              togglePending={toggleMutation.isPending}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -383,6 +459,30 @@ export function AlertsPage() {
         onClose={() => setIsSuggestionsPanelOpen(false)}
         stocks={stocks}
       />
+
+      {isSelectMode && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="flex items-center gap-3 bg-background border rounded-xl shadow-lg px-4 py-3">
+            <Button onClick={exitSelectMode} size="sm" variant="outline">
+              Zrušit
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Vybráno: {selectedKeys.size}
+            </span>
+            {selectedKeys.size > 0 && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleBulkDelete}
+                disabled={deleteBulkMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                {deleteBulkMutation.isPending ? 'Mazání...' : 'Smazat'}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
