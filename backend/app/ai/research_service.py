@@ -371,7 +371,7 @@ async def generate_research_report(
             period=period,
             ta_context=ta_context,
         )
-        markdown_content, model_used = await call_llm(system, user)
+        markdown_content, model_used = await call_llm(system, user, request_timeout=180)
 
         result = {
             "markdown": markdown_content,
@@ -383,8 +383,11 @@ async def generate_research_report(
             "model_used": model_used,
             "cached": False,
         }
-        await redis.set(cache_key, json.dumps(result), ex=CacheTTL.AI_TA_REPORT)
-        logger.info(f"TA report cached at {cache_key}")
+        try:
+            await redis.set(cache_key, json.dumps(result), ex=CacheTTL.AI_TA_REPORT)
+            logger.info(f"TA report cached at {cache_key}")
+        except Exception as e:
+            logger.warning(f"Failed to cache TA report for {ticker}: {e}")
         return result
 
     # ── Fundamental reports (briefing / full_analysis) ───────────────────────────
@@ -403,15 +406,39 @@ async def generate_research_report(
 
     # Combine all search results into one context block
     search_text_parts = []
+    failed_queries = []
     for i, (query, _) in enumerate(queries):
         results = search_results_list[i]
         if isinstance(results, Exception):
             logger.warning(f"Search failed for '{query}': {results}")
+            failed_queries.append(query)
             continue
         if results:
             search_text_parts.append(f"### Výsledky hledání: \"{query}\"\n\n{tavily_client.format_results(results)}")
+        else:
+            failed_queries.append(query)
 
-    search_context = ("\n\n" + "=" * 60 + "\n\n").join(search_text_parts) if search_text_parts else "Web search nedostupný."
+    total = len(queries)
+    succeeded = len(search_text_parts)
+
+    if succeeded == 0:
+        raise ValueError(
+            "Web search nevrátil žádná data — zkus to znovu za chvíli. "
+            "Pokud problém přetrvává, zkontroluj limit Tavily API."
+        )
+    if succeeded < total / 2:
+        raise ValueError(
+            f"Web search vrátil data pouze pro {succeeded} z {total} dotazů — příliš málo pro spolehlivý report. "
+            "Zkus to znovu za chvíli."
+        )
+
+    search_context = ("\n\n" + "=" * 60 + "\n\n").join(search_text_parts)
+    if failed_queries:
+        missing = ", ".join(f'"{q[:60]}"' for q in failed_queries)
+        search_context += (
+            f"\n\n⚠️ POZNÁMKA PRO ANALYTIKA: Data nebyla dostupná pro {len(failed_queries)} z {total} dotazů "
+            f"({missing}). V reportu uveď, že analýza těchto oblastí může být neúplná."
+        )
 
     if report_type == "briefing":
         system = briefing_prompt.SYSTEM_PROMPT
@@ -436,8 +463,9 @@ async def generate_research_report(
             insider_context=insider_context,
         )
 
-    # Call LLM
-    markdown_content, model_used = await call_llm(system, user)
+    # Call LLM — full_analysis generates up to 8000 tokens (~230s), briefing ~4000 tokens (~120s)
+    llm_timeout = 360 if report_type == "full_analysis" else 180
+    markdown_content, model_used = await call_llm(system, user, request_timeout=llm_timeout)
 
     # Append sources section from Tavily results
     source_items = []
@@ -466,7 +494,10 @@ async def generate_research_report(
     }
 
     # Cache for 24 hours
-    await redis.set(cache_key, json.dumps(result), ex=CacheTTL.AI_RESEARCH_REPORT)
-    logger.info(f"Report cached at {cache_key}")
+    try:
+        await redis.set(cache_key, json.dumps(result), ex=CacheTTL.AI_RESEARCH_REPORT)
+        logger.info(f"Report cached at {cache_key}")
+    except Exception as e:
+        logger.warning(f"Failed to cache report for {ticker}: {e}")
 
     return result
