@@ -170,3 +170,10 @@ export {
   resetGroup,
   toggleGroup,
 } from './alerts';
+
+// AI Watchlist Targets
+export {
+  type WatchlistTargetsRequest,
+  type WatchlistTargetsResponse,
+  generateWatchlistTargets,
+} from './ai_watchlist_targets';
