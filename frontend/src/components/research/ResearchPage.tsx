@@ -16,6 +16,7 @@ import { StockHeader } from '@/components/research/sections/StockHeader';
 import { FundamentalsSection } from '@/components/research/sections/FundamentalsSection';
 import { TechnicalSection } from '@/components/research/sections/TechnicalSection';
 import { AIResearchSection } from '@/components/research/sections/AIResearchSection';
+import { SmartAnalysisPanel } from '@/components/research/sections/SmartAnalysisPanel';
 
 // Main component
 export function ResearchPage() {
@@ -102,6 +103,9 @@ export function ResearchPage() {
           <div className="space-y-6">
             <StockHeader data={data} />
 
+            {/* Smart Analysis */}
+            <SmartAnalysisPanel data={data} />
+
             {/* Description */}
             {data.description && (
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -112,7 +116,7 @@ export function ResearchPage() {
             {/* Tabs */}
             <Tabs defaultValue="fundamentals" className="w-full">
               <TabsList>
-                <TabsTrigger value="fundamentals">Fundamenty</TabsTrigger>
+                <TabsTrigger value="fundamentals">Metriky</TabsTrigger>
                 <TabsTrigger value="valuation">Valuace</TabsTrigger>
                 <TabsTrigger value="technical">Technika</TabsTrigger>
                 <TabsTrigger value="ai">AI Analýza</TabsTrigger>

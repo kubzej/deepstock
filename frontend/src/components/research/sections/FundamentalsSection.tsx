@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Info } from 'lucide-react';
 import {
   Tooltip,
@@ -12,12 +11,6 @@ import {
   formatRatio,
   formatRatioAsPercent,
 } from '@/lib/format';
-
-interface Insight {
-  type: 'positive' | 'warning' | 'info';
-  title: string;
-  description: string;
-}
 
 const METRIC_TOOLTIPS: Record<
   string,
@@ -186,113 +179,13 @@ function Metric({ label, value, sentiment = 'neutral' }: MetricProps) {
   );
 }
 
-interface BadgeConfig {
-  count: number;
-  label: string;
-  type: 'warnings' | 'positives' | 'info';
-  colorClass: string;
-  bgClass: string;
-}
-
-function InsightsPanel({ insights }: { insights: Insight[] }) {
-  const [expanded, setExpanded] = useState<
-    'warnings' | 'positives' | 'info' | null
-  >(null);
-
-  if (insights.length === 0) return null;
-
-  const positives = insights.filter((i) => i.type === 'positive');
-  const warnings = insights.filter((i) => i.type === 'warning');
-  const infos = insights.filter((i) => i.type === 'info');
-
-  const badges: BadgeConfig[] = [
-    {
-      count: warnings.length,
-      label: warnings.length === 1 ? 'riziko' : 'rizika',
-      type: 'warnings',
-      colorClass: 'text-rose-600',
-      bgClass: 'bg-rose-50',
-    },
-    {
-      count: positives.length,
-      label: positives.length === 1 ? 'pozitivum' : 'pozitiv',
-      type: 'positives',
-      colorClass: 'text-emerald-600',
-      bgClass: 'bg-emerald-50',
-    },
-    {
-      count: infos.length,
-      label: infos.length === 1 ? 'poznámka' : 'poznámek',
-      type: 'info',
-      colorClass: 'text-zinc-600',
-      bgClass: 'bg-zinc-100',
-    },
-  ];
-
-  const activeItems =
-    expanded === 'warnings'
-      ? warnings
-      : expanded === 'positives'
-        ? positives
-        : expanded === 'info'
-          ? infos
-          : [];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">
-          Smart analýza
-        </span>
-        {badges
-          .filter((b) => b.count > 0)
-          .map((badge) => {
-            const isActive = expanded === badge.type;
-            return (
-              <button
-                key={badge.type}
-                onClick={() => setExpanded(isActive ? null : badge.type)}
-                className={`inline-flex items-center gap-2 h-8 px-4 rounded-md text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow'
-                    : 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                }`}
-              >
-                {badge.count} {badge.label}
-              </button>
-            );
-          })}
-      </div>
-
-      {expanded && activeItems.length > 0 && (
-        <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3 pt-4">
-          {activeItems.map((insight, i) => (
-            <div key={i}>
-              <p className="text-sm font-medium text-foreground">
-                {insight.title}
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                {insight.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface FundamentalsSectionProps {
   data: StockInfo;
 }
 
 export function FundamentalsSection({ data }: FundamentalsSectionProps) {
-  const insights: Insight[] = data.insights ?? [];
-
   return (
     <div className="space-y-8">
-      <InsightsPanel insights={insights} />
-
       <div className="space-y-2">
         <h4 className="text-sm font-semibold text-foreground/70">Valuace</h4>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3">
