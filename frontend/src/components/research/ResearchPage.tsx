@@ -116,7 +116,7 @@ export function ResearchPage() {
             {/* Tabs */}
             <Tabs defaultValue="fundamentals" className="w-full">
               <TabsList>
-                <TabsTrigger value="fundamentals">Metriky</TabsTrigger>
+                <TabsTrigger value="fundamentals">Fundamenty</TabsTrigger>
                 <TabsTrigger value="valuation">Valuace</TabsTrigger>
                 <TabsTrigger value="technical">Technika</TabsTrigger>
                 <TabsTrigger value="ai">AI Analýza</TabsTrigger>
