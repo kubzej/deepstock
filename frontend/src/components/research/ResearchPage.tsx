@@ -13,10 +13,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { fetchStockInfo } from '@/lib/api';
 import { ValuationSection } from '@/components/research/ValuationSection';
 import { StockHeader } from '@/components/research/sections/StockHeader';
-import { FundamentalsSection } from '@/components/research/sections/FundamentalsSection';
 import { TechnicalSection } from '@/components/research/sections/TechnicalSection';
 import { AIResearchSection } from '@/components/research/sections/AIResearchSection';
 import { SmartAnalysisPanel } from '@/components/research/sections/SmartAnalysisPanel';
+import { HistoricalFinancialsSection } from '@/components/research/sections/HistoricalFinancialsSection';
 
 // Main component
 export function ResearchPage() {
@@ -123,7 +123,7 @@ export function ResearchPage() {
               </TabsList>
 
               <TabsContent value="fundamentals" className="mt-6">
-                <FundamentalsSection data={data} />
+                <HistoricalFinancialsSection ticker={data.symbol} />
               </TabsContent>
 
               <TabsContent value="valuation" className="mt-6">

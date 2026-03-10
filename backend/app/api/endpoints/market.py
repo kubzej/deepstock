@@ -63,6 +63,19 @@ async def get_stock_info(ticker: str):
     return result
 
 
+@router.get("/financials/{ticker}")
+async def get_historical_financials(ticker: str):
+    """
+    Get historical annual financials for a ticker (up to 4 fiscal years).
+    Returns: multiples (P/E, P/B, P/S, P/FCF, EV/EBITDA, EV/Revenue),
+             profitability (margins, ROE, ROA), growth rates, and context.
+    """
+    result = await market_service.get_historical_financials(ticker.upper())
+    if result is None:
+        return {"error": "Unable to fetch historical financials for this ticker"}
+    return result
+
+
 @router.get("/technical/{ticker}")
 async def get_technical_indicators(ticker: str, period: str = "1y"):
     """

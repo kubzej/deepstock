@@ -45,6 +45,8 @@ export {
   fetchExchangeRates,
   fetchPriceHistory,
   fetchStockInfo,
+  type HistoricalFinancials,
+  fetchHistoricalFinancials,
   fetchTechnicalIndicators,
 } from './market';
 

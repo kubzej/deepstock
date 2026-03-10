@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { ChevronDown, X, Check, Info, BarChart2, TrendingUp } from 'lucide-react';
+import {
+  ChevronDown,
+  X,
+  Check,
+  Info,
+  BarChart2,
+  TrendingUp,
+} from 'lucide-react';
 import type { StockInfo } from '@/lib/api';
 
 interface Insight {
@@ -67,9 +74,38 @@ function valuationLabel(signal: ValuationSignal): {
   }
 }
 
+function hasHighGrowthPotential(data: StockInfo): boolean {
+  let signals = 0;
+
+  // Signal 1: Composite upside > 30%
+  const compositeUpside = data.valuation?.composite?.upside;
+  if (compositeUpside != null && compositeUpside > 30) signals++;
+
+  // Signal 2: Analyst target upside > 25% (min 5 analysts)
+  if (data.targetMeanPrice && data.price && data.price > 0) {
+    const analystUpside =
+      ((data.targetMeanPrice - data.price) / data.price) * 100;
+    const analystCount = data.numberOfAnalystOpinions ?? 0;
+    if (analystUpside > 25 && analystCount >= 5) signals++;
+  }
+
+  // Signal 3: Strong growth momentum (revenue OR earnings > 20%)
+  const revGrowth = data.revenueGrowth;
+  const earnGrowth = data.earningsGrowth;
+  if (
+    (revGrowth != null && revGrowth > 0.2) ||
+    (earnGrowth != null && earnGrowth > 0.2)
+  ) {
+    signals++;
+  }
+
+  return signals >= 2;
+}
+
 function computeVerdict(
   insights: Insight[],
   valuationSignal: ValuationSignal,
+  data: StockInfo,
 ): Verdict {
   const warnings = insights.filter((i) => i.type === 'warning').length;
   const positives = insights.filter((i) => i.type === 'positive').length;
@@ -80,14 +116,19 @@ function computeVerdict(
   const isOvervalued =
     valuationSignal === 'overvalued' ||
     valuationSignal === 'slightly_overvalued';
+  const highGrowth = hasHighGrowthPotential(data);
 
+  // Skip: výrazně negativní
   if (warnings >= 3 && isOvervalued) return 'skip';
   if (warnings > positives + 2) return 'skip';
 
+  // Explore: kvalitní + podhodnocená NEBO silný růstový potenciál
   if (positives >= 3 && (isUndervalued || valuationSignal === 'fair'))
     return 'explore';
   if (positives > warnings && isUndervalued) return 'explore';
+  if (highGrowth && positives >= warnings && !isOvervalued) return 'explore';
 
+  // Watch
   if (isOvervalued && warnings <= positives) return 'watch';
   if (valuationSignal === 'fair' || valuationSignal === null) return 'watch';
 
@@ -119,7 +160,11 @@ const INSIGHT_STYLE: Record<
   { icon: React.ElementType; iconClass: string; bgClass: string }
 > = {
   warning: { icon: X, iconClass: 'text-rose-500', bgClass: 'bg-rose-500/10' },
-  positive: { icon: Check, iconClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' },
+  positive: {
+    icon: Check,
+    iconClass: 'text-emerald-500',
+    bgClass: 'bg-emerald-500/10',
+  },
   info: { icon: Info, iconClass: 'text-zinc-400', bgClass: 'bg-zinc-400/10' },
 };
 
@@ -131,7 +176,9 @@ function InsightGroup({ items }: { items: Insight[] }) {
         const { icon: Icon, iconClass, bgClass } = INSIGHT_STYLE[insight.type];
         return (
           <div key={i} className="flex gap-2.5">
-            <div className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ${bgClass}`}>
+            <div
+              className={`mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ${bgClass}`}
+            >
               <Icon className={`w-3 h-3 ${iconClass}`} />
             </div>
             <div>
@@ -164,7 +211,7 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
   const modelsUsed = composite?.modelsUsed ?? 0;
   const valLabel = valuationLabel(valuationSignal);
 
-  const verdict = computeVerdict(insights, valuationSignal);
+  const verdict = computeVerdict(insights, valuationSignal, data);
   const vc = VERDICT_CONFIG[verdict];
 
   const warnings = insights.filter((i) => i.type === 'warning');
@@ -246,7 +293,8 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
                   <span className={valLabel.colorClass}>{valLabel.text}</span>
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                  Kompozitní signál z {modelsUsed} valuačních modelů (DCF, P/E peers, DDM…)
+                  Kompozitní signál z {modelsUsed} valuačních modelů (DCF, P/E
+                  peers, DDM…)
                 </p>
               </div>
             </div>
@@ -259,7 +307,9 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
                 <TrendingUp className="w-3 h-3 text-zinc-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Pozice v pásmu</p>
+                <p className="text-sm font-medium text-foreground">
+                  Pozice v pásmu
+                </p>
                 <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
                   {technicalNote.replace('Technika: cena je ', '')}
                 </p>

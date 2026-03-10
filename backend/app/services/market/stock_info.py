@@ -7,6 +7,7 @@ import json
 import logging
 from typing import List, Optional
 from app.core.cache import CacheTTL
+from app.services.market.financials import get_historical_financials
 
 logger = logging.getLogger(__name__)
 
@@ -174,15 +175,276 @@ DEFAULT_RULES = {
 }
 
 
-def generate_insights(data: dict) -> List[dict]:
+# ============================================================
+# LAYER 4 HELPER: HISTORICAL TREND INSIGHTS
+# ============================================================
+
+def _generate_historical_insights(historical: dict) -> List[dict]:
+    """
+    Generate trend-based insights from multi-year historical financials.
+    Analyzes margin trends, FCF consistency, growth acceleration,
+    valuation vs historical average, earnings quality, and capital allocation.
+    """
+    insights: List[dict] = []
+    years = historical.get("years", [])
+    if not years or "LTM" not in years:
+        return insights
+
+    ltm_idx = years.index("LTM")
+    n_fy = ltm_idx  # number of FY year columns
+
+    if n_fy < 2:
+        return insights
+
+    profitability = historical.get("profitability", {})
+    growth_data = historical.get("growth", {})
+    context = historical.get("context", {})
+    multiples = historical.get("multiples", {})
+
+    def fy_vals(arr):
+        """Extract only FY year values (first n_fy elements)."""
+        return arr[:n_fy] if arr and len(arr) >= n_fy else []
+
+    def ltm_val(arr):
+        """Get the LTM value."""
+        return arr[ltm_idx] if arr and len(arr) > ltm_idx else None
+
+    def avg_5y_val(arr):
+        """Get the 5Y Avg value (last element if label matches)."""
+        if arr and len(arr) > 0 and years[-1] == "5Y Avg":
+            return arr[-1]
+        return None
+
+    def non_null(vals):
+        """Filter out None values, return list of values only."""
+        return [v for v in vals if v is not None]
+
+    def _streak_rising(vals):
+        """Count consecutive rising values from the end."""
+        streak = 1
+        for i in range(len(vals) - 1, 0, -1):
+            if vals[i] > vals[i - 1]:
+                streak += 1
+            else:
+                break
+        return streak
+
+    def _streak_falling(vals):
+        """Count consecutive falling values from the end."""
+        streak = 1
+        for i in range(len(vals) - 1, 0, -1):
+            if vals[i] < vals[i - 1]:
+                streak += 1
+            else:
+                break
+        return streak
+
+    # ── 1. Rising operating margin (3+ consecutive years) ─────
+    op_margins = non_null(fy_vals(profitability.get("operating_margin", [])))
+    if len(op_margins) >= 3:
+        streak = _streak_rising(op_margins)
+        if streak >= 3:
+            first_val = op_margins[-streak]
+            last_val = op_margins[-1]
+            insights.append({
+                "type": "positive",
+                "title": "Rostoucí marže",
+                "description": (
+                    f"Operating Margin roste {streak} roky po sobě "
+                    f"({first_val * 100:.1f}% → {last_val * 100:.1f}%). "
+                    f"Zlepšující se efektivita."
+                ),
+            })
+
+    # ── 2. Declining operating margin (3+ consecutive years) ──
+    if len(op_margins) >= 3:
+        streak = _streak_falling(op_margins)
+        if streak >= 3:
+            first_val = op_margins[-streak]
+            last_val = op_margins[-1]
+            insights.append({
+                "type": "warning",
+                "title": "Klesající marže",
+                "description": (
+                    f"Operating Margin klesá {streak} roky po sobě "
+                    f"({first_val * 100:.1f}% → {last_val * 100:.1f}%). "
+                    f"Tlak na profitabilitu."
+                ),
+            })
+
+    # ── 3. Consistent positive FCF ────────────────────────────
+    fcf_fy = non_null(fy_vals(context.get("free_cashflow", [])))
+    if len(fcf_fy) >= 3:
+        if all(v > 0 for v in fcf_fy):
+            insights.append({
+                "type": "positive",
+                "title": "Konzistentní FCF",
+                "description": (
+                    f"Free Cash Flow byl pozitivní ve všech {len(fcf_fy)} "
+                    f"sledovaných letech. Stabilní generování hotovosti."
+                ),
+            })
+
+    # ── 4. Unstable FCF (2+ negative years) ───────────────────
+    if len(fcf_fy) >= 3:
+        negative_count = sum(1 for v in fcf_fy if v < 0)
+        if negative_count >= 2:
+            insights.append({
+                "type": "warning",
+                "title": "Nestabilní FCF",
+                "description": (
+                    f"Free Cash Flow byl záporný v {negative_count} z "
+                    f"{len(fcf_fy)} let. Nepředvídatelné cash flow."
+                ),
+            })
+
+    # ── 5. Accelerating revenue growth ────────────────────────
+    rev_growth = non_null(fy_vals(growth_data.get("revenue_growth", [])))
+    if len(rev_growth) >= 4:
+        recent_avg = (rev_growth[-1] + rev_growth[-2]) / 2
+        earlier_avg = (rev_growth[-3] + rev_growth[-4]) / 2
+        if recent_avg > earlier_avg and recent_avg > 0 and earlier_avg > 0:
+            insights.append({
+                "type": "positive",
+                "title": "Zrychlující růst",
+                "description": (
+                    f"Růst tržeb se zrychluje: průměr posledních 2 let "
+                    f"({recent_avg * 100:.1f}%) převyšuje předchozí 2 roky "
+                    f"({earlier_avg * 100:.1f}%)."
+                ),
+            })
+
+    # ── 6. Decelerating revenue growth (3+ years) ─────────────
+    if len(rev_growth) >= 3:
+        streak = _streak_falling(rev_growth)
+        if streak >= 3:
+            insights.append({
+                "type": "warning",
+                "title": "Zpomalující růst",
+                "description": (
+                    f"Růst tržeb zpomaluje {streak} roky po sobě "
+                    f"({rev_growth[-streak] * 100:.1f}% → "
+                    f"{rev_growth[-1] * 100:.1f}%)."
+                ),
+            })
+
+    # ── 7. P/E below historical average ──────────────────────
+    pe_arr = multiples.get("pe", [])
+    ltm_pe = ltm_val(pe_arr)
+    avg_pe = avg_5y_val(pe_arr)
+    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe > 0:
+        if ltm_pe < avg_pe * 0.8:
+            discount = (1 - ltm_pe / avg_pe) * 100
+            insights.append({
+                "type": "positive",
+                "title": "Valuace pod historickým průměrem",
+                "description": (
+                    f"Aktuální P/E ({ltm_pe:.1f}×) je o {discount:.0f}% pod "
+                    f"5letým průměrem ({avg_pe:.1f}×). Historicky levná."
+                ),
+            })
+
+    # ── 8. P/E above historical average ──────────────────────
+    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe > 0:
+        if ltm_pe > avg_pe * 1.2:
+            premium = (ltm_pe / avg_pe - 1) * 100
+            insights.append({
+                "type": "warning",
+                "title": "Valuace nad historickým průměrem",
+                "description": (
+                    f"Aktuální P/E ({ltm_pe:.1f}×) je o {premium:.0f}% nad "
+                    f"5letým průměrem ({avg_pe:.1f}×). Historicky drahá."
+                ),
+            })
+
+    # ── 9. Earnings quality problem ──────────────────────────
+    ni_fy = fy_vals(context.get("net_income", []))
+    fcf_fy_raw = fy_vals(context.get("free_cashflow", []))
+    if len(ni_fy) >= 3 and len(fcf_fy_raw) >= 3:
+        divergence_count = 0
+        for i in range(min(len(ni_fy), len(fcf_fy_raw)) - 1, 0, -1):
+            ni_curr, ni_prev = ni_fy[i], ni_fy[i - 1]
+            fcf_curr, fcf_prev = fcf_fy_raw[i], fcf_fy_raw[i - 1]
+            if (ni_curr is not None and ni_prev is not None
+                    and fcf_curr is not None and fcf_prev is not None):
+                if ni_curr > ni_prev and fcf_curr < fcf_prev:
+                    divergence_count += 1
+                else:
+                    break
+            else:
+                break
+        if divergence_count >= 2:
+            insights.append({
+                "type": "warning",
+                "title": "Earnings quality problém",
+                "description": (
+                    f"Net Income roste, ale FCF klesá již "
+                    f"{divergence_count} roky. Možné agresivní účetnictví "
+                    f"nebo rostoucí capex."
+                ),
+            })
+
+    # ── 10. Strong capital allocator (consistent ROIC > 15%) ─
+    roic_fy = non_null(fy_vals(profitability.get("roic", [])))
+    if len(roic_fy) >= 3:
+        if all(v > 0.15 for v in roic_fy):
+            roic_range = max(roic_fy) - min(roic_fy)
+            if roic_range < 0.10:
+                avg_roic = sum(roic_fy) / len(roic_fy)
+                insights.append({
+                    "type": "positive",
+                    "title": "Silný capital allocator",
+                    "description": (
+                        f"ROIC je konzistentně nad 15% (průměr "
+                        f"{avg_roic * 100:.1f}%) s nízkým rozptylem. "
+                        f"Efektivní alokace kapitálu."
+                    ),
+                })
+
+    # ── 11. Margin expansion (LTM >> 5Y avg) ─────────────────
+    nm_arr = profitability.get("net_margin", [])
+    ltm_nm = ltm_val(nm_arr)
+    avg_nm = avg_5y_val(nm_arr)
+    if ltm_nm is not None and avg_nm is not None and avg_nm > 0:
+        if ltm_nm > avg_nm * 1.3:
+            expansion = (ltm_nm / avg_nm - 1) * 100
+            insights.append({
+                "type": "positive",
+                "title": "Margin expansion",
+                "description": (
+                    f"Net Margin LTM ({ltm_nm * 100:.1f}%) je o "
+                    f"{expansion:.0f}% nad 5letým průměrem "
+                    f"({avg_nm * 100:.1f}%). Zlepšení profitability."
+                ),
+            })
+
+    # ── 12. Margin compression (LTM << 5Y avg) ───────────────
+    if ltm_nm is not None and avg_nm is not None and avg_nm > 0:
+        if ltm_nm < avg_nm * 0.7:
+            compression = (1 - ltm_nm / avg_nm) * 100
+            insights.append({
+                "type": "warning",
+                "title": "Margin compression",
+                "description": (
+                    f"Net Margin LTM ({ltm_nm * 100:.1f}%) je o "
+                    f"{compression:.0f}% pod 5letým průměrem "
+                    f"({avg_nm * 100:.1f}%). Tlak na ziskovost."
+                ),
+            })
+
+    return insights
+
+
+def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dict]:
     """
     Generate automatic fundamental analysis insights.
     Returns list of insights with type (positive/warning/info), title, and description.
-    
-    Implements 3 layers:
+
+    Implements 4 layers:
     1. Universal Red/Green Flags
     2. Contextual Combinations
     3. Sector-Specific Rules
+    4. Historical Trend Insights (if historical data available)
     """
     insights = []
     sector = data.get("sector") or ""
@@ -532,7 +794,21 @@ def generate_insights(data: dict) -> List[dict]:
                 "title": "Očekávaný pokles EPS",
                 "description": f"Forward EPS ({forward_eps:.2f}) je o {abs(eps_growth) * 100:.0f}% nižší než TTM ({eps:.2f}). Slabý výhled.",
             })
-    
+
+    # Low base effect warning on EPS growth
+    earnings_growth = get_num("earningsGrowth")
+    if (earnings_growth is not None and abs(earnings_growth) > 1.0
+            and eps is not None and 0 < abs(eps) < 1.0):
+        insights.append({
+            "type": "info",
+            "title": "Efekt nízké báze u EPS",
+            "description": (
+                f"Růst EPS ({earnings_growth * 100:.0f}%) vychází z nízké báze "
+                f"(EPS {eps:.2f}). Procentuální změna může být zavádějící — "
+                f"sledujte absolutní hodnoty."
+            ),
+        })
+
     # P/S analysis
     ps = get_num("priceToSales")
     if ps is not None:
@@ -613,7 +889,13 @@ def generate_insights(data: dict) -> List[dict]:
             "title": "P/E není vhodná metrika",
             "description": "Pro REITs je P/E zkresleno odpisy. Použijte FFO nebo P/FFO pro správné hodnocení.",
         })
-    
+
+    # ============================================================
+    # LAYER 4: HISTORICAL TREND INSIGHTS
+    # ============================================================
+    if historical:
+        insights.extend(_generate_historical_insights(historical))
+
     return insights
 
 
@@ -1829,8 +2111,9 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
             "lastUpdated": str(pd.Timestamp.now()),
         }
         
-        # Generate insights from fundamentals
-        result["insights"] = generate_insights(result)
+        # Generate insights from fundamentals + historical trends
+        historical = await get_historical_financials(redis, ticker)
+        result["insights"] = generate_insights(result, historical=historical)
         
         # Calculate fair value estimates
         result["valuation"] = calculate_valuation(result)

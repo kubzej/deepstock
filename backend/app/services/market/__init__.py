@@ -17,6 +17,7 @@ from .quotes import get_quotes, get_price_history
 from .options_quotes import get_option_quotes
 from .stock_info import get_stock_info
 from .technical import get_technical_indicators
+from .financials import get_historical_financials
 
 
 class MarketDataService:
@@ -47,6 +48,10 @@ class MarketDataService:
     async def get_technical_indicators(self, ticker: str, period: str = "1y") -> Optional[dict]:
         """Calculate technical indicators for a stock."""
         return await get_technical_indicators(self.redis, ticker, period)
+
+    async def get_historical_financials(self, ticker: str) -> Optional[dict]:
+        """Get historical annual financials: multiples, profitability, growth."""
+        return await get_historical_financials(self.redis, ticker)
 
 
 # Singleton instance using shared Redis pool

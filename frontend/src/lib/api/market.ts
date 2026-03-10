@@ -390,6 +390,75 @@ export interface TechnicalData {
   lastUpdated: string;
 }
 
+// ============ Historical Financials ============
+
+export interface HistoricalFinancials {
+  ticker: string;
+  currency: string;
+  years: string[]; // e.g. ["FY 2021", ..., "LTM", "5J Průměr"]
+  multiples: {
+    pe: (number | null)[];
+    peg: (number | null)[];
+    pb: (number | null)[];
+    ps: (number | null)[];
+    pfcf: (number | null)[];
+    ev_ebitda: (number | null)[];
+    ev_revenue: (number | null)[];
+    ev_fcf: (number | null)[];
+  };
+  health: {
+    current_ratio: (number | null)[];
+  };
+  yields: {
+    earnings_yield: (number | null)[];
+    fcf_yield: (number | null)[];
+    dividend_yield: (number | null)[];
+  };
+  profitability: {
+    gross_margin: (number | null)[];
+    operating_margin: (number | null)[];
+    ebitda_margin: (number | null)[];
+    net_margin: (number | null)[];
+    fcf_margin: (number | null)[];
+    roe: (number | null)[];
+    roa: (number | null)[];
+    roic: (number | null)[];
+  };
+  growth: {
+    revenue_growth: (number | null)[];
+    net_income_growth: (number | null)[];
+    eps_growth: (number | null)[];
+    ebitda_growth: (number | null)[];
+    fcf_growth: (number | null)[];
+    book_value_growth: (number | null)[];
+  };
+  context: {
+    revenue: (number | null)[];
+    net_income: (number | null)[];
+    free_cashflow: (number | null)[];
+    market_cap: (number | null)[];
+    enterprise_value: (number | null)[];
+    price_at_fy: (number | null)[];
+  };
+}
+
+export async function fetchHistoricalFinancials(ticker: string): Promise<HistoricalFinancials | null> {
+  const response = await fetch(
+    `${API_URL}/api/market/financials/${encodeURIComponent(ticker.toUpperCase())}`
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch historical financials');
+  }
+
+  const data = await response.json();
+  if (data.error) {
+    return null;
+  }
+
+  return data;
+}
+
 export async function fetchTechnicalIndicators(
   ticker: string,
   period: TechnicalPeriod = '1y'
