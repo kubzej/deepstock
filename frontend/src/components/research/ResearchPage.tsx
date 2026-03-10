@@ -16,6 +16,7 @@ import { StockHeader } from '@/components/research/sections/StockHeader';
 import { FundamentalsSection } from '@/components/research/sections/FundamentalsSection';
 import { TechnicalSection } from '@/components/research/sections/TechnicalSection';
 import { AIResearchSection } from '@/components/research/sections/AIResearchSection';
+import { SmartAnalysisPanel } from '@/components/research/sections/SmartAnalysisPanel';
 
 // Main component
 export function ResearchPage() {
@@ -101,6 +102,9 @@ export function ResearchPage() {
         {data && (
           <div className="space-y-6">
             <StockHeader data={data} />
+
+            {/* Smart Analysis */}
+            <SmartAnalysisPanel data={data} />
 
             {/* Description */}
             {data.description && (

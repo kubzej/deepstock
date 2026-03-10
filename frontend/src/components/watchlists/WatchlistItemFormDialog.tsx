@@ -14,7 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { type WatchlistItem } from '@/lib/api';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { type WatchlistItem, type Holding } from '@/lib/api';
+import { generateWatchlistTargets } from '@/lib/api/ai_watchlist_targets';
 
 interface WatchlistItemFormDialogProps {
   open: boolean;
@@ -22,6 +24,7 @@ interface WatchlistItemFormDialogProps {
   editingItem: WatchlistItem | null;
   onSave: (data: WatchlistItemFormData) => Promise<void>;
   saving?: boolean;
+  holding?: Holding | null;
 }
 
 export interface WatchlistItemFormData {
@@ -38,6 +41,7 @@ export function WatchlistItemFormDialog({
   editingItem,
   onSave,
   saving = false,
+  holding,
 }: WatchlistItemFormDialogProps) {
   // Form state
   const [ticker, setTicker] = useState('');
@@ -45,6 +49,10 @@ export function WatchlistItemFormDialog({
   const [sellTarget, setSellTarget] = useState('');
   const [notes, setNotes] = useState('');
   const [sector, setSector] = useState('');
+
+  // AI suggestion state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Reset form when dialog opens/closes or editingItem changes
   useEffect(() => {
@@ -62,6 +70,7 @@ export function WatchlistItemFormDialog({
         setNotes('');
         setSector('');
       }
+      setAiError(null);
     }
   }, [open, editingItem]);
 
@@ -75,7 +84,40 @@ export function WatchlistItemFormDialog({
     });
   };
 
+  const handleAiSuggest = async () => {
+    const resolvedTicker = editingItem?.stocks.ticker || ticker.trim().toUpperCase();
+    if (!resolvedTicker) return;
+
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await generateWatchlistTargets({
+        ticker: resolvedTicker,
+        avg_cost: holding?.avg_cost ?? undefined,
+        shares: holding?.shares ?? undefined,
+      });
+
+      if (result.buy_target !== null) {
+        setBuyTarget(result.buy_target.toString());
+      }
+      if (result.sell_target !== null) {
+        setSellTarget(result.sell_target.toString());
+      }
+      if (result.comment) {
+        setNotes((prev) => {
+          const aiNote = `[AI] ${result.comment}`;
+          return prev ? `${prev}\n\n${aiNote}` : aiNote;
+        });
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Nepodařilo se načíst doporučení.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const isValid = editingItem || ticker.trim().length > 0;
+  const canAiSuggest = !!(editingItem?.stocks.ticker || ticker.trim().length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -105,6 +147,34 @@ export function WatchlistItemFormDialog({
               />
             </div>
           )}
+
+          {/* AI suggestion button */}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAiSuggest}
+              disabled={aiLoading || !canAiSuggest}
+              className="gap-1.5 text-xs"
+            >
+              {aiLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {aiLoading ? 'Analyzuji...' : 'AI doporučení'}
+            </Button>
+            {holding && (
+              <span className="text-xs text-muted-foreground">
+                Držíš za avg. ${holding.avg_cost.toFixed(2)}
+              </span>
+            )}
+          </div>
+          {aiError && (
+            <p className="text-xs text-destructive">{aiError}</p>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="buyTarget">Nákupní cíl</Label>

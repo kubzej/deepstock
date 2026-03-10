@@ -32,6 +32,7 @@ import {
   useMoveWatchlistItem,
 } from '@/hooks/useWatchlists';
 import { useWatchlistTags, useSetItemTags } from '@/hooks/useWatchlistTags';
+import { useHoldings } from '@/hooks/useHoldings';
 import { WatchlistItemCard } from './WatchlistItemCard';
 import {
   WatchlistItemsTable,
@@ -136,6 +137,9 @@ export function WatchlistsPage({
     if (timestamps.length === 0) return null;
     return Math.min(...timestamps);
   }, [watchlistsUpdatedAt, quotesUpdatedAt]);
+
+  // All holdings (for AI suggestions — to detect avg_cost)
+  const { data: allHoldings = [] } = useHoldings(null);
 
   // Tags
   const { data: allTags = [] } = useWatchlistTags();
@@ -720,6 +724,11 @@ export function WatchlistsPage({
         editingItem={editingItem}
         onSave={handleSaveItem}
         saving={itemSaving}
+        holding={
+          editingItem
+            ? (allHoldings.find((h) => h.ticker === editingItem.stocks.ticker) ?? null)
+            : null
+        }
       />
 
       {/* Delete Item Dialog */}
