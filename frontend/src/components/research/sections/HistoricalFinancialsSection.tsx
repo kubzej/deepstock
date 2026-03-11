@@ -242,108 +242,108 @@ function Table({
 
   return (
     <div className="overflow-x-auto">
-        <table className="w-full text-xs border-collapse">
-          <colgroup>
-            <col className="w-44" />
-            {years.map((_, i) => (
-              <col key={i} className="min-w-[4rem]" />
-            ))}
-          </colgroup>
+      <table className="w-full text-xs border-collapse">
+        <colgroup>
+          <col className="w-44" />
+          {years.map((_, i) => (
+            <col key={i} className="min-w-[4rem]" />
+          ))}
+        </colgroup>
 
-          <thead>
-            <tr className="border-b border-border/40">
-              <th className="sticky left-0 z-10 bg-background" />
-              {years.map((y, i) => {
-                const isLtm = i === ltmIdx;
-                const isFwd = isFwdCol(i);
-                const isAvg = i === avgIdx;
-                return (
-                  <th
-                    key={i}
-                    className={[
-                      'text-right py-2.5 px-3 whitespace-nowrap text-xs font-medium',
-                      isLtm
-                        ? 'text-foreground font-semibold'
-                        : isFwd
-                          ? 'text-violet-400'
-                          : isAvg
-                            ? 'text-muted-foreground/40'
-                            : 'text-muted-foreground',
-                    ].join(' ')}
-                  >
-                    {y}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((row, ri) => {
-              if (row.kind === 'divider') {
-                return (
-                  <tr key={ri} aria-hidden>
-                    <td colSpan={years.length + 1} className="py-1.5" />
-                  </tr>
-                );
-              }
-
-              const tip = TOOLTIPS[row.label];
-
+        <thead>
+          <tr className="border-b border-border/40">
+            <th className="sticky left-0 z-10 bg-background" />
+            {years.map((y, i) => {
+              const isLtm = i === ltmIdx;
+              const isFwd = isFwdCol(i);
+              const isAvg = i === avgIdx;
               return (
-                <tr
-                  key={ri}
-                  className="border-t border-border/20 hover:bg-muted/30 transition-colors"
+                <th
+                  key={i}
+                  className={[
+                    'text-right py-2.5 px-3 whitespace-nowrap text-xs font-medium',
+                    isLtm
+                      ? 'text-foreground font-semibold'
+                      : isFwd
+                        ? 'text-violet-400'
+                        : isAvg
+                          ? 'text-muted-foreground/40'
+                          : 'text-muted-foreground',
+                  ].join(' ')}
                 >
-                  <td className="sticky left-0 z-10 bg-background py-2 pr-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <span>{row.label}</span>
-                      {tip && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Info className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/30 hover:text-muted-foreground cursor-pointer transition-colors" />
-                          </PopoverTrigger>
-                          <PopoverContent side="right" className="max-w-xs p-3">
-                            <div className="space-y-1.5 text-xs">
-                              <p className="text-sm">{tip.description}</p>
-                              <p className="text-emerald-400">✓ {tip.good}</p>
-                              <p className="text-rose-400">✗ {tip.bad}</p>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </div>
-                  </td>
-
-                  {row.values.map((v, i) => {
-                    const isLtm = i === ltmIdx;
-                    const isFwd = isFwdCol(i);
-                    const isAvg = i === avgIdx;
-                    const color = isAvg || isFwd ? '' : row.clr ? row.clr(v) : '';
-
-                    return (
-                      <td
-                        key={i}
-                        className={[
-                          'py-2 px-3 text-right text-sm font-mono-price tabular-nums',
-                          isLtm
-                            ? 'font-medium'
-                            : isFwd
-                              ? 'text-violet-400'
-                              : isAvg
-                                ? 'text-muted-foreground/40'
-                                : color,
-                        ].join(' ')}
-                      >
-                        {row.fmt(v)}
-                      </td>
-                    );
-                  })}
-                </tr>
+                  {y}
+                </th>
               );
             })}
-          </tbody>
-        </table>
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((row, ri) => {
+            if (row.kind === 'divider') {
+              return (
+                <tr key={ri} aria-hidden>
+                  <td colSpan={years.length + 1} className="py-1.5" />
+                </tr>
+              );
+            }
+
+            const tip = TOOLTIPS[row.label];
+
+            return (
+              <tr
+                key={ri}
+                className="border-t border-border/20 hover:bg-muted/30 transition-colors"
+              >
+                <td className="sticky left-0 z-10 bg-background py-2 pr-4 whitespace-nowrap">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <span>{row.label}</span>
+                    {tip && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Info className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/30 hover:text-muted-foreground cursor-pointer transition-colors" />
+                        </PopoverTrigger>
+                        <PopoverContent side="right" className="max-w-xs p-3">
+                          <div className="space-y-1.5 text-xs">
+                            <p className="text-sm">{tip.description}</p>
+                            <p className="text-emerald-400">✓ {tip.good}</p>
+                            <p className="text-rose-400">✗ {tip.bad}</p>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                </td>
+
+                {row.values.map((v, i) => {
+                  const isLtm = i === ltmIdx;
+                  const isFwd = isFwdCol(i);
+                  const isAvg = i === avgIdx;
+                  const color = isAvg || isFwd ? '' : row.clr ? row.clr(v) : '';
+
+                  return (
+                    <td
+                      key={i}
+                      className={[
+                        'py-2 px-3 text-right text-sm font-mono-price tabular-nums',
+                        isLtm
+                          ? `font-semibold ${color}`
+                          : isFwd
+                            ? 'text-violet-400'
+                            : isAvg
+                              ? 'text-muted-foreground/40'
+                              : color,
+                      ].join(' ')}
+                    >
+                      {row.fmt(v)}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -671,7 +671,12 @@ export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-3">
       {sections.map(({ label, rows }) => (
-        <CollapsibleSection key={label} label={label} tableProps={tableProps} rows={rows} />
+        <CollapsibleSection
+          key={label}
+          label={label}
+          tableProps={tableProps}
+          rows={rows}
+        />
       ))}
     </div>
   );

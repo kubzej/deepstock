@@ -332,7 +332,9 @@ def _generate_historical_insights(historical: dict) -> List[dict]:
     pe_arr = multiples.get("pe", [])
     ltm_pe = ltm_val(pe_arr)
     avg_pe = avg_5y_val(pe_arr)
-    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe > 0:
+    # avg_pe < 1.0 means bad/missing historical price data (near-zero prices
+    # from yfinance for secondary listings produce nonsensically small P/E averages)
+    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe >= 1.0:
         if ltm_pe < avg_pe * 0.8:
             discount = (1 - ltm_pe / avg_pe) * 100
             insights.append({
@@ -345,7 +347,7 @@ def _generate_historical_insights(historical: dict) -> List[dict]:
             })
 
     # ── 8. P/E above historical average ──────────────────────
-    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe > 0:
+    if ltm_pe is not None and avg_pe is not None and ltm_pe > 0 and avg_pe >= 1.0:
         if ltm_pe > avg_pe * 1.2:
             premium = (ltm_pe / avg_pe - 1) * 100
             insights.append({
@@ -810,9 +812,17 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
         })
 
     # P/S analysis
-    ps = get_num("priceToSales")
-    if ps is not None:
-        if 0 < ps < 1:
+    # priceToSalesTrailing12Months from yfinance is unreliable for cross-listed
+    # stocks (Frankfurt, London ADRs) — it uses the secondary listing's market cap
+    # against full global revenue, producing near-zero values. Compute manually.
+    _ps_market_cap = get_num("marketCap")
+    _ps_revenue = get_num("revenue")
+    ps_manual = (_ps_market_cap / _ps_revenue) if (_ps_market_cap and _ps_revenue and _ps_revenue > 0) else None
+    ps_raw = get_num("priceToSales")
+    # Prefer manual; fallback to yfinance only if manual isn't available
+    ps = ps_manual if ps_manual is not None else ps_raw
+    if ps is not None and ps >= 0.1:  # < 0.1 is essentially impossible — treat as bad data
+        if ps < 1:
             insights.append({
                 "type": "positive",
                 "title": "Nízké P/S",

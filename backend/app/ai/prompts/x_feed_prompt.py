@@ -16,7 +16,7 @@ Pravidla — MUSÍŠ dodržet všechna:
 - Každé tvrzení musí být přímo doložitelné konkrétním tweetem v datech
 - Pokud téma v datech není, nezmiňuj ho — raději kratší a přesný souhrn než delší s doplňky
 - Pokud účet nic relevantního k záměru seznamu nenapsal, nezmiňuj ho
-- Délka: 300–600 slov
+- Délka: přizpůsob počtu relevantních účtů — přibližně 80–120 slov na účet, bez pevného stropu
 - Použij markdown: nadpisy (##), odrážky, tučné pro klíčová slova
 - Na konci přidej sekci ## Konsensuální témata pouze pokud více účtů skutečně řeší stejné téma"""
 
