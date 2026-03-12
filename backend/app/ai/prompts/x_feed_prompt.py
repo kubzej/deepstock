@@ -39,7 +39,7 @@ def build_user_prompt(list_name: str, tweets_by_user: dict[str, list[dict]], des
             author = tweets[0].get("author") or {}
             display_name = author.get("name") or author.get("displayName") or username
         lines.append(f"## {display_name} (@{username})")
-        for tweet in tweets[:20]:  # max 20 tweets per user
+        for tweet in tweets:
             text = tweet.get("text") or tweet.get("full_text") or ""
             date = tweet.get("created_at") or tweet.get("createdAt") or ""
             url = tweet.get("url") or tweet.get("tweetUrl") or ""
