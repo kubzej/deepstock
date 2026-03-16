@@ -22,6 +22,45 @@ logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=4)
 
 
+def _normalize_ticker_data(df: pd.DataFrame, ticker: str) -> Optional[pd.DataFrame]:
+    """
+    Normalize yfinance download output to a per-ticker OHLCV frame.
+
+    yfinance can return different column layouts across versions:
+    - flat columns for a single ticker: Close, Open, ...
+    - MultiIndex with level order (Price, Ticker)
+    - MultiIndex with a single ticker still wrapped in the Ticker level
+    """
+    if df is None or df.empty:
+        return None
+
+    ticker = ticker.upper()
+
+    if not isinstance(df.columns, pd.MultiIndex):
+        return df
+
+    for level in range(df.columns.nlevels):
+        try:
+            level_values = df.columns.get_level_values(level)
+            if ticker in level_values:
+                ticker_data = df.xs(ticker, level=level, axis=1)
+                if isinstance(ticker_data, pd.Series):
+                    ticker_data = ticker_data.to_frame()
+                if isinstance(ticker_data.columns, pd.MultiIndex):
+                    ticker_data.columns = ticker_data.columns.get_level_values(0)
+                return ticker_data
+        except (KeyError, IndexError, ValueError):
+            continue
+
+    unique_tickers = set(df.columns.get_level_values(df.columns.nlevels - 1))
+    if len(unique_tickers) == 1 and ticker in unique_tickers:
+        ticker_data = df.copy()
+        ticker_data.columns = ticker_data.columns.get_level_values(0)
+        return ticker_data
+
+    return None
+
+
 def safe_float(value, decimals: int = 2) -> Optional[float]:
     """Safely convert a value to float, handling NaN/inf/None -> None for JSON serialization."""
     if value is None:
@@ -138,22 +177,26 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                 " ".join(missing_basic), 
                 period="2d",  # Need 2 days for previous close
                 interval="1d",
+                auto_adjust=False,
                 progress=False,
                 threads=True
             )
             
             if not df.empty:
-                # Handle single vs multiple tickers (yfinance returns different structure)
-                is_multi = len(missing_basic) > 1
-                
                 for t in missing_basic:
                     try:
-                        if is_multi:
-                            ticker_data = df.xs(t, level=1, axis=1) if t in df.columns.get_level_values(1) else None
-                        else:
-                            ticker_data = df
+                        ticker_data = _normalize_ticker_data(df, t)
                         
                         if ticker_data is None or ticker_data.empty:
+                            continue
+
+                        if "Close" not in ticker_data.columns:
+                            logger.warning(f"Missing Close column for {t}, skipping")
+                            continue
+
+                        ticker_data = ticker_data.dropna(subset=["Close"])
+                        if ticker_data.empty:
+                            logger.warning(f"No valid Close rows for {t}, skipping")
                             continue
                         
                         # Get latest row

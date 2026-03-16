@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 import logging
+import yfinance as yf
 from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, feed
 from app.core.redis import close_redis_pool
 
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     # Startup
+    logger.info("Starting DeepStock API with yfinance %s", yf.__version__)
     yield
     # Shutdown - close Redis connection pool
     await close_redis_pool()
