@@ -12,12 +12,12 @@ import {
   EconomicCalendar,
 } from '@/components/shared/TradingViewWidgets';
 import { MarketOverview } from './MarketOverview';
+import { FearGreedGauge } from './FearGreedGauge';
 
 type HeatmapSource = 'SPX500' | 'NASDAQ100';
 
 const HEATMAP_OPTIONS: { value: HeatmapSource; label: string }[] = [
   { value: 'SPX500', label: 'S&P 500' },
-  { value: 'NASDAQ100', label: 'Nasdaq 100' },
 ];
 
 export function MarketPage() {
@@ -84,7 +84,8 @@ export function MarketPage() {
           <TabsTrigger value="calendar">Kalendář</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
+        <TabsContent value="overview" className="mt-6 space-y-8">
+          <FearGreedGauge />
           <MarketOverview />
         </TabsContent>
 

@@ -40,6 +40,7 @@ export const STALE_TIMES = {
   stockInfo: 5 * 60 * 1000,         // 5 minutes
   technicalIndicators: 5 * 60 * 1000, // 5 minutes
   insiderTrades: 30 * 60 * 1000,    // 30 minutes (cached 12h on backend)
+  fearGreed: 30 * 60 * 1000,        // 30 minutes (cached 30min on backend)
 } as const;
 
 /**
@@ -134,4 +135,7 @@ export const queryKeys = {
   // Price Alerts
   alerts: () => ['alerts'] as const,
   activeAlerts: () => ['alerts', 'active'] as const,
+
+  // Market sentiment
+  fearGreed: () => ['fearGreed'] as const,
 } as const;

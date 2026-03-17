@@ -459,6 +459,27 @@ export async function fetchHistoricalFinancials(ticker: string): Promise<Histori
   return data;
 }
 
+// ============ Fear & Greed Index ============
+
+export interface FearGreedData {
+  score: number;
+  rating: string;
+  previousClose: number;
+  previousWeek: number;
+  previousMonth: number;
+  previousYear: number;
+}
+
+export async function fetchFearGreed(): Promise<FearGreedData> {
+  const response = await fetch(`${API_URL}/api/market/fear-greed`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch Fear & Greed index');
+  }
+
+  return response.json();
+}
+
 export async function fetchTechnicalIndicators(
   ticker: string,
   period: TechnicalPeriod = '1y'
