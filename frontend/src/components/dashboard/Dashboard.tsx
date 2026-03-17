@@ -6,7 +6,7 @@ import { PortfolioHeatmap } from './PortfolioHeatmap';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, TrendingUp } from 'lucide-react';
+import { RefreshCw, TrendingUp, AlertTriangle } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -27,6 +27,7 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
     isInitialLoading,
     isFetching,
     error,
+    ratesError,
     refresh,
     dataUpdatedAt,
     isAllPortfolios,
@@ -352,6 +353,16 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
           </div>
         </div>
       </div>
+
+      {/* Exchange rate fallback warning */}
+      {ratesError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Nepodařilo se načíst aktuální kurzy — hodnoty portfolia jsou přepočítány orientačními kurzy.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Content with Tabs */}
       <Tabs defaultValue="holdings" className="w-full">

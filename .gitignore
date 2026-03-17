@@ -61,3 +61,6 @@ dump.rdb
 # Supabase
 .branches
 .temp
+
+Claude
+.claude/settings.local.json

@@ -49,6 +49,7 @@ interface PortfolioContextType {
   /** @deprecated Use isInitialLoading instead */
   loading: boolean;
   error: string | null;
+  ratesError: boolean;
   /** Timestamp when data was last updated (oldest of all queries) */
   dataUpdatedAt: number | null;
   /** @deprecated Use dataUpdatedAt instead */
@@ -128,6 +129,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     isLoading: ratesLoading,
     isFetching: ratesFetching,
     dataUpdatedAt: ratesUpdatedAt,
+    error: ratesError,
   } = useExchangeRates();
 
   // Prefetch: Get all watchlist tickers for background prefetching
@@ -200,6 +202,9 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
   // Combined error
   const error = portfoliosError?.message || holdingsError?.message || null;
 
+  // True when exchange rates failed and we're using fallback values
+  const hasRatesError = !!ratesError && !ratesFetching;
+
   // Create default portfolio if none exists
   // Only create if:
   // 1. Not loading
@@ -263,6 +268,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   const setActivePortfolio = useCallback(
     async (portfolioId: string | null) => {
+      // Remove cached holdings/lots so skeleton shows while new portfolio loads
+      queryClient.removeQueries({ queryKey: ['holdings'] });
+      queryClient.removeQueries({ queryKey: ['openLots'] });
+
       if (portfolioId === null) {
         // "All portfolios" mode
         setIsAllPortfolios(true);
@@ -306,6 +315,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
     isFetching,
     loading,
     error,
+    ratesError: hasRatesError,
     dataUpdatedAt,
     lastFetched: dataUpdatedAt ? new Date(dataUpdatedAt) : null,
     isAllPortfolios,
