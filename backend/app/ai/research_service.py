@@ -312,6 +312,30 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
     return queries
 
 
+# ─── Journal auto-save ─────────────────────────────────────────────────────────
+
+async def _save_report_to_journal(ticker: str, markdown: str, report_type: str, model_used: str) -> None:
+    """Auto-save generated AI report to journal channel for this ticker (fire-and-forget)."""
+    try:
+        from app.services.journal import journal_service, EntryCreate
+        channel = await journal_service.get_channel_by_ticker(ticker)
+        if not channel:
+            return
+        await journal_service.create_entry(EntryCreate(
+            channel_id=channel["id"],
+            type="ai_report",
+            content=markdown,
+            metadata={
+                "report_type": report_type,
+                "ticker": ticker,
+                "model": model_used,
+            },
+        ))
+        logger.info(f"AI report ({report_type}) saved to journal for {ticker}")
+    except Exception as e:
+        logger.warning(f"Failed to save AI report to journal for {ticker}: {e}")
+
+
 # ─── Main service ──────────────────────────────────────────────────────────────
 
 async def generate_research_report(
@@ -388,6 +412,7 @@ async def generate_research_report(
             logger.info(f"TA report cached at {cache_key}")
         except Exception as e:
             logger.warning(f"Failed to cache TA report for {ticker}: {e}")
+        await _save_report_to_journal(ticker, markdown_content, report_type, model_used)
         return result
 
     # ── Fundamental reports (briefing / full_analysis) ───────────────────────────
@@ -500,4 +525,5 @@ async def generate_research_report(
     except Exception as e:
         logger.warning(f"Failed to cache report for {ticker}: {e}")
 
+    await _save_report_to_journal(ticker, markdown_content, report_type, model_used)
     return result

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RichTextEditor } from './RichTextEditor';
 import { RichTextContent } from './RichTextContent';
 import type { JournalEntry } from '@/lib/api/journal';
+import { MarkdownReport } from '@/components/shared/AIReportComponents';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -145,10 +146,9 @@ export function JournalEntryCard({
   // ── ai_report ─────────────────────────────────────
   if (entry.type === 'ai_report') {
     const reportTypeLabel: Record<string, string> = {
-
-      research: 'Průzkum akcie',
-      technical: 'Technická analýza',
+      briefing: 'Kvartální briefing',
       full_analysis: 'Plná analýza',
+      technical_analysis: 'Technická analýza',
     };
     const label = entry.metadata.report_type
       ? reportTypeLabel[entry.metadata.report_type] ?? 'AI přehled'
@@ -172,10 +172,10 @@ export function JournalEntryCard({
               variant="ghost"
               size="sm"
               className="h-7 text-xs gap-1"
-              onClick={() => setReportExpanded(true)}
+              onClick={() => setReportExpanded(v => !v)}
             >
-              Zobrazit
-              <ChevronDown className="h-3 w-3" />
+              {reportExpanded ? 'Skrýt' : 'Zobrazit'}
+              <ChevronDown className={`h-3 w-3 transition-transform ${reportExpanded ? 'rotate-180' : ''}`} />
             </Button>
             <Button
               variant="ghost"
@@ -189,17 +189,12 @@ export function JournalEntryCard({
           </div>
         </div>
 
-        {/* Full report dialog */}
-        <Dialog open={reportExpanded} onOpenChange={setReportExpanded}>
-          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{label}{entry.metadata.ticker ? ` — ${entry.metadata.ticker}` : ''}</DialogTitle>
-            </DialogHeader>
-            <div className="text-sm whitespace-pre-wrap font-mono leading-relaxed">
-              {entry.content}
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Inline expanded report */}
+        {reportExpanded && (
+          <div className="mt-3">
+            <MarkdownReport content={entry.content} />
+          </div>
+        )}
 
         {/* Delete confirm */}
         <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
