@@ -1,7 +1,10 @@
-from fastapi import APIRouter
+import json
+import httpx
+from fastapi import APIRouter, HTTPException
 from app.services.market import market_service
 from app.services.exchange import exchange_service
 from app.core.redis import get_redis
+from app.core.cache import CacheTTL
 from pydantic import BaseModel
 from typing import List
 
@@ -73,6 +76,45 @@ async def get_historical_financials(ticker: str):
     result = await market_service.get_historical_financials(ticker.upper())
     if result is None:
         return {"error": "Unable to fetch historical financials for this ticker"}
+    return result
+
+
+@router.get("/fear-greed")
+async def get_fear_greed():
+    """
+    Fetch CNN Fear & Greed Index.
+    Returns current score, rating, and historical snapshots (close, 1w, 1m, 1y).
+    Cached in Redis for 30 minutes.
+    """
+    redis = get_redis()
+    cache_key = "market:fear_greed"
+
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+                headers={"User-Agent": "Mozilla/5.0 (compatible; DeepStock/1.0)"},
+            )
+            response.raise_for_status()
+            raw = response.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Fear & Greed API nedostupné: {e}")
+
+    fg = raw["fear_and_greed"]
+    result = {
+        "score": round(fg["score"], 1),
+        "rating": fg["rating"],
+        "previousClose": round(fg["previous_close"], 1),
+        "previousWeek": round(fg["previous_1_week"], 1),
+        "previousMonth": round(fg["previous_1_month"], 1),
+        "previousYear": round(fg["previous_1_year"], 1),
+    }
+
+    await redis.setex(cache_key, CacheTTL.FEAR_GREED, json.dumps(result))
     return result
 
 

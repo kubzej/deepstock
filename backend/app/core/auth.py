@@ -28,10 +28,10 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
     Token is passed in Authorization header as 'Bearer <token>'.
     """
     if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-    
+        raise HTTPException(status_code=401, detail="Chybí autorizační hlavička")
+
     if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
+        raise HTTPException(status_code=401, detail="Neplatný formát autorizace")
     
     token = authorization.replace("Bearer ", "")
     
@@ -67,11 +67,11 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
         
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token: no user ID")
-        
+            raise HTTPException(status_code=401, detail="Neplatný token: chybí ID uživatele")
+
         return user_id
-    
+
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        raise HTTPException(status_code=401, detail="Token vypršel")
     except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Neplatný token: {str(e)}")
