@@ -357,7 +357,6 @@ export function JournalEntryCard({
     const isBuy = entry.metadata.action === 'BUY';
     const shares = entry.metadata.shares ?? 0;
     const price = entry.metadata.price ?? 0;
-    const fees = entry.metadata.fees ?? 0;
     const currency = entry.metadata.currency ?? 'USD';
 
     return (
