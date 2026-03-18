@@ -7,8 +7,15 @@ import {
   updateJournalEntry,
   deleteJournalEntry,
   deleteJournalChannel,
+  createJournalSection,
+  updateJournalSection,
+  deleteJournalSection,
+  createJournalChannel,
+  updateJournalChannel,
   type EntryCreateData,
   type JournalEntry,
+  type JournalSection,
+  type JournalChannel,
 } from '@/lib/api/journal';
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
@@ -115,6 +122,80 @@ export function useDeleteJournalChannel() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteJournalChannel(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+    },
+  });
+}
+
+// ============================================
+// Section mutations
+// ============================================
+
+export function useCreateJournalSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string }) => createJournalSection(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalSections() });
+    },
+  });
+}
+
+export function useReorderJournalSections() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      Promise.all(
+        orderedIds.map((id, index) => updateJournalSection(id, { sort_order: index })),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalSections() });
+    },
+  });
+}
+
+export function useUpdateJournalSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<JournalSection> }) =>
+      updateJournalSection(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalSections() });
+    },
+  });
+}
+
+export function useDeleteJournalSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteJournalSection(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalSections() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+    },
+  });
+}
+
+// ============================================
+// Channel mutations (custom)
+// ============================================
+
+export function useCreateJournalChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; section_id?: string }) => createJournalChannel(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+    },
+  });
+}
+
+export function useUpdateJournalChannel() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<JournalChannel> }) =>
+      updateJournalChannel(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
     },

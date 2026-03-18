@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { List, Tag, ChevronRight, Briefcase, Bell, Info, Rss } from 'lucide-react';
+import { List, Tag, ChevronRight, Briefcase, Bell, Info, Rss, BookOpen, Layers } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { WatchlistSettings } from '@/components/settings/WatchlistSettings';
 import { WatchlistTagSettings } from '@/components/settings/WatchlistTagSettings';
 import { PortfolioSettings } from '@/components/settings/PortfolioSettings';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { FeedListSettings } from '@/components/settings/FeedListSettings';
+import { JournalSettings } from '@/components/settings/JournalSettings';
+import { JournalChannelSettings } from '@/components/settings/JournalChannelSettings';
 
 type SettingsSection =
   | 'menu'
@@ -13,7 +15,9 @@ type SettingsSection =
   | 'watchlists'
   | 'watchlist-tags'
   | 'notifications'
-  | 'feed-lists';
+  | 'feed-lists'
+  | 'journal-sections'
+  | 'journal-channels';
 
 interface SettingsPageProps {
   initialSection?: SettingsSection;
@@ -42,6 +46,14 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
 
   if (activeSection === 'feed-lists') {
     return <FeedListSettings onBack={() => setActiveSection('menu')} />;
+  }
+
+  if (activeSection === 'journal-sections') {
+    return <JournalSettings onBack={() => setActiveSection('menu')} />;
+  }
+
+  if (activeSection === 'journal-channels') {
+    return <JournalChannelSettings onBack={() => setActiveSection('menu')} />;
   }
 
   // Main menu
@@ -150,6 +162,43 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
           <div className="flex-1 min-w-0">
             <div className="font-medium">X.com Feed listy</div>
             <div className="text-sm text-muted-foreground">Seznamy X účtů pro AI přehled příspěvků</div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </button>
+      </div>
+
+      {/* Deník */}
+      <div className="space-y-1">
+        <h2 className="text-sm font-medium text-muted-foreground px-2 mb-2">Deník</h2>
+
+        <button
+          onClick={() => setActiveSection('journal-sections')}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
+        >
+          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+            <Layers className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">Vlastní sekce</div>
+            <div className="text-sm text-muted-foreground">
+              Sekce pro organizaci vlastních kanálů
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+        </button>
+
+        <button
+          onClick={() => setActiveSection('journal-channels')}
+          className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
+        >
+          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+            <BookOpen className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">Vlastní kanály</div>
+            <div className="text-sm text-muted-foreground">
+              Kanály pro osobní poznámky a zápisky
+            </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
         </button>

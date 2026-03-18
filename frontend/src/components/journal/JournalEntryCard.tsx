@@ -120,7 +120,7 @@ export function JournalEntryCard({
         <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Smazat záznam?</DialogTitle>
+              <DialogTitle>Smazat poznámku?</DialogTitle>
             </DialogHeader>
             <p className="text-sm text-muted-foreground">Tuto akci nelze vrátit.</p>
             <div className="flex justify-end gap-2 mt-2">

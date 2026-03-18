@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import {
   Dialog,
@@ -40,6 +41,7 @@ import {
   SymbolOverview,
   isTradingViewSupported,
 } from '@/components/shared/TradingViewWidgets';
+import { StockJournalTab } from './StockJournalTab';
 
 interface StockDetailProps {
   ticker: string;
@@ -326,16 +328,25 @@ export function StockDetail({
         </div>
       </div>
 
+      {/* Tabs */}
+      <Tabs defaultValue="prehled">
+        <TabsList className="mb-6">
+          <TabsTrigger value="prehled">Přehled</TabsTrigger>
+          <TabsTrigger value="poznamky">Poznámky</TabsTrigger>
+          <TabsTrigger value="insider">Insider obchody</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="prehled" className="space-y-6">
       {/* Notes */}
       {stock?.notes && (
-        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+        <p className="text-sm text-muted-foreground leading-relaxed">
           {stock.notes}
         </p>
       )}
 
       {/* Price Chart - only for supported exchanges */}
       {isTradingViewSupported(ticker, stock.exchange || undefined) && (
-        <div className="mb-8">
+        <div>
           <SymbolOverview
             symbol={ticker}
             exchange={stock.exchange || undefined}
@@ -346,7 +357,7 @@ export function StockDetail({
 
       {/* Position Stats */}
       {position && positionCzk && (
-        <div className="mb-8">
+        <div>
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
             Vaše pozice
           </h2>
@@ -415,13 +426,13 @@ export function StockDetail({
 
       {/* No position */}
       {!hasPosition && (
-        <div className="mb-8 py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+        <div className="py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
           Nemáte otevřenou pozici v této akcii
         </div>
       )}
 
       {/* Transactions */}
-      <div className="mb-6">
+      <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Transakce ({transactions.length})
@@ -690,8 +701,16 @@ export function StockDetail({
         )}
       </div>
 
-      {/* Insider Trades (US stocks only — hidden when empty) */}
-      <InsiderTrades ticker={ticker} />
+        </TabsContent>
+
+        <TabsContent value="poznamky">
+          <StockJournalTab ticker={ticker} />
+        </TabsContent>
+
+        <TabsContent value="insider">
+          <InsiderTrades ticker={ticker} />
+        </TabsContent>
+      </Tabs>
 
       {/* Transaction Edit Modal */}
       <TransactionModal

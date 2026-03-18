@@ -86,7 +86,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
           onClick={() => setShowForm((v) => !v)}
         >
           <Plus className="h-4 w-4" />
-          Záznam
+          Poznámka
         </Button>
       </div>
 
@@ -137,7 +137,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
 
         {!isLoading && entries.length === 0 && (
           <div className="py-12 text-center text-muted-foreground text-sm">
-            Žádné záznamy. Přidej první poznámku.
+            Žádné poznámky. Přidej první.
           </div>
         )}
 

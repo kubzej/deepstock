@@ -9,6 +9,7 @@ export interface JournalSection {
   name: string;
   color: string;
   sort_order: number;
+  is_system: boolean;
   created_at: string;
 }
 
@@ -152,7 +153,7 @@ export async function fetchJournalEntries(params: FetchEntriesParams): Promise<J
   const res = await fetch(`${API_URL}/api/journal/entries?${query}`, {
     headers: await getAuthHeader(),
   });
-  if (!res.ok) throw new Error('Chyba při načítání záznamů');
+  if (!res.ok) throw new Error('Chyba při načítání poznámek');
   return res.json();
 }
 
@@ -162,7 +163,7 @@ export async function createJournalEntry(data: EntryCreateData): Promise<Journal
     headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Chyba při přidávání záznamu');
+  if (!res.ok) throw new Error('Chyba při přidávání poznámky');
   return res.json();
 }
 
@@ -172,7 +173,7 @@ export async function updateJournalEntry(id: string, content: string): Promise<J
     headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   });
-  if (!res.ok) throw new Error('Chyba při úpravě záznamu');
+  if (!res.ok) throw new Error('Chyba při úpravě poznámky');
   return res.json();
 }
 
@@ -181,5 +182,5 @@ export async function deleteJournalEntry(id: string): Promise<void> {
     method: 'DELETE',
     headers: await getAuthHeader(),
   });
-  if (!res.ok) throw new Error('Chyba při mazání záznamu');
+  if (!res.ok) throw new Error('Chyba při mazání poznámky');
 }

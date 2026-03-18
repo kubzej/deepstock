@@ -23,15 +23,16 @@ function ChannelItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-2 py-1.5 rounded-md text-sm transition-colors ${
+      className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm transition-colors ${
         isActive
           ? 'bg-primary/10 text-primary font-medium'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
-      <span className="truncate">{channel.name}</span>
+      <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
+      <span className="truncate flex-1 text-left">{channel.name}</span>
       {channel.entry_count > 0 && (
-        <span className="text-xs text-muted-foreground ml-2 shrink-0">{channel.entry_count}</span>
+        <span className="text-xs text-muted-foreground ml-1 shrink-0">{channel.entry_count}</span>
       )}
     </button>
   );
@@ -52,7 +53,6 @@ function SidebarContent({
   activeChannelId: string | null;
   onSelect: (channel: JournalChannel) => void;
 }) {
-  const [stocksCollapsed, setStocksCollapsed] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   const stockChannels = channels
@@ -69,27 +69,31 @@ function SidebarContent({
     });
   };
 
-  return (
-    <div className="space-y-1 px-2">
-      {/* Akcie — fixed section */}
-      <div>
+  const renderSectionBlock = (section: JournalSection) => {
+    const isCollapsed = collapsedSections.has(section.id);
+    const sectionChannels = section.is_system
+      ? stockChannels
+      : customChannels.filter((c) => c.section_id === section.id);
+    const emptyLabel = section.is_system ? 'Žádné akcie' : 'Prázdná sekce';
+
+    return (
+      <div key={section.id}>
         <button
-          className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-muted transition-colors group"
-          onClick={() => setStocksCollapsed((v) => !v)}
+          className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
+          onClick={() => toggleSection(section.id)}
         >
-          <div className="flex items-center gap-2">
-            <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-sm font-semibold text-foreground">Akcie</span>
-          </div>
-          {stocksCollapsed ? (
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {section.name}
+          </span>
+          {isCollapsed ? (
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           ) : (
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           )}
         </button>
-        {!stocksCollapsed && (
+        {!isCollapsed && (
           <div className="space-y-0.5">
-            {stockChannels.map((ch) => (
+            {sectionChannels.map((ch) => (
               <ChannelItem
                 key={ch.id}
                 channel={ch}
@@ -97,75 +101,19 @@ function SidebarContent({
                 onClick={() => onSelect(ch)}
               />
             ))}
-            {stockChannels.length === 0 && (
-              <p className="px-3 py-1.5 text-xs text-muted-foreground/60">Žádné akcie</p>
+            {sectionChannels.length === 0 && (
+              <p className="px-3 py-1.5 text-xs text-muted-foreground/60">{emptyLabel}</p>
             )}
           </div>
         )}
       </div>
+    );
+  };
 
-      {/* Custom sections */}
-      {sections.map((section) => {
-        const sectionChannels = customChannels.filter((c) => c.section_id === section.id);
-        const isCollapsed = collapsedSections.has(section.id);
-        return (
-          <div key={section.id}>
-            <button
-              className="w-full flex items-center justify-between px-2 py-1.5 mt-2 rounded-md hover:bg-muted transition-colors"
-              onClick={() => toggleSection(section.id)}
-            >
-              <div className="flex items-center gap-2">
-                <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-sm font-semibold text-foreground">{section.name}</span>
-              </div>
-              {isCollapsed ? (
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
-            </button>
-            {!isCollapsed && (
-              <div className="space-y-0.5">
-                {sectionChannels.map((ch) => (
-                  <ChannelItem
-                    key={ch.id}
-                    channel={ch}
-                    isActive={ch.id === activeChannelId}
-                    onClick={() => onSelect(ch)}
-                  />
-                ))}
-                {sectionChannels.length === 0 && (
-                  <p className="px-3 py-1.5 text-xs text-muted-foreground/60">Prázdná sekce</p>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-
-      {/* Unsectioned custom channels */}
-      {(() => {
-        const unsectioned = customChannels.filter((c) => !c.section_id);
-        if (unsectioned.length === 0) return null;
-        return (
-          <div>
-            <div className="flex items-center gap-2 px-2 py-1.5 mt-2">
-              <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="text-sm font-semibold text-foreground">Ostatní</span>
-            </div>
-            <div className="space-y-0.5">
-              {unsectioned.map((ch) => (
-                <ChannelItem
-                  key={ch.id}
-                  channel={ch}
-                  isActive={ch.id === activeChannelId}
-                  onClick={() => onSelect(ch)}
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+  return (
+    <div className="space-y-1 px-2">
+      {/* All sections in sort_order — system section (Akcie) renders stock channels */}
+      {sections.map(renderSectionBlock)}
     </div>
   );
 }
