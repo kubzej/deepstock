@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Pencil, Trash2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from './RichTextEditor';
+import { RichTextContent } from './RichTextContent';
 import type { JournalEntry } from '@/lib/api/journal';
 
 interface JournalEntryCardProps {
@@ -60,7 +61,7 @@ export function JournalEntryCard({
   // ── note ──────────────────────────────────────────
   if (entry.type === 'note') {
     return (
-      <div className="py-4 border-b border-border last:border-0">
+      <div className="rounded-lg bg-muted/30 px-4 py-3">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
@@ -96,10 +97,10 @@ export function JournalEntryCard({
 
         {editing ? (
           <div className="space-y-2">
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[80px] text-sm"
+            <RichTextEditor
+              content={editContent}
+              onChange={setEditContent}
+              onSubmit={handleSaveEdit}
               autoFocus
             />
             <div className="flex gap-2">
@@ -112,7 +113,7 @@ export function JournalEntryCard({
             </div>
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap">{entry.content}</p>
+          <RichTextContent html={entry.content} />
         )}
 
         {/* Delete confirm */}
@@ -144,6 +145,7 @@ export function JournalEntryCard({
   // ── ai_report ─────────────────────────────────────
   if (entry.type === 'ai_report') {
     const reportTypeLabel: Record<string, string> = {
+
       research: 'Průzkum akcie',
       technical: 'Technická analýza',
       full_analysis: 'Plná analýza',
@@ -153,7 +155,7 @@ export function JournalEntryCard({
       : 'AI přehled';
 
     return (
-      <div className="py-4 border-b border-border last:border-0">
+      <div className="rounded-lg bg-muted/30 px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
@@ -228,7 +230,7 @@ export function JournalEntryCard({
   // ── ext_ref ───────────────────────────────────────
   if (entry.type === 'ext_ref') {
     return (
-      <div className="py-4 border-b border-border last:border-0">
+      <div className="rounded-lg bg-muted/30 px-4 py-3">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>

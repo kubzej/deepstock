@@ -187,48 +187,56 @@ export function JournalPage() {
       <div className="md:hidden">
         {activeChannel ? (
           /* Obrazovka 2: feed */
-          <div className="px-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
-              onClick={() => setActiveChannel(null)}
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Zpět
-            </Button>
-            <JournalFeed channel={activeChannel} />
+          <div>
+            <div className="sticky top-0 bg-background z-10 px-4 pt-2 pb-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2 text-muted-foreground hover:text-foreground"
+                onClick={() => setActiveChannel(null)}
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Zpět
+              </Button>
+            </div>
+            <div className="px-4">
+              <JournalFeed channel={activeChannel} />
+            </div>
           </div>
         ) : (
           /* Obrazovka 1: seznam kanálů */
-          <div className="px-4">
-            <PageHeader title="Deník" />
+          <div>
+            <div className="sticky top-0 bg-background z-10 px-4 pt-2">
+              <PageHeader title="Deník" />
+            </div>
             {channelsLoading ? (
               <div className="space-y-2">
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : (
-              <SidebarContent
-                channels={channels}
-                sections={sections}
-                activeChannelId={null}
-                onSelect={setActiveChannel}
-              />
+              <div className="px-4">
+                <SidebarContent
+                  channels={channels}
+                  sections={sections}
+                  activeChannelId={null}
+                  onSelect={setActiveChannel}
+                />
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Desktop layout */}
-      <div className="hidden md:flex flex-col" style={{ height: 'calc(100vh - 48px)' }}>
+      {/* Desktop layout — fixed height, internal scroll only */}
+      <div className="hidden md:flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 48px)' }}>
         {/* Shared header */}
         <div className="px-6 pt-4 shrink-0">
           <PageHeader title="Deník" />
         </div>
 
-        {/* Two-column body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar */}
+        {/* Two-column body — takes remaining height */}
+        <div className="flex min-h-0 flex-1">
+          {/* Sidebar — scrolls independently */}
           <aside className="w-56 shrink-0 overflow-y-auto pt-2 pb-4">
             {channelsLoading ? (
               <div className="space-y-2 px-3">
@@ -244,8 +252,8 @@ export function JournalPage() {
             )}
           </aside>
 
-          {/* Feed */}
-          <main className="flex-1 overflow-hidden flex flex-col px-6 pt-2 pb-4">
+          {/* Feed — scrolls independently */}
+          <main className="flex-1 min-w-0 flex flex-col overflow-hidden px-6 pt-2 pb-4">
             {activeChannel ? (
               <JournalFeed channel={activeChannel} />
             ) : (

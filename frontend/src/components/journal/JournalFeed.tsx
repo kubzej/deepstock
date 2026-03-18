@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JournalEntryCard } from './JournalEntryCard';
+import { RichTextEditor } from './RichTextEditor';
 import {
   useJournalEntries,
   useCreateJournalEntry,
@@ -19,6 +19,7 @@ interface JournalFeedProps {
 export function JournalFeed({ channel }: JournalFeedProps) {
   const [showForm, setShowForm] = useState(false);
   const [newContent, setNewContent] = useState('');
+  const [editorKey, setEditorKey] = useState(0);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -49,22 +50,21 @@ export function JournalFeed({ channel }: JournalFeedProps) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const isEmptyHtml = (html: string) => {
+    const text = html.replace(/<[^>]*>/g, '').trim();
+    return text === '';
+  };
+
   const handleSubmit = async () => {
-    if (!newContent.trim()) return;
+    if (isEmptyHtml(newContent)) return;
     await createEntry.mutateAsync({
       channel_id: channel.id,
       type: 'note',
-      content: newContent.trim(),
+      content: newContent,
     });
     setNewContent('');
+    setEditorKey((k) => k + 1); // reset editor
     setShowForm(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSubmit();
-    }
   };
 
   const entries = data?.pages.flatMap((p) => p) ?? [];
@@ -93,19 +93,18 @@ export function JournalFeed({ channel }: JournalFeedProps) {
       {/* New entry form */}
       {showForm && (
         <div className="mb-4 space-y-2 shrink-0">
-          <Textarea
+          <RichTextEditor
+            key={editorKey}
             placeholder="Napiš poznámku… (Cmd+Enter pro odeslání)"
-            value={newContent}
-            onChange={(e) => setNewContent(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="min-h-[100px] text-sm"
+            onChange={setNewContent}
+            onSubmit={handleSubmit}
             autoFocus
           />
           <div className="flex gap-2">
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={createEntry.isPending || !newContent.trim()}
+              disabled={createEntry.isPending || isEmptyHtml(newContent)}
             >
               {createEntry.isPending ? (
                 <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Ukládám...</>
@@ -114,7 +113,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { setShowForm(false); setNewContent(''); }}
+              onClick={() => { setShowForm(false); setNewContent(''); setEditorKey((k) => k + 1); }}
             >
               Zrušit
             </Button>
@@ -142,6 +141,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
           </div>
         )}
 
+        <div className="space-y-2">
         {entries.map((entry) => (
           <JournalEntryCard
             key={entry.id}
@@ -152,6 +152,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
             isUpdating={updateEntry.isPending}
           />
         ))}
+        </div>
 
         {/* Infinite scroll trigger */}
         <div ref={loadMoreRef} className="py-2">
