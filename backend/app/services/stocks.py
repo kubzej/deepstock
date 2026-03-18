@@ -171,7 +171,7 @@ class StockService:
         response = supabase.table("stocks") \
             .insert({
                 "ticker": ticker.upper(),
-                "name": name or ticker.upper(),
+                "name": name or None,
             }) \
             .execute()
         stock = response.data[0]
