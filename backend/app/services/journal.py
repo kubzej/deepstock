@@ -2,9 +2,11 @@
 Journal Service - channels, sections, and entries for the personal journal
 """
 import logging
+import re
 from typing import List, Optional
 from pydantic import BaseModel
 from app.core.supabase import supabase
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -257,8 +259,30 @@ class JournalService:
         return response.data[0] if response.data else None
 
     async def delete_entry(self, entry_id: str) -> bool:
+        # Fetch entry first to clean up storage images
+        entry = supabase.table("journal_entries").select("content").eq("id", entry_id).execute()
+        if entry.data:
+            self._delete_storage_images(entry.data[0].get("content", ""))
         supabase.table("journal_entries").delete().eq("id", entry_id).execute()
         return True
+
+    def _delete_storage_images(self, html: str) -> None:
+        """Remove Supabase Storage images referenced in entry HTML."""
+        if not html:
+            return
+        settings = get_settings()
+        # Match src="..." from img tags pointing to our Supabase storage
+        storage_prefix = f"{settings.supabase_url}/storage/v1/object/public/journal/"
+        paths = []
+        for src in re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html):
+            if src.startswith(storage_prefix):
+                path = src[len(storage_prefix):]
+                paths.append(path)
+        if paths:
+            try:
+                supabase.storage.from_("journal").remove(paths)
+            except Exception as e:
+                logger.warning(f"Failed to delete storage images: {e}")
 
 
 journal_service = JournalService()

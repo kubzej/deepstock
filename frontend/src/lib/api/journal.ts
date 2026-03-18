@@ -40,6 +40,11 @@ export interface JournalEntry {
     model?: string;
     url?: string;
     label?: string;
+    og_title?: string;
+    og_description?: string;
+    og_image?: string;
+    discord_content?: string;
+    discord_author?: string;
   };
   created_at: string;
   updated_at: string | null;
@@ -177,6 +182,37 @@ export async function updateJournalEntry(id: string, content: string): Promise<J
   return res.json();
 }
 
+export async function uploadJournalImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_URL}/api/journal/upload-image`, {
+    method: 'POST',
+    headers: await getAuthHeader(),
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail ?? 'Chyba při nahrávání obrázku');
+  }
+  const data = await res.json();
+  return data.url;
+}
+
+export interface UrlPreview {
+  title: string;
+  description: string;
+  image: string;
+}
+
+export async function fetchUrlPreview(url: string): Promise<UrlPreview> {
+  const res = await fetch(
+    `${API_URL}/api/journal/url-preview?url=${encodeURIComponent(url)}`,
+    { headers: await getAuthHeader() }
+  );
+  if (!res.ok) throw new Error('Nepodařilo se načíst preview');
+  return res.json();
+}
+
 export async function deleteJournalEntry(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/journal/entries/${id}`, {
     method: 'DELETE',
@@ -184,3 +220,4 @@ export async function deleteJournalEntry(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error('Chyba při mazání poznámky');
 }
+

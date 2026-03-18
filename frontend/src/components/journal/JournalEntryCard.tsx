@@ -155,8 +155,12 @@ export function JournalEntryCard({
       : 'AI přehled';
 
     return (
-      <div className="rounded-lg bg-muted/30 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="rounded-lg bg-muted/30 overflow-hidden">
+        {/* Clickable header */}
+        <div
+          className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer select-none"
+          onClick={() => setReportExpanded(v => !v)}
+        >
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
               AI
@@ -168,20 +172,12 @@ export function JournalEntryCard({
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={() => setReportExpanded(v => !v)}
-            >
-              {reportExpanded ? 'Skrýt' : 'Zobrazit'}
-              <ChevronDown className={`h-3 w-3 transition-transform ${reportExpanded ? 'rotate-180' : ''}`} />
-            </Button>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${reportExpanded ? 'rotate-180' : ''}`} />
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmDelete(true)}
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
               disabled={isDeleting}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -189,9 +185,9 @@ export function JournalEntryCard({
           </div>
         </div>
 
-        {/* Inline expanded report */}
+        {/* Expanded report */}
         {reportExpanded && (
-          <div className="mt-3">
+          <div className="px-4 pb-3">
             <MarkdownReport content={entry.content} />
           </div>
         )}
@@ -226,11 +222,23 @@ export function JournalEntryCard({
   if (entry.type === 'ext_ref') {
     return (
       <div className="rounded-lg bg-muted/30 px-4 py-3">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
+        {/* Header: date + actions */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
+            {entry.updated_at && (
+              <span className="text-xs text-muted-foreground/60">(upraveno)</span>
+            )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => { setEditing(true); setEditContent(entry.content); }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -243,19 +251,66 @@ export function JournalEntryCard({
           </div>
         </div>
 
+        {/* Link — always at top */}
         {entry.metadata.url && (
           <a
             href={entry.metadata.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline mb-1"
+            className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline mb-3"
           >
             <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            {entry.metadata.label || entry.metadata.url}
+            {entry.metadata.label || entry.metadata.og_title || entry.metadata.url}
           </a>
         )}
-        {entry.content && (
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{entry.content}</p>
+
+        {/* OG preview image + description */}
+        {(entry.metadata.og_image || entry.metadata.og_description) && (
+          <div className="rounded-md border border-border overflow-hidden mb-3">
+            {entry.metadata.og_image && (
+              <img src={entry.metadata.og_image} alt="" className="w-full h-32 object-cover" />
+            )}
+            {entry.metadata.og_description && (
+              <p className="px-3 py-2 text-xs text-muted-foreground line-clamp-2">
+                {entry.metadata.og_description}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Quoted message (manual or Twitter text) */}
+        {entry.metadata.discord_content && (
+          <blockquote className="mb-3 pl-3 border-l-2 border-muted-foreground/30 text-sm text-muted-foreground whitespace-pre-wrap italic">
+            {entry.metadata.discord_author && (
+              <span className="block text-xs font-medium not-italic mb-0.5">{entry.metadata.discord_author}</span>
+            )}
+            {entry.metadata.discord_content}
+          </blockquote>
+        )}
+
+        {editing ? (
+          <div className="space-y-2">
+            <textarea
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+              rows={3}
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="Komentář (volitelné)…"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveEdit} disabled={isUpdating}>
+                {isUpdating ? 'Ukládám...' : 'Uložit'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                Zrušit
+              </Button>
+            </div>
+          </div>
+        ) : (
+          entry.content && (
+            <p className="text-sm whitespace-pre-wrap">{entry.content}</p>
+          )
         )}
 
         {/* Delete confirm */}
