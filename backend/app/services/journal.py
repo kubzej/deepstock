@@ -3,6 +3,7 @@ Journal Service - channels, sections, and entries for the personal journal
 """
 import logging
 import re
+from datetime import datetime, date
 from typing import List, Optional
 from pydantic import BaseModel
 from app.core.supabase import supabase
@@ -283,6 +284,151 @@ class JournalService:
                 supabase.storage.from_("journal").remove(paths)
             except Exception as e:
                 logger.warning(f"Failed to delete storage images: {e}")
+
+
+    # ------------------------------------------
+    # Transaction / Option journal entries
+    # ------------------------------------------
+
+    async def create_transaction_journal_entry(
+        self,
+        ticker: str,
+        transaction_id: str,
+        portfolio_id: str,
+        action: str,
+        shares: float,
+        price: float,
+        currency: str,
+        fees: float,
+        notes: Optional[str],
+        executed_at: datetime,
+    ) -> None:
+        """Create a journal entry for a stock transaction. Fire-and-forget safe."""
+        try:
+            channel = await self.get_channel_by_ticker(ticker)
+            if not channel:
+                return
+            supabase.table("journal_entries").insert({
+                "channel_id": channel["id"],
+                "type": "transaction",
+                "content": notes or "",
+                "metadata": {
+                    "action": action,
+                    "shares": shares,
+                    "price": price,
+                    "currency": currency,
+                    "fees": fees,
+                    "ticker": ticker.upper(),
+                    "portfolio_id": portfolio_id,
+                },
+                "linked_transaction_id": transaction_id,
+                "created_at": executed_at.isoformat(),
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Failed to create transaction journal entry ({ticker} {transaction_id}): {e}")
+
+    async def update_transaction_journal_entry(
+        self,
+        transaction_id: str,
+        notes: Optional[str],
+        shares: float,
+        price: float,
+        currency: str,
+        fees: float,
+    ) -> None:
+        """Update journal entry linked to a stock transaction."""
+        try:
+            existing = supabase.table("journal_entries") \
+                .select("id, metadata") \
+                .eq("linked_transaction_id", transaction_id) \
+                .execute()
+            if not existing.data:
+                return
+            entry = existing.data[0]
+            new_metadata = {
+                **entry["metadata"],
+                "shares": shares,
+                "price": price,
+                "currency": currency,
+                "fees": fees,
+            }
+            supabase.table("journal_entries") \
+                .update({"content": notes or "", "metadata": new_metadata}) \
+                .eq("id", entry["id"]) \
+                .execute()
+        except Exception as e:
+            logger.warning(f"Failed to update transaction journal entry ({transaction_id}): {e}")
+
+    async def create_option_journal_entry(
+        self,
+        ticker: str,
+        option_transaction_id: str,
+        portfolio_id: str,
+        action: str,
+        option_type: str,
+        strike: float,
+        expiration: date,
+        contracts: int,
+        premium: Optional[float],
+        option_symbol: str,
+        notes: Optional[str],
+        created_at: datetime,
+    ) -> None:
+        """Create a journal entry for an option transaction. Fire-and-forget safe."""
+        try:
+            channel = await self.get_channel_by_ticker(ticker)
+            if not channel:
+                return
+            supabase.table("journal_entries").insert({
+                "channel_id": channel["id"],
+                "type": "option_trade",
+                "content": notes or "",
+                "metadata": {
+                    "action": action,
+                    "option_type": option_type,
+                    "strike": strike,
+                    "expiration": expiration.isoformat() if hasattr(expiration, "isoformat") else str(expiration),
+                    "contracts": contracts,
+                    "premium": premium,
+                    "option_symbol": option_symbol,
+                    "ticker": ticker.upper(),
+                    "portfolio_id": portfolio_id,
+                },
+                "linked_option_transaction_id": option_transaction_id,
+                "created_at": created_at.isoformat(),
+            }).execute()
+        except Exception as e:
+            logger.warning(f"Failed to create option journal entry ({ticker} {option_transaction_id}): {e}")
+
+    async def update_option_journal_entry(
+        self,
+        option_transaction_id: str,
+        notes: Optional[str],
+        action: str,
+        contracts: int,
+        premium: Optional[float],
+    ) -> None:
+        """Update journal entry linked to an option transaction."""
+        try:
+            existing = supabase.table("journal_entries") \
+                .select("id, metadata") \
+                .eq("linked_option_transaction_id", option_transaction_id) \
+                .execute()
+            if not existing.data:
+                return
+            entry = existing.data[0]
+            new_metadata = {
+                **entry["metadata"],
+                "action": action,
+                "contracts": contracts,
+                "premium": premium,
+            }
+            supabase.table("journal_entries") \
+                .update({"content": notes or "", "metadata": new_metadata}) \
+                .eq("id", entry["id"]) \
+                .execute()
+        except Exception as e:
+            logger.warning(f"Failed to update option journal entry ({option_transaction_id}): {e}")
 
 
 journal_service = JournalService()

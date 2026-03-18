@@ -23,7 +23,7 @@ function ChannelItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-sm transition-colors ${
+      className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[13px] transition-colors ${
         isActive
           ? 'bg-muted text-foreground font-medium'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -81,7 +81,7 @@ function SidebarContent({
           className="w-full flex items-center justify-between px-2 py-0.5 group transition-colors"
           onClick={() => toggleSection(section.id)}
         >
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
+          <span className="text-xs font-semibold uppercase tracking-widest text-foreground/70 group-hover:text-foreground transition-colors">
             {section.name}
           </span>
           {isCollapsed

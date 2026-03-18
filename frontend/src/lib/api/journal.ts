@@ -26,7 +26,27 @@ export interface JournalChannel {
   stock_name: string | null;
 }
 
-export type JournalEntryType = 'note' | 'ai_report' | 'ext_ref';
+export type JournalEntryType = 'note' | 'ai_report' | 'ext_ref' | 'transaction' | 'option_trade';
+
+export interface TransactionEntryMetadata {
+  action: 'BUY' | 'SELL';
+  shares: number;
+  price: number;
+  currency: string;
+  fees: number;
+  ticker: string;
+}
+
+export interface OptionTradeEntryMetadata {
+  action: 'BTO' | 'STC' | 'STO' | 'BTC' | 'EXPIRATION' | 'ASSIGNMENT' | 'EXERCISE';
+  option_type: 'call' | 'put';
+  strike: number;
+  expiration: string;
+  contracts: number;
+  premium: number | null;
+  option_symbol: string;
+  ticker: string;
+}
 
 export interface JournalEntry {
   id: string;
@@ -34,10 +54,13 @@ export interface JournalEntry {
   type: JournalEntryType;
   content: string;
   metadata: {
+    // note
     price_at_creation?: number;
+    // ai_report
     report_type?: 'research' | 'technical' | 'full_analysis';
     ticker?: string;
     model?: string;
+    // ext_ref
     url?: string;
     label?: string;
     og_title?: string;
@@ -45,6 +68,21 @@ export interface JournalEntry {
     og_image?: string;
     discord_content?: string;
     discord_author?: string;
+    // transaction / option_trade shared
+    action?: string;
+    portfolio_id?: string;
+    // transaction
+    shares?: number;
+    price?: number;
+    currency?: string;
+    fees?: number;
+    // option_trade
+    option_type?: 'call' | 'put';
+    strike?: number;
+    expiration?: string;
+    contracts?: number;
+    premium?: number | null;
+    option_symbol?: string;
   };
   created_at: string;
   updated_at: string | null;

@@ -1,8 +1,11 @@
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot
 from app.services.performance import get_stock_performance, get_options_performance
+from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from typing import List, Optional
+from datetime import datetime
 
 router = APIRouter()
 
@@ -94,7 +97,21 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate):
     Automatically updates holdings with FIFO cost basis.
     For SELL: use source_transaction_id to sell from a specific lot.
     """
-    return await portfolio_service.add_transaction(portfolio_id, data)
+    tx = await portfolio_service.add_transaction(portfolio_id, data)
+    executed_at = datetime.fromisoformat(tx["executed_at"]) if isinstance(tx["executed_at"], str) else tx["executed_at"]
+    asyncio.create_task(journal_service.create_transaction_journal_entry(
+        ticker=data.stock_ticker,
+        transaction_id=tx["id"],
+        portfolio_id=portfolio_id,
+        action=tx["type"],
+        shares=tx["shares"],
+        price=tx["price_per_share"],
+        currency=tx["currency"],
+        fees=tx.get("fees") or 0,
+        notes=data.notes,
+        executed_at=executed_at,
+    ))
+    return tx
 
 
 @router.get("/{portfolio_id}/open-lots")
@@ -138,6 +155,14 @@ async def update_transaction(
         result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
         if not result:
             raise HTTPException(status_code=404, detail="Transakce nenalezena")
+        asyncio.create_task(journal_service.update_transaction_journal_entry(
+            transaction_id=transaction_id,
+            notes=result.get("notes"),
+            shares=result["shares"],
+            price=result["price_per_share"],
+            currency=result["currency"],
+            fees=result.get("fees") or 0,
+        ))
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

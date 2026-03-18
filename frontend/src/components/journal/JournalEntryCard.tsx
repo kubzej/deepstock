@@ -6,6 +6,7 @@ import { RichTextEditor } from './RichTextEditor';
 import { RichTextContent } from './RichTextContent';
 import type { JournalEntry } from '@/lib/api/journal';
 import { MarkdownReport } from '@/components/shared/AIReportComponents';
+import { usePortfolio } from '@/contexts/PortfolioContext';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -22,6 +23,14 @@ function formatDate(iso: string) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  }).format(new Date(iso));
+}
+
+function formatDateOnly(iso: string) {
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
   }).format(new Date(iso));
 }
 
@@ -44,6 +53,10 @@ export function JournalEntryCard({
   const [editContent, setEditContent] = useState(entry.content);
   const [reportExpanded, setReportExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { portfolios } = usePortfolio();
+  const portfolioName = entry.metadata.portfolio_id
+    ? (portfolios.find(p => p.id === entry.metadata.portfolio_id)?.name ?? null)
+    : null;
 
   const handleSaveEdit = () => {
     if (editContent.trim() === entry.content.trim()) {
@@ -332,6 +345,139 @@ export function JournalEntryCard({
               >
                 Smazat
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ── transaction ───────────────────────────────────
+  if (entry.type === 'transaction') {
+    const isBuy = entry.metadata.action === 'BUY';
+    const shares = entry.metadata.shares ?? 0;
+    const price = entry.metadata.price ?? 0;
+    const fees = entry.metadata.fees ?? 0;
+    const currency = entry.metadata.currency ?? 'USD';
+
+    return (
+      <div className="rounded-lg bg-muted/30 px-4 py-3 group">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className={`text-xs font-semibold tracking-widest uppercase ${isBuy ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {isBuy ? 'Nákup' : 'Prodej'}
+              </span>
+              <span className="text-sm font-semibold">{entry.metadata.ticker}</span>
+              <span className="text-sm font-mono">
+                {shares} ks × {formatPrice(price)}{currency !== 'USD' ? ` ${currency}` : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-muted-foreground">{formatDateOnly(entry.created_at)}</span>
+              {portfolioName && (
+                <>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/60">{portfolioName}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+            onClick={() => setConfirmDelete(true)}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        {entry.content && (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2 pt-2 border-t border-border/40">
+            {entry.content}
+          </p>
+        )}
+
+        <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Smazat záznam transakce?</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">Tuto akci nelze vrátit.</p>
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+              <Button variant="destructive" size="sm" disabled={isDeleting}
+                onClick={() => { setConfirmDelete(false); onDelete(entry.id); }}>Smazat</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ── option_trade ──────────────────────────────────
+  if (entry.type === 'option_trade') {
+    const action = entry.metadata.action ?? '';
+    const contracts = entry.metadata.contracts ?? 0;
+    const premium = entry.metadata.premium;
+    const strike = entry.metadata.strike ?? 0;
+    const expiration = entry.metadata.expiration
+      ? new Date(entry.metadata.expiration).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
+      : '';
+
+    return (
+      <div className="rounded-lg bg-muted/30 px-4 py-3 group">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
+                {action}
+              </span>
+              <span className="text-sm font-semibold">{entry.metadata.ticker}</span>
+              <span className="text-xs font-mono text-muted-foreground uppercase">
+                {entry.metadata.option_type}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="text-xs font-mono text-muted-foreground">
+                ${strike} · exp {expiration} · {contracts} kontr.{premium != null ? ` @ ${formatPrice(premium)}` : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-muted-foreground">{formatDateOnly(entry.created_at)}</span>
+              {portfolioName && (
+                <>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/60">{portfolioName}</span>
+                </>
+              )}
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+            onClick={() => setConfirmDelete(true)}
+            disabled={isDeleting}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        {entry.content && (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-2 pt-2 border-t border-border/40">
+            {entry.content}
+          </p>
+        )}
+
+        <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle>Smazat záznam opce?</DialogTitle></DialogHeader>
+            <p className="text-sm text-muted-foreground">Tuto akci nelze vrátit.</p>
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>Zrušit</Button>
+              <Button variant="destructive" size="sm" disabled={isDeleting}
+                onClick={() => { setConfirmDelete(false); onDelete(entry.id); }}>Smazat</Button>
             </div>
           </DialogContent>
         </Dialog>
