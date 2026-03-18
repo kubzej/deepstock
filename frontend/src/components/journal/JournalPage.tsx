@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, ArrowLeft, Hash } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -23,16 +23,15 @@ function ChannelItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm transition-colors ${
+      className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-sm transition-colors ${
         isActive
-          ? 'bg-primary/10 text-primary font-medium'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          ? 'bg-muted text-foreground font-medium'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
       }`}
     >
-      <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
       <span className="truncate flex-1 text-left">{channel.name}</span>
       {channel.entry_count > 0 && (
-        <span className="text-xs text-muted-foreground ml-1 shrink-0">{channel.entry_count}</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground/60 shrink-0">{channel.entry_count}</span>
       )}
     </button>
   );
@@ -79,20 +78,19 @@ function SidebarContent({
     return (
       <div key={section.id}>
         <button
-          className="w-full flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
+          className="w-full flex items-center justify-between px-2 py-0.5 group transition-colors"
           onClick={() => toggleSection(section.id)}
         >
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground transition-colors">
             {section.name}
           </span>
-          {isCollapsed ? (
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
+          {isCollapsed
+            ? <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
+            : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+          }
         </button>
         {!isCollapsed && (
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 mt-0.5">
             {sectionChannels.map((ch) => (
               <ChannelItem
                 key={ch.id}
@@ -102,7 +100,7 @@ function SidebarContent({
               />
             ))}
             {sectionChannels.length === 0 && (
-              <p className="px-3 py-1.5 text-xs text-muted-foreground/60">{emptyLabel}</p>
+              <p className="px-2 py-1 text-xs text-muted-foreground/40">{emptyLabel}</p>
             )}
           </div>
         )}
@@ -111,8 +109,7 @@ function SidebarContent({
   };
 
   return (
-    <div className="space-y-1 px-2">
-      {/* All sections in sort_order — system section (Akcie) renders stock channels */}
+    <div className="space-y-3 px-2">
       {sections.map(renderSectionBlock)}
     </div>
   );
