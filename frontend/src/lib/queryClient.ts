@@ -41,6 +41,10 @@ export const STALE_TIMES = {
   technicalIndicators: 5 * 60 * 1000, // 5 minutes
   insiderTrades: 30 * 60 * 1000,    // 30 minutes (cached 12h on backend)
   fearGreed: 30 * 60 * 1000,        // 30 minutes (cached 30min on backend)
+
+  // Journal - user data, only invalidate on CRUD
+  journalChannels: Infinity,
+  journalEntries: Infinity,
 } as const;
 
 /**
@@ -138,4 +142,10 @@ export const queryKeys = {
 
   // Market sentiment
   fearGreed: () => ['fearGreed'] as const,
+
+  // Journal
+  journalChannels: () => ['journalChannels'] as const,
+  journalSections: () => ['journalSections'] as const,
+  journalEntries: (channelId: string) => ['journalEntries', channelId] as const,
+  journalEntriesByTicker: (ticker: string) => ['journalEntriesByTicker', ticker] as const,
 } as const;

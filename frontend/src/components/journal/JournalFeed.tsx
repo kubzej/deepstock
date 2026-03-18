@@ -1,0 +1,206 @@
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { JournalEntryCard } from './JournalEntryCard';
+import { RichTextEditor } from './RichTextEditor';
+import {
+  useJournalEntries,
+  useCreateJournalEntry,
+  useUpdateJournalEntry,
+  useDeleteJournalEntry,
+} from '@/hooks/useJournal';
+import { fetchUrlPreview } from '@/lib/api/journal';
+import type { JournalChannel, UrlPreview } from '@/lib/api/journal';
+
+interface JournalFeedProps {
+  channel: JournalChannel;
+}
+
+export function JournalFeed({ channel }: JournalFeedProps) {
+  const [showForm, setShowForm] = useState(false);
+  const [content, setContent] = useState('');
+  const [editorKey, setEditorKey] = useState(0);
+  const [url, setUrl] = useState('');
+  const [urlPreview, setUrlPreview] = useState<UrlPreview | null>(null);
+  const [isFetchingPreview, setIsFetchingPreview] = useState(false);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useJournalEntries(channel.id);
+  const createEntry = useCreateJournalEntry(channel.id);
+  const updateEntry = useUpdateJournalEntry(channel.id);
+  const deleteEntry = useDeleteJournalEntry(channel.id);
+
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const isEmptyHtml = (html: string) => html.replace(/<[^>]*>/g, '').trim() === '';
+
+  const resetForm = () => {
+    setContent('');
+    setEditorKey((k) => k + 1);
+    setUrl('');
+    setUrlPreview(null);
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    setShowForm(false);
+  };
+
+  const handleUrlChange = (val: string) => {
+    setUrl(val);
+    setUrlPreview(null);
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    const trimmed = val.trim();
+    if (!trimmed.startsWith('http')) return;
+    if (trimmed.includes('discord.com')) return;
+    previewTimerRef.current = setTimeout(async () => {
+      setIsFetchingPreview(true);
+      try {
+        const preview = await fetchUrlPreview(trimmed);
+        if (preview.title || preview.description) setUrlPreview(preview);
+      } catch { /* ignore */ }
+      finally { setIsFetchingPreview(false); }
+    }, 800);
+  };
+
+  const handleSubmit = async () => {
+    const trimmedUrl = url.trim();
+    if (trimmedUrl) {
+      await createEntry.mutateAsync({
+        channel_id: channel.id,
+        type: 'ext_ref',
+        content,
+        metadata: {
+          url: trimmedUrl,
+          og_title: urlPreview?.title || undefined,
+          og_description: urlPreview?.description || undefined,
+          og_image: urlPreview?.image || undefined,
+        },
+      });
+    } else {
+      if (isEmptyHtml(content)) return;
+      await createEntry.mutateAsync({ channel_id: channel.id, type: 'note', content });
+    }
+    resetForm();
+  };
+
+  const canSubmit = url.trim() ? true : !isEmptyHtml(content);
+  const entries = data?.pages.flatMap((p) => p) ?? [];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div>
+          <h2 className="text-lg font-semibold">{channel.stock_name ?? channel.name}</h2>
+          {channel.stock_name && (
+            <p className="text-sm text-muted-foreground font-mono">{channel.ticker}</p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={showForm ? 'secondary' : 'default'}
+          className="gap-1.5"
+          onClick={() => setShowForm((v) => !v)}
+        >
+          <Plus className="h-4 w-4" />
+          Přidat
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="mb-4 shrink-0 space-y-2">
+          <RichTextEditor
+            key={editorKey}
+            placeholder="Napiš poznámku… (Cmd+Enter pro odeslání)"
+            onChange={setContent}
+            onSubmit={handleSubmit}
+            autoFocus
+          />
+
+          {/* OG preview */}
+          {urlPreview && (urlPreview.title || urlPreview.description) && (
+            <div className="flex gap-3 px-3 py-2 rounded-md bg-muted/40 border border-border">
+              {urlPreview.image && (
+                <img src={urlPreview.image} alt="" className="w-10 h-10 object-cover rounded shrink-0" />
+              )}
+              <div className="min-w-0">
+                {urlPreview.title && <p className="text-sm font-medium truncate">{urlPreview.title}</p>}
+                {urlPreview.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-1">{urlPreview.description}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1">
+              <Input
+                placeholder="URL odkazu (volitelné)"
+                value={url}
+                onChange={(e) => handleUrlChange(e.target.value)}
+              />
+              {isFetchingPreview && (
+                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            <Button size="sm" onClick={handleSubmit} disabled={createEntry.isPending || !canSubmit || isFetchingPreview}>
+              {createEntry.isPending ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Ukládám...</> : 'Přidat'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={resetForm}>Zrušit</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Entries */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="py-4 border-b border-border">
+                <Skeleton className="h-3 w-32 mb-2" />
+                <Skeleton className="h-4 w-full mb-1" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && entries.length === 0 && (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            Žádné záznamy. Přidej první.
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <JournalEntryCard
+              key={entry.id}
+              entry={entry}
+              onDelete={(id) => deleteEntry.mutate(id)}
+              onUpdate={(id, content) => updateEntry.mutate({ id, content })}
+              isDeleting={deleteEntry.isPending}
+              isUpdating={updateEntry.isPending}
+            />
+          ))}
+        </div>
+
+        <div ref={loadMoreRef} className="py-2">
+          {isFetchingNextPage && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

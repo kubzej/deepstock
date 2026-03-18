@@ -55,7 +55,13 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
   }
 
   const trades = data?.trades ?? [];
-  if (trades.length === 0) return null;
+  if (trades.length === 0) {
+    return (
+      <div className="py-12 text-center text-muted-foreground text-sm">
+        Žádné insider obchody za posledních 12 měsíců.
+      </div>
+    );
+  }
 
   // Summary stats
   const totalBuys = trades

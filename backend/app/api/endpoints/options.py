@@ -1,17 +1,19 @@
 """
 Options API Endpoints for DeepStock.
 """
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Query
 from app.services.options import (
-    options_service, 
-    OptionTransactionCreate, 
+    options_service,
+    OptionTransactionCreate,
     OptionTransactionUpdate,
     OptionPriceUpdate,
     OptionAction,
 )
+from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from typing import Optional, List
-from datetime import date
+from datetime import date, datetime
 
 router = APIRouter()
 
@@ -83,7 +85,7 @@ async def create_option_transaction(
 ):
     """
     Create a new option transaction.
-    
+
     Actions:
     - BTO: Buy to Open (create long position)
     - STC: Sell to Close (close long position)
@@ -93,7 +95,23 @@ async def create_option_transaction(
     - ASSIGNMENT: Short option was assigned
     - EXERCISE: Long option was exercised
     """
-    return await options_service.create_transaction(portfolio_id, data)
+    tx = await options_service.create_transaction(portfolio_id, data)
+    created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
+    asyncio.create_task(journal_service.create_option_journal_entry(
+        ticker=data.symbol,
+        option_transaction_id=tx["id"],
+        portfolio_id=portfolio_id,
+        action=tx["action"],
+        option_type=tx["option_type"],
+        strike=tx["strike_price"],
+        expiration=data.expiration_date,
+        contracts=tx["contracts"],
+        premium=tx.get("premium"),
+        option_symbol=tx["option_symbol"],
+        notes=data.notes,
+        created_at=created_at,
+    ))
+    return tx
 
 
 @router.put("/transactions/{transaction_id}")
@@ -106,6 +124,13 @@ async def update_option_transaction(
     result = await options_service.update_transaction(transaction_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    asyncio.create_task(journal_service.update_option_journal_entry(
+        option_transaction_id=transaction_id,
+        notes=result.get("notes"),
+        action=result["action"],
+        contracts=result["contracts"],
+        premium=result.get("premium"),
+    ))
     return result
 
 

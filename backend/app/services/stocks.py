@@ -96,7 +96,7 @@ class StockService:
         existing = await self.get_by_ticker(data.ticker)
         if existing:
             raise ValueError(f"Stock with ticker {data.ticker} already exists")
-        
+
         response = supabase.table("stocks") \
             .insert({
                 "ticker": data.ticker.upper(),
@@ -109,7 +109,17 @@ class StockService:
                 "notes": data.notes,
             }) \
             .execute()
-        return response.data[0]
+        stock = response.data[0]
+
+        # Auto-create journal channel for this stock
+        try:
+            from app.services.journal import journal_service
+            await journal_service.get_or_create_stock_channel(stock["id"], stock["ticker"])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not create journal channel for {stock['ticker']}: {e}")
+
+        return stock
     
     async def update(self, stock_id: str, data: StockUpdate) -> Optional[dict]:
         """Update stock details."""
@@ -157,14 +167,24 @@ class StockService:
         existing = await self.get_by_ticker(ticker)
         if existing:
             return existing
-        
+
         response = supabase.table("stocks") \
             .insert({
                 "ticker": ticker.upper(),
-                "name": name or ticker.upper(),
+                "name": name or None,
             }) \
             .execute()
-        return response.data[0]
+        stock = response.data[0]
+
+        # Auto-create journal channel for this stock
+        try:
+            from app.services.journal import journal_service
+            await journal_service.get_or_create_stock_channel(stock["id"], stock["ticker"])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not create journal channel for {stock['ticker']}: {e}")
+
+        return stock
 
 
 stock_service = StockService()

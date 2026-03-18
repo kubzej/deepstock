@@ -21,6 +21,7 @@ import { ResearchPage } from '@/components/research';
 import { MarketPage } from '@/components/market';
 import { AlertsPage } from '@/components/alerts';
 import { FeedPage } from '@/components/feed/FeedPage';
+import { JournalPage } from '@/components/journal/JournalPage';
 import { deleteStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import {
@@ -196,6 +197,8 @@ function App() {
         return <FeedPage />;
       case 'research':
         return <ResearchPage />;
+      case 'journal':
+        return <JournalPage />;
       case 'watchlist':
         return (
           <WatchlistsPage

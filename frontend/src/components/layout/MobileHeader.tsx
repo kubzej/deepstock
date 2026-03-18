@@ -14,6 +14,7 @@ import {
   BarChart3,
   Bell,
   Rss,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,6 +53,7 @@ export function MobileHeader({
     { id: 'alerts', icon: Bell, label: 'Alerty' },
     { id: 'feed', icon: Rss, label: 'Feeds' },
     { id: 'research', icon: Search, label: 'Průzkum akcie' },
+    { id: 'journal', icon: BookOpen, label: 'Deník' },
     { id: 'settings', icon: Settings, label: 'Nastavení' },
   ];
 
