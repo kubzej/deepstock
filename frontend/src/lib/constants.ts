@@ -17,6 +17,7 @@ export const EXCHANGE_OPTIONS = [
   { value: 'HKEX', label: 'Hong Kong Exchanges (HK)' },
   { value: 'PSE', label: 'Philippine Stock Exchange (PH)' },
   { value: 'OMX-STO', label: 'Nasdaq Stockholm (SE)' },
+  { value: 'OSL', label: 'Oslo Børs (NO)' },
   { value: 'VIE', label: 'Vienna Stock Exchange (AT)' },
   { value: 'WSE', label: 'Warsaw Stock Exchange (PL)' },
   { value: 'PSE-PRA', label: 'Prague Stock Exchange (CZ)' },

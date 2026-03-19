@@ -14,6 +14,7 @@ import {
   Heading3,
   ImageIcon,
   Loader2,
+  TextQuote,
 } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import { uploadJournalImage } from '@/lib/api/journal';
@@ -163,6 +164,15 @@ export function RichTextEditor({
           className="h-7 w-7 p-0"
         >
           <ListOrdered className="h-3.5 w-3.5" />
+        </Toggle>
+        <Toggle
+          size="sm"
+          pressed={editor.isActive('blockquote')}
+          onPressedChange={() => editor.chain().focus().toggleBlockquote().run()}
+          aria-label="Citace"
+          className="h-7 w-7 p-0"
+        >
+          <TextQuote className="h-3.5 w-3.5" />
         </Toggle>
         <div className="w-px h-4 bg-border mx-1" />
         <button
