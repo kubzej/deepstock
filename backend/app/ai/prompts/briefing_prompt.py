@@ -100,7 +100,10 @@ Ne obecné trendy – konkrétní milníky, s daty nebo čísly.
 - Bull: 3 konkrétní katalyzátory, reálnost a časový horizont
 - Bear: 3 konkrétní rizika, pravděpodobnost a potenciální dopad
 - Peer context: Jak si firma vede vůči konkurenci? Je prémiové ocenění oprávněné?
-- Makro: Aktuální postoj Fedu a stav trhu (S&P 500) z vyhledávacích výsledků — jsou makro podmínky tailwind nebo headwind pro tento titul/sektor?
+- Makro a geopolitika: Fed, stav S&P 500, inflace z vyhledávacích výsledků. Dále geopolitické
+  události (konflikty, sankce, regulace) a sektorové/sezónní katalyzátory (komoditní cykly,
+  poptávkové špičky, energetická politika), které mohou ovlivnit titul v příštích 6–12 měsících.
+  Pokud nic relevantního nebylo nalezeno, konstatuj to.
 
 **8. Doporučení analytiků po posledních výsledcích**
 - Aktuální konsenzus (Buy/Hold/Sell) a průměrný price target

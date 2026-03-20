@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, ArrowLeft, Search, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { JournalFeed } from './JournalFeed';
 import { useJournalChannels, useJournalSections } from '@/hooks/useJournal';
@@ -23,7 +24,7 @@ function ChannelItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[13px] transition-colors ${
+      className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-md text-sm transition-colors min-h-[44px] ${
         isActive
           ? 'bg-muted text-foreground font-medium'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -31,7 +32,11 @@ function ChannelItem({
     >
       <span className="truncate flex-1 text-left">{channel.name}</span>
       {channel.entry_count > 0 && (
-        <span className="text-[11px] tabular-nums text-muted-foreground/60 shrink-0">{channel.entry_count}</span>
+        <span className={`text-xs tabular-nums shrink-0 px-1.5 py-0.5 rounded-full ${
+          isActive
+            ? 'bg-background/60 text-foreground'
+            : 'bg-muted text-muted-foreground'
+        }`}>{channel.entry_count}</span>
       )}
     </button>
   );
@@ -53,6 +58,7 @@ function SidebarContent({
   onSelect: (channel: JournalChannel) => void;
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
 
   const stockChannels = channels
     .filter((c) => c.type === 'stock')
@@ -70,27 +76,45 @@ function SidebarContent({
 
   const renderSectionBlock = (section: JournalSection) => {
     const isCollapsed = collapsedSections.has(section.id);
-    const sectionChannels = section.is_system
+    let sectionChannels = section.is_system
       ? stockChannels
       : customChannels.filter((c) => c.section_id === section.id);
-    const emptyLabel = section.is_system ? 'Žádné akcie' : 'Prázdná sekce';
+
+    if (section.is_system && search.trim()) {
+      sectionChannels = sectionChannels.filter((c) =>
+        c.name.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    const emptyLabel = section.is_system && search.trim()
+      ? 'Žádné výsledky'
+      : section.is_system
+        ? 'Žádné akcie'
+        : 'Prázdná sekce';
+
+    const totalEntries = sectionChannels.reduce((sum, c) => sum + c.entry_count, 0);
 
     return (
       <div key={section.id}>
         <button
-          className="w-full flex items-center justify-between px-2 py-0.5 group transition-colors"
+          className="w-full flex items-center justify-between px-2 py-2 group transition-colors"
           onClick={() => toggleSection(section.id)}
         >
-          <span className="text-xs font-semibold uppercase tracking-widest text-foreground/70 group-hover:text-foreground transition-colors">
-            {section.name}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-widest text-foreground/60 group-hover:text-foreground transition-colors">
+              {section.name}
+            </span>
+            {totalEntries > 0 && (
+              <span className="text-[10px] tabular-nums text-muted-foreground/40">{totalEntries}</span>
+            )}
+          </div>
           {isCollapsed
-            ? <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
-            : <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+            ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
+            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/30" />
           }
         </button>
         {!isCollapsed && (
-          <div className="space-y-0.5 mt-0.5">
+          <div className="space-y-0.5">
             {sectionChannels.map((ch) => (
               <ChannelItem
                 key={ch.id}
@@ -100,7 +124,7 @@ function SidebarContent({
               />
             ))}
             {sectionChannels.length === 0 && (
-              <p className="px-2 py-1 text-xs text-muted-foreground/40">{emptyLabel}</p>
+              <p className="px-3 py-2 text-xs text-muted-foreground/40">{emptyLabel}</p>
             )}
           </div>
         )}
@@ -109,7 +133,26 @@ function SidebarContent({
   };
 
   return (
-    <div className="space-y-3 px-2">
+    <div className="space-y-1 px-2">
+      {stockChannels.length > 4 && (
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Hledat ticker..."
+            className="h-9 pl-8 pr-8 text-sm bg-muted/40 border-muted focus-visible:ring-1"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
       {sections.map(renderSectionBlock)}
     </div>
   );
@@ -155,11 +198,11 @@ export function JournalPage() {
               <PageHeader title="Deník" />
             </div>
             {channelsLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+              <div className="space-y-1 px-4">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
             ) : (
-              <div className="px-4">
+              <div className="px-4 pt-2">
                 <SidebarContent
                   channels={channels}
                   sections={sections}
@@ -184,8 +227,8 @@ export function JournalPage() {
           {/* Sidebar — scrolls independently */}
           <aside className="w-56 shrink-0 overflow-y-auto pt-2 pb-4">
             {channelsLoading ? (
-              <div className="space-y-2 px-3">
-                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+              <div className="space-y-1 px-4">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
             ) : (
               <SidebarContent

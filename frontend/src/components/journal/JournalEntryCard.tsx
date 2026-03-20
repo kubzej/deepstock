@@ -237,10 +237,15 @@ export function JournalEntryCard({
       <div className="rounded-lg bg-muted/30 px-4 py-3">
         {/* Header: date + actions */}
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
             {entry.updated_at && (
               <span className="text-xs text-muted-foreground/60">(upraveno)</span>
+            )}
+            {entry.metadata.price_at_creation !== undefined && (
+              <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                {formatPrice(entry.metadata.price_at_creation)}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -270,10 +275,10 @@ export function JournalEntryCard({
             href={entry.metadata.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline mb-3"
+            className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline mb-3 min-w-0"
           >
             <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            {entry.metadata.label || entry.metadata.og_title || entry.metadata.url}
+            <span className="truncate">{entry.metadata.label || entry.metadata.og_title || entry.metadata.url}</span>
           </a>
         )}
 
@@ -303,12 +308,10 @@ export function JournalEntryCard({
 
         {editing ? (
           <div className="space-y-2">
-            <textarea
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-              rows={3}
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              placeholder="Komentář (volitelné)…"
+            <RichTextEditor
+              content={editContent}
+              onChange={setEditContent}
+              onSubmit={handleSaveEdit}
               autoFocus
             />
             <div className="flex gap-2">
@@ -322,7 +325,7 @@ export function JournalEntryCard({
           </div>
         ) : (
           entry.content && (
-            <p className="text-sm whitespace-pre-wrap">{entry.content}</p>
+            <RichTextContent html={entry.content} />
           )
         )}
 

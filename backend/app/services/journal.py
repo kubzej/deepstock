@@ -226,7 +226,7 @@ class JournalService:
         """
         metadata = dict(data.metadata)
 
-        if data.type == "note" and redis is not None:
+        if data.type in ("note", "ext_ref") and redis is not None:
             channel = supabase.table("journal_channels") \
                 .select("type, ticker") \
                 .eq("id", data.channel_id) \

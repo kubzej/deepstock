@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { Search, PenLine } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,11 +17,14 @@ import { TechnicalSection } from '@/components/research/sections/TechnicalSectio
 import { AIResearchSection } from '@/components/research/sections/AIResearchSection';
 import { SmartAnalysisPanel } from '@/components/research/sections/SmartAnalysisPanel';
 import { HistoricalFinancialsSection } from '@/components/research/sections/HistoricalFinancialsSection';
+import { QuickJournalSheet } from '@/components/research/sections/QuickJournalSheet';
+import { useJournalChannels } from '@/hooks/useJournal';
 
 // Main component
 export function ResearchPage() {
   const [ticker, setTicker] = useState('');
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false);
 
   const { data, isLoading, isFetching, dataUpdatedAt, error, refetch } =
     useQuery({
@@ -30,6 +33,11 @@ export function ResearchPage() {
       enabled: !!activeTicker,
       staleTime: 5 * 60 * 1000, // 5 minutes
     });
+
+  const { data: channels = [] } = useJournalChannels();
+  const journalChannel = activeTicker
+    ? channels.find((c) => c.ticker === activeTicker) ?? null
+    : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +109,27 @@ export function ResearchPage() {
         {/* Results */}
         {data && (
           <div className="space-y-6">
-            <StockHeader data={data} />
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <StockHeader data={data} />
+              </div>
+              {journalChannel && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0 gap-2 text-muted-foreground hover:text-foreground mt-1"
+                  onClick={() => setNoteSheetOpen(true)}
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Poznámka</span>
+                  {journalChannel.entry_count > 0 && (
+                    <span className="text-xs tabular-nums bg-muted px-1.5 py-0.5 rounded-full">
+                      {journalChannel.entry_count}
+                    </span>
+                  )}
+                </Button>
+              )}
+            </div>
 
             {/* Smart Analysis */}
             <SmartAnalysisPanel data={data} />
@@ -145,6 +173,15 @@ export function ResearchPage() {
               </TabsContent>
             </Tabs>
           </div>
+        )}
+
+        {/* Quick journal note sheet */}
+        {journalChannel && (
+          <QuickJournalSheet
+            channel={journalChannel}
+            open={noteSheetOpen}
+            onClose={() => setNoteSheetOpen(false)}
+          />
         )}
       </div>
     </TooltipProvider>
