@@ -41,7 +41,6 @@ export function QuickJournalSheet({ channel, open, onClose }: QuickJournalSheetP
     });
     setNewContent('');
     setEditorKey((k) => k + 1);
-    setShowForm(false);
   };
 
   const handleClose = () => {
