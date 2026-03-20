@@ -280,7 +280,7 @@ def _format_ta_context(ta: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_search_queries(ticker: str, company_name: str, report_type: ReportType) -> list[tuple[str, int]]:
+def _build_search_queries(ticker: str, company_name: str, report_type: ReportType, sector: str = "", industry: str = "") -> list[tuple[str, int]]:
     """
     Return list of (query, days_back) tuples to search.
     Days_back limits Tavily to recent results.
@@ -299,6 +299,12 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
 
     queries += [
         (f"{short_name} {ticker} vs competitors peer comparison valuation {year}", 90),
+    ]
+
+    # Sector-specific geopolitical and macro catalyst query
+    sector_context = " ".join(filter(None, [sector, industry])) or "market"
+    queries += [
+        (f"{sector_context} geopolitics regulations commodity demand supply seasonal outlook {year}", 60),
     ]
 
     if report_type == "full_analysis":
@@ -419,7 +425,9 @@ async def generate_research_report(
     fundamentals_context = _format_fundamentals(stock_data)
 
     # Run web searches + insider fetch in parallel
-    queries = _build_search_queries(ticker, company_name, report_type)
+    sector = stock_data.get("sector", "")
+    industry = stock_data.get("industry", "")
+    queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry)
     search_tasks = [tavily_client.search(query, max_results=4, days=days) for query, days in queries]
     insider_months = 6 if report_type == "full_analysis" else 3
     all_tasks = [*search_tasks, get_insider_trades(redis, ticker, months=insider_months)]
