@@ -40,7 +40,7 @@ import { formatPrice } from '@/lib/format';
 import type { Transaction, OptionTransaction } from '@/lib/api';
 
 type TabType = 'stocks' | 'options';
-type TransactionTypeFilter = 'all' | 'buy' | 'sell';
+type TransactionTypeFilter = 'all' | 'buy' | 'sell' | 'settlement';
 type OptionTypeFilter = 'all' | 'call' | 'put';
 
 export function TransactionHistoryPage() {
@@ -134,7 +134,11 @@ export function TransactionHistoryPage() {
       }
 
       // Type filter (buy/sell based on action)
+      // Type filter
       if (typeFilter !== 'all') {
+        const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
+        if (typeFilter === 'settlement') return isSettlement;
+        if (isSettlement) return false;
         const isBuy = tx.action === 'BTO' || tx.action === 'BTC';
         if (typeFilter === 'buy' && !isBuy) return false;
         if (typeFilter === 'sell' && isBuy) return false;
@@ -241,6 +245,7 @@ export function TransactionHistoryPage() {
               <SelectItem value="all">Vše</SelectItem>
               <SelectItem value="buy">Nákup</SelectItem>
               <SelectItem value="sell">Prodej</SelectItem>
+              <SelectItem value="settlement">Vypořádání</SelectItem>
             </SelectContent>
           </Select>
 
@@ -453,6 +458,7 @@ export function TransactionHistoryPage() {
               {/* Mobile Cards */}
               <div className="md:hidden space-y-2">
                 {filteredOptionTransactions.map((tx: OptionTransaction) => {
+                  const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
                   const totalPremium = tx.total_premium || 0;
                   const rate = tx.exchange_rate_to_czk || 1;
                   const fees = tx.fees || 0;
@@ -493,7 +499,7 @@ export function TransactionHistoryPage() {
                             : '—'}
                         </span>
                         <span className="font-mono-price font-medium">
-                          {formatPrice(totalCzk, 'CZK')}
+                          {isSettlement ? '—' : formatPrice(totalCzk, 'CZK')}
                         </span>
                       </div>
                     </div>
@@ -544,6 +550,8 @@ export function TransactionHistoryPage() {
                   <TableBody>
                     {filteredOptionTransactions.map((tx: OptionTransaction) => {
                       // Calculate total in CZK
+                      // ASSIGNMENT/EXERCISE: P/L is already in the opening tx, show nothing
+                      const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
                       const totalPremium = tx.total_premium || 0;
                       const rate = tx.exchange_rate_to_czk || 1;
                       const fees = tx.fees || 0;
@@ -592,7 +600,7 @@ export function TransactionHistoryPage() {
                             {tx.fees ? formatPrice(tx.fees, tx.currency) : '—'}
                           </TableCell>
                           <TableCell className="text-right font-mono-price">
-                            {formatPrice(totalCzk, 'CZK')}
+                            {isSettlement ? '—' : formatPrice(totalCzk, 'CZK')}
                           </TableCell>
                         </TableRow>
                       );

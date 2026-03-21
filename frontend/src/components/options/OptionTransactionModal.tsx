@@ -31,8 +31,10 @@ import {
   useCreateOptionTransaction,
   useCloseOptionPosition,
 } from '@/hooks/useOptions';
+import { useStocks } from '@/hooks/useStocks';
 import { formatPrice, formatDate } from '@/lib/format';
 import { API_URL } from '@/lib/api';
+import { CURRENCIES } from '@/lib/constants';
 import type { OptionType, OptionAction, OptionHolding } from '@/lib/api';
 
 // ============ Types ============
@@ -131,6 +133,7 @@ export function OptionTransactionModal({
   const { portfolio } = usePortfolio();
   const createMutation = useCreateOptionTransaction();
   const closeMutation = useCloseOptionPosition();
+  const { data: stocks = [] } = useStocks();
 
   const isCloseMode = mode === 'close' && !!holding;
   const isOpenMode = mode === 'open';
@@ -143,12 +146,24 @@ export function OptionTransactionModal({
   const [expirationDate, setExpirationDate] = useState('');
   const [contracts, setContracts] = useState('1');
   const [premium, setPremium] = useState('');
+  const [currency, setCurrency] = useState('USD');
   const [fees, setFees] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   const [transactionDate, setTransactionDate] = useState(
     new Date().toISOString().split('T')[0],
   );
   const [notes, setNotes] = useState('');
+
+  // Derive stock currency from underlying ticker
+  const underlyingTicker = isCloseMode ? holding.symbol : ticker;
+  const stockCurrency = stocks.find((s) => s.ticker === underlyingTicker)?.currency ?? 'USD';
+
+  // Auto-fill currency when ticker changes in open mode
+  useEffect(() => {
+    if (isOpenMode && stockCurrency) {
+      setCurrency(stockCurrency);
+    }
+  }, [isOpenMode, stockCurrency]);
 
   // Lot selection state (for ASSIGNMENT short call / EXERCISE long put)
   const [availableLots, setAvailableLots] = useState<AvailableLot[]>([]);
@@ -270,6 +285,7 @@ export function OptionTransactionModal({
       setExpirationDate(holding.expiration_date);
       setContracts(holding.contracts.toString());
       setPremium('');
+      setCurrency('USD');
       setFees('');
       setExchangeRate('');
       setTransactionDate(new Date().toISOString().split('T')[0]);
@@ -283,6 +299,7 @@ export function OptionTransactionModal({
       setExpirationDate('');
       setContracts('1');
       setPremium('');
+      setCurrency('USD');
       setFees('');
       setExchangeRate('');
       setTransactionDate(new Date().toISOString().split('T')[0]);
@@ -400,6 +417,7 @@ export function OptionTransactionModal({
             expiration_date: expirationDate,
             contracts: parseInt(contracts, 10),
             premium: parseFloat(premium),
+            currency,
             fees: fees ? parseFloat(fees) : undefined,
             exchange_rate_to_czk: parseFloat(exchangeRate),
             date: transactionDate,
@@ -439,13 +457,11 @@ export function OptionTransactionModal({
               <p className="text-sm">
                 Zavíráte pozici:{' '}
                 <span className="font-mono-price font-medium">
-                  {holding.symbol} {holding.option_type.toUpperCase()} $
-                  {holding.strike_price}
+                  {holding.symbol} {holding.option_type.toUpperCase()} {stockCurrency}{holding.strike_price}
                 </span>
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Otevřeno: {holding.contracts} kontraktů @ $
-                {holding.avg_premium?.toFixed(2) || '—'}
+                Otevřeno: {holding.contracts} kontraktů @ {stockCurrency}{holding.avg_premium?.toFixed(2) || '—'}
               </p>
             </div>
           )}
@@ -507,11 +523,11 @@ export function OptionTransactionModal({
             </div>
           </div>
 
-          {/* Strike & Expiration - only in open mode */}
+          {/* Strike, Expiration & Currency - only in open mode */}
           {isOpenMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="strike">Strike price ($)</Label>
+                <Label htmlFor="strike">Strike price</Label>
                 <Input
                   id="strike"
                   type="number"
@@ -531,6 +547,20 @@ export function OptionTransactionModal({
                   value={expirationDate}
                   onChange={(e) => setExpirationDate(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Měna podkladu</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
@@ -734,7 +764,7 @@ export function OptionTransactionModal({
 
               {isExchangeRateRequired && (
                 <div className="space-y-2">
-                  <Label htmlFor="exchangeRate">Kurz USD/CZK</Label>
+                  <Label htmlFor="exchangeRate">Kurz {isOpenMode ? currency : stockCurrency}/CZK</Label>
                   <Input
                     id="exchangeRate"
                     type="number"

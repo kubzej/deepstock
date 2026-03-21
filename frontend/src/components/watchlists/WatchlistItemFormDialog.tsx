@@ -17,6 +17,7 @@ import {
 import { Sparkles, Loader2 } from 'lucide-react';
 import { type WatchlistItem, type Holding } from '@/lib/api';
 import { generateWatchlistTargets } from '@/lib/api/ai_watchlist_targets';
+import { formatPrice } from '@/lib/format';
 
 interface WatchlistItemFormDialogProps {
   open: boolean;
@@ -167,7 +168,7 @@ export function WatchlistItemFormDialog({
             </Button>
             {holding && (
               <span className="text-xs text-muted-foreground">
-                Držíš za avg. ${holding.avg_cost.toFixed(2)}
+                Držíš za avg. {formatPrice(holding.avg_cost, holding.currency)}
               </span>
             )}
           </div>

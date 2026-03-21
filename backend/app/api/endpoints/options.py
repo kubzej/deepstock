@@ -202,7 +202,7 @@ async def close_option_position(
     to specify which stock lot to sell.
     """
     try:
-        return await options_service.close_position(
+        tx, stock_tx = await options_service.close_position(
             portfolio_id=portfolio_id,
             option_symbol=option_symbol,
             closing_action=closing_action,
@@ -216,6 +216,41 @@ async def close_option_position(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Option journal entry (same pattern as create_option_transaction)
+    created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
+    asyncio.create_task(journal_service.create_option_journal_entry(
+        ticker=tx["symbol"],
+        option_transaction_id=tx["id"],
+        portfolio_id=portfolio_id,
+        action=tx["action"],
+        option_type=tx["option_type"],
+        strike=float(tx["strike_price"]),
+        expiration=date.fromisoformat(tx["expiration_date"]) if isinstance(tx["expiration_date"], str) else tx["expiration_date"],
+        contracts=tx["contracts"],
+        premium=tx.get("premium"),
+        option_symbol=tx["option_symbol"],
+        notes=notes,
+        created_at=created_at,
+    ))
+
+    # Stock transaction journal entry for EXERCISE/ASSIGNMENT (same pattern as portfolio.py add_transaction)
+    if stock_tx:
+        stock_executed_at = datetime.fromisoformat(stock_tx["executed_at"]) if isinstance(stock_tx["executed_at"], str) else stock_tx["executed_at"]
+        asyncio.create_task(journal_service.create_transaction_journal_entry(
+            ticker=tx["symbol"],
+            transaction_id=stock_tx["id"],
+            portfolio_id=portfolio_id,
+            action=stock_tx["type"],
+            shares=stock_tx["shares"],
+            price=stock_tx["price_per_share"],
+            currency=stock_tx["currency"],
+            fees=stock_tx.get("fees") or 0,
+            notes=stock_tx.get("notes"),
+            executed_at=stock_executed_at,
+        ))
+
+    return tx
 
 
 # ==========================================

@@ -16,7 +16,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
 import { fetchTechnicalIndicators, type TechnicalPeriod } from '@/lib/api';
-import { getSmartDecimals } from '@/lib/format';
+import { getSmartDecimals, formatPrice } from '@/lib/format';
 
 // ============================================================
 // TYPES
@@ -71,12 +71,6 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'short' });
 }
 
-function formatPrice(value: number): string {
-  return value.toLocaleString('cs-CZ', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function getSignalType(
   fibPosition: number | null,

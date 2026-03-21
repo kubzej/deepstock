@@ -48,8 +48,9 @@ export interface OptionHolding {
   first_transaction: string | null;
   last_transaction: string | null;
   dte: number;
-  // Notes from opening transaction
+  // Notes and currency from opening transaction
   notes: string | null;
+  currency: string;
   // From option_prices cache
   current_price: number | null;
   bid: number | null;

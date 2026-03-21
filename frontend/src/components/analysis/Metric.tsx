@@ -2,7 +2,7 @@
  * Metric Display Component
  * Simple label + value for stats
  */
-import { formatPrice } from '@/lib/format';
+import { formatPrice, formatPercent, formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 interface MetricProps {
@@ -22,8 +22,8 @@ export function Metric({
     format === 'currency'
       ? formatPrice(value, 'CZK')
       : format === 'percent'
-        ? `${value.toFixed(1)}%`
-        : value.toLocaleString('cs-CZ');
+        ? formatPercent(value, 1)
+        : formatNumber(value);
 
   return (
     <div>

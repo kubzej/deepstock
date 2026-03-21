@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInsiderTrades } from '@/hooks/useInsiderTrades';
-import { formatDateCzech } from '@/lib/format';
+import { formatDateCzech, formatLargeNumber, formatPrice } from '@/lib/format';
 
 interface InsiderTradesProps {
   ticker: string;
@@ -16,14 +16,11 @@ interface InsiderTradesProps {
 
 /**
  * Format large dollar values compactly: $9,375,000 → $9.38M
+ * Insider trades are always USD (SEC filings).
  */
 function formatValue(value: number | null): string {
   if (value == null) return '—';
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
-  if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
+  return `$${formatLargeNumber(Math.abs(value))}`;
 }
 
 /**
@@ -149,7 +146,7 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
                   <span className="text-[11px] text-muted-foreground font-mono-price flex-shrink-0 ml-2">
                     {formatShares(trade.shares)} ks
                     {trade.price_per_share
-                      ? ` × $${trade.price_per_share.toFixed(2)}`
+                      ? ` × ${formatPrice(trade.price_per_share, 'USD')}`
                       : ''}
                   </span>
                 </div>

@@ -8,16 +8,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { fetchHistoricalFinancials } from '@/lib/api/market';
-import { formatLargeNumber } from '@/lib/format';
+import { formatLargeNumber, formatRatioAsPercent, formatPrice } from '@/lib/format';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
 const fmtX = (v: number | null) => (v == null ? '—' : `${v.toFixed(1)}x`);
-const fmtPct = (v: number | null) =>
-  v == null ? '—' : `${(v * 100).toFixed(1)}%`;
+const fmtPct = (v: number | null) => formatRatioAsPercent(v, 1);
 const fmtLarge = (v: number | null) => (v == null ? '—' : formatLargeNumber(v));
-const fmtPrice = (v: number | null, sym: string) =>
-  v == null ? '—' : `${sym}${v.toFixed(2)}`;
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
@@ -416,7 +413,6 @@ export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
     currency,
   } = data;
   const ltmIdx = years.indexOf('LTM');
-  const sym = { USD: '$', EUR: '€', GBP: '£' }[currency] ?? `${currency} `;
 
   const priceMulRows: Row[] = [
     {
@@ -641,7 +637,7 @@ export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
       kind: 'row',
       label: 'Price at FY End',
       values: context.price_at_fy,
-      fmt: (v) => fmtPrice(v, sym),
+      fmt: (v) => formatPrice(v, currency),
     },
   ];
 

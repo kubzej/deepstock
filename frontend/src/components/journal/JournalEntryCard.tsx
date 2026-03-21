@@ -7,6 +7,7 @@ import { RichTextContent } from './RichTextContent';
 import type { JournalEntry } from '@/lib/api/journal';
 import { MarkdownReport } from '@/components/shared/AIReportComponents';
 import { usePortfolio } from '@/contexts/PortfolioContext';
+import { formatPrice } from '@/lib/format';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -34,13 +35,6 @@ function formatDateOnly(iso: string) {
   }).format(new Date(iso));
 }
 
-function formatPrice(price: number) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(price);
-}
 
 export function JournalEntryCard({
   entry,
@@ -84,7 +78,7 @@ export function JournalEntryCard({
             )}
             {entry.metadata.price_at_creation !== undefined && (
               <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                {formatPrice(entry.metadata.price_at_creation)}
+                {formatPrice(entry.metadata.price_at_creation, 'USD')}
               </span>
             )}
           </div>
@@ -244,7 +238,7 @@ export function JournalEntryCard({
             )}
             {entry.metadata.price_at_creation !== undefined && (
               <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                {formatPrice(entry.metadata.price_at_creation)}
+                {formatPrice(entry.metadata.price_at_creation, 'USD')}
               </span>
             )}
           </div>
@@ -372,7 +366,7 @@ export function JournalEntryCard({
               </span>
               <span className="text-sm font-semibold">{entry.metadata.ticker}</span>
               <span className="text-sm font-mono">
-                {shares} ks × {formatPrice(price)}{currency !== 'USD' ? ` ${currency}` : ''}
+                {shares} ks × {formatPrice(price, currency)}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">
@@ -423,6 +417,7 @@ export function JournalEntryCard({
     const contracts = entry.metadata.contracts ?? 0;
     const premium = entry.metadata.premium;
     const strike = entry.metadata.strike ?? 0;
+    const optionCurrency = entry.metadata.currency ?? 'USD';
     const expiration = entry.metadata.expiration
       ? new Date(entry.metadata.expiration).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric' })
       : '';
@@ -442,7 +437,7 @@ export function JournalEntryCard({
             </div>
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span className="text-xs font-mono text-muted-foreground">
-                ${strike} · exp {expiration} · {contracts} kontr.{premium != null ? ` @ ${formatPrice(premium)}` : ''}
+                {formatPrice(strike, optionCurrency)} · exp {expiration} · {contracts} kontr.{premium != null ? ` @ ${formatPrice(premium, optionCurrency)}` : ''}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5">

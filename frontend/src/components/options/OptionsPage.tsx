@@ -32,6 +32,7 @@ import {
   type ModalMode,
 } from './OptionTransactionModal';
 import type { OptionHolding } from '@/lib/api';
+import { formatPrice } from '@/lib/format';
 
 type OptionsTab = 'positions' | 'calculator' | 'greeks';
 
@@ -212,7 +213,7 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         title="Smazat pozici"
-        description={`Opravdu chcete smazat tuto pozici? Budou smazány všechny transakce.${holdingToDelete ? ` ${holdingToDelete.symbol} ${holdingToDelete.option_type.toUpperCase()} $${holdingToDelete.strike_price}` : ''}`}
+        description={`Opravdu chcete smazat tuto pozici? Budou smazány všechny transakce.${holdingToDelete ? ` ${holdingToDelete.symbol} ${holdingToDelete.option_type.toUpperCase()} ${formatPrice(holdingToDelete.strike_price, holdingToDelete.currency)}` : ''}`}
         confirmLabel="Smazat"
         onConfirm={confirmDelete}
         loading={deleteBySymbolMutation.isPending}

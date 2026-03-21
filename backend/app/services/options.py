@@ -514,7 +514,7 @@ class OptionsService:
         exchange_rate_to_czk: Optional[float] = None,
         notes: Optional[str] = None,
         source_transaction_id: Optional[str] = None
-    ) -> dict:
+    ) -> tuple[dict, Optional[dict]]:
         """
         Close an existing option position.
         
@@ -580,11 +580,15 @@ class OptionsService:
             # Premium is transferred to stock cost basis, option P/L = 0
             realized_pl = 0
         
+        # Currency comes from the holding (view exposes it from the opening transaction)
+        option_currency = holding.get("currency") or "USD"
+
         # Determine if we need a stock transaction
         linked_stock_tx_id = None
-        
+        linked_stock_tx = None
+
         if closing_action in ["ASSIGNMENT", "EXERCISE"]:
-            stock_tx = await self._create_stock_transaction_for_option_close(
+            linked_stock_tx = await self._create_stock_transaction_for_option_close(
                 portfolio_id=portfolio_id,
                 holding=holding,
                 closing_action=closing_action,
@@ -594,7 +598,7 @@ class OptionsService:
                 source_transaction_id=source_transaction_id,
                 notes=notes,
             )
-            linked_stock_tx_id = stock_tx["id"]
+            linked_stock_tx_id = linked_stock_tx["id"]
         
         # Create option closing transaction
         option_symbol_value = generate_occ_symbol(
@@ -615,7 +619,7 @@ class OptionsService:
             "contracts": contracts,
             "premium": closing_premium if closing_action in ["BTC", "STC"] else avg_premium,
             "total_premium": realized_pl,  # Store realized P/L here for performance calculation
-            "currency": "USD",
+            "currency": option_currency,
             "exchange_rate_to_czk": exchange_rate_to_czk,
             "fees": fees,
             "date": close_date.isoformat(),
@@ -631,8 +635,8 @@ class OptionsService:
             f"Closed option position {option_symbol_value} with {closing_action}: "
             f"realized P/L = ${realized_pl:.2f}"
         )
-        
-        return response.data[0]
+
+        return response.data[0], linked_stock_tx
     
     async def _create_stock_transaction_for_option_close(
         self,
@@ -694,19 +698,22 @@ class OptionsService:
         
         # Get or create stock
         stock = await stock_service.get_or_create(symbol)
-        
+
+        # Currency comes from the holding (view exposes it from the opening transaction)
+        stock_currency = holding.get("currency") or "USD"
+
         # Calculate totals
         total_amount = shares * effective_price
         total_amount_czk = total_amount * exchange_rate_to_czk if exchange_rate_to_czk else None
-        
+
         # Build note with details about the adjustment
         if closing_action == "ASSIGNMENT" and avg_premium > 0:
-            tx_notes = f"{closing_action} from {holding['option_symbol']} (strike ${strike_price}, premium ${avg_premium})"
+            tx_notes = f"{closing_action} from {holding['option_symbol']} (strike {strike_price} {stock_currency}, premium {avg_premium} {stock_currency})"
         else:
             tx_notes = f"{closing_action} from {holding['option_symbol']}"
         if notes:
             tx_notes = f"{tx_notes} - {notes}"
-        
+
         tx_data = {
             "portfolio_id": portfolio_id,
             "stock_id": stock["id"],
@@ -714,7 +721,7 @@ class OptionsService:
             "shares": shares,
             "price_per_share": effective_price,
             "total_amount": total_amount,
-            "currency": "USD",
+            "currency": stock_currency,
             "exchange_rate_to_czk": exchange_rate_to_czk,
             "total_amount_czk": total_amount_czk,
             "fees": 0,  # No separate fees for stock tx, fees on option tx

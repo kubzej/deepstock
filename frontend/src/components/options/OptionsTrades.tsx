@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { cn } from '@/lib/utils';
-import { formatPercent } from '@/lib/format';
+import { formatPercent, formatPrice } from '@/lib/format';
 import { X, Trash2, TrendingUp, MessageSquare } from 'lucide-react';
 
 type FilterType = 'all' | 'long-call' | 'long-put' | 'short-call' | 'short-put';
@@ -24,18 +24,7 @@ interface OptionsTradesProps {
 
 // ============ Utility Functions ============
 
-function formatPrice(value: number | null, decimals = 2): string {
-  if (value === null) return '—';
-  return value.toLocaleString('cs-CZ', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
 
-function formatUSD(value: number | null): string {
-  if (value === null) return '—';
-  return `$${formatPrice(value)}`;
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('cs-CZ', {
@@ -311,11 +300,11 @@ export function OptionsTrades({
                       Strike
                     </div>
                     <div className="font-mono-price font-medium">
-                      {formatUSD(h.strike_price)}
+                      {formatPrice(h.strike_price, h.currency)}
                     </div>
                     {h.underlying_price !== null && (
                       <div className="text-[10px] text-muted-foreground">
-                        {formatUSD(h.underlying_price)}
+                        {formatPrice(h.underlying_price, h.currency)}
                         {h.buffer_percent !== null && (
                           <span
                             className={cn(
@@ -350,12 +339,12 @@ export function OptionsTrades({
                       Premium
                     </div>
                     <div className="font-mono-price font-medium">
-                      {formatUSD(h.avg_premium)}
+                      {formatPrice(h.avg_premium, h.currency)}
                     </div>
                     {h.current_price !== null && (
                       <div className="text-[10px]">
                         <span className="text-muted-foreground">
-                          {formatUSD(h.current_price)}
+                          {formatPrice(h.current_price, h.currency)}
                         </span>
                         {h.priceChangePercent !== null && (
                           <span
@@ -415,7 +404,7 @@ export function OptionsTrades({
                         )}
                       >
                         {h.pl >= 0 ? '+' : ''}
-                        {formatUSD(h.pl)}
+                        {formatPrice(h.pl, h.currency)}
                       </div>
                     ) : (
                       <div className="text-muted-foreground">—</div>
@@ -433,7 +422,7 @@ export function OptionsTrades({
                     {h.breakeven !== null ? (
                       <>
                         <div className="font-mono-price font-medium">
-                          {formatUSD(h.breakeven)}
+                          {formatPrice(h.breakeven, h.currency)}
                         </div>
                         {h.breakevenDistance !== null && (
                           <div className="text-[10px]">

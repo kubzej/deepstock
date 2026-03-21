@@ -24,6 +24,7 @@ import {
 import { queryKeys } from '@/lib/queryClient';
 import type { AlertConditionType } from '@/lib/api';
 import { Plus, Bell, Bot, Search, X, Trash2 } from 'lucide-react';
+import { formatPrice } from '@/lib/format';
 import { Input } from '@/components/ui/input';
 import { AlertSuggestionsPanel } from './AlertSuggestionsPanel';
 import { SingleAlertCard, RangeAlertCard } from './AlertCard';
@@ -359,6 +360,7 @@ export function AlertsPage() {
             .map(([ticker, items]) => {
             const quote = quotes[ticker];
             const currentPrice = quote?.price;
+            const stockCurrency = stocks.find((s) => s.ticker === ticker)?.currency ?? 'USD';
             const firstItem = items[0];
             const stockName =
               firstItem?.type === 'single'
@@ -372,7 +374,7 @@ export function AlertsPage() {
                   <span className="text-xs text-muted-foreground truncate">{stockName}</span>
                   <span className="text-xs text-muted-foreground">·</span>
                   <span className="text-xs font-mono-price text-muted-foreground">
-                    {currentPrice ? `$${currentPrice.toFixed(2)}` : '—'}
+                    {currentPrice ? formatPrice(currentPrice, stockCurrency) : '—'}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {items.length} {pluralizeAlert(items.length)}
