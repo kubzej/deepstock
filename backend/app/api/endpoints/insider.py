@@ -1,7 +1,10 @@
 """Insider trading API endpoints — SEC Form 4 data."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from starlette.requests import Request
 
+from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.schemas.insider import InsiderTrade, InsiderTradesResponse
 from app.services.insider import get_insider_trades
@@ -10,7 +13,8 @@ router = APIRouter()
 
 
 @router.get("/{ticker}", response_model=InsiderTradesResponse)
-async def insider_trades(ticker: str, months: int = 12):
+@limiter.limit("30/hour")
+async def insider_trades(request: Request, ticker: str, months: int = 12, user_id: str = Depends(get_current_user_id)):
     """
     Get insider (Form 4) buy/sell transactions for a US-listed stock.
 

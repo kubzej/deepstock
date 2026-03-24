@@ -1,7 +1,7 @@
 /**
  * Market API - Quotes, price history, stock info, technical indicators
  */
-import { API_URL } from './client';
+import { API_URL, getAuthHeader } from './client';
 
 // ============ Quote Types ============
 
@@ -53,6 +53,7 @@ export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quo
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(await getAuthHeader()),
     },
     body: JSON.stringify({ tickers }),
   });
@@ -71,6 +72,7 @@ export async function fetchOptionQuotes(occSymbols: string[]): Promise<Record<st
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(await getAuthHeader()),
     },
     body: JSON.stringify({ symbols: occSymbols }),
   });
@@ -83,7 +85,9 @@ export async function fetchOptionQuotes(occSymbols: string[]): Promise<Record<st
 }
 
 export async function fetchExchangeRates(): Promise<ExchangeRates> {
-  const response = await fetch(`${API_URL}/api/market/exchange-rates`);
+  const response = await fetch(`${API_URL}/api/market/exchange-rates`, {
+    headers: await getAuthHeader(),
+  });
   
   if (!response.ok) {
     throw new Error('Failed to fetch exchange rates');
@@ -110,7 +114,8 @@ export async function fetchPriceHistory(
   period: ChartPeriod = '1mo'
 ): Promise<PriceHistoryPoint[]> {
   const response = await fetch(
-    `${API_URL}/api/market/history/${encodeURIComponent(ticker)}?period=${period}`
+    `${API_URL}/api/market/history/${encodeURIComponent(ticker)}?period=${period}`,
+    { headers: await getAuthHeader() }
   );
   
   if (!response.ok) {
@@ -220,7 +225,8 @@ export interface StockInfo {
 
 export async function fetchStockInfo(ticker: string): Promise<StockInfo | null> {
   const response = await fetch(
-    `${API_URL}/api/market/stock-info/${encodeURIComponent(ticker.toUpperCase())}`
+    `${API_URL}/api/market/stock-info/${encodeURIComponent(ticker.toUpperCase())}`,
+    { headers: await getAuthHeader() }
   );
   
   if (!response.ok) {
@@ -444,7 +450,8 @@ export interface HistoricalFinancials {
 
 export async function fetchHistoricalFinancials(ticker: string): Promise<HistoricalFinancials | null> {
   const response = await fetch(
-    `${API_URL}/api/market/financials/${encodeURIComponent(ticker.toUpperCase())}`
+    `${API_URL}/api/market/financials/${encodeURIComponent(ticker.toUpperCase())}`,
+    { headers: await getAuthHeader() }
   );
 
   if (!response.ok) {
@@ -471,7 +478,9 @@ export interface FearGreedData {
 }
 
 export async function fetchFearGreed(): Promise<FearGreedData> {
-  const response = await fetch(`${API_URL}/api/market/fear-greed`);
+  const response = await fetch(`${API_URL}/api/market/fear-greed`, {
+    headers: await getAuthHeader(),
+  });
 
   if (!response.ok) {
     throw new Error('Failed to fetch Fear & Greed index');
@@ -485,7 +494,8 @@ export async function fetchTechnicalIndicators(
   period: TechnicalPeriod = '1y'
 ): Promise<TechnicalData | null> {
   const response = await fetch(
-    `${API_URL}/api/market/technical/${encodeURIComponent(ticker.toUpperCase())}?period=${period}`
+    `${API_URL}/api/market/technical/${encodeURIComponent(ticker.toUpperCase())}?period=${period}`,
+    { headers: await getAuthHeader() }
   );
   
   if (!response.ok) {

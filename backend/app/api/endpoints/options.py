@@ -10,6 +10,7 @@ from app.services.options import (
     OptionPriceUpdate,
     OptionAction,
 )
+from app.services.portfolio import portfolio_service
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from typing import Optional, List
@@ -32,8 +33,10 @@ async def get_all_option_holdings(user_id: str = Depends(get_current_user_id)):
 
 
 @router.get("/holdings/{portfolio_id}")
-async def get_portfolio_option_holdings(portfolio_id: str):
+async def get_portfolio_option_holdings(portfolio_id: str, user_id: str = Depends(get_current_user_id)):
     """Get option holdings for a specific portfolio."""
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await options_service.get_holdings(portfolio_id)
 
 
@@ -69,10 +72,12 @@ async def get_option_transactions(
 
 
 @router.get("/transactions/{transaction_id}")
-async def get_option_transaction(transaction_id: str):
+async def get_option_transaction(transaction_id: str, user_id: str = Depends(get_current_user_id)):
     """Get a single option transaction by ID."""
     tx = await options_service.get_transaction_by_id(transaction_id)
     if not tx:
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
     return tx
 
@@ -259,7 +264,8 @@ async def close_option_position(
 
 @router.get("/prices")
 async def get_option_prices(
-    symbols: str = Query(..., description="Comma-separated OCC symbols")
+    symbols: str = Query(..., description="Comma-separated OCC symbols"),
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Get cached prices for option symbols.

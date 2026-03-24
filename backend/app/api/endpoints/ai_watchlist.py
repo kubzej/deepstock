@@ -10,8 +10,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
 
@@ -35,7 +37,9 @@ class WatchlistTargetsResponse(BaseModel):
 
 
 @router.post("/watchlist-targets", response_model=WatchlistTargetsResponse)
+@limiter.limit("10/hour")
 async def generate_watchlist_targets(
+    request: Request,
     payload: WatchlistTargetsRequest,
     user_id: str = Depends(get_current_user_id),
 ):

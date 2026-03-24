@@ -48,7 +48,7 @@ async def create_stock(
 ) -> dict:
     """Create a new stock."""
     try:
-        return await stock_service.create(data)
+        return await stock_service.create(data, user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

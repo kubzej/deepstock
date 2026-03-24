@@ -9,6 +9,10 @@ from pydantic import BaseModel
 from app.core.supabase import supabase
 from app.core.config import get_settings
 
+# Single-user app — owner's UUID used as fallback when user_id is not available
+# in the call chain (e.g. auto-created stock channels from portfolio/watchlist services)
+_OWNER_USER_ID = "c5e00af6-13b1-42e4-b6e1-f3bf43fc2028"
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,51 +65,59 @@ class JournalService:
     # Sections
     # ------------------------------------------
 
-    async def get_sections(self) -> List[dict]:
+    async def get_sections(self, user_id: str) -> List[dict]:
         response = supabase.table("journal_sections") \
             .select("*") \
+            .eq("user_id", user_id) \
             .order("sort_order") \
             .execute()
         return response.data
 
-    async def create_section(self, data: SectionCreate) -> dict:
+    async def create_section(self, data: SectionCreate, user_id: str) -> dict:
         response = supabase.table("journal_sections") \
             .insert({
                 "name": data.name,
                 "color": data.color,
                 "sort_order": data.sort_order,
+                "user_id": user_id,
             }) \
             .execute()
         return response.data[0]
 
-    async def update_section(self, section_id: str, data: SectionUpdate) -> Optional[dict]:
+    async def update_section(self, section_id: str, data: SectionUpdate, user_id: str) -> Optional[dict]:
         update_data = {k: v for k, v in data.model_dump().items() if v is not None}
         if not update_data:
-            response = supabase.table("journal_sections").select("*").eq("id", section_id).execute()
+            response = supabase.table("journal_sections").select("*").eq("id", section_id).eq("user_id", user_id).execute()
             return response.data[0] if response.data else None
         response = supabase.table("journal_sections") \
             .update(update_data) \
             .eq("id", section_id) \
+            .eq("user_id", user_id) \
             .execute()
         return response.data[0] if response.data else None
 
-    async def delete_section(self, section_id: str) -> bool:
+    async def delete_section(self, section_id: str, user_id: str) -> bool:
+        # Verify ownership
+        existing = supabase.table("journal_sections").select("id").eq("id", section_id).eq("user_id", user_id).execute()
+        if not existing.data:
+            return False
         # Move channels in this section to no section (SET NULL via FK)
         supabase.table("journal_channels") \
             .update({"section_id": None}) \
             .eq("section_id", section_id) \
             .execute()
-        supabase.table("journal_sections").delete().eq("id", section_id).execute()
+        supabase.table("journal_sections").delete().eq("id", section_id).eq("user_id", user_id).execute()
         return True
 
     # ------------------------------------------
     # Channels
     # ------------------------------------------
 
-    async def get_channels(self) -> List[dict]:
+    async def get_channels(self, user_id: str) -> List[dict]:
         """All channels with entry count and stock name for stock channels."""
         response = supabase.table("journal_channels") \
             .select("*, entry_count:journal_entries(count), stock:stocks(name)") \
+            .eq("user_id", user_id) \
             .order("type") \
             .order("name") \
             .execute()
@@ -119,11 +131,13 @@ class JournalService:
             channels.append(ch)
         return channels
 
-    async def get_or_create_stock_channel(self, stock_id: str, ticker: str) -> dict:
+    async def get_or_create_stock_channel(self, stock_id: str, ticker: str, user_id: str = None) -> dict:
         """Called when a stock is created. Idempotent."""
+        resolved_user_id = user_id or _OWNER_USER_ID
         existing = supabase.table("journal_channels") \
             .select("*") \
             .eq("stock_id", stock_id) \
+            .eq("user_id", resolved_user_id) \
             .execute()
         if existing.data:
             return existing.data[0]
@@ -135,49 +149,73 @@ class JournalService:
                 "stock_id": stock_id,
                 "ticker": ticker.upper(),
                 "sort_order": 0,
+                "user_id": resolved_user_id,
             }) \
             .execute()
         return response.data[0]
 
-    async def create_custom_channel(self, data: ChannelCreate) -> dict:
+    async def create_custom_channel(self, data: ChannelCreate, user_id: str) -> dict:
         response = supabase.table("journal_channels") \
             .insert({
                 "type": "custom",
                 "name": data.name,
                 "section_id": data.section_id,
                 "sort_order": data.sort_order,
+                "user_id": user_id,
             }) \
             .execute()
         return response.data[0]
 
-    async def update_channel(self, channel_id: str, data: ChannelUpdate) -> Optional[dict]:
+    async def update_channel(self, channel_id: str, data: ChannelUpdate, user_id: str) -> Optional[dict]:
         update_data = {k: v for k, v in data.model_dump().items() if v is not None}
         if not update_data:
-            response = supabase.table("journal_channels").select("*").eq("id", channel_id).execute()
+            response = supabase.table("journal_channels").select("*").eq("id", channel_id).eq("user_id", user_id).execute()
             return response.data[0] if response.data else None
         response = supabase.table("journal_channels") \
             .update(update_data) \
             .eq("id", channel_id) \
+            .eq("user_id", user_id) \
             .execute()
         return response.data[0] if response.data else None
 
-    async def delete_custom_channel(self, channel_id: str) -> bool:
+    async def delete_custom_channel(self, channel_id: str, user_id: str) -> bool:
         """Only custom channels can be deleted directly. Stock channels are deleted via CASCADE."""
         existing = supabase.table("journal_channels") \
             .select("type") \
             .eq("id", channel_id) \
+            .eq("user_id", user_id) \
             .execute()
         if not existing.data or existing.data[0]["type"] != "custom":
             return False
-        supabase.table("journal_channels").delete().eq("id", channel_id).execute()
+        supabase.table("journal_channels").delete().eq("id", channel_id).eq("user_id", user_id).execute()
         return True
 
-    async def get_channel_by_ticker(self, ticker: str) -> Optional[dict]:
-        response = supabase.table("journal_channels") \
+    async def get_channel_by_ticker(self, ticker: str, user_id: Optional[str] = None) -> Optional[dict]:
+        query = supabase.table("journal_channels") \
             .select("*") \
-            .eq("ticker", ticker.upper()) \
-            .execute()
+            .eq("ticker", ticker.upper())
+        if user_id:
+            query = query.eq("user_id", user_id)
+        response = query.execute()
         return response.data[0] if response.data else None
+
+    async def verify_channel_ownership(self, channel_id: str, user_id: str) -> bool:
+        """Check that a channel belongs to the given user."""
+        response = supabase.table("journal_channels") \
+            .select("id") \
+            .eq("id", channel_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
+
+    async def verify_entry_ownership(self, entry_id: str, user_id: str) -> bool:
+        """Check that an entry belongs to a channel owned by user."""
+        response = supabase.table("journal_entries") \
+            .select("channel_id, journal_channels!inner(user_id)") \
+            .eq("id", entry_id) \
+            .eq("journal_channels.user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
 
     # ------------------------------------------
     # Entries
@@ -189,13 +227,14 @@ class JournalService:
         ticker: Optional[str] = None,
         cursor: Optional[str] = None,
         limit: int = 50,
+        user_id: Optional[str] = None,
     ) -> List[dict]:
         """
         Fetch entries for a channel or ticker (infinite scroll via cursor).
         cursor = ISO timestamp — return entries older than this created_at.
         """
         if ticker and not channel_id:
-            channel = await self.get_channel_by_ticker(ticker)
+            channel = await self.get_channel_by_ticker(ticker, user_id=user_id)
             if not channel:
                 return []
             channel_id = channel["id"]

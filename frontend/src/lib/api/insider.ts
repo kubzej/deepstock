@@ -1,7 +1,7 @@
 /**
  * Insider Trading API — SEC Form 4 data
  */
-import { API_URL } from './client';
+import { API_URL, getAuthHeader } from './client';
 
 export interface InsiderTrade {
   ticker: string;
@@ -29,6 +29,7 @@ export async function fetchInsiderTrades(
 ): Promise<InsiderTradesResponse> {
   const response = await fetch(
     `${API_URL}/api/insider/${encodeURIComponent(ticker.toUpperCase())}?months=${months}`,
+    { headers: await getAuthHeader() },
   );
 
   if (!response.ok) {

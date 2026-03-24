@@ -3,9 +3,12 @@ Authentication utilities for Supabase JWT tokens.
 """
 from fastapi import HTTPException, Header
 from typing import Optional
+import logging
 import jwt
 from jwt import PyJWKClient
 import os
+
+logger = logging.getLogger(__name__)
 
 # Cache JWKS client to avoid repeated fetches
 _jwks_client: Optional[PyJWKClient] = None
@@ -49,21 +52,21 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
                     algorithms=["ES256", "RS256", "HS256"],
                     audience="authenticated"
                 )
-            except Exception:
-                # Fallback to HS256 with JWT secret
+            except Exception as jwks_err:
+                # JWKS failed — fallback to HS256 with JWT secret
+                logger.warning("JWKS verification failed, trying HS256: %s", jwks_err)
                 jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
-                if jwt_secret:
-                    payload = jwt.decode(token, jwt_secret, algorithms=["HS256"], audience="authenticated")
-                else:
-                    payload = jwt.decode(token, options={"verify_signature": False})
-        else:
-            # No JWKS client, try HS256 with secret
-            jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
-            if jwt_secret:
+                if not jwt_secret:
+                    logger.error("JWKS failed and SUPABASE_JWT_SECRET not set — cannot verify token")
+                    raise HTTPException(status_code=503, detail="Autentizace dočasně nedostupná")
                 payload = jwt.decode(token, jwt_secret, algorithms=["HS256"], audience="authenticated")
-            else:
-                # Dev mode - no verification
-                payload = jwt.decode(token, options={"verify_signature": False})
+        else:
+            # No JWKS client — use HS256 with secret
+            jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+            if not jwt_secret:
+                logger.error("Neither SUPABASE_URL nor SUPABASE_JWT_SECRET configured")
+                raise HTTPException(status_code=503, detail="Autentizace není nakonfigurována")
+            payload = jwt.decode(token, jwt_secret, algorithms=["HS256"], audience="authenticated")
         
         user_id = payload.get("sub")
         if not user_id:
@@ -71,7 +74,9 @@ def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
 
         return user_id
 
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token vypršel")
-    except jwt.InvalidTokenError as e:
-        raise HTTPException(status_code=401, detail=f"Neplatný token: {str(e)}")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Neplatný token")

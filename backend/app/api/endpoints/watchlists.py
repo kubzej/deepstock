@@ -105,6 +105,8 @@ async def get_watchlist_items(
     user_id: str = Depends(get_current_user_id)
 ) -> List[dict]:
     """Get all items in a watchlist with stock info."""
+    if not await watchlist_service.verify_watchlist_ownership(watchlist_id, user_id):
+        raise HTTPException(status_code=404, detail="Watchlist nenalezen")
     return await watchlist_service.get_watchlist_items(watchlist_id)
 
 
@@ -115,6 +117,8 @@ async def add_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Add a stock to a watchlist."""
+    if not await watchlist_service.verify_watchlist_ownership(watchlist_id, user_id):
+        raise HTTPException(status_code=404, detail="Watchlist nenalezen")
     try:
         return await watchlist_service.add_item(watchlist_id, data)
     except ValueError as e:
@@ -128,6 +132,8 @@ async def update_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Update a watchlist item (targets, notes, sector)."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     result = await watchlist_service.update_item(item_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="Položka nenalezena")
@@ -140,6 +146,8 @@ async def delete_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Remove an item from a watchlist."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     success = await watchlist_service.delete_item(item_id)
     if not success:
         raise HTTPException(status_code=404, detail="Položka nenalezena")
@@ -157,6 +165,10 @@ async def move_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Move an item to another watchlist."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
+    if not await watchlist_service.verify_watchlist_ownership(data.target_watchlist_id, user_id):
+        raise HTTPException(status_code=404, detail="Cílový watchlist nenalezen")
     try:
         result = await watchlist_service.move_item(item_id, data.target_watchlist_id)
         if not result:
@@ -225,6 +237,8 @@ async def get_item_tags(
     user_id: str = Depends(get_current_user_id)
 ) -> List[dict]:
     """Get all tags assigned to an item."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     return await watchlist_service.get_item_tags(item_id)
 
 
@@ -239,6 +253,8 @@ async def set_item_tags(
     user_id: str = Depends(get_current_user_id)
 ) -> List[dict]:
     """Replace all tags on an item."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     return await watchlist_service.set_item_tags(item_id, data.tag_ids)
 
 
@@ -249,6 +265,8 @@ async def add_tag_to_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Add a tag to an item."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     success = await watchlist_service.add_tag_to_item(item_id, tag_id)
     return {"success": success}
 
@@ -260,5 +278,7 @@ async def remove_tag_from_item(
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
     """Remove a tag from an item."""
+    if not await watchlist_service.verify_item_ownership(item_id, user_id):
+        raise HTTPException(status_code=404, detail="Položka nenalezena")
     success = await watchlist_service.remove_tag_from_item(item_id, tag_id)
     return {"success": success}

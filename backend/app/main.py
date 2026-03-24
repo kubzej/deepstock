@@ -1,11 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
 import os
 import logging
 import yfinance as yf
 from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, cron, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, feed, journal
 from app.core.redis import close_redis_pool
+from app.core.rate_limit import limiter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +26,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="DeepStock API", lifespan=lifespan)
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS setup - allow frontend origins
 allowed_origins = [

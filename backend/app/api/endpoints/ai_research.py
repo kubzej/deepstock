@@ -9,10 +9,13 @@ import json
 import logging
 from datetime import date
 from typing import Literal, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pydantic import BaseModel
+from starlette.requests import Request
 
+from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
 
@@ -33,6 +36,7 @@ async def get_cached_research_report(
     ticker: str,
     report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "full_analysis",
     period: str = "3mo",
+    user_id: str = Depends(get_current_user_id),
 ):
     ticker = ticker.upper()
     today = date.today().isoformat()
@@ -48,7 +52,8 @@ async def get_cached_research_report(
 
 
 @router.post("/research/{ticker}")
-async def generate_report(ticker: str, payload: GenerateReportRequest):
+@limiter.limit("10/hour")
+async def generate_report(request: Request, ticker: str, payload: GenerateReportRequest, user_id: str = Depends(get_current_user_id)):
     """
     Generate an AI research report for the given ticker.
 
@@ -96,6 +101,7 @@ async def download_pdf(
     report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing",
     current_price: Optional[float] = None,
     period: str = "3mo",
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Download the cached AI research report as PDF.

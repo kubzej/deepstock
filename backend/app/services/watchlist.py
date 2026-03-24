@@ -56,6 +56,28 @@ class TagUpdate(BaseModel):
 class WatchlistService:
     
     # ==========================================
+    # OWNERSHIP VERIFICATION
+    # ==========================================
+
+    async def verify_watchlist_ownership(self, watchlist_id: str, user_id: str) -> bool:
+        """Check that a watchlist belongs to the given user."""
+        response = supabase.table("watchlists") \
+            .select("id") \
+            .eq("id", watchlist_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
+
+    async def verify_item_ownership(self, item_id: str, user_id: str) -> bool:
+        """Check that a watchlist item belongs to a watchlist owned by user."""
+        response = supabase.table("watchlist_items") \
+            .select("watchlist_id, watchlists!inner(user_id)") \
+            .eq("id", item_id) \
+            .eq("watchlists.user_id", user_id) \
+            .execute()
+        return len(response.data) > 0
+
+    # ==========================================
     # WATCHLISTS
     # ==========================================
     

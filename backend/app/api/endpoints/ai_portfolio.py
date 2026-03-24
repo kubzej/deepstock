@@ -11,8 +11,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
 from app.services.options import options_service
@@ -53,7 +55,9 @@ async def get_cached_portfolio_advisor(
 
 
 @router.post("/portfolio-advisor", response_model=PortfolioAdvisorResponse)
+@limiter.limit("10/hour")
 async def generate_portfolio_advisor(
+    request: Request,
     payload: PortfolioAdvisorRequest = PortfolioAdvisorRequest(),
     user_id: str = Depends(get_current_user_id),
 ):

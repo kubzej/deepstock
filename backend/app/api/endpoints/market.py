@@ -1,8 +1,9 @@
 import json
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.services.market import market_service
 from app.services.exchange import exchange_service
+from app.core.auth import get_current_user_id
 from app.core.redis import get_redis
 from app.core.cache import CacheTTL
 from pydantic import BaseModel
@@ -17,7 +18,7 @@ class OptionSymbolsRequest(BaseModel):
     symbols: List[str]
 
 @router.post("/batch-quotes")
-async def get_quotes(payload: TickerRequest):
+async def get_quotes(payload: TickerRequest, user_id: str = Depends(get_current_user_id)):
     """
     Fetch price and change % for a list of tickers.
     Uses Redis caching + yfinance batch download.
@@ -27,7 +28,7 @@ async def get_quotes(payload: TickerRequest):
 
 
 @router.post("/option-quotes")
-async def get_option_quotes(payload: OptionSymbolsRequest):
+async def get_option_quotes(payload: OptionSymbolsRequest, user_id: str = Depends(get_current_user_id)):
     """
     Fetch price and Greeks for option OCC symbols.
     Uses Redis caching + yfinance.
@@ -37,7 +38,7 @@ async def get_option_quotes(payload: OptionSymbolsRequest):
 
 
 @router.get("/exchange-rates")
-async def get_exchange_rates():
+async def get_exchange_rates(user_id: str = Depends(get_current_user_id)):
     """
     Get current exchange rates to CZK.
     Returns: {'USD': 23.45, 'EUR': 25.10, 'GBP': 29.80, 'CZK': 1.0}
@@ -46,7 +47,7 @@ async def get_exchange_rates():
 
 
 @router.get("/history/{ticker}")
-async def get_price_history(ticker: str, period: str = "1mo"):
+async def get_price_history(ticker: str, period: str = "1mo", user_id: str = Depends(get_current_user_id)):
     """
     Get historical price data for charting.
     Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
@@ -55,7 +56,7 @@ async def get_price_history(ticker: str, period: str = "1mo"):
 
 
 @router.get("/stock-info/{ticker}")
-async def get_stock_info(ticker: str):
+async def get_stock_info(ticker: str, user_id: str = Depends(get_current_user_id)):
     """
     Get detailed stock info including fundamentals and valuation.
     Returns price, valuation ratios, margins, growth metrics, analyst targets.
@@ -67,7 +68,7 @@ async def get_stock_info(ticker: str):
 
 
 @router.get("/financials/{ticker}")
-async def get_historical_financials(ticker: str):
+async def get_historical_financials(ticker: str, user_id: str = Depends(get_current_user_id)):
     """
     Get historical annual financials for a ticker (up to 4 fiscal years).
     Returns: multiples (P/E, P/B, P/S, P/FCF, EV/EBITDA, EV/Revenue),
@@ -80,7 +81,7 @@ async def get_historical_financials(ticker: str):
 
 
 @router.get("/fear-greed")
-async def get_fear_greed():
+async def get_fear_greed(user_id: str = Depends(get_current_user_id)):
     """
     Fetch CNN Fear & Greed Index.
     Returns current score, rating, and historical snapshots (close, 1w, 1m, 1y).
@@ -101,8 +102,8 @@ async def get_fear_greed():
             )
             response.raise_for_status()
             raw = response.json()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Fear & Greed API nedostupné: {e}")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Fear & Greed API dočasně nedostupné")
 
     fg = raw["fear_and_greed"]
     result = {
@@ -119,7 +120,7 @@ async def get_fear_greed():
 
 
 @router.get("/technical/{ticker}")
-async def get_technical_indicators(ticker: str, period: str = "1y"):
+async def get_technical_indicators(ticker: str, period: str = "1y", user_id: str = Depends(get_current_user_id)):
     """
     Get technical analysis indicators for a stock.
     

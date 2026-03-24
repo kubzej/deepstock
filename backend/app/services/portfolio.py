@@ -116,6 +116,15 @@ class PortfolioService:
             .eq("user_id", user_id) \
             .execute()
         return response.data
+
+    async def verify_portfolio_ownership(self, portfolio_id: str, user_id: str) -> bool:
+        """Check that a portfolio belongs to the given user."""
+        response = supabase.table("portfolios") \
+            .select("id") \
+            .eq("id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return bool(response.data)
     
     async def create_portfolio(self, user_id: str, data: PortfolioCreate) -> dict:
         """Create a new portfolio."""

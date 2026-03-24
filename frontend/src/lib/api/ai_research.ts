@@ -1,7 +1,7 @@
 /**
  * AI Research API — generate and download AI-powered research reports
  */
-import { API_URL } from './client';
+import { API_URL, getAuthHeader } from './client';
 
 export type ReportType = 'briefing' | 'full_analysis' | 'technical_analysis';
 
@@ -23,7 +23,9 @@ export async function getCachedReport(
 ): Promise<AIResearchReport> {
   const params = new URLSearchParams({ report_type: reportType });
   if (reportType === 'technical_analysis') params.set('period', period);
-  const response = await fetch(`${API_URL}/api/ai/research/${ticker}?${params}`);
+  const response = await fetch(`${API_URL}/api/ai/research/${ticker}?${params}`, {
+    headers: await getAuthHeader(),
+  });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(error.detail || `HTTP ${response.status}`);
@@ -40,7 +42,7 @@ export async function generateReport(
 ): Promise<AIResearchReport> {
   const response = await fetch(`${API_URL}/api/ai/research/${ticker}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
     body: JSON.stringify({
       current_price: currentPrice,
       report_type: reportType,
@@ -71,7 +73,9 @@ export async function downloadPDF(
     params.set('period', period);
   }
 
-  const response = await fetch(`${API_URL}/api/ai/research/${ticker}/pdf?${params}`);
+  const response = await fetch(`${API_URL}/api/ai/research/${ticker}/pdf?${params}`, {
+    headers: await getAuthHeader(),
+  });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));

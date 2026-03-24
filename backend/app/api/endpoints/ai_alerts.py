@@ -12,8 +12,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.core.supabase import supabase
 from app.services.market import market_service
@@ -41,7 +43,9 @@ class AlertSuggestionsResponse(BaseModel):
 
 
 @router.post("/alert-suggestions", response_model=AlertSuggestionsResponse)
+@limiter.limit("10/hour")
 async def generate_alert_suggestions(
+    request: Request,
     payload: AlertSuggestionsRequest,
     user_id: str = Depends(get_current_user_id),
 ):

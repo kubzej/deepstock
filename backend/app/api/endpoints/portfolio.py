@@ -79,24 +79,30 @@ async def delete_portfolio(
 
 
 @router.get("/{portfolio_id}/holdings")
-async def get_holdings(portfolio_id: str):
+async def get_holdings(portfolio_id: str, user_id: str = Depends(get_current_user_id)):
     """Get all holdings in a portfolio."""
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.get_holdings(portfolio_id)
 
 
 @router.get("/{portfolio_id}/transactions")
-async def get_transactions(portfolio_id: str, limit: int = 50):
+async def get_transactions(portfolio_id: str, limit: int = 50, user_id: str = Depends(get_current_user_id)):
     """Get recent transactions for a portfolio."""
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.get_transactions(portfolio_id, limit)
 
 
 @router.post("/{portfolio_id}/transactions")
-async def add_transaction(portfolio_id: str, data: TransactionCreate):
+async def add_transaction(portfolio_id: str, data: TransactionCreate, user_id: str = Depends(get_current_user_id)):
     """
     Add a new transaction (BUY or SELL).
     Automatically updates holdings with FIFO cost basis.
     For SELL: use source_transaction_id to sell from a specific lot.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     tx = await portfolio_service.add_transaction(portfolio_id, data)
     executed_at = datetime.fromisoformat(tx["executed_at"]) if isinstance(tx["executed_at"], str) else tx["executed_at"]
     asyncio.create_task(journal_service.create_transaction_journal_entry(
@@ -115,29 +121,35 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate):
 
 
 @router.get("/{portfolio_id}/open-lots")
-async def get_all_open_lots(portfolio_id: str):
+async def get_all_open_lots(portfolio_id: str, user_id: str = Depends(get_current_user_id)):
     """
     Get all open lots across all holdings in the portfolio.
     Returns BUY transactions with remaining shares, enriched with stock info.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.get_all_open_lots(portfolio_id)
 
 
 @router.get("/{portfolio_id}/available-lots/{stock_ticker}", response_model=List[AvailableLot])
-async def get_available_lots(portfolio_id: str, stock_ticker: str):
+async def get_available_lots(portfolio_id: str, stock_ticker: str, user_id: str = Depends(get_current_user_id)):
     """
     Get available lots for selling a specific stock.
     Returns BUY transactions with remaining shares not yet sold.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.get_available_lots(portfolio_id, stock_ticker)
 
 
 @router.post("/{portfolio_id}/recalculate")
-async def recalculate_holdings(portfolio_id: str):
+async def recalculate_holdings(portfolio_id: str, user_id: str = Depends(get_current_user_id)):
     """
     Recalculate all holdings for a portfolio.
     Use this after migration to populate total_invested_czk.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.recalculate_all_holdings(portfolio_id)
 
 
@@ -145,12 +157,15 @@ async def recalculate_holdings(portfolio_id: str):
 async def update_transaction(
     portfolio_id: str,
     transaction_id: str,
-    data: TransactionUpdate
+    data: TransactionUpdate,
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Update an existing transaction.
     Only certain fields can be updated: shares, price, currency, fees, notes, date.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     try:
         result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
         if not result:
@@ -169,11 +184,13 @@ async def update_transaction(
 
 
 @router.delete("/{portfolio_id}/transactions/{transaction_id}")
-async def delete_transaction(portfolio_id: str, transaction_id: str):
+async def delete_transaction(portfolio_id: str, transaction_id: str, user_id: str = Depends(get_current_user_id)):
     """
     Delete a transaction.
     Warning: Cannot delete a BUY if shares from it have been sold.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     try:
         success = await portfolio_service.delete_transaction(portfolio_id, transaction_id)
         if not success:
