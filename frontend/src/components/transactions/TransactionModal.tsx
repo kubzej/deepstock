@@ -20,7 +20,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useStocks } from '@/hooks/useStocks';
-import { updateTransaction, API_URL, type Transaction } from '@/lib/api';
+import { updateTransaction, API_URL, getAuthHeader, type Transaction } from '@/lib/api';
 import { formatPrice, formatDate, formatNumber } from '@/lib/format';
 import { CURRENCIES } from '@/lib/constants';
 
@@ -156,6 +156,7 @@ export function TransactionModal({
     try {
       const response = await fetch(
         `${API_URL}/api/portfolio/${activePortfolio.id}/available-lots/${formData.stockTicker}`,
+        { headers: await getAuthHeader() },
       );
       if (response.ok) {
         const lots = await response.json();
@@ -376,7 +377,7 @@ export function TransactionModal({
       `${API_URL}/api/portfolio/${activePortfolio!.id}/transactions`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...(await getAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stock_ticker: data.stockTicker,
           stock_name: data.stockName || data.stockTicker,
