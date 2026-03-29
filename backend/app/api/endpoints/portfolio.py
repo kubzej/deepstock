@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot
 from app.services.performance import get_stock_performance, get_options_performance
@@ -31,9 +30,16 @@ async def get_all_holdings(user_id: str = Depends(get_current_user_id)):
 
 
 @router.get("/all/transactions")
-async def get_all_transactions(user_id: str = Depends(get_current_user_id), limit: int = 100):
-    """Get transactions across all user's portfolios."""
-    return await portfolio_service.get_all_transactions(user_id, limit)
+async def get_all_transactions(
+    user_id: str = Depends(get_current_user_id),
+    limit: int = 100,
+    cursor: Optional[str] = None,
+):
+    """
+    Get transactions across all user's portfolios, newest first.
+    Pass cursor (ISO datetime from previous response's next_cursor) to load older pages.
+    """
+    return await portfolio_service.get_all_transactions(user_id, limit, cursor)
 
 
 @router.get("/all/open-lots")
@@ -41,14 +47,6 @@ async def get_all_open_lots_for_user(user_id: str = Depends(get_current_user_id)
     """Get all open lots across all user's portfolios."""
     return await portfolio_service.get_all_open_lots_for_user(user_id)
 
-
-@router.post("/admin/recalculate-all")
-async def recalculate_all_portfolios(user_id: str = Depends(get_current_user_id)):
-    """
-    Recalculate all holdings across ALL portfolios.
-    One-time use after migration. Requires authentication.
-    """
-    return await portfolio_service.recalculate_all_portfolios()
 
 
 # ============ Single portfolio endpoints ============
@@ -103,20 +101,23 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate, user_id: s
     """
     if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
         raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
-    tx = await portfolio_service.add_transaction(portfolio_id, data)
-    executed_at = datetime.fromisoformat(tx["executed_at"]) if isinstance(tx["executed_at"], str) else tx["executed_at"]
-    asyncio.create_task(journal_service.create_transaction_journal_entry(
-        ticker=data.stock_ticker,
-        transaction_id=tx["id"],
-        portfolio_id=portfolio_id,
-        action=tx["type"],
-        shares=tx["shares"],
-        price=tx["price_per_share"],
-        currency=tx["currency"],
-        fees=tx.get("fees") or 0,
-        notes=data.notes,
-        executed_at=executed_at,
-    ))
+    try:
+        tx = await portfolio_service.add_transaction(portfolio_id, data)
+        executed_at = datetime.fromisoformat(tx["executed_at"]) if isinstance(tx["executed_at"], str) else tx["executed_at"]
+        await journal_service.create_transaction_journal_entry(
+            ticker=data.stock_ticker,
+            transaction_id=tx["id"],
+            portfolio_id=portfolio_id,
+            action=tx["type"],
+            shares=tx["shares"],
+            price=tx["price_per_share"],
+            currency=tx["currency"],
+            fees=tx.get("fees") or 0,
+            notes=data.notes,
+            executed_at=executed_at,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return tx
 
 
@@ -170,14 +171,14 @@ async def update_transaction(
         result = await portfolio_service.update_transaction(portfolio_id, transaction_id, data)
         if not result:
             raise HTTPException(status_code=404, detail="Transakce nenalezena")
-        asyncio.create_task(journal_service.update_transaction_journal_entry(
+        await journal_service.update_transaction_journal_entry(
             transaction_id=transaction_id,
             notes=result.get("notes"),
             shares=result["shares"],
             price=result["price_per_share"],
             currency=result["currency"],
             fees=result.get("fees") or 0,
-        ))
+        )
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

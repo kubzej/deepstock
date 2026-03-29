@@ -29,10 +29,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, FileText, DollarSign } from 'lucide-react';
+import { ChevronDown, Search, FileText, DollarSign } from 'lucide-react';
 import { usePortfolios } from '@/hooks/usePortfolios';
+import { Button } from '@/components/ui/button';
 import {
-  useAllTransactions,
+  useInfiniteTransactions,
   useAllOptionTransactions,
 } from '@/hooks/useTransactionHistory';
 import { formatPrice } from '@/lib/format';
@@ -63,11 +64,16 @@ export function TransactionHistoryPage() {
   // Data
   const { data: portfolios = [] } = usePortfolios();
   const {
-    data: stockTransactions = [],
+    data: stockPages,
     isLoading: stocksLoading,
     isFetching: stocksFetching,
     dataUpdatedAt: stocksUpdatedAt,
-  } = useAllTransactions();
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteTransactions();
+
+  const stockTransactions = stockPages?.pages.flatMap((p) => p.data) ?? [];
   const {
     data: optionTransactions = [],
     isLoading: optionsLoading,
@@ -173,7 +179,7 @@ export function TransactionHistoryPage() {
   ]);
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+    queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
     queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
   };
 
@@ -431,10 +437,25 @@ export function TransactionHistoryPage() {
             </>
           )}
 
-          {/* Summary */}
-          {!stocksLoading && filteredStockTransactions.length > 0 && (
-            <div className="flex justify-end mt-4 text-sm text-muted-foreground">
-              Zobrazeno {filteredStockTransactions.length} transakcí
+          {/* Load more + summary */}
+          {!stocksLoading && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                {filteredStockTransactions.length > 0
+                  ? `Zobrazeno ${filteredStockTransactions.length} z ${stockTransactions.length} načtených transakcí`
+                  : null}
+              </div>
+              {hasNextPage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  {isFetchingNextPage ? 'Načítám...' : 'Načíst starší transakce'}
+                </Button>
+              )}
             </div>
           )}
         </TabsContent>

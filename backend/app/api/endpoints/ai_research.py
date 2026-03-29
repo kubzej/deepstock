@@ -89,7 +89,7 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating report for {ticker}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Neočekávaná chyba při generování reportu.")

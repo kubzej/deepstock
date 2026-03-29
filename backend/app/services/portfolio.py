@@ -244,29 +244,50 @@ class PortfolioService:
         
         return response.data
     
-    async def get_all_transactions(self, user_id: str, limit: int = 100) -> List[dict]:
-        """Get transactions across all user's portfolios."""
-        # First get user's portfolio IDs
+    async def get_all_transactions(
+        self, user_id: str, limit: int = 100, cursor: Optional[str] = None
+    ) -> dict:
+        """
+        Get transactions across all user's portfolios.
+
+        Supports cursor-based pagination: pass cursor (ISO datetime of the
+        last seen executed_at) to fetch the next page of older transactions.
+
+        Returns:
+            {
+                "data": [...],
+                "next_cursor": "<ISO datetime> | None",
+                "has_more": bool,
+            }
+        """
         portfolios = await self.get_user_portfolios(user_id)
         if not portfolios:
-            return []
-        
+            return {"data": [], "next_cursor": None, "has_more": False}
+
         portfolio_ids = [p["id"] for p in portfolios]
         portfolio_names = {p["id"]: p["name"] for p in portfolios}
-        
-        # Get transactions with portfolio info
-        response = supabase.table("transactions") \
+
+        query = supabase.table("transactions") \
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares), portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
-            .order("executed_at", desc=True) \
-            .limit(limit) \
-            .execute()
-        
-        # Add portfolio_name to each transaction
-        for tx in response.data:
+            .order("executed_at", desc=True)
+
+        if cursor:
+            query = query.lt("executed_at", cursor)
+
+        # Fetch one extra row to determine whether more pages exist
+        response = query.limit(limit + 1).execute()
+
+        rows = response.data or []
+        has_more = len(rows) > limit
+        data = rows[:limit]
+
+        next_cursor = data[-1]["executed_at"] if (has_more and data) else None
+
+        for tx in data:
             tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
-        
-        return response.data
+
+        return {"data": data, "next_cursor": next_cursor, "has_more": has_more}
     
     async def get_all_open_lots_for_user(self, user_id: str) -> List[dict]:
         """
@@ -412,11 +433,24 @@ class PortfolioService:
             "source_transaction_id": data.source_transaction_id,
         }
         
+        # 3. Validate available shares for SELL
+        if data.type.upper() == "SELL":
+            holding = supabase.table("holdings") \
+                .select("shares") \
+                .eq("portfolio_id", portfolio_id) \
+                .eq("stock_id", stock["id"]) \
+                .execute()
+            available = float(holding.data[0]["shares"]) if holding.data else 0.0
+            if data.shares > available:
+                raise ValueError(
+                    f"Nedostatek akcií: k dispozici {available}, požadováno {data.shares}"
+                )
+
         tx_response = supabase.table("transactions") \
             .insert(tx_data) \
             .execute()
-        
-        # 3. Update holdings (recalculate position)
+
+        # 4. Update holdings (recalculate position)
         await self._recalculate_holding(portfolio_id, stock["id"])
         
         return tx_response.data[0]
