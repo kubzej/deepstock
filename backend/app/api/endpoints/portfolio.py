@@ -102,7 +102,7 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate, user_id: s
     if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
         raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     try:
-        tx = await portfolio_service.add_transaction(portfolio_id, data)
+        tx = await portfolio_service.add_transaction(portfolio_id, data, user_id=user_id)
         executed_at = datetime.fromisoformat(tx["executed_at"]) if isinstance(tx["executed_at"], str) else tx["executed_at"]
         await journal_service.create_transaction_journal_entry(
             ticker=data.stock_ticker,
@@ -196,6 +196,7 @@ async def delete_transaction(portfolio_id: str, transaction_id: str, user_id: st
         success = await portfolio_service.delete_transaction(portfolio_id, transaction_id)
         if not success:
             raise HTTPException(status_code=404, detail="Transakce nenalezena")
+        await journal_service.delete_transaction_journal_entry(transaction_id)
         return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

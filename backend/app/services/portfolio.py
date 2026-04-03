@@ -2,7 +2,7 @@ from app.core.supabase import supabase
 from app.services.stocks import stock_service
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 
@@ -39,6 +39,17 @@ class AvailableLot(BaseModel):
     price_per_share: float
     currency: str
     total_amount: float
+
+
+class TransactionUpdate(BaseModel):
+    """Update model for transactions - all fields optional."""
+    shares: Optional[float] = None
+    price_per_share: Optional[float] = None
+    currency: Optional[str] = None
+    exchange_rate_to_czk: Optional[float] = None
+    fees: Optional[float] = None
+    notes: Optional[str] = None
+    executed_at: Optional[datetime] = None
 
 
 class PortfolioService:
@@ -206,20 +217,6 @@ class PortfolioService:
             count += 1
         
         return {"recalculated": count}
-    
-    async def recalculate_all_portfolios(self) -> dict:
-        """Recalculate all holdings across ALL portfolios."""
-        # Get all portfolios
-        portfolios = supabase.table("portfolios") \
-            .select("id") \
-            .execute()
-        
-        total = 0
-        for p in portfolios.data:
-            result = await self.recalculate_all_holdings(p["id"])
-            total += result["recalculated"]
-        
-        return {"portfolios": len(portfolios.data), "holdings_recalculated": total}
     
     async def get_all_holdings(self, user_id: str) -> List[dict]:
         """Get all holdings across all user's portfolios with portfolio info."""
@@ -404,7 +401,7 @@ class PortfolioService:
         response = query.execute()
         return response.data
     
-    async def add_transaction(self, portfolio_id: str, data: TransactionCreate) -> dict:
+    async def add_transaction(self, portfolio_id: str, data: TransactionCreate, user_id: str = None) -> dict:
         """
         Add a transaction and update holdings.
         This is the core logic for portfolio management.
@@ -414,7 +411,7 @@ class PortfolioService:
         - Otherwise, use FIFO (oldest lots first)
         """
         # 1. Ensure stock exists in master table
-        stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name)
+        stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name, user_id=user_id)
         
         # 2. Create transaction record
         total_amount = data.shares * data.price_per_share
@@ -706,11 +703,11 @@ class PortfolioService:
                 "total_cost": round(total_cost, 4),
                 "total_invested_czk": round(total_invested_czk, 4),
                 "realized_pnl": round(realized_pnl, 4),
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="portfolio_id,stock_id") \
             .execute()
 
-    async def update_transaction(self, portfolio_id: str, transaction_id: str, data: 'TransactionUpdate') -> Optional[dict]:
+    async def update_transaction(self, portfolio_id: str, transaction_id: str, data: TransactionUpdate) -> Optional[dict]:
         """
         Update a transaction. Only allows updating certain fields.
         Recalculates holding after update.
@@ -771,7 +768,7 @@ class PortfolioService:
         if not update_data:
             return tx
         
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         response = supabase.table("transactions") \
             .update(update_data) \
@@ -822,17 +819,6 @@ class PortfolioService:
         await self._recalculate_holding(portfolio_id, stock_id)
         
         return True
-
-
-class TransactionUpdate(BaseModel):
-    """Update model for transactions - all fields optional."""
-    shares: Optional[float] = None
-    price_per_share: Optional[float] = None
-    currency: Optional[str] = None
-    exchange_rate_to_czk: Optional[float] = None
-    fees: Optional[float] = None
-    notes: Optional[str] = None
-    executed_at: Optional[datetime] = None
 
 
 portfolio_service = PortfolioService()

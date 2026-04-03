@@ -46,50 +46,32 @@ class ExchangeRateService:
             return json.loads(cached)
         
         rates = {'CZK': 1.0}  # CZK to CZK is always 1
-        
+
         try:
-            # Step 1: Fetch direct pairs (USD, EUR, GBP, CHF to CZK)
-            direct_tickers = " ".join(self.DIRECT_PAIRS.values())
-            direct_data = yf.download(direct_tickers, period="1d", progress=False)
-            
+            # Fetch all tickers in a single batch
+            cross_tickers = {curr: f'{curr}USD=X' for curr in self.CROSS_RATE_CURRENCIES}
+            all_tickers = list(self.DIRECT_PAIRS.values()) + list(cross_tickers.values())
+            data = yf.download(" ".join(all_tickers), period="1d", progress=False)
+
+            # Step 1: Process direct pairs (USD, EUR, GBP, CHF to CZK)
             for currency, ticker in self.DIRECT_PAIRS.items():
                 try:
-                    if len(self.DIRECT_PAIRS) == 1:
-                        rate = float(direct_data['Close'].iloc[-1])
-                    else:
-                        rate = float(direct_data['Close'][ticker].iloc[-1])
-                    
-                    # Check for NaN
+                    rate = float(data['Close'][ticker].iloc[-1])
                     if math.isnan(rate):
                         raise ValueError("NaN rate")
                     rates[currency] = round(rate, 4)
                 except Exception:
                     rates[currency] = self.FALLBACK_RATES.get(currency, 1.0)
-            
-            # Step 2: Calculate cross-rates via USD for other currencies
-            # e.g., HKD/CZK = (1 / HKD/USD) * USD/CZK = USD/HKD * USD/CZK
+
+            # Step 2: Calculate cross-rates via USD
+            # e.g., HKD/CZK = HKD/USD * USD/CZK
             usd_czk = rates.get('USD', 23.5)
-            
-            # Fetch XXX/USD pairs for cross-rate currencies
-            cross_tickers = {curr: f'{curr}USD=X' for curr in self.CROSS_RATE_CURRENCIES}
-            cross_tickers_str = " ".join(cross_tickers.values())
-            cross_data = yf.download(cross_tickers_str, period="1d", progress=False)
-            
-            for currency in self.CROSS_RATE_CURRENCIES:
+            for currency, ticker in cross_tickers.items():
                 try:
-                    ticker = cross_tickers[currency]
-                    if len(cross_tickers) == 1:
-                        curr_to_usd = float(cross_data['Close'].iloc[-1])
-                    else:
-                        curr_to_usd = float(cross_data['Close'][ticker].iloc[-1])
-                    
-                    # Check for NaN
+                    curr_to_usd = float(data['Close'][ticker].iloc[-1])
                     if math.isnan(curr_to_usd):
                         raise ValueError("NaN rate")
-                    
-                    # Cross rate: XXX/CZK = XXX/USD * USD/CZK
-                    cross_rate = curr_to_usd * usd_czk
-                    rates[currency] = round(cross_rate, 4)
+                    rates[currency] = round(curr_to_usd * usd_czk, 4)
                 except Exception as e:
                     logger.warning(f"Failed to get cross rate for {currency}: {e}")
                     rates[currency] = self.FALLBACK_RATES.get(currency, 1.0)

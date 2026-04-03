@@ -120,7 +120,7 @@ async def add_item(
     if not await watchlist_service.verify_watchlist_ownership(watchlist_id, user_id):
         raise HTTPException(status_code=404, detail="Watchlist nenalezen")
     try:
-        return await watchlist_service.add_item(watchlist_id, data)
+        return await watchlist_service.add_item(watchlist_id, data, user_id=user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

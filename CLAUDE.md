@@ -140,6 +140,11 @@ async def my_endpoint(user_id: str = Depends(get_current_user_id)):
 - Market data: `market_service` singleton from `app.services.market`
 - Routers registered in `app/main.py`
 
+### Security — Always Filter by user_id
+
+Backend uses Supabase `service_role_key` which bypasses Row Level Security.
+Every endpoint that returns user data **must** filter by `user_id` — either directly via `.eq("user_id", user_id)` or via a `verify_*_ownership()` check. Never return data without ownership verification.
+
 ### Market Service
 
 `market_service` (singleton) wraps all yfinance calls with Redis caching:

@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.core.supabase import supabase
 from app.core.redis import get_redis
-from app.services.exchange import ExchangeRateService
+from app.services.exchange import exchange_service
 from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
@@ -199,7 +199,6 @@ async def get_stock_performance(
         return PerformanceResult(data=[], total_return=0, total_return_pct=0)
     
     # 5. Get exchange rates for CZK conversion
-    exchange_service = ExchangeRateService()
     rates = await exchange_service.get_rates()
     
     # 6. Build daily positions from transactions

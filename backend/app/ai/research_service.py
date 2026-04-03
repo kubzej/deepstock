@@ -342,6 +342,15 @@ async def _save_report_to_journal(ticker: str, markdown: str, report_type: str, 
         logger.warning(f"Failed to save AI report to journal for {ticker}: {e}")
 
 
+# ─── Cache key ────────────────────────────────────────────────────────────────
+
+def build_cache_key(ticker: str, report_type: str, period: str = "3mo") -> str:
+    """Single source of truth for AI research cache keys."""
+    today = date.today().isoformat()
+    period_suffix = f":{period}" if report_type == "technical_analysis" else ""
+    return f"ai_research:{ticker}:{report_type}:{today}{period_suffix}"
+
+
 # ─── Main service ──────────────────────────────────────────────────────────────
 
 async def generate_research_report(
@@ -364,10 +373,7 @@ async def generate_research_report(
 
     Returns dict with keys: markdown, ticker, report_type, generated_at, model_used, cached
     """
-    today = date.today().isoformat()
-    # For technical_analysis include period in cache key (different period = different report)
-    cache_suffix = f":{period}" if report_type == "technical_analysis" else ""
-    cache_key = f"ai_research:{ticker}:{report_type}:{today}{cache_suffix}"
+    cache_key = build_cache_key(ticker, report_type, period)
 
     redis = get_redis()
 

@@ -147,6 +147,7 @@ async def delete_option_transaction(
     success = await options_service.delete_transaction(transaction_id)
     if not success:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    await journal_service.delete_option_journal_entry(transaction_id)
     return {"success": True}
 
 
@@ -217,6 +218,7 @@ async def close_option_position(
             exchange_rate_to_czk=exchange_rate_to_czk,
             notes=notes,
             source_transaction_id=source_transaction_id,
+            user_id=user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

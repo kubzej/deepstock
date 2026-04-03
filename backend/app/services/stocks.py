@@ -162,7 +162,7 @@ class StockService:
         except Exception:
             return False
     
-    async def get_or_create(self, ticker: str, name: Optional[str] = None) -> dict:
+    async def get_or_create(self, ticker: str, name: Optional[str] = None, user_id: Optional[str] = None) -> dict:
         """Get stock by ticker or create if not exists."""
         existing = await self.get_by_ticker(ticker)
         if existing:
@@ -179,7 +179,7 @@ class StockService:
         # Auto-create journal channel for this stock
         try:
             from app.services.journal import journal_service
-            await journal_service.get_or_create_stock_channel(stock["id"], stock["ticker"])
+            await journal_service.get_or_create_stock_channel(stock["id"], stock["ticker"], user_id=user_id)
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"Could not create journal channel for {stock['ticker']}: {e}")

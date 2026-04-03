@@ -87,7 +87,7 @@ class PriceAlertService:
         
         # Get items with targets from these watchlists
         items_response = supabase.table("watchlist_items") \
-            .select("*, stocks(ticker, name)") \
+            .select("*, stocks(ticker, name, currency)") \
             .in_("watchlist_id", watchlist_ids) \
             .execute()
         
@@ -164,10 +164,11 @@ class PriceAlertService:
         stock = item.get("stocks", {})
         ticker = stock.get("ticker", "Unknown")
         stock_name = stock.get("name", ticker)
+        currency = stock.get("currency") or "USD"
         target = float(item.get("target_buy_price", 0))
-        
+
         title = f"🟢 Nákupní příležitost: {ticker}"
-        body = f"{stock_name} je na ${current_price:.2f} (cíl: ${target:.2f})"
+        body = f"{stock_name} je na {current_price:.2f} {currency} (cíl: {target:.2f} {currency})"
         
         sent = send_push_notification(
             user_id=user_id,
@@ -183,10 +184,11 @@ class PriceAlertService:
         stock = item.get("stocks", {})
         ticker = stock.get("ticker", "Unknown")
         stock_name = stock.get("name", ticker)
+        currency = stock.get("currency") or "USD"
         target = float(item.get("target_sell_price", 0))
-        
+
         title = f"🔴 Prodejní cíl dosažen: {ticker}"
-        body = f"{stock_name} je na ${current_price:.2f} (cíl: ${target:.2f})"
+        body = f"{stock_name} je na {current_price:.2f} {currency} (cíl: {target:.2f} {currency})"
         
         sent = send_push_notification(
             user_id=user_id,
@@ -203,7 +205,7 @@ class PriceAlertService:
             supabase.table("watchlist_items") \
                 .update({
                     "last_buy_alert_price": target_price,
-                    "last_buy_alert_at": datetime.utcnow().isoformat()
+                    "last_buy_alert_at": datetime.now(timezone.utc).isoformat()
                 }) \
                 .eq("id", item_id) \
                 .execute()
@@ -216,7 +218,7 @@ class PriceAlertService:
             supabase.table("watchlist_items") \
                 .update({
                     "last_sell_alert_price": target_price,
-                    "last_sell_alert_at": datetime.utcnow().isoformat()
+                    "last_sell_alert_at": datetime.now(timezone.utc).isoformat()
                 }) \
                 .eq("id", item_id) \
                 .execute()
@@ -429,7 +431,7 @@ class PriceAlertService:
         Used by cron job to check alerts.
         """
         response = supabase.table("price_alerts") \
-            .select("*, stocks(ticker, name)") \
+            .select("*, stocks(ticker, name, currency)") \
             .eq("is_enabled", True) \
             .eq("is_triggered", False) \
             .execute()
@@ -629,20 +631,22 @@ class PriceAlertService:
         condition_value = float(alert.get("condition_value", 0))
         user_id = alert.get("user_id")
         
+        currency = stock.get("currency") or "USD"
+
         # Build notification message based on condition type
         if condition_type == "price_above":
-            title = f"⬆️ {ticker} nad ${condition_value:.2f}"
-            body = f"{stock_name} je na ${current_price:.2f}"
+            title = f"⬆️ {ticker} nad {condition_value:.2f} {currency}"
+            body = f"{stock_name} je na {current_price:.2f} {currency}"
         elif condition_type == "price_below":
-            title = f"⬇️ {ticker} pod ${condition_value:.2f}"
-            body = f"{stock_name} je na ${current_price:.2f}"
+            title = f"⬇️ {ticker} pod {condition_value:.2f} {currency}"
+            body = f"{stock_name} je na {current_price:.2f} {currency}"
         elif condition_type == "percent_change_day":
             direction = "+" if current_value >= 0 else ""
             title = f"📊 {ticker} změna {direction}{current_value:.1f}%"
             body = f"{stock_name} překročil práh ±{abs(condition_value):.1f}%"
         else:
             title = f"🔔 Alert: {ticker}"
-            body = f"Cena: ${current_price:.2f}"
+            body = f"Cena: {current_price:.2f} {currency}"
 
         # Append AI reason from notes if present
         notes = alert.get("notes")
