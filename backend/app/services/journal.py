@@ -9,10 +9,6 @@ from pydantic import BaseModel
 from app.core.supabase import supabase
 from app.core.config import get_settings
 
-# Single-user app — owner's UUID used as fallback when user_id is not available
-# in the call chain (e.g. auto-created stock channels from portfolio/watchlist services)
-_OWNER_USER_ID = "c5e00af6-13b1-42e4-b6e1-f3bf43fc2028"
-
 logger = logging.getLogger(__name__)
 
 
@@ -133,7 +129,7 @@ class JournalService:
 
     async def get_or_create_stock_channel(self, stock_id: str, ticker: str, user_id: str = None) -> dict:
         """Called when a stock is created. Idempotent."""
-        resolved_user_id = user_id or _OWNER_USER_ID
+        resolved_user_id = user_id
         existing = supabase.table("journal_channels") \
             .select("*") \
             .eq("stock_id", stock_id) \
@@ -468,6 +464,30 @@ class JournalService:
                 .execute()
         except Exception as e:
             logger.warning(f"Failed to update option journal entry ({option_transaction_id}): {e}")
+
+    async def delete_transaction_journal_entry(self, transaction_id: str) -> None:
+        """Delete journal entry linked to a stock transaction."""
+        try:
+            existing = supabase.table("journal_entries") \
+                .select("id") \
+                .eq("linked_transaction_id", transaction_id) \
+                .execute()
+            if existing.data:
+                await self.delete_entry(existing.data[0]["id"])
+        except Exception as e:
+            logger.warning(f"Failed to delete transaction journal entry ({transaction_id}): {e}")
+
+    async def delete_option_journal_entry(self, option_transaction_id: str) -> None:
+        """Delete journal entry linked to an option transaction."""
+        try:
+            existing = supabase.table("journal_entries") \
+                .select("id") \
+                .eq("linked_option_transaction_id", option_transaction_id) \
+                .execute()
+            if existing.data:
+                await self.delete_entry(existing.data[0]["id"])
+        except Exception as e:
+            logger.warning(f"Failed to delete option journal entry ({option_transaction_id}): {e}")
 
 
 journal_service = JournalService()

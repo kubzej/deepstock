@@ -374,25 +374,14 @@ interface AllTransactionsRaw extends TransactionRaw {
   portfolio_name: string;
 }
 
-export async function fetchAllTransactions(limit: number = 100): Promise<Transaction[]> {
-  const authHeader = await getAuthHeader();
-  const response = await fetch(`${API_URL}/api/portfolio/all/transactions?limit=${limit}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-    },
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Unauthorized');
-    }
-    throw new Error('Failed to fetch all transactions');
-  }
-  
-  const raw: AllTransactionsRaw[] = await response.json();
-  
-  return raw.map((tx) => ({
+export interface TransactionPage {
+  data: Transaction[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+function mapRawTransaction(tx: AllTransactionsRaw): Transaction {
+  return {
     id: tx.id,
     portfolioId: tx.portfolio_id,
     ticker: tx.stocks?.ticker || 'UNKNOWN',
@@ -416,7 +405,45 @@ export async function fetchAllTransactions(limit: number = 100): Promise<Transac
       shares: tx.source_transaction.shares,
     } : undefined,
     portfolioName: tx.portfolio_name,
-  }));
+  };
+}
+
+export async function fetchAllTransactions(limit: number = 1000): Promise<Transaction[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/all/transactions?limit=${limit}`, {
+    headers: { 'Content-Type': 'application/json', ...authHeader },
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    throw new Error('Failed to fetch all transactions');
+  }
+  const body = await response.json();
+  // Support both legacy array response and new paginated shape
+  const raw: AllTransactionsRaw[] = Array.isArray(body) ? body : body.data;
+  return raw.map(mapRawTransaction);
+}
+
+export async function fetchAllTransactionsPage(
+  limit: number = 100,
+  cursor?: string | null,
+): Promise<TransactionPage> {
+  const authHeader = await getAuthHeader();
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  const response = await fetch(
+    `${API_URL}/api/portfolio/all/transactions?${params}`,
+    { headers: { 'Content-Type': 'application/json', ...authHeader } },
+  );
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('Unauthorized');
+    throw new Error('Failed to fetch transactions');
+  }
+  const body = await response.json();
+  return {
+    data: (body.data as AllTransactionsRaw[]).map(mapRawTransaction),
+    next_cursor: body.next_cursor ?? null,
+    has_more: body.has_more ?? false,
+  };
 }
 
 export async function addTransaction(

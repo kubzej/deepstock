@@ -18,6 +18,7 @@ from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
+from app.ai.research_service import build_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,7 @@ async def get_cached_research_report(
     user_id: str = Depends(get_current_user_id),
 ):
     ticker = ticker.upper()
-    today = date.today().isoformat()
-    cache_suffix = f":{period}" if report_type == "technical_analysis" else ""
-    cache_key = f"ai_research:{ticker}:{report_type}:{today}{cache_suffix}"
+    cache_key = build_cache_key(ticker, report_type, period)
     redis = get_redis()
     cached = await redis.get(cache_key)
     if not cached:
@@ -89,7 +88,7 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
         )
         return result
     except ValueError as e:
-        raise HTTPException(status_code=402, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating report for {ticker}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Neočekávaná chyba při generování reportu.")
@@ -109,11 +108,9 @@ async def download_pdf(
     If no cached report exists for today, generates a new one first
     (requires current_price parameter).
     """
-    from datetime import date
     ticker = ticker.upper()
     today = date.today().isoformat()
-    cache_suffix = f":{period}" if report_type == "technical_analysis" else ""
-    cache_key = f"ai_research:{ticker}:{report_type}:{today}{cache_suffix}"
+    cache_key = build_cache_key(ticker, report_type, period)
 
     redis = get_redis()
     cached = await redis.get(cache_key)

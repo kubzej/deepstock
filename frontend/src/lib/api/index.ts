@@ -73,6 +73,8 @@ export {
   fetchAllOpenLots,
   fetchTransactions,
   fetchAllTransactions,
+  fetchAllTransactionsPage,
+  type TransactionPage,
   addTransaction,
   updateTransaction,
   deleteTransaction,

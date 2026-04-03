@@ -233,7 +233,7 @@ class WatchlistService:
             .execute()
         return response.data[0] if response.data else None
     
-    async def add_item(self, watchlist_id: str, data: WatchlistItemCreate) -> dict:
+    async def add_item(self, watchlist_id: str, data: WatchlistItemCreate, user_id: str = None) -> dict:
         """Add an item to a watchlist."""
         stock_id = data.stock_id
         
@@ -241,7 +241,8 @@ class WatchlistService:
         if not stock_id and data.ticker:
             stock = await stock_service.get_or_create(
                 ticker=data.ticker.upper(),
-                name=data.stock_name
+                name=data.stock_name,
+                user_id=user_id,
             )
             stock_id = stock["id"]
         

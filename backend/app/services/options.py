@@ -6,7 +6,7 @@ import logging
 from app.core.supabase import supabase
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -382,7 +382,7 @@ class OptionsService:
                         "volume": info.get("volume"),
                         "open_interest": info.get("openInterest"),
                         "implied_volatility": info.get("impliedVolatility"),
-                        "updated_at": datetime.utcnow().isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
                     })
                     
                 except Exception as e:
@@ -438,7 +438,7 @@ class OptionsService:
         """Update or insert option price and Greeks."""
         upsert_data = {
             "option_symbol": option_symbol,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         
         if data.price is not None:
@@ -513,7 +513,8 @@ class OptionsService:
         fees: float = 0,
         exchange_rate_to_czk: Optional[float] = None,
         notes: Optional[str] = None,
-        source_transaction_id: Optional[str] = None
+        source_transaction_id: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> tuple[dict, Optional[dict]]:
         """
         Close an existing option position.
@@ -597,6 +598,7 @@ class OptionsService:
                 exchange_rate_to_czk=exchange_rate_to_czk,
                 source_transaction_id=source_transaction_id,
                 notes=notes,
+                user_id=user_id,
             )
             linked_stock_tx_id = linked_stock_tx["id"]
         
@@ -648,6 +650,7 @@ class OptionsService:
         exchange_rate_to_czk: Optional[float],
         source_transaction_id: Optional[str],
         notes: Optional[str],
+        user_id: Optional[str] = None,
     ) -> dict:
         """
         Create a stock transaction when an option is assigned/exercised.
@@ -697,7 +700,7 @@ class OptionsService:
             )
         
         # Get or create stock
-        stock = await stock_service.get_or_create(symbol)
+        stock = await stock_service.get_or_create(symbol, user_id=user_id)
 
         # Currency comes from the holding (view exposes it from the opening transaction)
         stock_currency = holding.get("currency") or "USD"

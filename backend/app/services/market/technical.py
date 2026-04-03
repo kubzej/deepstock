@@ -1,6 +1,7 @@
 """
 Technical indicators calculation and signals generation
 """
+import numpy as np
 import yfinance as yf
 import pandas as pd
 import json
@@ -88,15 +89,8 @@ async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.Dat
         df['atr_percent'] = (df['atr14'] / df['close']) * 100
         
         # OBV (On-Balance Volume)
-        obv = [0]
-        for i in range(1, len(df)):
-            if df['close'].iloc[i] > df['close'].iloc[i-1]:
-                obv.append(obv[-1] + df['volume'].iloc[i])
-            elif df['close'].iloc[i] < df['close'].iloc[i-1]:
-                obv.append(obv[-1] - df['volume'].iloc[i])
-            else:
-                obv.append(obv[-1])
-        df['obv'] = obv
+        direction = np.sign(df['close'].diff()).fillna(0)
+        df['obv'] = (direction * df['volume']).cumsum()
         df['obv_sma'] = df['obv'].rolling(window=20).mean()
         
         # ADX (Average Directional Index)

@@ -1,7 +1,6 @@
 """
 Options API Endpoints for DeepStock.
 """
-import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Query
 from app.services.options import (
     options_service,
@@ -102,7 +101,7 @@ async def create_option_transaction(
     """
     tx = await options_service.create_transaction(portfolio_id, data)
     created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
-    asyncio.create_task(journal_service.create_option_journal_entry(
+    await journal_service.create_option_journal_entry(
         ticker=data.symbol,
         option_transaction_id=tx["id"],
         portfolio_id=portfolio_id,
@@ -115,7 +114,7 @@ async def create_option_transaction(
         option_symbol=tx["option_symbol"],
         notes=data.notes,
         created_at=created_at,
-    ))
+    )
     return tx
 
 
@@ -129,13 +128,13 @@ async def update_option_transaction(
     result = await options_service.update_transaction(transaction_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    asyncio.create_task(journal_service.update_option_journal_entry(
+    await journal_service.update_option_journal_entry(
         option_transaction_id=transaction_id,
         notes=result.get("notes"),
         action=result["action"],
         contracts=result["contracts"],
         premium=result.get("premium"),
-    ))
+    )
     return result
 
 
@@ -148,6 +147,7 @@ async def delete_option_transaction(
     success = await options_service.delete_transaction(transaction_id)
     if not success:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    await journal_service.delete_option_journal_entry(transaction_id)
     return {"success": True}
 
 
@@ -218,13 +218,14 @@ async def close_option_position(
             exchange_rate_to_czk=exchange_rate_to_czk,
             notes=notes,
             source_transaction_id=source_transaction_id,
+            user_id=user_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Option journal entry (same pattern as create_option_transaction)
     created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
-    asyncio.create_task(journal_service.create_option_journal_entry(
+    await journal_service.create_option_journal_entry(
         ticker=tx["symbol"],
         option_transaction_id=tx["id"],
         portfolio_id=portfolio_id,
@@ -237,12 +238,12 @@ async def close_option_position(
         option_symbol=tx["option_symbol"],
         notes=notes,
         created_at=created_at,
-    ))
+    )
 
     # Stock transaction journal entry for EXERCISE/ASSIGNMENT (same pattern as portfolio.py add_transaction)
     if stock_tx:
         stock_executed_at = datetime.fromisoformat(stock_tx["executed_at"]) if isinstance(stock_tx["executed_at"], str) else stock_tx["executed_at"]
-        asyncio.create_task(journal_service.create_transaction_journal_entry(
+        await journal_service.create_transaction_journal_entry(
             ticker=tx["symbol"],
             transaction_id=stock_tx["id"],
             portfolio_id=portfolio_id,
@@ -253,7 +254,7 @@ async def close_option_position(
             fees=stock_tx.get("fees") or 0,
             notes=stock_tx.get("notes"),
             executed_at=stock_executed_at,
-        ))
+        )
 
     return tx
 

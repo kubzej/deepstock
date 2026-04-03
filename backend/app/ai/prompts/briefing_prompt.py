@@ -90,15 +90,18 @@ vůči analytickým price targetům? Je ocenění napjaté, nebo existuje prosto
 **5. Insider aktivita – co říkají lidé uvnitř firmy**
 Posuď insider nákupy a prodeje z dat výše. Jsou nákupy signifikantní (vysoká hodnota,
 více insiderů najednou, nebo CEO/CFO)? Jsou prodeje rutinní (scheduled) nebo alarmující?
-Pokud žádná data nejsou, konstatuj to.
+Pozor na ekonomicky ekvivalentní nástroje: prepaid variable forward contracts, 10b5-1 plány
+uzavřené při vysokém kurzu nebo cashless exercises — tyto se neobjeví jako "S" v Form 4,
+ale ekonomicky jsou prodeje. Pokud žádná data nejsou, konstatuj to.
 
 **6. Co sledovat – klíčové metriky a milníky**
 Vyber 3–5 konkrétních věcí, které rozhodnou o směřování akcie v příštích 6–12 měsících.
 Ne obecné trendy – konkrétní milníky, s daty nebo čísly.
 
-**7. Bull case / Bear case**
-- Bull: 3 konkrétní katalyzátory, reálnost a časový horizont
-- Bear: 3 konkrétní rizika, pravděpodobnost a potenciální dopad
+**7. Bear case / Bull case**
+- Bear: 3 konkrétní rizika, pravděpodobnost a potenciální dopad na cenu
+- Bull: 3 konkrétní katalyzátory, reálnost a časový horizont — pokud jsou podmínky
+  spekulativní nebo závisí na více věcech najednou, řekni to jasně
 - Peer context: Jak si firma vede vůči konkurenci? Je prémiové ocenění oprávněné?
 - Makro a geopolitika: Fed, stav S&P 500, inflace z vyhledávacích výsledků. Dále geopolitické
   události (konflikty, sankce, regulace) a sektorové/sezónní katalyzátory (komoditní cykly,

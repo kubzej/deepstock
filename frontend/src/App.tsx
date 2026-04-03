@@ -84,13 +84,7 @@ function App() {
   };
 
   const handleEditSuccess = () => {
-    // Refresh the page to show updated data
-    const ticker = editStock?.ticker;
     setEditStock(null);
-    if (ticker) {
-      setSelectedTicker(null);
-      setTimeout(() => setSelectedTicker(ticker), 100);
-    }
   };
 
   // Stock delete handlers
@@ -113,15 +107,10 @@ function App() {
     }
   };
 
-  // If viewing stock detail
-  if (selectedTicker) {
-    return (
-      <PortfolioProvider>
-        <AppLayout
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          onNewOptionTransaction={() => setOptionModalOpen(true)}
-        >
+  const renderContent = () => {
+    if (selectedTicker) {
+      return (
+        <>
           <StockDetail
             ticker={selectedTicker}
             onBack={handleBackFromDetail}
@@ -167,12 +156,10 @@ function App() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </AppLayout>
-      </PortfolioProvider>
-    );
-  }
+        </>
+      );
+    }
 
-  const renderContent = () => {
     switch (activeTab) {
       case 'home':
         return (
@@ -231,17 +218,21 @@ function App() {
       >
         {renderContent()}
 
-        {/* Transaction Modal */}
-        <TransactionModal
-          open={transactionModalOpen}
-          onOpenChange={setTransactionModalOpen}
-        />
+        {!selectedTicker && (
+          <>
+            {/* Transaction Modal */}
+            <TransactionModal
+              open={transactionModalOpen}
+              onOpenChange={setTransactionModalOpen}
+            />
 
-        {/* Option Transaction Modal */}
-        <OptionTransactionModal
-          open={optionModalOpen}
-          onOpenChange={setOptionModalOpen}
-        />
+            {/* Option Transaction Modal */}
+            <OptionTransactionModal
+              open={optionModalOpen}
+              onOpenChange={setOptionModalOpen}
+            />
+          </>
+        )}
       </AppLayout>
     </PortfolioProvider>
   );

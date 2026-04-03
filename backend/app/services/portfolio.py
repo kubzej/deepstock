@@ -2,7 +2,7 @@ from app.core.supabase import supabase
 from app.services.stocks import stock_service
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 
@@ -39,6 +39,17 @@ class AvailableLot(BaseModel):
     price_per_share: float
     currency: str
     total_amount: float
+
+
+class TransactionUpdate(BaseModel):
+    """Update model for transactions - all fields optional."""
+    shares: Optional[float] = None
+    price_per_share: Optional[float] = None
+    currency: Optional[str] = None
+    exchange_rate_to_czk: Optional[float] = None
+    fees: Optional[float] = None
+    notes: Optional[str] = None
+    executed_at: Optional[datetime] = None
 
 
 class PortfolioService:
@@ -207,20 +218,6 @@ class PortfolioService:
         
         return {"recalculated": count}
     
-    async def recalculate_all_portfolios(self) -> dict:
-        """Recalculate all holdings across ALL portfolios."""
-        # Get all portfolios
-        portfolios = supabase.table("portfolios") \
-            .select("id") \
-            .execute()
-        
-        total = 0
-        for p in portfolios.data:
-            result = await self.recalculate_all_holdings(p["id"])
-            total += result["recalculated"]
-        
-        return {"portfolios": len(portfolios.data), "holdings_recalculated": total}
-    
     async def get_all_holdings(self, user_id: str) -> List[dict]:
         """Get all holdings across all user's portfolios with portfolio info."""
         # First get user's portfolio IDs
@@ -244,29 +241,50 @@ class PortfolioService:
         
         return response.data
     
-    async def get_all_transactions(self, user_id: str, limit: int = 100) -> List[dict]:
-        """Get transactions across all user's portfolios."""
-        # First get user's portfolio IDs
+    async def get_all_transactions(
+        self, user_id: str, limit: int = 100, cursor: Optional[str] = None
+    ) -> dict:
+        """
+        Get transactions across all user's portfolios.
+
+        Supports cursor-based pagination: pass cursor (ISO datetime of the
+        last seen executed_at) to fetch the next page of older transactions.
+
+        Returns:
+            {
+                "data": [...],
+                "next_cursor": "<ISO datetime> | None",
+                "has_more": bool,
+            }
+        """
         portfolios = await self.get_user_portfolios(user_id)
         if not portfolios:
-            return []
-        
+            return {"data": [], "next_cursor": None, "has_more": False}
+
         portfolio_ids = [p["id"] for p in portfolios]
         portfolio_names = {p["id"]: p["name"] for p in portfolios}
-        
-        # Get transactions with portfolio info
-        response = supabase.table("transactions") \
+
+        query = supabase.table("transactions") \
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares), portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
-            .order("executed_at", desc=True) \
-            .limit(limit) \
-            .execute()
-        
-        # Add portfolio_name to each transaction
-        for tx in response.data:
+            .order("executed_at", desc=True)
+
+        if cursor:
+            query = query.lt("executed_at", cursor)
+
+        # Fetch one extra row to determine whether more pages exist
+        response = query.limit(limit + 1).execute()
+
+        rows = response.data or []
+        has_more = len(rows) > limit
+        data = rows[:limit]
+
+        next_cursor = data[-1]["executed_at"] if (has_more and data) else None
+
+        for tx in data:
             tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
-        
-        return response.data
+
+        return {"data": data, "next_cursor": next_cursor, "has_more": has_more}
     
     async def get_all_open_lots_for_user(self, user_id: str) -> List[dict]:
         """
@@ -383,7 +401,7 @@ class PortfolioService:
         response = query.execute()
         return response.data
     
-    async def add_transaction(self, portfolio_id: str, data: TransactionCreate) -> dict:
+    async def add_transaction(self, portfolio_id: str, data: TransactionCreate, user_id: str = None) -> dict:
         """
         Add a transaction and update holdings.
         This is the core logic for portfolio management.
@@ -393,7 +411,7 @@ class PortfolioService:
         - Otherwise, use FIFO (oldest lots first)
         """
         # 1. Ensure stock exists in master table
-        stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name)
+        stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name, user_id=user_id)
         
         # 2. Create transaction record
         total_amount = data.shares * data.price_per_share
@@ -412,11 +430,24 @@ class PortfolioService:
             "source_transaction_id": data.source_transaction_id,
         }
         
+        # 3. Validate available shares for SELL
+        if data.type.upper() == "SELL":
+            holding = supabase.table("holdings") \
+                .select("shares") \
+                .eq("portfolio_id", portfolio_id) \
+                .eq("stock_id", stock["id"]) \
+                .execute()
+            available = float(holding.data[0]["shares"]) if holding.data else 0.0
+            if data.shares > available:
+                raise ValueError(
+                    f"Nedostatek akcií: k dispozici {available}, požadováno {data.shares}"
+                )
+
         tx_response = supabase.table("transactions") \
             .insert(tx_data) \
             .execute()
-        
-        # 3. Update holdings (recalculate position)
+
+        # 4. Update holdings (recalculate position)
         await self._recalculate_holding(portfolio_id, stock["id"])
         
         return tx_response.data[0]
@@ -672,11 +703,11 @@ class PortfolioService:
                 "total_cost": round(total_cost, 4),
                 "total_invested_czk": round(total_invested_czk, 4),
                 "realized_pnl": round(realized_pnl, 4),
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="portfolio_id,stock_id") \
             .execute()
 
-    async def update_transaction(self, portfolio_id: str, transaction_id: str, data: 'TransactionUpdate') -> Optional[dict]:
+    async def update_transaction(self, portfolio_id: str, transaction_id: str, data: TransactionUpdate) -> Optional[dict]:
         """
         Update a transaction. Only allows updating certain fields.
         Recalculates holding after update.
@@ -737,7 +768,7 @@ class PortfolioService:
         if not update_data:
             return tx
         
-        update_data["updated_at"] = datetime.utcnow().isoformat()
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         response = supabase.table("transactions") \
             .update(update_data) \
@@ -788,17 +819,6 @@ class PortfolioService:
         await self._recalculate_holding(portfolio_id, stock_id)
         
         return True
-
-
-class TransactionUpdate(BaseModel):
-    """Update model for transactions - all fields optional."""
-    shares: Optional[float] = None
-    price_per_share: Optional[float] = None
-    currency: Optional[str] = None
-    exchange_rate_to_czk: Optional[float] = None
-    fees: Optional[float] = None
-    notes: Optional[str] = None
-    executed_at: Optional[datetime] = None
 
 
 portfolio_service = PortfolioService()
