@@ -4,30 +4,26 @@ X Feed Analysis prompt — summarizes recent tweets from a curated list of accou
 from datetime import datetime, timezone
 
 SYSTEM_PROMPT = """Jsi finanční analytik specializující se na sledování sociálních sítí.
-Dostaneš tweety z vybraných X/Twitter účtů za posledních 24–48 hodin a informaci o tom, jaký je záměr tohoto seznamu účtů (co sledujeme).
+Dostaneš tweety z vybraných X/Twitter účtů za posledních 24-48 hodin a instrukce jak je analyzovat.
 
-Tvým úkolem je vytvořit souhrn přizpůsobený záměru seznamu — viz sekce "Záměr seznamu" v datech.
-Pokud záměr není uveden, zaměř se obecně na: investiční témata, tržní události, makro pohyby, geopolitiku ovlivňující trhy.
-
-Pravidla — MUSÍŠ dodržet všechna:
+Základní pravidla — MUSÍŠ dodržet vždy:
 - Piš výhradně česky
-- NIKDY nepoužívej emoji ani emotikony — ani v nadpisech, ani v odrážkách
-- Vycházej POUZE z poskytnutých tweetů — nedomýšlej, nepřidávej vlastní analýzu, netvoř závěry, které z dat nevyplývají
+- NIKDY nepoužívej emoji ani emotikony
+- Vycházej POUZE z poskytnutých tweetů — žádné vlastní znalosti, doplňky ani závěry které z dat nevyplývají
 - Každé tvrzení musí být přímo doložitelné konkrétním tweetem v datech
-- Pokud téma v datech není, nezmiňuj ho — raději kratší a přesný souhrn než delší s doplňky
-- Pokud účet nic relevantního k záměru seznamu nenapsal, nezmiňuj ho
-- Délka: přizpůsob počtu relevantních účtů — přibližně 80–120 slov na účet, bez pevného stropu
+- Pokud téma v datech není, nezmiňuj ho
 - Použij markdown: nadpisy (##), odrážky, tučné pro klíčová slova
-- Na konci přidej sekci ## Konsensuální témata pouze pokud více účtů skutečně řeší stejné téma"""
+
+Strukturu výstupu, co sledovat a jak organizovat informace určují instrukce v datech — řiď se jimi."""
 
 
 def build_user_prompt(list_name: str, tweets_by_user: dict[str, list[dict]], description: str | None = None) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [f"# Feed: {list_name}", f"Vygenerováno: {now}", ""]
     if description:
-        lines += [f"Zamer seznamu: {description}", ""]
+        lines += ["## Instrukce pro analýzu", description, ""]
     else:
-        lines += ["Zamer seznamu: obecny prehled - investicni temata, makro, geopolitika", ""]
+        lines += ["## Instrukce pro analýzu", "Obecný přehled — investiční témata, tržní události, makro, geopolitika ovlivňující trhy.", ""]
 
     total_tweets = 0
     for username, tweets in tweets_by_user.items():

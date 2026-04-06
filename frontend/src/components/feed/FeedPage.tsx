@@ -112,7 +112,7 @@ function FeedListCard({ list }: { list: FeedList }) {
               <Loader2 className="w-5 h-5 animate-spin shrink-0" />
               <div className="text-sm">
                 <p className="font-medium">Načítám příspěvky a analyzuji...</p>
-                <p className="text-xs">Může trvat 15–30 sekund.</p>
+                <p className="text-xs">Může trvat 1-2 minuty.</p>
               </div>
             </div>
           )}

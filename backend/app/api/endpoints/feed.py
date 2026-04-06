@@ -158,11 +158,11 @@ async def generate_feed_summary(
             return FeedSummaryResponse(**data, cached=True)
 
     # Fetch tweets
-    from app.services.apify_service import fetch_tweets_for_list
+    from app.services.twitter_service import fetch_tweets_for_list
     try:
         tweets_by_user = await fetch_tweets_for_list(usernames)
     except Exception as e:
-        logger.error(f"Apify fetch failed: {e}", exc_info=True)
+        logger.error(f"Twitter fetch failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail="Nepodařilo se načíst tweety. Zkus to znovu.")
 
     # Guard: skip LLM if no tweets were fetched

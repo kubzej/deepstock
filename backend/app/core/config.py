@@ -25,8 +25,10 @@ class Settings(BaseSettings):
     ai_model: str = "anthropic/claude-sonnet-4-6"
     ai_max_tokens: int = 8000
 
-    # Apify
-    apify_api_token: str = ""
+    # Twitter scraping
+    twitter_auth_token: str = ""
+    twitter_ct0: str = ""
+    proxy_url: str = ""  # optional, empty = no proxy
 
     # App
     debug: bool = False

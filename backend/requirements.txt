@@ -10,6 +10,7 @@ supabase>=2.3.0
 PyJWT[crypto]>=2.8.0
 pywebpush>=2.0.0
 slowapi>=0.1.9
+twikit @ https://github.com/d60/twikit/archive/refs/heads/main.tar.gz
 
 # AI Research
 litellm>=1.40.0
