@@ -614,7 +614,7 @@ export function OptionTransactionModal({
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                    Celkem
+                    Cashflow
                   </div>
                   <div className="font-mono-price font-medium">
                     $

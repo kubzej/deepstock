@@ -12,10 +12,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Pencil, Trash2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   createPortfolio,
+  recalculateAllPortfolioHoldings,
   updatePortfolio,
   deletePortfolio,
   type Portfolio,
@@ -34,7 +35,12 @@ export function PortfolioSettings({ onBack }: PortfolioSettingsProps) {
   const [deleteData, setDeleteData] = useState<Portfolio | null>(null);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculateOpen, setRecalculateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(
+    null,
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -97,6 +103,28 @@ export function PortfolioSettings({ onBack }: PortfolioSettingsProps) {
     }
   };
 
+  const handleRecalculate = async () => {
+    setRecalculating(true);
+    setError(null);
+
+    try {
+      const result = await recalculateAllPortfolioHoldings();
+      await refresh();
+      setRecalculateOpen(false);
+      setMaintenanceMessage(
+        `Přepočítáno ${result.recalculated} pozic napříč ${result.portfolios} portfolii.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Nepodařilo se přepočítat historické účetnictví',
+      );
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header with back button */}
@@ -116,6 +144,35 @@ export function PortfolioSettings({ onBack }: PortfolioSettingsProps) {
         <p className="text-muted-foreground text-sm mt-1">
           Správa vašich investičních portfolií
         </p>
+      </div>
+
+      {(maintenanceMessage || error) && (
+        <Alert variant={error ? 'destructive' : 'default'}>
+          <AlertDescription>{error ?? maintenanceMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3">
+        <div>
+          <div className="text-sm font-medium">Obnova dopočtů portfolia</div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Znovu sestaví agregované pozice a odvozené hodnoty ze zdrojových
+            transakcí napříč portfolii. Hodí se po větších změnách logiky nebo
+            když chceš srovnat uložené souhrny s historií transakcí.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setMaintenanceMessage(null);
+            setError(null);
+            setRecalculateOpen(true);
+          }}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Obnovit dopočty
+        </Button>
       </div>
 
       {loading ? (
@@ -243,6 +300,32 @@ export function PortfolioSettings({ onBack }: PortfolioSettingsProps) {
               disabled={saving}
             >
               {saving ? 'Mažu...' : 'Smazat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recalculateOpen} onOpenChange={setRecalculateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Obnovit dopočty portfolia</DialogTitle>
+            <DialogDescription>
+              Akce projde všechna vaše portfolia a znovu dopočítá agregované
+              pozice a související metriky ze zdrojových transakcí. Uložené
+              souhrnné hodnoty se mohou upravit, pokud byly dříve neaktuální.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRecalculateOpen(false)}
+              disabled={recalculating}
+            >
+              Zrušit
+            </Button>
+            <Button onClick={handleRecalculate} disabled={recalculating}>
+              {recalculating ? 'Obnovuji...' : 'Spustit obnovu'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -48,6 +48,12 @@ async def get_all_open_lots_for_user(user_id: str = Depends(get_current_user_id)
     return await portfolio_service.get_all_open_lots_for_user(user_id)
 
 
+@router.post("/all/recalculate")
+async def recalculate_all_user_holdings(user_id: str = Depends(get_current_user_id)):
+    """Recalculate holdings across all portfolios owned by the user."""
+    return await portfolio_service.recalculate_all_user_holdings(user_id)
+
+
 
 # ============ Single portfolio endpoints ============
 

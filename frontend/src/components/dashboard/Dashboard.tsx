@@ -11,6 +11,7 @@ import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
+import { calculatePortfolioSnapshot } from '@/lib/portfolioSnapshot';
 
 interface DashboardProps {
   onStockClick?: (ticker: string) => void;
@@ -48,37 +49,19 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
     }));
   }, [holdings]);
 
-  // Calculate totals in CZK
-  const totalValueCzk = holdingsForTable.reduce((sum, h) => {
-    const price = quotes[h.ticker]?.price ?? 0;
-    const scale = h.priceScale ?? 1;
-    // For LSE stocks, price is in pence - multiply by scale to get actual value
-    return sum + toCZK(price * scale * h.shares, h.currency, rates);
-  }, 0);
+  const snapshot = useMemo(
+    () => calculatePortfolioSnapshot(holdingsForTable, quotes, rates),
+    [holdingsForTable, quotes, rates],
+  );
 
-  // Use historical invested CZK if available, otherwise calculate from current rate
-  const totalCostCzk = holdingsForTable.reduce((sum, h) => {
-    if (h.totalInvestedCzk !== undefined && h.totalInvestedCzk !== null) {
-      return sum + h.totalInvestedCzk;
-    }
-    // Fallback to current rate calculation
-    return sum + toCZK(h.avgCost * h.shares, h.currency, rates);
-  }, 0);
-
-  const totalPnLCzk = totalValueCzk - totalCostCzk;
-  const totalPnLPercent =
-    totalCostCzk > 0 ? (totalPnLCzk / totalCostCzk) * 100 : 0;
-
-  const dailyChangeCzk = holdingsForTable.reduce((sum, h) => {
-    const change = quotes[h.ticker]?.change ?? 0;
-    const scale = h.priceScale ?? 1;
-    return sum + toCZK(change * scale * h.shares, h.currency, rates);
-  }, 0);
-
-  const dailyChangePercent =
-    totalValueCzk > 0
-      ? (dailyChangeCzk / (totalValueCzk - dailyChangeCzk)) * 100
-      : 0;
+  const {
+    totalValueCzk,
+    totalCostCzk,
+    totalPnLCzk,
+    totalPnLPercent,
+    dailyChangeCzk,
+    dailyChangePercent,
+  } = snapshot;
 
   // Calculate extended hours (pre-market / after-hours) change
   const extendedHoursData = useMemo(() => {
@@ -311,10 +294,10 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
             </div>
           )}
 
-          {/* Total P/L */}
+          {/* Unrealized P/L across open holdings */}
           <div>
             <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-              Celkem P/L
+              Nerealizovaný P/L
             </span>
             <span
               className={`text-lg font-mono-price font-semibold ${
@@ -359,7 +342,8 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            Nepodařilo se načíst aktuální kurzy — hodnoty portfolia jsou přepočítány orientačními kurzy.
+            Nepodařilo se načíst aktuální kurzy — hodnoty portfolia jsou
+            přepočítány orientačními kurzy.
           </AlertDescription>
         </Alert>
       )}

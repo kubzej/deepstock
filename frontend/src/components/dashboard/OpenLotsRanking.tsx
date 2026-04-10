@@ -22,6 +22,9 @@ export interface OpenLot {
   currency: string;
   priceScale?: number;
   exchangeRate?: number;
+  economicBuyPrice: number;
+  remainingCostBasis: number;
+  remainingCostBasisCzk: number;
   portfolioName?: string;
   preMarketPrice?: number | null;
   postMarketPrice?: number | null;
@@ -50,6 +53,7 @@ function LotRow({
     date: string;
     shares: number;
     buyPrice: number;
+    economicBuyPrice: number;
     currentPriceScaled: number;
     currency: string;
     plCzk: number;
@@ -128,8 +132,7 @@ function LotRow({
         {/* Subrow: Shares × Buy Price → Current Price | Cost → Value */}
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[11px] text-muted-foreground font-mono-price">
-            {lot.shares} ks × {formatPrice(lot.buyPrice, lot.currency)}
-            {' '}
+            {lot.shares} ks × {formatPrice(lot.economicBuyPrice, lot.currency)}{' '}
             <span
               className={
                 lot.extendedHoursType === 'pre'
@@ -221,24 +224,23 @@ export function OpenLotsRanking({
         const scale = lot.priceScale ?? 1;
 
         // Pick effective price: pre-market > post-market > regular
-        const extendedHoursType: 'pre' | 'post' | null =
-          lot.preMarketPrice ? 'pre' : lot.postMarketPrice ? 'post' : null;
+        const extendedHoursType: 'pre' | 'post' | null = lot.preMarketPrice
+          ? 'pre'
+          : lot.postMarketPrice
+            ? 'post'
+            : null;
         const effectivePrice =
           lot.preMarketPrice ?? lot.postMarketPrice ?? lot.currentPrice;
 
         // buyPrice is stored in actual currency (e.g., GBP for LSE stocks)
         // effectivePrice from quotes is in quoted units (e.g., pence) - needs scale
-        const costBasis = lot.buyPrice * lot.shares;
+        const costBasis = lot.remainingCostBasis;
         const currentPriceScaled = effectivePrice * scale;
         const currentValue = currentPriceScaled * lot.shares;
         const plAmount = currentValue - costBasis;
         const plPercent = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
 
-        // Use historical exchange rate for cost basis if available
-        // This ensures P/L matches the main position calculation
-        const costBasisCzk = lot.exchangeRate
-          ? costBasis * lot.exchangeRate
-          : toCZK(costBasis, lot.currency, rates);
+        const costBasisCzk = lot.remainingCostBasisCzk;
         const currentValueCzk = toCZK(currentValue, lot.currency, rates);
         const plCzk = currentValueCzk - costBasisCzk;
 

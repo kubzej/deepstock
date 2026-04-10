@@ -36,7 +36,7 @@ export interface Holding {
   currency: string;
   sector?: string;
   priceScale?: number;
-  totalInvestedCzk?: number;
+  totalInvestedCzk: number;
   portfolioName?: string;
 }
 
@@ -129,9 +129,7 @@ export function HoldingsTable({
       const currentValue = currentPrice * scale * h.shares;
       const currentValueCzk = toCZK(currentValue, h.currency, rates);
 
-      // Use historical invested CZK if available, otherwise calculate from current rate
-      const investedCzk =
-        h.totalInvestedCzk ?? toCZK(h.avgCost * h.shares, h.currency, rates);
+      const investedCzk = h.totalInvestedCzk;
 
       const plCzk = currentValueCzk - investedCzk;
       const plPercent = investedCzk > 0 ? (plCzk / investedCzk) * 100 : 0;

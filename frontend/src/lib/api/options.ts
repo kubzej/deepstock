@@ -26,6 +26,16 @@ export interface OptionTransaction {
   currency: string;
   exchange_rate_to_czk: number | null;
   fees: number;
+  gross_amount: number;
+  gross_amount_czk: number;
+  economic_amount: number;
+  economic_amount_czk: number;
+  net_cashflow: number;
+  net_cashflow_czk: number;
+  fee_czk: number;
+  realized_pl: number | null;
+  realized_pl_czk: number | null;
+  transferred_entry_per_share: number | null;
   date: string;
   notes: string | null;
   linked_stock_tx_id: string | null;

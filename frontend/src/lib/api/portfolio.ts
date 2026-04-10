@@ -20,7 +20,7 @@ export interface Holding {
   currency: string;
   sector?: string;
   price_scale?: number;
-  total_invested_czk?: number;
+  total_invested_czk: number;
   current_price?: number;
   current_value?: number;
   unrealized_pnl?: number;
@@ -43,6 +43,20 @@ interface TransactionRaw {
   currency: string;
   exchange_rate_to_czk?: number;
   fees?: number;
+  gross_amount: number;
+  gross_amount_czk: number;
+  economic_amount: number;
+  economic_amount_czk: number;
+  net_cashflow: number;
+  net_cashflow_czk: number;
+  fee_czk: number;
+  cost_basis_sold: number | null;
+  cost_basis_sold_czk: number | null;
+  realized_pnl: number | null;
+  realized_pnl_czk: number | null;
+  remaining_shares: number | null;
+  remaining_cost_basis: number | null;
+  remaining_cost_basis_czk: number | null;
   executed_at: string;
   notes?: string;
   source_transaction_id?: string;
@@ -83,6 +97,20 @@ export interface Transaction {
   currency: string;
   exchangeRate?: number;
   fees?: number;
+  grossAmount: number;
+  grossAmountCzk: number;
+  economicAmount: number;
+  economicAmountCzk: number;
+  netCashflow: number;
+  netCashflowCzk: number;
+  feeCzk: number;
+  costBasisSold: number | null;
+  costBasisSoldCzk: number | null;
+  realizedPnl: number | null;
+  realizedPnlCzk: number | null;
+  remainingShares: number | null;
+  remainingCostBasis: number | null;
+  remainingCostBasisCzk: number | null;
   date: string;
   notes?: string;
   // For SELL: source lot transaction ID and full object
@@ -102,6 +130,9 @@ export interface OpenLot {
   currency: string;
   priceScale?: number;
   exchangeRate?: number;
+  economicBuyPrice: number;
+  remainingCostBasis: number;
+  remainingCostBasisCzk: number;
   portfolioName?: string;
 }
 
@@ -113,6 +144,11 @@ export interface TransactionUpdateData {
   fees?: number;
   notes?: string;
   executed_at?: string;
+}
+
+export interface RecalculateHoldingsResult {
+  portfolios: number;
+  recalculated: number;
 }
 
 // ============ Portfolio Endpoints ============
@@ -205,6 +241,26 @@ export async function deletePortfolio(portfolioId: string): Promise<void> {
   }
 }
 
+export async function recalculateAllPortfolioHoldings(): Promise<RecalculateHoldingsResult> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(`${API_URL}/api/portfolio/all/recalculate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeader,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    throw new Error('Nepodařilo se přepočítat portfolio účetnictví');
+  }
+
+  return response.json();
+}
+
 // ============ Holdings Endpoints ============
 
 export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
@@ -233,7 +289,7 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
     currency: h.stocks.currency || 'USD',
     sector: h.stocks.sector || '',
     price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
-    total_invested_czk: h.total_invested_czk,
+    total_invested_czk: requireHoldingTotalInvestedCzk(h.total_invested_czk),
   }));
 }
 
@@ -250,6 +306,16 @@ interface AllHoldingsRaw {
   total_invested_czk?: number;
   portfolio_id: string;
   portfolio_name: string;
+}
+
+function requireHoldingTotalInvestedCzk(
+  totalInvestedCzk: number | undefined,
+): number {
+  if (totalInvestedCzk === undefined) {
+    throw new Error('Backend neposlal total_invested_czk pro holding');
+  }
+
+  return totalInvestedCzk;
 }
 
 export async function fetchAllHoldings(): Promise<Holding[]> {
@@ -277,7 +343,7 @@ export async function fetchAllHoldings(): Promise<Holding[]> {
     currency: h.stocks.currency || 'USD',
     sector: h.stocks.sector || '',
     price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
-    total_invested_czk: h.total_invested_czk,
+    total_invested_czk: requireHoldingTotalInvestedCzk(h.total_invested_czk),
     portfolio_id: h.portfolio_id,
     portfolio_name: h.portfolio_name,
   }));
@@ -342,32 +408,8 @@ export async function fetchTransactions(portfolioId: string, limit: number = 50)
   }
   
   const raw: TransactionRaw[] = await response.json();
-  
-  // Transform to frontend format
-  return raw.map((tx) => ({
-    id: tx.id,
-    portfolioId: tx.portfolio_id,
-    ticker: tx.stocks?.ticker || 'UNKNOWN',
-    stockName: tx.stocks?.name || '',
-    type: tx.type,
-    shares: tx.shares,
-    price: tx.price_per_share,
-    total: tx.total_amount,
-    totalCzk: tx.total_amount_czk || 0,
-    currency: tx.currency,
-    exchangeRate: tx.exchange_rate_to_czk,
-    fees: tx.fees,
-    date: tx.executed_at,
-    notes: tx.notes,
-    sourceTransactionId: tx.source_transaction_id,
-    sourceTransaction: tx.source_transaction ? {
-      id: tx.source_transaction.id,
-      date: tx.source_transaction.executed_at,
-      price: tx.source_transaction.price_per_share,
-      currency: tx.source_transaction.currency,
-      shares: tx.source_transaction.shares,
-    } : undefined,
-  }));
+
+  return raw.map((tx) => mapRawTransaction(tx));
 }
 
 interface AllTransactionsRaw extends TransactionRaw {
@@ -380,7 +422,24 @@ export interface TransactionPage {
   has_more: boolean;
 }
 
-function mapRawTransaction(tx: AllTransactionsRaw): Transaction {
+function mapSourceTransaction(tx: TransactionRaw['source_transaction']): SourceTransaction | undefined {
+  if (!tx) {
+    return undefined;
+  }
+
+  return {
+    id: tx.id,
+    date: tx.executed_at,
+    price: tx.price_per_share,
+    currency: tx.currency,
+    shares: tx.shares,
+  };
+}
+
+function mapRawTransaction(
+  tx: TransactionRaw,
+  options?: { portfolioName?: string },
+): Transaction {
   return {
     id: tx.id,
     portfolioId: tx.portfolio_id,
@@ -394,17 +453,25 @@ function mapRawTransaction(tx: AllTransactionsRaw): Transaction {
     currency: tx.currency,
     exchangeRate: tx.exchange_rate_to_czk,
     fees: tx.fees,
+    grossAmount: tx.gross_amount,
+    grossAmountCzk: tx.gross_amount_czk,
+    economicAmount: tx.economic_amount,
+    economicAmountCzk: tx.economic_amount_czk,
+    netCashflow: tx.net_cashflow,
+    netCashflowCzk: tx.net_cashflow_czk,
+    feeCzk: tx.fee_czk,
+    costBasisSold: tx.cost_basis_sold,
+    costBasisSoldCzk: tx.cost_basis_sold_czk,
+    realizedPnl: tx.realized_pnl,
+    realizedPnlCzk: tx.realized_pnl_czk,
+    remainingShares: tx.remaining_shares,
+    remainingCostBasis: tx.remaining_cost_basis,
+    remainingCostBasisCzk: tx.remaining_cost_basis_czk,
     date: tx.executed_at,
     notes: tx.notes,
     sourceTransactionId: tx.source_transaction_id,
-    sourceTransaction: tx.source_transaction ? {
-      id: tx.source_transaction.id,
-      date: tx.source_transaction.executed_at,
-      price: tx.source_transaction.price_per_share,
-      currency: tx.source_transaction.currency,
-      shares: tx.source_transaction.shares,
-    } : undefined,
-    portfolioName: tx.portfolio_name,
+    sourceTransaction: mapSourceTransaction(tx.source_transaction),
+    portfolioName: options?.portfolioName,
   };
 }
 
@@ -418,9 +485,9 @@ export async function fetchAllTransactions(limit: number = 1000): Promise<Transa
     throw new Error('Failed to fetch all transactions');
   }
   const body = await response.json();
-  // Support both legacy array response and new paginated shape
-  const raw: AllTransactionsRaw[] = Array.isArray(body) ? body : body.data;
-  return raw.map(mapRawTransaction);
+  return (body.data as AllTransactionsRaw[]).map((tx) =>
+    mapRawTransaction(tx, { portfolioName: tx.portfolio_name }),
+  );
 }
 
 export async function fetchAllTransactionsPage(
@@ -440,7 +507,9 @@ export async function fetchAllTransactionsPage(
   }
   const body = await response.json();
   return {
-    data: (body.data as AllTransactionsRaw[]).map(mapRawTransaction),
+    data: (body.data as AllTransactionsRaw[]).map((tx) =>
+      mapRawTransaction(tx, { portfolioName: tx.portfolio_name }),
+    ),
     next_cursor: body.next_cursor ?? null,
     has_more: body.has_more ?? false,
   };
@@ -500,22 +569,7 @@ export async function updateTransaction(
   }
   
   const raw = await response.json();
-  return {
-    id: raw.id,
-    portfolioId: raw.portfolio_id,
-    ticker: raw.stocks?.ticker || '',
-    stockName: raw.stocks?.name || '',
-    type: raw.type,
-    shares: raw.shares,
-    price: raw.price_per_share,
-    total: raw.total_amount,
-    totalCzk: raw.total_amount * (raw.exchange_rate_to_czk || 1),
-    currency: raw.currency,
-    exchangeRate: raw.exchange_rate_to_czk,
-    fees: raw.fees,
-    date: raw.executed_at,
-    notes: raw.notes,
-  };
+  return mapRawTransaction(raw);
 }
 
 export async function deleteTransaction(

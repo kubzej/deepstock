@@ -166,17 +166,6 @@ async def delete_option_transactions_by_symbol(
 # Close Position (convenience endpoint)
 # ==========================================
 
-class ClosePositionRequest(OptionTransactionUpdate):
-    """Request to close an existing position."""
-    option_symbol: str
-    closing_action: OptionAction
-    contracts: int
-    premium: Optional[float] = None
-    close_date: date
-    fees: float = 0
-    exchange_rate_to_czk: Optional[float] = None
-    notes: Optional[str] = None
-
 
 @router.post("/{portfolio_id}/close")
 async def close_option_position(

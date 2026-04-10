@@ -391,10 +391,10 @@ export function OptionsTrades({
                     </div>
                   </div>
 
-                  {/* P/L */}
+                  {/* Unrealized P/L for the open option position */}
                   <div>
                     <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                      P/L
+                      Nerealizovaný P/L
                     </div>
                     {h.pl !== null ? (
                       <div

@@ -142,7 +142,10 @@ export function TransactionHistoryPage() {
       // Type filter (buy/sell based on action)
       // Type filter
       if (typeFilter !== 'all') {
-        const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
+        const isSettlement =
+          tx.action === 'ASSIGNMENT' ||
+          tx.action === 'EXERCISE' ||
+          tx.action === 'EXPIRATION';
         if (typeFilter === 'settlement') return isSettlement;
         if (isSettlement) return false;
         const isBuy = tx.action === 'BTO' || tx.action === 'BTC';
@@ -352,10 +355,7 @@ export function TransactionHistoryPage() {
                         {tx.shares} × {formatPrice(tx.price, tx.currency)}
                       </span>
                       <span className="font-mono-price font-medium">
-                        {formatPrice(
-                          tx.type === 'BUY' ? -tx.totalCzk : tx.totalCzk,
-                          'CZK',
-                        )}
+                        {formatPrice(tx.netCashflowCzk, 'CZK')}
                       </span>
                     </div>
                   </div>
@@ -392,7 +392,7 @@ export function TransactionHistoryPage() {
                         Poplatky
                       </TableHead>
                       <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
-                        Celkem CZK
+                        Cashflow CZK
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -424,10 +424,7 @@ export function TransactionHistoryPage() {
                           {tx.fees ? formatPrice(tx.fees, tx.currency) : '—'}
                         </TableCell>
                         <TableCell className="text-right font-mono-price">
-                          {formatPrice(
-                            tx.type === 'BUY' ? -tx.totalCzk : tx.totalCzk,
-                            'CZK',
-                          )}
+                          {formatPrice(tx.netCashflowCzk, 'CZK')}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -453,7 +450,9 @@ export function TransactionHistoryPage() {
                   disabled={isFetchingNextPage}
                 >
                   <ChevronDown className="h-4 w-4 mr-1" />
-                  {isFetchingNextPage ? 'Načítám...' : 'Načíst starší transakce'}
+                  {isFetchingNextPage
+                    ? 'Načítám...'
+                    : 'Načíst starší transakce'}
                 </Button>
               )}
             </div>
@@ -479,15 +478,6 @@ export function TransactionHistoryPage() {
               {/* Mobile Cards */}
               <div className="md:hidden space-y-2">
                 {filteredOptionTransactions.map((tx: OptionTransaction) => {
-                  const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
-                  const totalPremium = tx.total_premium || 0;
-                  const rate = tx.exchange_rate_to_czk || 1;
-                  const fees = tx.fees || 0;
-                  const isSell = tx.action === 'STO' || tx.action === 'STC';
-                  const totalCzk = isSell
-                    ? totalPremium * rate - fees
-                    : -(totalPremium * rate) - fees;
-
                   return (
                     <div
                       key={tx.id}
@@ -520,7 +510,7 @@ export function TransactionHistoryPage() {
                             : '—'}
                         </span>
                         <span className="font-mono-price font-medium">
-                          {isSettlement ? '—' : formatPrice(totalCzk, 'CZK')}
+                          {formatPrice(tx.net_cashflow_czk, 'CZK')}
                         </span>
                       </div>
                     </div>
@@ -564,23 +554,12 @@ export function TransactionHistoryPage() {
                         Poplatky
                       </TableHead>
                       <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-right">
-                        Celkem CZK
+                        Cashflow CZK
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOptionTransactions.map((tx: OptionTransaction) => {
-                      // Calculate total in CZK
-                      // ASSIGNMENT/EXERCISE: P/L is already in the opening tx, show nothing
-                      const isSettlement = tx.action === 'ASSIGNMENT' || tx.action === 'EXERCISE' || tx.action === 'EXPIRATION';
-                      const totalPremium = tx.total_premium || 0;
-                      const rate = tx.exchange_rate_to_czk || 1;
-                      const fees = tx.fees || 0;
-                      const isSell = tx.action === 'STO' || tx.action === 'STC';
-                      const totalCzk = isSell
-                        ? totalPremium * rate - fees
-                        : -(totalPremium * rate) - fees;
-
                       return (
                         <TableRow key={tx.id}>
                           <TableCell className="text-muted-foreground">
@@ -621,7 +600,7 @@ export function TransactionHistoryPage() {
                             {tx.fees ? formatPrice(tx.fees, tx.currency) : '—'}
                           </TableCell>
                           <TableCell className="text-right font-mono-price">
-                            {isSettlement ? '—' : formatPrice(totalCzk, 'CZK')}
+                            {formatPrice(tx.net_cashflow_czk, 'CZK')}
                           </TableCell>
                         </TableRow>
                       );

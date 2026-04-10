@@ -36,8 +36,10 @@ import type {
   OptionTransaction,
   Stock,
   PerformancePeriod,
+  PerformancePoint,
 } from '@/lib/api';
 import { AIPortfolioAdvisorSection } from '@/components/analysis/AIPortfolioAdvisorSection';
+import { calculatePortfolioSnapshot } from '@/lib/portfolioSnapshot';
 
 type TabType = 'overview' | 'stocks' | 'options' | 'ai';
 type ValueMode = 'current' | 'invested';
@@ -161,7 +163,7 @@ export function AnalysisPage() {
   // Helper to get value for distribution based on mode
   const calcValue = (h: (typeof holdings)[0]) => {
     if (valueMode === 'invested') {
-      return h.total_invested_czk ?? 0;
+      return h.total_invested_czk;
     }
     const quote = quotes[h.ticker];
     const price = quote?.price || 0;
@@ -178,6 +180,55 @@ export function AnalysisPage() {
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings, quotes, rates, valueMode]);
+
+  const portfolioSnapshot = useMemo(
+    () =>
+      calculatePortfolioSnapshot(
+        holdings.map((holding) => ({
+          ticker: holding.ticker,
+          shares: holding.shares,
+          currency: holding.currency,
+          priceScale: holding.price_scale,
+          totalInvestedCzk: holding.total_invested_czk,
+        })),
+        quotes,
+        rates,
+      ),
+    [holdings, quotes, rates],
+  );
+
+  // Build chart data: replace today's point with live snapshot (matches Dashboard),
+  // then filter by selected date range
+  const chartData = useMemo((): PerformancePoint[] => {
+    const points = stockPerfData?.data ?? [];
+    if (points.length === 0) return [];
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const liveValue = portfolioSnapshot.totalValueCzk;
+    const liveCost = portfolioSnapshot.totalCostCzk;
+
+    // Replace/append today's point with live data so chart matches Dashboard
+    const withLiveToday = [...points];
+    if (liveValue > 0) {
+      const todayIdx = withLiveToday.findIndex((p) => p.date === today);
+      const livePoint: PerformancePoint = {
+        date: today,
+        value: Math.round(liveValue * 100) / 100,
+        invested: Math.round(liveCost * 100) / 100,
+      };
+      if (todayIdx >= 0) {
+        withLiveToday[todayIdx] = livePoint;
+      } else {
+        withLiveToday.push(livePoint);
+      }
+    }
+
+    // Filter by date range
+    return withLiveToday.filter((point) => {
+      const date = parseISO(point.date);
+      return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
+    });
+  }, [stockPerfData?.data, dateRange, portfolioSnapshot]);
 
   // Distribution calculations
   const sectorDistribution = useMemo((): DistributionItem[] => {
@@ -332,7 +383,7 @@ export function AnalysisPage() {
 
           {/* Performance chart */}
           <PerformanceChart
-            data={stockPerfData?.data ?? []}
+            data={chartData}
             isLoading={stockPerfLoading}
             showInvested
           />
