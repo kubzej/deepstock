@@ -255,3 +255,20 @@ def annotate_stock_transactions(transactions: list[dict]) -> list[dict]:
 
     by_id = {tx["id"]: tx for tx in enriched}
     return [by_id[tx["id"]] for tx in transactions if tx.get("id") in by_id]
+
+
+def compute_lot_remaining_shares(transactions: list[dict]) -> dict[str, float]:
+    """
+    Return {buy_transaction_id: remaining_shares} for all BUY lots.
+
+    Accounts for both linked sells (source_transaction_id set) and FIFO
+    fallback sells (source_transaction_id is None). Requires the full
+    transaction list for the position (buys AND sells) so the annotation
+    engine can correctly consume sells against lots.
+    """
+    annotated = annotate_stock_transactions(transactions)
+    return {
+        tx["id"]: tx["remaining_shares"]
+        for tx in annotated
+        if tx["type"] == "BUY"
+    }
