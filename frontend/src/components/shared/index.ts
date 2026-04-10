@@ -6,6 +6,7 @@
 export { Login } from './Login';
 
 // Layout components
+export { BrandLogo } from './BrandLogo';
 export { PageHeader } from './PageHeader';
 export { PillButton } from './PillButton';
 export { PortfolioSelector } from './PortfolioSelector';

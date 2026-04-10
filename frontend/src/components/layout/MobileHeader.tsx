@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModal } from '@/contexts/ModalContext';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
 const menuItems = [
@@ -60,7 +61,7 @@ export function MobileHeader() {
       <div className="flex items-center justify-between h-14 px-4">
         {/* Logo + Portfolio Selector */}
         <div className="flex flex-col">
-          <span className="text-lg font-bold text-primary">DeepStock</span>
+          <BrandLogo size="sm" />
           <PortfolioSelector
             variant="mobile"
             onSettingsClick={() => navigate({ to: '/settings/portfolios' })}

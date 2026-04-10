@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModal } from '@/contexts/ModalContext';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
 const menuItems = [
@@ -47,10 +48,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden md:flex flex-col w-64 h-screen bg-card border-r border-border fixed left-0 top-0">
+    <aside className="hidden md:flex flex-col w-64 h-screen bg-sidebar border-r border-border fixed left-0 top-0">
       {/* Logo + Portfolio Selector */}
       <div className="p-4 border-b border-border">
-        <h1 className="text-xl font-bold text-primary mb-3">DeepStock</h1>
+        <BrandLogo className="mb-3" />
         <PortfolioSelector
           variant="desktop"
           onSettingsClick={() => navigate({ to: '/settings/portfolios' })}
