@@ -3,7 +3,6 @@
  * Shows price with upper, middle (SMA 20), and lower bands
  */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   ComposedChart,
   Line,
@@ -15,12 +14,9 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
-import {
-  fetchTechnicalIndicators,
-  type IndicatorSignalType,
-  type TechnicalPeriod,
-} from '@/lib/api';
+import { type IndicatorSignalType, type TechnicalPeriod } from '@/lib/api';
 import { getSmartDecimals } from '@/lib/format';
+import { useTechnicalData } from '@/hooks/useTechnicalData';
 
 // ============================================================
 // TYPES
@@ -170,12 +166,7 @@ function CustomTooltip({
 export function BollingerBandsChart({ ticker }: BollingerBandsChartProps) {
   const [period, setPeriod] = useState<TechnicalPeriod>('3mo');
 
-  const { data: technicalData, isLoading } = useQuery({
-    queryKey: ['technical', ticker, period],
-    queryFn: () => fetchTechnicalIndicators(ticker, period),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  const { data: technicalData, isLoading } = useTechnicalData(ticker, period);
 
   if (isLoading || !technicalData) {
     return (

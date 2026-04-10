@@ -206,40 +206,39 @@ async def get_stock_performance(
     positions: Dict[str, float] = {}  # ticker -> shares
     invested_total_czk = 0.0
     tx_by_date: Dict[str, List[dict]] = {}
-    
+
     for tx in transactions:
         tx_date = pd.to_datetime(tx["executed_at"]).date().isoformat()
         if tx_date not in tx_by_date:
             tx_by_date[tx_date] = []
         tx_by_date[tx_date].append(tx)
-    
+
     # 7. Calculate daily portfolio value
     result_data = []
     dates = close_prices.index.tolist()
-    
+
     for date in dates:
         date_str = date.date().isoformat()
-        
+
         # Apply any transactions on this date
         if date_str in tx_by_date:
             for tx in tx_by_date[date_str]:
                 ticker = tx["stocks"]["ticker"]
                 shares = float(tx["shares"])
-                
-                # Use total_amount_czk if available, otherwise convert manually
-                if tx.get("total_amount_czk"):
-                    amount_czk = float(tx["total_amount_czk"])
-                else:
-                    total_amount = float(tx["total_amount"])
-                    rate = float(tx.get("exchange_rate_to_czk") or rates.get(tx.get("currency", "USD"), 23.5))
-                    amount_czk = total_amount * rate
-                
+                tx_rate = float(tx.get("exchange_rate_to_czk") or rates.get(tx.get("currency", "USD"), 23.5))
+
                 if tx["type"] == "BUY":
+                    # Invested = gross amount + fees (fee-inclusive cashflow)
+                    gross_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
+                    fees_czk = float(tx.get("fees") or 0) * tx_rate
+                    invested_total_czk += gross_czk + fees_czk
                     positions[ticker] = positions.get(ticker, 0) + shares
-                    invested_total_czk += amount_czk
+
                 else:  # SELL
+                    # Invested decreases by proceeds received (cashflow semantics)
+                    proceeds_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
+                    invested_total_czk -= proceeds_czk
                     positions[ticker] = positions.get(ticker, 0) - shares
-                    invested_total_czk -= amount_czk
         
         # Calculate portfolio value in CZK
         portfolio_value_czk = 0.0

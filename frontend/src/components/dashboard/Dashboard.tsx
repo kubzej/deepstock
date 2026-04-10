@@ -11,7 +11,7 @@ import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
-import { calculatePortfolioSnapshot } from '@/lib/portfolioSnapshot';
+import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
 
 interface DashboardProps {
   onAddTransaction?: () => void;
@@ -48,19 +48,15 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
     }));
   }, [holdings]);
 
-  const snapshot = useMemo(
-    () => calculatePortfolioSnapshot(holdingsForTable, quotes, rates),
-    [holdingsForTable, quotes, rates],
-  );
+  const snapshotPortfolioId = isAllPortfolios ? null : (portfolio?.id ?? undefined);
+  const { data: snapshot } = usePortfolioSnapshot(snapshotPortfolioId);
 
-  const {
-    totalValueCzk,
-    totalCostCzk,
-    totalPnLCzk,
-    totalPnLPercent,
-    dailyChangeCzk,
-    dailyChangePercent,
-  } = snapshot;
+  const totalValueCzk = snapshot?.total_value_czk ?? 0;
+  const totalCostCzk = snapshot?.total_cost_czk ?? 0;
+  const totalPnLCzk = snapshot?.total_pnl_czk ?? 0;
+  const totalPnLPercent = snapshot?.total_pnl_percent ?? 0;
+  const dailyChangeCzk = snapshot?.daily_change_czk ?? 0;
+  const dailyChangePercent = snapshot?.daily_change_percent ?? 0;
 
   // Calculate extended hours (pre-market / after-hours) change
   const extendedHoursData = useMemo(() => {

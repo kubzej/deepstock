@@ -1,5 +1,5 @@
 /**
- * Portfolio API - Portfolio CRUD, holdings, transactions, open lots
+ * Portfolio API - Portfolio CRUD, holdings, transactions, open lots, snapshot
  */
 import { API_URL, getAuthHeader } from './client';
 
@@ -598,6 +598,32 @@ export async function deleteTransaction(
     }
     throw new Error('Nepodařilo se smazat transakci');
   }
+}
+
+
+// ============ Snapshot Types & Endpoints ============
+
+export interface PortfolioSnapshot {
+  total_value_czk: number;
+  total_cost_czk: number;
+  total_pnl_czk: number;
+  total_pnl_percent: number;
+  daily_change_czk: number;
+  daily_change_percent: number;
+}
+
+export async function fetchPortfolioSnapshot(portfolioId: string | null): Promise<PortfolioSnapshot> {
+  const authHeader = await getAuthHeader();
+  const endpoint = portfolioId
+    ? `${API_URL}/api/portfolio/${portfolioId}/snapshot`
+    : `${API_URL}/api/portfolio/all/snapshot`;
+  const response = await fetch(endpoint, {
+    headers: { ...authHeader },
+  });
+  if (!response.ok) {
+    throw new Error('Nepodařilo se načíst snapshot portfolia');
+  }
+  return response.json();
 }
 
 

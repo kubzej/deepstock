@@ -5,6 +5,8 @@ from app.services.portfolio_accounting import (
     calculate_stock_holding_totals,
     compute_lot_remaining_shares,
 )
+from app.services.market import market_service
+from app.services.exchange import exchange_service
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -46,6 +48,15 @@ class AvailableLot(BaseModel):
     economic_price_per_share: float
     remaining_cost_basis: float
     remaining_cost_basis_czk: float
+
+
+class PortfolioSnapshot(BaseModel):
+    total_value_czk: float
+    total_cost_czk: float
+    total_pnl_czk: float
+    total_pnl_percent: float
+    daily_change_czk: float
+    daily_change_percent: float
 
 
 def _require_annotated_float(transaction: dict, field_name: str) -> float:
@@ -701,6 +712,64 @@ class PortfolioService:
         await self._recalculate_holding(portfolio_id, stock_id)
         
         return True
+
+    async def get_portfolio_snapshot(self, portfolio_id: Optional[str], user_id: str) -> PortfolioSnapshot:
+        """
+        Compute live portfolio snapshot: total value, cost basis, P/L, and daily change in CZK.
+        portfolio_id=None means all portfolios for the user.
+        """
+        if portfolio_id:
+            holdings = await self.get_holdings(portfolio_id)
+        else:
+            holdings = await self.get_all_holdings(user_id)
+
+        if not holdings:
+            return PortfolioSnapshot(
+                total_value_czk=0.0,
+                total_cost_czk=0.0,
+                total_pnl_czk=0.0,
+                total_pnl_percent=0.0,
+                daily_change_czk=0.0,
+                daily_change_percent=0.0,
+            )
+
+        tickers = [h["stocks"]["ticker"] for h in holdings]
+        quotes = await market_service.get_quotes(tickers)
+        rates = await exchange_service.get_rates()
+
+        total_value_czk = 0.0
+        total_cost_czk = 0.0
+        daily_change_czk = 0.0
+
+        for holding in holdings:
+            ticker = holding["stocks"]["ticker"]
+            currency = holding["stocks"].get("currency") or "USD"
+            scale = float(holding["stocks"].get("price_scale") or 1)
+            shares = float(holding.get("shares") or 0)
+            total_invested_czk = float(holding.get("total_invested_czk") or 0)
+            rate = float(rates.get(currency, 1.0))
+
+            quote = quotes.get(ticker, {})
+            price = float(quote.get("price") or 0)
+            change = float(quote.get("change") or 0)
+
+            total_value_czk += price * scale * shares * rate
+            total_cost_czk += total_invested_czk
+            daily_change_czk += change * scale * shares * rate
+
+        total_pnl_czk = total_value_czk - total_cost_czk
+        total_pnl_percent = (total_pnl_czk / total_cost_czk * 100) if total_cost_czk > 0 else 0.0
+        prev_value = total_value_czk - daily_change_czk
+        daily_change_percent = (daily_change_czk / prev_value * 100) if prev_value > 0 else 0.0
+
+        return PortfolioSnapshot(
+            total_value_czk=round(total_value_czk, 2),
+            total_cost_czk=round(total_cost_czk, 2),
+            total_pnl_czk=round(total_pnl_czk, 2),
+            total_pnl_percent=round(total_pnl_percent, 4),
+            daily_change_czk=round(daily_change_czk, 2),
+            daily_change_percent=round(daily_change_percent, 4),
+        )
 
 
 portfolio_service = PortfolioService()

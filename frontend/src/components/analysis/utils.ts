@@ -213,14 +213,14 @@ export function calculateStockPerformance(
       totalBought += amount;
     } else {
       totalSold += amount;
-      if (tx.sourceTransaction) {
-        const costBasis =
-          tx.sourceTransaction.price * tx.shares * (tx.exchangeRate || 1);
-        const saleAmount = amount;
-        const pl = saleAmount - costBasis;
-        trades.push(pl);
+      // Use backend-computed realized P/L (fee-inclusive, FIFO) instead of manual calculation
+      if (tx.realizedPnlCzk !== null && tx.realizedPnlCzk !== undefined) {
+        const realizedPL = tx.realizedPnlCzk;
+        const costBasisCzk = tx.costBasisSoldCzk ?? 0;
+        const proceedsCzk = tx.economicAmountCzk ?? amount;
+        trades.push(realizedPL);
 
-        const realizedPLPct = costBasis > 0 ? (pl / costBasis) * 100 : 0;
+        const realizedPLPct = costBasisCzk > 0 ? (realizedPL / costBasisCzk) * 100 : 0;
 
         closedTrades.push({
           id: tx.id,
@@ -228,14 +228,14 @@ export function calculateStockPerformance(
           stockName: tx.stockName,
           portfolioName: tx.portfolioName,
           shares: tx.shares,
-          buyDate: tx.sourceTransaction.date,
+          buyDate: tx.sourceTransaction?.date ?? tx.date,
           sellDate: tx.date,
-          buyPrice: tx.sourceTransaction.price,
+          buyPrice: tx.sourceTransaction?.price ?? 0,
           sellPrice: tx.price,
           currency: tx.currency,
-          costBasisCzk: costBasis,
-          proceedsCzk: saleAmount,
-          realizedPLCzk: pl,
+          costBasisCzk,
+          proceedsCzk,
+          realizedPLCzk: realizedPL,
           realizedPLPct,
         });
       }

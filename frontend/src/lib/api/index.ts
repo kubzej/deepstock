@@ -82,6 +82,8 @@ export {
   deleteTransaction,
   fetchStockPerformance,
   fetchOptionsPerformance,
+  type PortfolioSnapshot,
+  fetchPortfolioSnapshot,
 } from './portfolio';
 
 // Stocks

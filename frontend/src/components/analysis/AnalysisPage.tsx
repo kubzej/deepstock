@@ -39,7 +39,7 @@ import type {
   PerformancePoint,
 } from '@/lib/api';
 import { AIPortfolioAdvisorSection } from '@/components/analysis/AIPortfolioAdvisorSection';
-import { calculatePortfolioSnapshot } from '@/lib/portfolioSnapshot';
+import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
 
 type TabType = 'overview' | 'stocks' | 'options' | 'ai';
 type ValueMode = 'current' | 'invested';
@@ -83,8 +83,12 @@ export function AnalysisPage() {
     isFetching: portfolioFetching,
     dataUpdatedAt,
     activePortfolio,
+    isAllPortfolios,
   } = usePortfolio();
   const portfolioId = activePortfolio?.id;
+
+  const snapshotPortfolioId = isAllPortfolios ? null : portfolioId;
+  const { data: portfolioSnapshot } = usePortfolioSnapshot(snapshotPortfolioId);
 
   const {
     data: stockTransactions = [],
@@ -181,22 +185,6 @@ export function AnalysisPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings, quotes, rates, valueMode]);
 
-  const portfolioSnapshot = useMemo(
-    () =>
-      calculatePortfolioSnapshot(
-        holdings.map((holding) => ({
-          ticker: holding.ticker,
-          shares: holding.shares,
-          currency: holding.currency,
-          priceScale: holding.price_scale,
-          totalInvestedCzk: holding.total_invested_czk,
-        })),
-        quotes,
-        rates,
-      ),
-    [holdings, quotes, rates],
-  );
-
   // Build chart data: replace today's point with live snapshot (matches Dashboard),
   // then filter by selected date range
   const chartData = useMemo((): PerformancePoint[] => {
@@ -204,8 +192,8 @@ export function AnalysisPage() {
     if (points.length === 0) return [];
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    const liveValue = portfolioSnapshot.totalValueCzk;
-    const liveCost = portfolioSnapshot.totalCostCzk;
+    const liveValue = portfolioSnapshot?.total_value_czk ?? 0;
+    const liveCost = portfolioSnapshot?.total_cost_czk ?? 0;
 
     // Replace/append today's point with live data so chart matches Dashboard
     const withLiveToday = [...points];
@@ -228,7 +216,7 @@ export function AnalysisPage() {
       const date = parseISO(point.date);
       return !isBefore(date, dateRange.from) && !isAfter(date, dateRange.to);
     });
-  }, [stockPerfData?.data, dateRange, portfolioSnapshot]);
+  }, [stockPerfData?.data, dateRange, portfolioSnapshot?.total_value_czk, portfolioSnapshot?.total_cost_czk]);
 
   // Distribution calculations
   const sectorDistribution = useMemo((): DistributionItem[] => {
