@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PillButton } from '@/components/shared/PillButton';
@@ -203,7 +204,6 @@ interface OpenLotsRankingProps {
   lots: OpenLot[];
   rates: ExchangeRates;
   maxItems?: number;
-  onLotClick?: (ticker: string) => void;
   showPortfolioColumn?: boolean;
 }
 
@@ -211,9 +211,9 @@ export function OpenLotsRanking({
   lots,
   rates,
   maxItems,
-  onLotClick,
   showPortfolioColumn = false,
 }: OpenLotsRankingProps) {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('plPercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -358,7 +358,7 @@ export function OpenLotsRanking({
             key={lot.id}
             lot={lot}
             showPortfolio={showPortfolioColumn}
-            onClick={() => onLotClick?.(lot.ticker)}
+            onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: lot.ticker } })}
           />
         ))}
       </div>

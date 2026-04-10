@@ -5,6 +5,7 @@
  * Color = daily change % (green = up, red = down)
  */
 import { useMemo, useCallback } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Treemap, ResponsiveContainer } from 'recharts';
 import type { Quote, ExchangeRates } from '@/lib/api';
 import type { Holding } from './HoldingsTable';
@@ -14,7 +15,6 @@ interface PortfolioHeatmapProps {
   holdings: Holding[];
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
-  onCellClick?: (ticker: string) => void;
 }
 
 interface HeatmapItem {
@@ -82,9 +82,8 @@ function getChangeColor(pct: number): string {
 /**
  * Custom Treemap cell — clean, modern look
  */
-function HeatmapCell(
-  props: Record<string, unknown> & { onCellClick?: (ticker: string) => void },
-) {
+function HeatmapCell(props: Record<string, unknown>) {
+  const navigate = useNavigate();
   const {
     x = 0,
     y = 0,
@@ -95,7 +94,6 @@ function HeatmapCell(
     weight,
     price,
     currency,
-    onCellClick,
   } = props;
 
   // Skip internal parent/root nodes — only render leaf data nodes
@@ -157,8 +155,8 @@ function HeatmapCell(
 
   return (
     <g
-      onClick={() => onCellClick?.(String(ticker))}
-      style={{ cursor: onCellClick ? 'pointer' : 'default' }}
+      onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: String(ticker) } })}
+      style={{ cursor: 'pointer' }}
       className="heatmap-cell"
     >
       {/* Background with subtle highlight gradient */}
@@ -244,7 +242,6 @@ export function PortfolioHeatmap({
   holdings,
   quotes,
   rates,
-  onCellClick,
 }: PortfolioHeatmapProps) {
   const heatmapData = useMemo(() => {
     const totalValueCzk = holdings.reduce((sum, h) => {
@@ -285,10 +282,8 @@ export function PortfolioHeatmap({
   }, [holdings, quotes, rates]);
 
   const renderCell = useCallback(
-    (props: Record<string, unknown>) => (
-      <HeatmapCell {...props} onCellClick={onCellClick} />
-    ),
-    [onCellClick],
+    (props: Record<string, unknown>) => <HeatmapCell {...props} />,
+    [],
   );
 
   if (heatmapData.length === 0) {

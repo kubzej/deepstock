@@ -271,9 +271,10 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
 
   const setActivePortfolio = useCallback(
     async (portfolioId: string | null) => {
-      // Remove cached holdings/lots so skeleton shows while new portfolio loads
+      // Remove cached holdings/lots/transactions so skeleton shows while new portfolio loads
       queryClient.removeQueries({ queryKey: ['holdings'] });
       queryClient.removeQueries({ queryKey: ['openLots'] });
+      queryClient.removeQueries({ queryKey: ['transactions'] });
 
       if (portfolioId === null) {
         // "All portfolios" mode
@@ -301,6 +302,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['openLots'] }),
       queryClient.invalidateQueries({ queryKey: ['quotes'] }),
       queryClient.invalidateQueries({ queryKey: ['exchangeRates'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] }),
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionHoldings'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionTransactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionStats'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] }),
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] }),
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] }),
     ]);

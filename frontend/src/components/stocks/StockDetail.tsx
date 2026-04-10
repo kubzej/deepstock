@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeft,
   TrendingUp,
@@ -14,13 +15,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { useStock } from '@/hooks/useStocks';
+import { useStock, useDeleteStock } from '@/hooks/useStocks';
 import {
   useTickerTransactions,
   useDeleteTransaction,
@@ -36,6 +38,7 @@ import {
   toCZK,
 } from '@/lib/format';
 import { TransactionModal } from '@/components/transactions';
+import { StockFormDialog } from './StockFormDialog';
 import { InsiderTrades } from './InsiderTrades';
 import {
   SymbolOverview,
@@ -43,19 +46,10 @@ import {
 } from '@/components/shared/TradingViewWidgets';
 import { StockJournalTab } from './StockJournalTab';
 
-interface StockDetailProps {
-  ticker: string;
-  onBack: () => void;
-  onEdit?: (stock: Stock) => void;
-  onDelete?: (stock: Stock) => void;
-}
-
-export function StockDetail({
-  ticker,
-  onBack,
-  onEdit,
-  onDelete,
-}: StockDetailProps) {
+export function StockDetail() {
+  const { ticker } = useParams({ from: '/stocks/$ticker' });
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/stocks' });
   const {
     portfolio,
     getHoldingByTicker,
@@ -83,6 +77,11 @@ export function StockDetail({
 
   // Transaction delete mutation
   const deleteTransactionMutation = useDeleteTransaction();
+
+  // Stock edit/delete state
+  const [editStock, setEditStock] = useState<Stock | null>(null);
+  const [deleteStockOpen, setDeleteStockOpen] = useState(false);
+  const deleteStockMutation = useDeleteStock();
 
   // Transaction edit/delete state
   const [editingTransaction, setEditingTransaction] =
@@ -239,8 +238,7 @@ export function StockDetail({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => stock && onEdit?.(stock)}
-            disabled={!onEdit}
+            onClick={() => stock && setEditStock(stock)}
           >
             <Pencil className="w-4 h-4 mr-1" />
             Upravit
@@ -248,8 +246,7 @@ export function StockDetail({
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => stock && onDelete?.(stock)}
-            disabled={!onDelete}
+            onClick={() => setDeleteStockOpen(true)}
           >
             <Trash2 className="w-4 h-4 mr-1" />
             Smazat
@@ -705,6 +702,51 @@ export function StockDetail({
           <InsiderTrades ticker={ticker} />
         </TabsContent>
       </Tabs>
+
+      {/* Stock Edit Dialog */}
+      <StockFormDialog
+        stock={editStock}
+        open={!!editStock}
+        onOpenChange={(open) => !open && setEditStock(null)}
+        onSuccess={() => setEditStock(null)}
+      />
+
+      {/* Stock Delete Confirmation */}
+      <Dialog open={deleteStockOpen} onOpenChange={setDeleteStockOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Smazat {ticker}?</DialogTitle>
+            <DialogDescription>
+              Tato akce je nevratná. Smazáním akcie smažete i všechny transakce
+              a holdings s ní spojené.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteStockOpen(false)}
+              disabled={deleteStockMutation.isPending}
+            >
+              Zrušit
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteStockMutation.isPending}
+              onClick={() => {
+                if (!stock) return;
+                deleteStockMutation.mutate(stock.id, {
+                  onSuccess: () => {
+                    setDeleteStockOpen(false);
+                    onBack();
+                  },
+                });
+              }}
+            >
+              {deleteStockMutation.isPending ? 'Mažu...' : 'Smazat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Transaction Edit Modal */}
       <TransactionModal

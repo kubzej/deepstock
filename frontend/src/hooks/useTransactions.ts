@@ -53,11 +53,12 @@ export function useDeleteTransaction() {
     mutationFn: ({ portfolioId, transactionId }: { portfolioId: string; transactionId: string }) => 
       deleteTransaction(portfolioId, transactionId),
     onSuccess: () => {
-      // Invalidate all transactions queries
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      // Also invalidate holdings as they may have changed
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
     },
   });
 }
@@ -69,18 +70,20 @@ export function useAddTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ 
-      portfolioId, 
-      data 
-    }: { 
-      portfolioId: string; 
+    mutationFn: ({
+      portfolioId,
+      data
+    }: {
+      portfolioId: string;
       data: Omit<Transaction, 'id' | 'portfolio_id'>
     }) => addTransaction(portfolioId, data),
     onSuccess: () => {
-      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
     },
   });
 }
@@ -92,20 +95,22 @@ export function useUpdateTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ 
-      portfolioId, 
-      transactionId, 
-      data 
-    }: { 
-      portfolioId: string; 
+    mutationFn: ({
+      portfolioId,
+      transactionId,
+      data
+    }: {
+      portfolioId: string;
       transactionId: string;
       data: TransactionUpdateData;
     }) => updateTransaction(portfolioId, transactionId, data),
     onSuccess: () => {
-      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
     },
   });
 }

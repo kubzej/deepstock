@@ -174,6 +174,8 @@ export function useAddWatchlistItem() {
         queryKey: queryKeys.watchlistItems(variables.watchlistId),
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
     },
   });
 }
@@ -221,6 +223,8 @@ export function useDeleteWatchlistItem() {
         queryKey: queryKeys.watchlistItems(variables.watchlistId),
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
     },
   });
 }
@@ -245,6 +249,8 @@ export function useMoveWatchlistItem() {
         queryKey: queryKeys.watchlistItems(variables.toWatchlistId),
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
     },
   });
 }

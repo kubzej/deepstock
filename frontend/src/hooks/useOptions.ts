@@ -87,6 +87,8 @@ export function useCreateOptionTransaction() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
     },
   });
 }
@@ -103,6 +105,8 @@ export function useDeleteOptionTransaction() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
     },
   });
 }
@@ -120,6 +124,8 @@ export function useDeleteOptionTransactionsBySymbol() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
     },
   });
 }
@@ -170,13 +176,17 @@ export function useCloseOptionPosition() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
       // Also invalidate stock data for ASSIGNMENT/EXERCISE as they create stock transactions
       if (variables.closingAction === 'ASSIGNMENT' || variables.closingAction === 'EXERCISE') {
         queryClient.invalidateQueries({ queryKey: ['holdings'] });
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         queryClient.invalidateQueries({ queryKey: ['openLots'] });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
-        queryClient.invalidateQueries({ queryKey: ['performance'] });
+        queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+        queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
+        queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
       }
     },
   });

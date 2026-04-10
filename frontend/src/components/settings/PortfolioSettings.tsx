@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,11 +23,9 @@ import {
   type Portfolio,
 } from '@/lib/api';
 
-interface PortfolioSettingsProps {
-  onBack: () => void;
-}
-
-export function PortfolioSettings({ onBack }: PortfolioSettingsProps) {
+export function PortfolioSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const { portfolios, loading, refresh } = usePortfolio();
 
   // Dialog state

@@ -14,11 +14,10 @@ import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 import { calculatePortfolioSnapshot } from '@/lib/portfolioSnapshot';
 
 interface DashboardProps {
-  onStockClick?: (ticker: string) => void;
   onAddTransaction?: () => void;
 }
 
-export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
+export function Dashboard({ onAddTransaction }: DashboardProps) {
   const {
     portfolio,
     holdings,
@@ -361,7 +360,6 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
             holdings={holdingsForTable}
             quotes={quotes}
             rates={rates}
-            onRowClick={onStockClick}
             showPortfolioColumn={isAllPortfolios}
           />
         </TabsContent>
@@ -371,7 +369,6 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
             <OpenLotsRanking
               lots={lotsWithPrices}
               rates={rates}
-              onLotClick={onStockClick}
               showPortfolioColumn={isAllPortfolios}
             />
           ) : (
@@ -393,7 +390,6 @@ export function Dashboard({ onStockClick, onAddTransaction }: DashboardProps) {
             holdings={holdingsForTable}
             quotes={quotes}
             rates={rates}
-            onCellClick={onStockClick}
           />
         </TabsContent>
       </Tabs>

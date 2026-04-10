@@ -1,3 +1,4 @@
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   LayoutDashboard,
   Database,
@@ -16,40 +17,33 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModal } from '@/contexts/ModalContext';
 import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
-interface SidebarProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  onNewTransaction: () => void;
-  onNewOptionTransaction?: () => void;
-}
+const menuItems = [
+  { path: '/', icon: LayoutDashboard, label: 'Přehled', exact: true },
+  { path: '/stocks', icon: Database, label: 'Akcie' },
+  { path: '/opce', icon: Target, label: 'Opce' },
+  { path: '/history', icon: History, label: 'Historie transakcí' },
+  { path: '/market', icon: BarChart3, label: 'Trh' },
+  { path: '/analysis', icon: LineChart, label: 'Analýza' },
+  { path: '/watchlist', icon: Eye, label: 'Watchlisty' },
+  { path: '/alerts', icon: Bell, label: 'Alerty' },
+  { path: '/feed', icon: Rss, label: 'Feeds' },
+  { path: '/research', icon: Search, label: 'Průzkum akcie' },
+  { path: '/journal', icon: BookOpen, label: 'Deník' },
+  { path: '/settings', icon: Settings, label: 'Nastavení' },
+];
 
-export function Sidebar({
-  activeTab,
-  onTabChange,
-  onNewTransaction,
-  onNewOptionTransaction,
-}: SidebarProps) {
+export function Sidebar() {
   const { signOut, user } = useAuth();
+  const { openTransactionModal, openOptionModal } = useModal();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const menuItems = [
-    { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
-    { id: 'stocks', icon: Database, label: 'Akcie' },
-    { id: 'opce', icon: Target, label: 'Opce' },
-    { id: 'history', icon: History, label: 'Historie transakcí' },
-    { id: 'market', icon: BarChart3, label: 'Trh' },
-    { id: 'analysis', icon: LineChart, label: 'Analýza' },
-    { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
-    { id: 'alerts', icon: Bell, label: 'Alerty' },
-    { id: 'feed', icon: Rss, label: 'Feeds' },
-    { id: 'research', icon: Search, label: 'Průzkum akcie' },
-    { id: 'journal', icon: BookOpen, label: 'Deník' },
-    { id: 'settings', icon: Settings, label: 'Nastavení' },
-  ];
-
-  const handleSettingsClick = () => {
-    onTabChange('settings:portfolios');
+  const isActive = (path: string, exact?: boolean) => {
+    if (exact) return pathname === path;
+    return pathname === path || pathname.startsWith(path + '/');
   };
 
   return (
@@ -59,17 +53,17 @@ export function Sidebar({
         <h1 className="text-xl font-bold text-primary mb-3">DeepStock</h1>
         <PortfolioSelector
           variant="desktop"
-          onSettingsClick={handleSettingsClick}
+          onSettingsClick={() => navigate({ to: '/settings/portfolios' })}
         />
       </div>
 
       {/* New Transaction Buttons */}
       <div className="p-4 space-y-2">
-        <Button onClick={onNewTransaction} className="w-full gap-2">
+        <Button onClick={openTransactionModal} className="w-full gap-2">
           <Plus className="w-4 h-4" />
           Přidat transakci
         </Button>
-        <Button onClick={onNewOptionTransaction} className="w-full gap-2">
+        <Button onClick={openOptionModal} className="w-full gap-2">
           <Plus className="w-4 h-4" />
           Přidat opci
         </Button>
@@ -80,21 +74,21 @@ export function Sidebar({
         <ul className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const active = isActive(item.path, item.exact);
 
             return (
-              <li key={item.id}>
-                <button
-                  onClick={() => onTabChange(item.id)}
+              <li key={item.path}>
+                <Link
+                  to={item.path}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive
+                    active
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
-                </button>
+                </Link>
               </li>
             );
           })}

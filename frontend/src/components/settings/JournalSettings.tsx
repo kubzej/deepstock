@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   DndContext,
   closestCenter,
@@ -39,9 +40,6 @@ import {
   useReorderJournalSections,
 } from '@/hooks/useJournal';
 
-interface JournalSettingsProps {
-  onBack: () => void;
-}
 
 interface SortableRowProps {
   section: JournalSection;
@@ -104,7 +102,9 @@ function SortableRow({ section, onEdit, onDelete }: SortableRowProps) {
   );
 }
 
-export function JournalSettings({ onBack }: JournalSettingsProps) {
+export function JournalSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const { data: sections = [], isLoading } = useJournalSections();
   const createMutation = useCreateJournalSection();
   const updateMutation = useUpdateJournalSection();

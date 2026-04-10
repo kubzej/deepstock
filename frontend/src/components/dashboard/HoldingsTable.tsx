@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Table,
   TableBody,
@@ -94,7 +95,6 @@ interface HoldingsTableProps {
   holdings: Holding[];
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
-  onRowClick?: (ticker: string) => void;
   showPortfolioColumn?: boolean;
 }
 
@@ -102,9 +102,9 @@ export function HoldingsTable({
   holdings,
   quotes,
   rates,
-  onRowClick,
   showPortfolioColumn = false,
 }: HoldingsTableProps) {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [expandedTickers, setExpandedTickers] = useState<Set<string>>(
@@ -389,7 +389,7 @@ export function HoldingsTable({
                   onClick={() =>
                     isExpandable
                       ? toggleExpand(holding.ticker)
-                      : onRowClick?.(holding.ticker)
+                      : navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })
                   }
                 >
                   <TableCell>
@@ -528,7 +528,7 @@ export function HoldingsTable({
                     <TableRow
                       key={`${subHolding.ticker}-${subHolding.portfolioName}`}
                       className="cursor-pointer hover:bg-muted/50 border-border bg-muted/20"
-                      onClick={() => onRowClick?.(subHolding.ticker)}
+                      onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: subHolding.ticker } })}
                     >
                       <TableCell>
                         <div className="pl-8 text-muted-foreground text-sm">
@@ -640,7 +640,7 @@ export function HoldingsTable({
                 portfolioHoldings={
                   isExpandable ? holding.portfolioHoldings : undefined
                 }
-                onClick={() => onRowClick?.(holding.ticker)}
+                onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })}
               />
             );
           })}

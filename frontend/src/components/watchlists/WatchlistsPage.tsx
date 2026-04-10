@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -58,15 +59,8 @@ function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
   return quote.price >= item.target_sell_price;
 }
 
-interface WatchlistsPageProps {
-  onStockClick?: (ticker: string) => void;
-  onNavigateToSettings?: () => void;
-}
-
-export function WatchlistsPage({
-  onStockClick,
-  onNavigateToSettings,
-}: WatchlistsPageProps) {
+export function WatchlistsPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -463,11 +457,10 @@ export function WatchlistsPage({
           icon={Eye}
           title="Zatím nemáte žádný watchlist"
           description="Vytvořte watchlist v Nastavení → Watchlisty."
-          action={
-            onNavigateToSettings
-              ? { label: 'Otevřít nastavení', onClick: onNavigateToSettings }
-              : undefined
-          }
+          action={{
+            label: 'Otevřít nastavení',
+            onClick: () => navigate({ to: '/settings/watchlists' }),
+          }}
         />
       ) : (
         <div className="space-y-4">
@@ -683,7 +676,7 @@ export function WatchlistsPage({
                           showMoveOption={
                             watchlists.length > 1 && !isFilterView
                           }
-                          onClick={() => onStockClick?.(item.stocks.ticker)}
+                          onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
                           showWatchlistName={isFilterView}
                           watchlistName={
                             isFilterView
@@ -702,7 +695,6 @@ export function WatchlistsPage({
                     sortKey={sortKey}
                     sortDir={sortDir}
                     onSort={handleSort}
-                    onStockClick={onStockClick}
                     onEdit={openEditItem}
                     onDelete={setDeleteItemData}
                     onMove={setMoveItemData}

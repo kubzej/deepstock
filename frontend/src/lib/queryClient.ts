@@ -113,6 +113,7 @@ export const queryKeys = {
   transactions: (portfolioId: string) => ['transactions', portfolioId] as const,
   allTransactions: () => ['transactions', 'all'] as const,
   transactionHistory: (limit: number) => ['transactionHistory', limit] as const,
+  infiniteTransactions: (pageSize: number) => ['infiniteTransactions', pageSize] as const,
   optionTransactionHistory: (limit: number) => ['optionTransactionHistory', limit] as const,
 
   // Options

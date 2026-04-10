@@ -1,3 +1,4 @@
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
 import {
   LayoutDashboard,
   Database,
@@ -25,40 +26,33 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModal } from '@/contexts/ModalContext';
 import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
-interface MobileHeaderProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  onNewTransaction: () => void;
-  onNewOptionTransaction?: () => void;
-}
+const menuItems = [
+  { path: '/', icon: LayoutDashboard, label: 'Přehled', exact: true },
+  { path: '/stocks', icon: Database, label: 'Akcie' },
+  { path: '/opce', icon: Target, label: 'Opce' },
+  { path: '/history', icon: History, label: 'Historie transakcí' },
+  { path: '/market', icon: BarChart3, label: 'Trh' },
+  { path: '/analysis', icon: LineChart, label: 'Analýza' },
+  { path: '/watchlist', icon: Eye, label: 'Watchlisty' },
+  { path: '/alerts', icon: Bell, label: 'Alerty' },
+  { path: '/feed', icon: Rss, label: 'Feeds' },
+  { path: '/research', icon: Search, label: 'Průzkum akcie' },
+  { path: '/journal', icon: BookOpen, label: 'Deník' },
+  { path: '/settings', icon: Settings, label: 'Nastavení' },
+];
 
-export function MobileHeader({
-  activeTab,
-  onTabChange,
-  onNewTransaction,
-  onNewOptionTransaction,
-}: MobileHeaderProps) {
+export function MobileHeader() {
   const { signOut } = useAuth();
+  const { openTransactionModal, openOptionModal } = useModal();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const menuItems = [
-    { id: 'home', icon: LayoutDashboard, label: 'Přehled' },
-    { id: 'stocks', icon: Database, label: 'Akcie' },
-    { id: 'opce', icon: Target, label: 'Opce' },
-    { id: 'history', icon: History, label: 'Historie transakcí' },
-    { id: 'market', icon: BarChart3, label: 'Trh' },
-    { id: 'analysis', icon: LineChart, label: 'Analýza' },
-    { id: 'watchlist', icon: Eye, label: 'Watchlisty' },
-    { id: 'alerts', icon: Bell, label: 'Alerty' },
-    { id: 'feed', icon: Rss, label: 'Feeds' },
-    { id: 'research', icon: Search, label: 'Průzkum akcie' },
-    { id: 'journal', icon: BookOpen, label: 'Deník' },
-    { id: 'settings', icon: Settings, label: 'Nastavení' },
-  ];
-
-  const handleSettingsClick = () => {
-    onTabChange('settings:portfolios');
+  const isActive = (path: string, exact?: boolean) => {
+    if (exact) return pathname === path;
+    return pathname === path || pathname.startsWith(path + '/');
   };
 
   return (
@@ -69,7 +63,7 @@ export function MobileHeader({
           <span className="text-lg font-bold text-primary">DeepStock</span>
           <PortfolioSelector
             variant="mobile"
-            onSettingsClick={handleSettingsClick}
+            onSettingsClick={() => navigate({ to: '/settings/portfolios' })}
           />
         </div>
 
@@ -83,14 +77,11 @@ export function MobileHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onNewTransaction} className="py-3">
+              <DropdownMenuItem onClick={openTransactionModal} className="py-3">
                 <Banknote className="w-5 h-5 mr-3" />
                 Akciová transakce
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onNewOptionTransaction}
-                className="py-3"
-              >
+              <DropdownMenuItem onClick={openOptionModal} className="py-3">
                 <Target className="w-5 h-5 mr-3" />
                 Opční transakce
               </DropdownMenuItem>
@@ -107,16 +98,18 @@ export function MobileHeader({
             <DropdownMenuContent align="end" className="w-52">
               {menuItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeTab === item.id;
+                const active = isActive(item.path, item.exact);
 
                 return (
                   <DropdownMenuItem
-                    key={item.id}
-                    onClick={() => onTabChange(item.id)}
-                    className={`py-3 text-base ${isActive ? 'bg-primary/10 text-primary' : ''}`}
+                    key={item.path}
+                    asChild
+                    className={`py-3 text-base ${active ? 'bg-primary/10 text-primary' : ''}`}
                   >
-                    <Icon className="w-5 h-5 mr-3" />
-                    {item.label}
+                    <Link to={item.path}>
+                      <Icon className="w-5 h-5 mr-3" />
+                      {item.label}
+                    </Link>
                   </DropdownMenuItem>
                 );
               })}

@@ -87,6 +87,13 @@ export function useDeleteStock() {
       );
       // Invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
+      // Deleting a stock removes all its transactions and holdings
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['holdings'] });
+      queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
     },
   });
 }

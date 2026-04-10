@@ -14,12 +14,11 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 
-interface NotificationSettingsProps {
-  onBack: () => void;
-}
-
-export function NotificationSettings({ onBack }: NotificationSettingsProps) {
+export function NotificationSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const {
     isSupported,
     isSubscribed,

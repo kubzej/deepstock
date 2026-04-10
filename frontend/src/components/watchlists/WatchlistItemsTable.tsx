@@ -32,6 +32,7 @@ import {
   ArrowDown,
   Tag,
 } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   type WatchlistItem,
   type WatchlistItemWithSource,
@@ -62,7 +63,6 @@ interface WatchlistItemsTableProps {
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
-  onStockClick?: (ticker: string) => void;
   onEdit: (item: WatchlistItem) => void;
   onDelete: (item: WatchlistItem) => void;
   onMove: (item: WatchlistItem) => void;
@@ -108,7 +108,6 @@ export function WatchlistItemsTable({
   sortKey,
   sortDir,
   onSort,
-  onStockClick,
   onEdit,
   onDelete,
   onMove,
@@ -116,6 +115,8 @@ export function WatchlistItemsTable({
   showMoveOption = true,
   showWatchlistName = false,
 }: WatchlistItemsTableProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="hidden md:block overflow-x-auto">
       <Table className="w-full">
@@ -223,7 +224,7 @@ export function WatchlistItemsTable({
                       ? 'bg-amber-500/5 border-l-2 border-l-amber-500'
                       : ''
                 }`}
-                onClick={() => onStockClick?.(item.stocks.ticker)}
+                onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
