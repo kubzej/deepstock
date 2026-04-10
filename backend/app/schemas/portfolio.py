@@ -30,7 +30,7 @@ class HoldingResponse(BaseModel):
     currency: str
     sector: Optional[str] = None
     price_scale: Optional[int] = None
-    total_invested_czk: Optional[float] = None
+    total_invested_czk: float
     # Enriched fields (when calculated with current prices)
     current_price: Optional[float] = None
     current_value: Optional[float] = None
@@ -102,8 +102,11 @@ class OpenLotResponse(BaseModel):
     date: str  # Formatted date string
     shares: float  # Remaining shares
     buy_price: float = Field(alias="buyPrice")
+    economic_buy_price: float = Field(alias="economicBuyPrice")
     currency: str
     price_scale: Optional[int] = None
+    remaining_cost_basis: float = Field(alias="remainingCostBasis")
+    remaining_cost_basis_czk: float = Field(alias="remainingCostBasisCzk")
     portfolio_name: Optional[str] = None
     
     class Config:
@@ -123,6 +126,9 @@ class AvailableLotResponse(BaseModel):
     price_per_share: float
     currency: str
     total_amount: float
+    economic_price_per_share: float
+    remaining_cost_basis: float
+    remaining_cost_basis_czk: float
     
     class Config:
         from_attributes = True

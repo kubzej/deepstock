@@ -2,42 +2,25 @@ import { type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileHeader } from './MobileHeader';
 import { UpdatePrompt } from '@/components/shared/UpdatePrompt';
+import { ExchangeRatesBanner } from '@/components/shared/ExchangeRatesBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  onNewOptionTransaction?: () => void;
 }
 
-export function AppLayout({
-  children,
-  activeTab,
-  onTabChange,
-  onNewOptionTransaction,
-}: AppLayoutProps) {
-  const handleNewTransaction = () => {
-    // Trigger 'add' tab which App.tsx handles to open TransactionModal
-    onTabChange('add');
-  };
-
+export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        onNewTransaction={handleNewTransaction}
-        onNewOptionTransaction={onNewOptionTransaction}
-      />
+      <Sidebar />
 
       {/* Mobile Header */}
-      <MobileHeader
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        onNewTransaction={handleNewTransaction}
-        onNewOptionTransaction={onNewOptionTransaction}
-      />
+      <MobileHeader />
+
+      {/* Exchange rates error banner */}
+      <div className="md:ml-64">
+        <ExchangeRatesBanner />
+      </div>
 
       {/* Main Content */}
       <main className="md:ml-64 min-h-screen px-4 md:px-8 lg:px-12 pt-header-mobile pb-content-mobile md:pt-6 md:pb-6">

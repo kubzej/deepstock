@@ -92,6 +92,7 @@ export function useCreateJournalEntry(channelId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries(channelId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+      queryClient.invalidateQueries({ queryKey: ['journalEntriesByTicker'] });
     },
   });
 }
@@ -114,6 +115,7 @@ export function useDeleteJournalEntry(channelId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries(channelId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+      queryClient.invalidateQueries({ queryKey: ['journalEntriesByTicker'] });
     },
   });
 }

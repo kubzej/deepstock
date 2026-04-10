@@ -31,6 +31,7 @@ export default defineConfig({
       filename: 'sw-push.ts',
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
       },
       includeAssets: ['deepstock.svg', 'favicon-192x192.png', 'favicon-512x512.png'],
       manifest: {

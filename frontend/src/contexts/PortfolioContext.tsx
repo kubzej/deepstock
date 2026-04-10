@@ -246,31 +246,35 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
         (sum, h) => sum + h.shares,
         0,
       );
-      const totalInvested = matchingHoldings.reduce(
-        (sum, h) => sum + h.avg_cost * h.shares,
+      const totalInvestedCzk = matchingHoldings.reduce(
+        (sum, h) => sum + (h.total_invested_czk || 0),
         0,
       );
+      const aggregateCurrency = first.currency;
+      const aggregateRate = ratesData[aggregateCurrency] || 1;
+      const totalInvested =
+        totalInvestedCzk > 0
+          ? totalInvestedCzk / aggregateRate
+          : matchingHoldings.reduce((sum, h) => sum + h.avg_cost * h.shares, 0);
 
       return {
         ...first,
         shares: totalShares,
         avg_cost: totalShares > 0 ? totalInvested / totalShares : 0,
-        total_invested_czk: matchingHoldings.reduce(
-          (sum, h) => sum + (h.total_invested_czk || 0),
-          0,
-        ),
+        total_invested_czk: totalInvestedCzk,
         portfolio_id: undefined,
         portfolio_name: undefined,
       };
     },
-    [holdingsWithPrices],
+    [holdingsWithPrices, ratesData],
   );
 
   const setActivePortfolio = useCallback(
     async (portfolioId: string | null) => {
-      // Remove cached holdings/lots so skeleton shows while new portfolio loads
+      // Remove cached holdings/lots/transactions so skeleton shows while new portfolio loads
       queryClient.removeQueries({ queryKey: ['holdings'] });
       queryClient.removeQueries({ queryKey: ['openLots'] });
+      queryClient.removeQueries({ queryKey: ['transactions'] });
 
       if (portfolioId === null) {
         // "All portfolios" mode
@@ -298,6 +302,13 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['openLots'] }),
       queryClient.invalidateQueries({ queryKey: ['quotes'] }),
       queryClient.invalidateQueries({ queryKey: ['exchangeRates'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] }),
+      queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionHoldings'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionTransactions'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionStats'] }),
+      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] }),
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] }),
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] }),
     ]);

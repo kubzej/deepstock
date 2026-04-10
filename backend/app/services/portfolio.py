@@ -1,9 +1,15 @@
 from app.core.supabase import supabase
 from app.services.stocks import stock_service
+from app.services.portfolio_accounting import (
+    annotate_stock_transactions,
+    calculate_stock_holding_totals,
+    compute_lot_remaining_shares,
+)
+from app.services.market import market_service
+from app.services.exchange import exchange_service
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
-from decimal import Decimal
 
 
 class PortfolioCreate(BaseModel):
@@ -39,6 +45,25 @@ class AvailableLot(BaseModel):
     price_per_share: float
     currency: str
     total_amount: float
+    economic_price_per_share: float
+    remaining_cost_basis: float
+    remaining_cost_basis_czk: float
+
+
+class PortfolioSnapshot(BaseModel):
+    total_value_czk: float
+    total_cost_czk: float
+    total_pnl_czk: float
+    total_pnl_percent: float
+    daily_change_czk: float
+    daily_change_percent: float
+
+
+def _require_annotated_float(transaction: dict, field_name: str) -> float:
+    value = transaction.get(field_name)
+    if value is None:
+        raise ValueError(f"Missing annotated field {field_name} for transaction {transaction.get('id')}")
+    return float(value)
 
 
 class TransactionUpdate(BaseModel):
@@ -54,71 +79,67 @@ class TransactionUpdate(BaseModel):
 
 class PortfolioService:
 
+    async def _get_stock_transactions_for_position(
+        self,
+        portfolio_id: str,
+        stock_id: str,
+    ) -> List[dict]:
+        response = supabase.table("transactions") \
+            .select("*") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("stock_id", stock_id) \
+            .order("executed_at", desc=False) \
+            .execute()
+        return response.data or []
+
+    async def _get_transaction_context(self, transactions: List[dict]) -> List[dict]:
+        if not transactions:
+            return []
+
+        contexts: List[dict] = []
+        seen_pairs: set[tuple[str, str]] = set()
+
+        for tx in transactions:
+            pair = (tx["portfolio_id"], tx["stock_id"])
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            contexts.extend(
+                await self._get_stock_transactions_for_position(
+                    tx["portfolio_id"],
+                    tx["stock_id"],
+                )
+            )
+
+        unique_by_id = {tx["id"]: tx for tx in contexts}
+        return list(unique_by_id.values())
+
+    async def _annotate_transactions(self, transactions: List[dict]) -> List[dict]:
+        if not transactions:
+            return []
+        context_transactions = await self._get_transaction_context(transactions)
+        annotated = annotate_stock_transactions(context_transactions)
+        annotated_by_id = {tx["id"]: tx for tx in annotated}
+        return [
+            {**tx, **annotated_by_id.get(tx["id"], {})}
+            for tx in transactions
+        ]
+
     async def _get_sold_amount_for_buy_lot(self, buy_tx: dict) -> float:
         """
         Return how many shares from a BUY transaction were already sold.
 
-        Covers both models used in this app:
-        1) Explicit lot-linked sells (source_transaction_id)
-        2) Legacy/fallback sells without source_transaction_id (FIFO allocation)
+        Covers both linked sells (source_transaction_id) and FIFO fallback
+        sells (no source_transaction_id) via the canonical accounting engine.
         """
         buy_id = buy_tx["id"]
-        portfolio_id = buy_tx["portfolio_id"]
-        stock_id = buy_tx["stock_id"]
+        original_shares = float(buy_tx["shares"])
 
-        sold_amount = 0.0
-
-        # 1) Explicit lot-linked sells
-        linked_sells = supabase.table("transactions") \
-            .select("shares") \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("stock_id", stock_id) \
-            .eq("type", "SELL") \
-            .eq("source_transaction_id", buy_id) \
-            .execute()
-
-        for sell in (linked_sells.data or []):
-            sold_amount += float(sell["shares"])
-
-        # 2) FIFO fallback sells (no source_transaction_id)
-        fifo_sells = supabase.table("transactions") \
-            .select("shares") \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("stock_id", stock_id) \
-            .eq("type", "SELL") \
-            .is_("source_transaction_id", "null") \
-            .execute()
-
-        total_fifo_to_allocate = sum(float(row["shares"]) for row in (fifo_sells.data or []))
-        if total_fifo_to_allocate <= 0:
-            return sold_amount
-
-        # Get BUY lots in chronological order and allocate FIFO sells
-        buys = supabase.table("transactions") \
-            .select("id, shares") \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("stock_id", stock_id) \
-            .eq("type", "BUY") \
-            .order("executed_at", desc=False) \
-            .execute()
-
-        remaining_fifo = total_fifo_to_allocate
-        sold_by_fifo_for_target = 0.0
-
-        for buy in (buys.data or []):
-            if remaining_fifo <= 0:
-                break
-
-            lot_shares = float(buy["shares"])
-            sell_from_lot = min(lot_shares, remaining_fifo)
-
-            if buy["id"] == buy_id:
-                sold_by_fifo_for_target = sell_from_lot
-                break
-
-            remaining_fifo -= sell_from_lot
-
-        return sold_amount + sold_by_fifo_for_target
+        transactions = await self._get_stock_transactions_for_position(
+            buy_tx["portfolio_id"], buy_tx["stock_id"]
+        )
+        remaining = compute_lot_remaining_shares(transactions)
+        return original_shares - remaining.get(buy_id, 0.0)
     
     async def get_user_portfolios(self, user_id: str) -> List[dict]:
         """Get all portfolios for a user."""
@@ -204,19 +225,49 @@ class PortfolioService:
         return response.data
     
     async def recalculate_all_holdings(self, portfolio_id: str) -> dict:
-        """Recalculate all holdings for a portfolio to populate total_invested_czk."""
-        # Get all unique stock_ids from holdings
-        holdings = supabase.table("holdings") \
+        """Recalculate all historical holdings for a portfolio."""
+        transaction_rows = supabase.table("transactions") \
             .select("stock_id") \
             .eq("portfolio_id", portfolio_id) \
             .execute()
-        
-        count = 0
-        for h in holdings.data:
-            await self._recalculate_holding(portfolio_id, h["stock_id"])
-            count += 1
-        
-        return {"recalculated": count}
+
+        holding_rows = supabase.table("holdings") \
+            .select("stock_id") \
+            .eq("portfolio_id", portfolio_id) \
+            .execute()
+
+        stock_ids = sorted(
+            {
+                row["stock_id"]
+                for row in [
+                    *(transaction_rows.data or []),
+                    *(holding_rows.data or []),
+                ]
+                if row.get("stock_id")
+            }
+        )
+
+        for stock_id in stock_ids:
+            await self._recalculate_holding(portfolio_id, stock_id)
+
+        return {
+            "portfolio_id": portfolio_id,
+            "recalculated": len(stock_ids),
+        }
+
+    async def recalculate_all_user_holdings(self, user_id: str) -> dict:
+        """Recalculate holdings across all portfolios owned by the user."""
+        portfolios = await self.get_user_portfolios(user_id)
+        recalculated = 0
+
+        for portfolio in portfolios:
+            result = await self.recalculate_all_holdings(portfolio["id"])
+            recalculated += result["recalculated"]
+
+        return {
+            "portfolios": len(portfolios),
+            "recalculated": recalculated,
+        }
     
     async def get_all_holdings(self, user_id: str) -> List[dict]:
         """Get all holdings across all user's portfolios with portfolio info."""
@@ -281,93 +332,41 @@ class PortfolioService:
 
         next_cursor = data[-1]["executed_at"] if (has_more and data) else None
 
-        for tx in data:
+        annotated = await self._annotate_transactions(data)
+
+        for tx in annotated:
             tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
 
-        return {"data": data, "next_cursor": next_cursor, "has_more": has_more}
+        return {"data": annotated, "next_cursor": next_cursor, "has_more": has_more}
     
     async def get_all_open_lots_for_user(self, user_id: str) -> List[dict]:
         """
         Get all open lots across ALL user's portfolios.
         Returns BUY transactions with remaining shares, enriched with stock info and portfolio name.
         """
-        # Get user's portfolios
         portfolios = await self.get_user_portfolios(user_id)
         if not portfolios:
             return []
-        
+
         portfolio_ids = [p["id"] for p in portfolios]
         portfolio_names = {p["id"]: p["name"] for p in portfolios}
-        
-        # Get all BUY transactions across all portfolios
+
         buy_response = supabase.table("transactions") \
             .select("*, stocks(ticker, name, currency, price_scale)") \
             .in_("portfolio_id", portfolio_ids) \
             .eq("type", "BUY") \
             .order("executed_at", desc=False) \
             .execute()
-        
-        buy_transactions = buy_response.data or []
-        
-        # Get all SELL transactions with source_transaction_id
-        sell_response = supabase.table("transactions") \
-            .select("source_transaction_id, shares") \
-            .in_("portfolio_id", portfolio_ids) \
-            .eq("type", "SELL") \
-            .not_.is_("source_transaction_id", "null") \
-            .execute()
-        
-        sell_transactions = sell_response.data or []
-        
-        # Calculate sold quantities per lot
-        sold_per_lot: dict[str, float] = {}
-        for sell in sell_transactions:
-            if sell.get("source_transaction_id"):
-                lot_id = sell["source_transaction_id"]
-                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
-        
-        # Handle FIFO sells per stock per portfolio
-        fifo_sell_response = supabase.table("transactions") \
-            .select("stock_id, portfolio_id, shares") \
-            .in_("portfolio_id", portfolio_ids) \
-            .eq("type", "SELL") \
-            .is_("source_transaction_id", "null") \
-            .execute()
-        
-        # Key: (stock_id, portfolio_id) -> sold amount
-        fifo_sells_per_stock: dict[tuple, float] = {}
-        for sell in (fifo_sell_response.data or []):
-            key = (sell["stock_id"], sell["portfolio_id"])
-            fifo_sells_per_stock[key] = fifo_sells_per_stock.get(key, 0) + float(sell["shares"])
-        
-        # Group buys by (stock_id, portfolio_id) for FIFO processing
-        buys_by_key: dict[tuple, list] = {}
-        for buy in buy_transactions:
-            key = (buy["stock_id"], buy["portfolio_id"])
-            if key not in buys_by_key:
-                buys_by_key[key] = []
-            buys_by_key[key].append(buy)
-        
-        # Apply FIFO sells to lots
-        for key, fifo_sold in fifo_sells_per_stock.items():
-            remaining_to_sell = fifo_sold
-            for buy in buys_by_key.get(key, []):
-                if remaining_to_sell <= 0:
-                    break
-                already_sold = sold_per_lot.get(buy["id"], 0)
-                available = float(buy["shares"]) - already_sold
-                if available > 0:
-                    sell_from_this = min(available, remaining_to_sell)
-                    sold_per_lot[buy["id"]] = already_sold + sell_from_this
-                    remaining_to_sell -= sell_from_this
-        
-        # Build open lots with remaining shares
+
+        # _annotate_transactions groups by (portfolio_id, stock_id) and loads the full
+        # position context per pair — FIFO is computed correctly within each portfolio.
+        buy_transactions = await self._annotate_transactions(buy_response.data or [])
+
         open_lots = []
         for buy in buy_transactions:
-            sold_from_lot = sold_per_lot.get(buy["id"], 0)
-            remaining = float(buy["shares"]) - sold_from_lot
-            
-            if remaining > 0.0001:  # Small threshold for floating point
+            remaining = float(buy["remaining_shares"])
+
+            if remaining > 0.0001:
                 stock_info = buy.get("stocks", {})
                 price_scale_raw = stock_info.get("price_scale")
                 price_scale = float(price_scale_raw) if price_scale_raw else 1.0
@@ -378,12 +377,15 @@ class PortfolioService:
                     "date": buy["executed_at"][:10] if buy["executed_at"] else "",
                     "shares": remaining,
                     "buyPrice": float(buy["price_per_share"]),
+                    "economicBuyPrice": _require_annotated_float(buy, "economic_amount") / float(buy["shares"]),
                     "currency": stock_info.get("currency") or buy.get("currency") or "USD",
                     "priceScale": price_scale,
                     "exchangeRate": float(buy["exchange_rate_to_czk"]) if buy.get("exchange_rate_to_czk") else None,
+                    "remainingCostBasis": _require_annotated_float(buy, "remaining_cost_basis"),
+                    "remainingCostBasisCzk": _require_annotated_float(buy, "remaining_cost_basis_czk"),
                     "portfolioName": portfolio_names.get(buy["portfolio_id"], ""),
                 })
-        
+
         return open_lots
 
     async def get_transactions(self, portfolio_id: str, limit: int = 50, stock_id: str = None) -> List[dict]:
@@ -399,7 +401,7 @@ class PortfolioService:
             query = query.eq("stock_id", stock_id)
             
         response = query.execute()
-        return response.data
+        return await self._annotate_transactions(response.data or [])
     
     async def add_transaction(self, portfolio_id: str, data: TransactionCreate, user_id: str = None) -> dict:
         """
@@ -450,81 +452,36 @@ class PortfolioService:
         # 4. Update holdings (recalculate position)
         await self._recalculate_holding(portfolio_id, stock["id"])
         
-        return tx_response.data[0]
+        created_tx = tx_response.data[0]
+        annotated_transactions = await self._annotate_transactions(
+            await self._get_stock_transactions_for_position(portfolio_id, stock["id"])
+        )
+        return next(
+            (tx for tx in annotated_transactions if tx["id"] == created_tx["id"]),
+            created_tx,
+        )
     
     async def get_all_open_lots(self, portfolio_id: str) -> List[dict]:
         """
         Get all open lots across all holdings in a portfolio.
         Returns BUY transactions with remaining shares, enriched with stock info.
         """
-        # Get all BUY transactions for this portfolio
         buy_response = supabase.table("transactions") \
             .select("*, stocks(ticker, name, currency, price_scale)") \
             .eq("portfolio_id", portfolio_id) \
             .eq("type", "BUY") \
             .order("executed_at", desc=False) \
             .execute()
-        
-        buy_transactions = buy_response.data or []
-        
-        # Get all SELL transactions with source_transaction_id
-        sell_response = supabase.table("transactions") \
-            .select("source_transaction_id, shares") \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("type", "SELL") \
-            .not_.is_("source_transaction_id", "null") \
-            .execute()
-        
-        sell_transactions = sell_response.data or []
-        
-        # Calculate sold quantities per lot
-        sold_per_lot: dict[str, float] = {}
-        for sell in sell_transactions:
-            if sell.get("source_transaction_id"):
-                lot_id = sell["source_transaction_id"]
-                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
-        
-        # Also handle FIFO sells (no source_transaction_id) per stock
-        fifo_sell_response = supabase.table("transactions") \
-            .select("stock_id, shares") \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("type", "SELL") \
-            .is_("source_transaction_id", "null") \
-            .execute()
-        
-        fifo_sells_per_stock: dict[str, float] = {}
-        for sell in (fifo_sell_response.data or []):
-            stock_id = sell["stock_id"]
-            fifo_sells_per_stock[stock_id] = fifo_sells_per_stock.get(stock_id, 0) + float(sell["shares"])
-        
-        # Group buys by stock_id for FIFO processing
-        buys_by_stock: dict[str, list] = {}
-        for buy in buy_transactions:
-            stock_id = buy["stock_id"]
-            if stock_id not in buys_by_stock:
-                buys_by_stock[stock_id] = []
-            buys_by_stock[stock_id].append(buy)
-        
-        # Apply FIFO sells to lots
-        for stock_id, fifo_sold in fifo_sells_per_stock.items():
-            remaining_to_sell = fifo_sold
-            for buy in buys_by_stock.get(stock_id, []):
-                if remaining_to_sell <= 0:
-                    break
-                already_sold = sold_per_lot.get(buy["id"], 0)
-                available = float(buy["shares"]) - already_sold
-                if available > 0:
-                    sell_from_this = min(available, remaining_to_sell)
-                    sold_per_lot[buy["id"]] = already_sold + sell_from_this
-                    remaining_to_sell -= sell_from_this
-        
-        # Build open lots with remaining shares
+
+        # _annotate_transactions loads the full position context (buys + sells)
+        # and sets remaining_shares correctly for both linked and FIFO sells.
+        buy_transactions = await self._annotate_transactions(buy_response.data or [])
+
         open_lots = []
         for buy in buy_transactions:
-            sold_from_lot = sold_per_lot.get(buy["id"], 0)
-            remaining = float(buy["shares"]) - sold_from_lot
-            
-            if remaining > 0.0001:  # Small threshold for floating point
+            remaining = float(buy["remaining_shares"])
+
+            if remaining > 0.0001:
                 stock_info = buy.get("stocks", {})
                 price_scale_raw = stock_info.get("price_scale")
                 price_scale = float(price_scale_raw) if price_scale_raw else 1.0
@@ -535,11 +492,14 @@ class PortfolioService:
                     "date": buy["executed_at"][:10] if buy["executed_at"] else "",
                     "shares": remaining,
                     "buyPrice": float(buy["price_per_share"]),
+                    "economicBuyPrice": _require_annotated_float(buy, "economic_amount") / float(buy["shares"]),
                     "currency": stock_info.get("currency") or buy.get("currency") or "USD",
                     "priceScale": price_scale,
                     "exchangeRate": float(buy["exchange_rate_to_czk"]) if buy.get("exchange_rate_to_czk") else None,
+                    "remainingCostBasis": _require_annotated_float(buy, "remaining_cost_basis"),
+                    "remainingCostBasisCzk": _require_annotated_float(buy, "remaining_cost_basis_czk"),
                 })
-        
+
         return open_lots
 
     async def get_available_lots(self, portfolio_id: str, stock_ticker: str) -> List[AvailableLot]:
@@ -552,13 +512,15 @@ class PortfolioService:
             .select("id") \
             .eq("ticker", stock_ticker.upper()) \
             .execute()
-        
+
         if not stock_response.data:
             return []
-        
+
         stock_id = stock_response.data[0]["id"]
-        
-        # Get all BUY transactions for this stock/portfolio
+
+        # Get all BUY transactions for this stock/portfolio.
+        # _annotate_transactions loads the full position context (buys + sells)
+        # and computes remaining_shares correctly for both linked and FIFO sells.
         buy_response = supabase.table("transactions") \
             .select("*") \
             .eq("stock_id", stock_id) \
@@ -566,34 +528,14 @@ class PortfolioService:
             .eq("type", "BUY") \
             .order("executed_at", desc=False) \
             .execute()
-        
-        buy_transactions = buy_response.data or []
-        
-        # Get all SELL transactions that reference specific lots
-        sell_response = supabase.table("transactions") \
-            .select("source_transaction_id, shares") \
-            .eq("stock_id", stock_id) \
-            .eq("portfolio_id", portfolio_id) \
-            .eq("type", "SELL") \
-            .not_.is_("source_transaction_id", "null") \
-            .execute()
-        
-        sell_transactions = sell_response.data or []
-        
-        # Calculate sold quantities per lot
-        sold_per_lot: dict[str, float] = {}
-        for sell in sell_transactions:
-            if sell.get("source_transaction_id"):
-                lot_id = sell["source_transaction_id"]
-                sold_per_lot[lot_id] = sold_per_lot.get(lot_id, 0) + float(sell["shares"])
-        
-        # Build available lots with remaining shares
+
+        buy_transactions = await self._annotate_transactions(buy_response.data or [])
+
         available_lots: List[AvailableLot] = []
         for buy in buy_transactions:
-            sold_from_lot = sold_per_lot.get(buy["id"], 0)
-            remaining = float(buy["shares"]) - sold_from_lot
-            
-            if remaining > 0:
+            remaining = float(buy["remaining_shares"])
+
+            if remaining > 0.0001:
                 available_lots.append(AvailableLot(
                     id=buy["id"],
                     date=buy["executed_at"][:10] if buy["executed_at"] else "",
@@ -602,8 +544,13 @@ class PortfolioService:
                     price_per_share=float(buy["price_per_share"]),
                     currency=buy["currency"] or "USD",
                     total_amount=float(buy["total_amount"] or 0),
+                    economic_price_per_share=(
+                        _require_annotated_float(buy, "economic_amount") / float(buy["shares"])
+                    ),
+                    remaining_cost_basis=_require_annotated_float(buy, "remaining_cost_basis"),
+                    remaining_cost_basis_czk=_require_annotated_float(buy, "remaining_cost_basis_czk"),
                 ))
-        
+
         return available_lots
     
     async def _recalculate_holding(self, portfolio_id: str, stock_id: str):
@@ -622,87 +569,23 @@ class PortfolioService:
         
         transactions = response.data
         
-        # Calculate position - respects source_transaction_id if specified
-        shares = 0
-        total_cost = 0
-        total_invested_czk = 0  # Sum of BUY amounts in CZK (historical rates)
-        realized_pnl = 0
-        # Track lots by transaction ID for specific lot selling
-        buy_lots = []  # List of {id, shares, price, amount_czk_per_share} dicts
-        
-        for tx in transactions:
-            if tx["type"] == "BUY":
-                tx_shares = float(tx["shares"])
-                tx_price = float(tx["price_per_share"])
-                tx_amount = float(tx["total_amount"])
-                tx_amount_czk = float(tx.get("total_amount_czk") or tx_amount)
-                
-                shares += tx_shares
-                total_cost += tx_amount
-                total_invested_czk += tx_amount_czk
-                
-                buy_lots.append({
-                    "id": tx["id"],
-                    "shares": tx_shares,
-                    "price": tx_price,
-                    "amount_czk_per_share": tx_amount_czk / tx_shares if tx_shares > 0 else 0
-                })
-            elif tx["type"] == "SELL":
-                sell_shares = float(tx["shares"])
-                sell_price = float(tx["price_per_share"])
-                source_tx_id = tx.get("source_transaction_id")
-                shares -= sell_shares
-                
-                shares_to_sell = sell_shares
-                cost_of_sold = 0
-                cost_of_sold_czk = 0
-                
-                if source_tx_id:
-                    # Sell from specific lot
-                    for lot in buy_lots:
-                        if lot["id"] == source_tx_id:
-                            sell_from_lot = min(lot["shares"], shares_to_sell)
-                            cost_of_sold += sell_from_lot * lot["price"]
-                            cost_of_sold_czk += sell_from_lot * lot["amount_czk_per_share"]
-                            lot["shares"] -= sell_from_lot
-                            shares_to_sell -= sell_from_lot
-                            # Remove lot if empty
-                            if lot["shares"] <= 0:
-                                buy_lots.remove(lot)
-                            break
-                
-                # FIFO for remaining shares (if source lot didn't cover all, or no source specified)
-                while shares_to_sell > 0 and buy_lots:
-                    lot = buy_lots[0]
-                    if lot["shares"] <= shares_to_sell:
-                        # Use entire lot
-                        cost_of_sold += lot["shares"] * lot["price"]
-                        cost_of_sold_czk += lot["shares"] * lot["amount_czk_per_share"]
-                        shares_to_sell -= lot["shares"]
-                        buy_lots.pop(0)
-                    else:
-                        # Partial lot
-                        cost_of_sold += shares_to_sell * lot["price"]
-                        cost_of_sold_czk += shares_to_sell * lot["amount_czk_per_share"]
-                        lot["shares"] -= shares_to_sell
-                        shares_to_sell = 0
-                
-                realized_pnl += (sell_shares * sell_price) - cost_of_sold
-                total_cost -= cost_of_sold
-                total_invested_czk -= cost_of_sold_czk
-        
-        avg_cost = total_cost / shares if shares > 0 else 0
+        calculation = calculate_stock_holding_totals(transactions)
+        avg_cost = (
+            calculation.total_cost / calculation.shares
+            if calculation.shares > 0
+            else 0
+        )
         
         # Upsert holding
         supabase.table("holdings") \
             .upsert({
                 "portfolio_id": portfolio_id,
                 "stock_id": stock_id,
-                "shares": shares,
+                "shares": calculation.shares,
                 "avg_cost_per_share": round(avg_cost, 4),
-                "total_cost": round(total_cost, 4),
-                "total_invested_czk": round(total_invested_czk, 4),
-                "realized_pnl": round(realized_pnl, 4),
+                "total_cost": round(calculation.total_cost, 4),
+                "total_invested_czk": round(calculation.total_invested_czk, 4),
+                "realized_pnl": round(calculation.realized_pnl, 4),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, on_conflict="portfolio_id,stock_id") \
             .execute()
@@ -778,7 +661,17 @@ class PortfolioService:
         # Recalculate holding
         await self._recalculate_holding(portfolio_id, stock_id)
         
-        return response.data[0] if response.data else None
+        updated_tx = response.data[0] if response.data else None
+        if not updated_tx:
+            return None
+
+        annotated_transactions = await self._annotate_transactions(
+            await self._get_stock_transactions_for_position(portfolio_id, stock_id)
+        )
+        return next(
+            (item for item in annotated_transactions if item["id"] == updated_tx["id"]),
+            updated_tx,
+        )
 
     async def delete_transaction(self, portfolio_id: str, transaction_id: str) -> bool:
         """
@@ -819,6 +712,64 @@ class PortfolioService:
         await self._recalculate_holding(portfolio_id, stock_id)
         
         return True
+
+    async def get_portfolio_snapshot(self, portfolio_id: Optional[str], user_id: str) -> PortfolioSnapshot:
+        """
+        Compute live portfolio snapshot: total value, cost basis, P/L, and daily change in CZK.
+        portfolio_id=None means all portfolios for the user.
+        """
+        if portfolio_id:
+            holdings = await self.get_holdings(portfolio_id)
+        else:
+            holdings = await self.get_all_holdings(user_id)
+
+        if not holdings:
+            return PortfolioSnapshot(
+                total_value_czk=0.0,
+                total_cost_czk=0.0,
+                total_pnl_czk=0.0,
+                total_pnl_percent=0.0,
+                daily_change_czk=0.0,
+                daily_change_percent=0.0,
+            )
+
+        tickers = [h["stocks"]["ticker"] for h in holdings]
+        quotes = await market_service.get_quotes(tickers)
+        rates = await exchange_service.get_rates()
+
+        total_value_czk = 0.0
+        total_cost_czk = 0.0
+        daily_change_czk = 0.0
+
+        for holding in holdings:
+            ticker = holding["stocks"]["ticker"]
+            currency = holding["stocks"].get("currency") or "USD"
+            scale = float(holding["stocks"].get("price_scale") or 1)
+            shares = float(holding.get("shares") or 0)
+            total_invested_czk = float(holding.get("total_invested_czk") or 0)
+            rate = float(rates.get(currency, 1.0))
+
+            quote = quotes.get(ticker, {})
+            price = float(quote.get("price") or 0)
+            change = float(quote.get("change") or 0)
+
+            total_value_czk += price * scale * shares * rate
+            total_cost_czk += total_invested_czk
+            daily_change_czk += change * scale * shares * rate
+
+        total_pnl_czk = total_value_czk - total_cost_czk
+        total_pnl_percent = (total_pnl_czk / total_cost_czk * 100) if total_cost_czk > 0 else 0.0
+        prev_value = total_value_czk - daily_change_czk
+        daily_change_percent = (daily_change_czk / prev_value * 100) if prev_value > 0 else 0.0
+
+        return PortfolioSnapshot(
+            total_value_czk=round(total_value_czk, 2),
+            total_cost_czk=round(total_cost_czk, 2),
+            total_pnl_czk=round(total_pnl_czk, 2),
+            total_pnl_percent=round(total_pnl_percent, 4),
+            daily_change_czk=round(daily_change_czk, 2),
+            daily_change_percent=round(daily_change_percent, 4),
+        )
 
 
 portfolio_service = PortfolioService()

@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { clientsClaim } from 'workbox-core';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -13,6 +14,10 @@ cleanupOutdatedCaches();
 
 // Precache static assets (injected by vite-plugin-pwa)
 precacheAndRoute(self.__WB_MANIFEST);
+
+// PWA navigation fallback — serve /index.html for all HTML5 history routes
+const navigationHandler = createHandlerBoundToURL('/index.html');
+registerRoute(new NavigationRoute(navigationHandler));
 
 // Push notification handler
 self.addEventListener('push', (event) => {

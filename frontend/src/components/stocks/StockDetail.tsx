@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeft,
   TrendingUp,
@@ -14,13 +15,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { useStock } from '@/hooks/useStocks';
+import { useStock, useDeleteStock } from '@/hooks/useStocks';
 import {
   useTickerTransactions,
   useDeleteTransaction,
@@ -36,6 +38,7 @@ import {
   toCZK,
 } from '@/lib/format';
 import { TransactionModal } from '@/components/transactions';
+import { StockFormDialog } from './StockFormDialog';
 import { InsiderTrades } from './InsiderTrades';
 import {
   SymbolOverview,
@@ -43,19 +46,10 @@ import {
 } from '@/components/shared/TradingViewWidgets';
 import { StockJournalTab } from './StockJournalTab';
 
-interface StockDetailProps {
-  ticker: string;
-  onBack: () => void;
-  onEdit?: (stock: Stock) => void;
-  onDelete?: (stock: Stock) => void;
-}
-
-export function StockDetail({
-  ticker,
-  onBack,
-  onEdit,
-  onDelete,
-}: StockDetailProps) {
+export function StockDetail() {
+  const { ticker } = useParams({ from: '/stocks/$ticker' });
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/stocks' });
   const {
     portfolio,
     getHoldingByTicker,
@@ -84,6 +78,11 @@ export function StockDetail({
   // Transaction delete mutation
   const deleteTransactionMutation = useDeleteTransaction();
 
+  // Stock edit/delete state
+  const [editStock, setEditStock] = useState<Stock | null>(null);
+  const [deleteStockOpen, setDeleteStockOpen] = useState(false);
+  const deleteStockMutation = useDeleteStock();
+
   // Transaction edit/delete state
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
@@ -97,18 +96,6 @@ export function StockDetail({
   const holding = getHoldingByTicker(ticker);
   // Use portfolio quote if available, otherwise fetched quote
   const quote = portfolioQuotes[ticker] || fetchedQuotes[ticker];
-
-  // Calculate sold shares per lot (for BUY transaction status)
-  const soldPerLot = useMemo(() => {
-    const map = new Map<string, number>();
-    transactions.forEach((tx) => {
-      if (tx.type === 'SELL' && tx.sourceTransactionId) {
-        const current = map.get(tx.sourceTransactionId) || 0;
-        map.set(tx.sourceTransactionId, current + tx.shares);
-      }
-    });
-    return map;
-  }, [transactions]);
 
   // Assign lot numbers to BUY transactions (#1, #2, ...)
   const lotNumbers = useMemo(() => {
@@ -124,12 +111,13 @@ export function StockDetail({
   }, [transactions]);
 
   // Helper to get lot status for BUY transactions
-  const getLotStatus = (txId: string, totalShares: number) => {
-    const sold = soldPerLot.get(txId) || 0;
+  const getLotStatus = (tx: Transaction) => {
+    const remaining = tx.remainingShares!;
+    const sold = tx.shares - remaining;
     return {
       sold,
-      remaining: totalShares - sold,
-      isFullySold: sold >= totalShares,
+      remaining,
+      isFullySold: remaining <= 0.0001,
     };
   };
 
@@ -226,13 +214,9 @@ export function StockDetail({
     : null;
 
   // CZK conversions for position
-  // Use historical total_invested_czk for cost basis (preserves historical exchange rate)
-  // Fall back to current rate conversion if not available
   const positionCzk = position
     ? (() => {
-        const totalCost =
-          holding?.total_invested_czk ??
-          toCZK(position.totalCost, stockCurrency, rates);
+        const totalCost = holding!.total_invested_czk;
         const totalValue = toCZK(position.totalValue, stockCurrency, rates);
         return {
           totalCost,
@@ -254,8 +238,7 @@ export function StockDetail({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => stock && onEdit?.(stock)}
-            disabled={!onEdit}
+            onClick={() => stock && setEditStock(stock)}
           >
             <Pencil className="w-4 h-4 mr-1" />
             Upravit
@@ -263,8 +246,7 @@ export function StockDetail({
           <Button
             variant="destructive"
             size="sm"
-            onClick={() => stock && onDelete?.(stock)}
-            disabled={!onDelete}
+            onClick={() => setDeleteStockOpen(true)}
           >
             <Trash2 className="w-4 h-4 mr-1" />
             Smazat
@@ -337,238 +319,271 @@ export function StockDetail({
         </TabsList>
 
         <TabsContent value="prehled" className="space-y-6">
-      {/* Notes */}
-      {stock?.notes && (
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {stock.notes}
-        </p>
-      )}
+          {/* Notes */}
+          {stock?.notes && (
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {stock.notes}
+            </p>
+          )}
 
-      {/* Price Chart - only for supported exchanges */}
-      {isTradingViewSupported(ticker, stock.exchange || undefined) && (
-        <div>
-          <SymbolOverview
-            symbol={ticker}
-            exchange={stock.exchange || undefined}
-            height={350}
-          />
-        </div>
-      )}
-
-      {/* Position Stats */}
-      {position && positionCzk && (
-        <div>
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Vaše pozice
-          </h2>
-          <div className="flex flex-wrap gap-x-8 gap-y-4">
+          {/* Price Chart - only for supported exchanges */}
+          {isTradingViewSupported(ticker, stock.exchange || undefined) && (
             <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Počet akcií
-              </p>
-              <p className="text-lg font-mono-price font-semibold">
-                {position.shares}
-              </p>
+              <SymbolOverview
+                symbol={ticker}
+                exchange={stock.exchange || undefined}
+                height={350}
+              />
             </div>
+          )}
+
+          {/* Position Stats */}
+          {position && positionCzk && (
             <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Průměrná cena
-              </p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatPrice(position.avgCost, stockCurrency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Investováno
-              </p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatCurrency(positionCzk.totalCost)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                Aktuální hodnota
-              </p>
-              <p className="text-lg font-mono-price font-semibold">
-                {formatCurrency(positionCzk.totalValue)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                P/L
-              </p>
-              <p
-                className={`text-lg font-mono-price font-semibold ${
-                  positionCzk.unrealizedPnL >= 0
-                    ? 'text-positive'
-                    : 'text-negative'
-                }`}
-              >
-                {formatCurrency(positionCzk.unrealizedPnL)}
-                <span className="text-sm ml-2">
-                  (
-                  {formatPercent(
-                    positionCzk.totalCost > 0
-                      ? (positionCzk.unrealizedPnL / positionCzk.totalCost) *
-                          100
-                      : 0,
-                    2,
-                    true,
-                  )}
-                  )
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* No position */}
-      {!hasPosition && (
-        <div className="py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-          Nemáte otevřenou pozici v této akcii
-        </div>
-      )}
-
-      {/* Transactions */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Transakce ({transactions.length})
-          </h2>
-        </div>
-
-        {transactionsLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : transactions.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Žádné transakce</p>
-        ) : (
-          <>
-            <div className="space-y-1">
-              {transactions.slice(0, visibleTxCount).map((tx) => {
-                const isBuy = tx.type === 'BUY';
-                const lotStatus = isBuy ? getLotStatus(tx.id, tx.shares) : null;
-
-                let pnl: number | null = null;
-                let pnlPercent: number | null = null;
-                let pnlCzk: number | null = null;
-
-                // Realized P/L for SELL transactions
-                if (!isBuy && tx.sourceTransaction) {
-                  const srcPrice = tx.sourceTransaction.price;
-                  pnl = (tx.price - srcPrice) * tx.shares;
-                  pnlPercent = ((tx.price - srcPrice) / srcPrice) * 100;
-                  pnlCzk = pnl * (tx.exchangeRate || 1);
-                }
-
-                // Unrealized P/L for BUY transactions (open lots)
-                if (
-                  isBuy &&
-                  lotStatus &&
-                  lotStatus.remaining > 0 &&
-                  quote?.price
-                ) {
-                  const priceScale = stock?.price_scale ?? 1;
-                  const currentPriceScaled = quote.price * priceScale;
-                  pnl = (currentPriceScaled - tx.price) * lotStatus.remaining;
-                  pnlPercent =
-                    tx.price > 0
-                      ? ((currentPriceScaled - tx.price) / tx.price) * 100
-                      : 0;
-                  // Use historical exchange rate for cost, current rate for value
-                  // This matches the main position P/L calculation
-                  const costBasisCzk = tx.exchangeRate
-                    ? tx.price * lotStatus.remaining * tx.exchangeRate
-                    : toCZK(tx.price * lotStatus.remaining, tx.currency, rates);
-                  const currentValueCzk = toCZK(
-                    currentPriceScaled * lotStatus.remaining,
-                    tx.currency,
-                    rates,
-                  );
-                  pnlCzk = currentValueCzk - costBasisCzk;
-                }
-
-                // Lot number for BUY, or source lot number for SELL
-                const lotNum = isBuy
-                  ? lotNumbers.get(tx.id)
-                  : tx.sourceTransactionId
-                    ? lotNumbers.get(tx.sourceTransactionId)
-                    : undefined;
-
-                // Lot link description (right side)
-                let lotInfo: string | null = null;
-                if (isBuy && lotStatus) {
-                  if (lotStatus.isFullySold) {
-                    lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
-                  } else if (lotStatus.sold > 0) {
-                    lotInfo = `zbývá ${lotStatus.remaining}/${tx.shares}`;
-                  }
-                } else if (!isBuy && tx.sourceTransaction) {
-                  lotInfo = `z lotu #${lotNum ?? '?'} (${formatPrice(tx.sourceTransaction.price, tx.sourceTransaction.currency)})`;
-                }
-
-                const isExpanded = expandedTxId === tx.id;
-                const isClosed = (isBuy && lotStatus?.isFullySold) || !isBuy;
-
-                return (
-                  <div
-                    key={tx.id}
-                    className={`group rounded-xl cursor-pointer active:scale-[0.99] transition-transform ${
-                      isClosed ? 'bg-muted/15 opacity-50' : 'bg-muted/30'
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Vaše pozice
+              </h2>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Počet akcií
+                  </p>
+                  <p className="text-lg font-mono-price font-semibold">
+                    {position.shares}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Průměrná cena
+                  </p>
+                  <p className="text-lg font-mono-price font-semibold">
+                    {formatPrice(position.avgCost, stockCurrency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Investováno
+                  </p>
+                  <p className="text-lg font-mono-price font-semibold">
+                    {formatCurrency(positionCzk.totalCost)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Aktuální hodnota
+                  </p>
+                  <p className="text-lg font-mono-price font-semibold">
+                    {formatCurrency(positionCzk.totalValue)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Nerealizovaný P/L
+                  </p>
+                  <p
+                    className={`text-lg font-mono-price font-semibold ${
+                      positionCzk.unrealizedPnL >= 0
+                        ? 'text-positive'
+                        : 'text-negative'
                     }`}
-                    onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
                   >
-                    <div className="px-3 py-2.5">
-                      {/* Header Row */}
-                      <div className="flex items-center justify-between">
-                        {/* Left: Badge + lot# + date */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
-                            >
-                              {isBuy ? 'NÁKUP' : 'PRODEJ'}
-                            </Badge>
-                            {lotNum && (
-                              <span className="text-[10px] font-mono-price text-muted-foreground">
-                                #{lotNum}
-                              </span>
-                            )}
-                            <span className="text-[11px] text-muted-foreground">
-                              {formatDateCzech(tx.date)}
-                            </span>
-                            {isAllPortfolios && tx.portfolioName && (
-                              <span className="text-[11px] text-muted-foreground">
-                                · {tx.portfolioName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                    {formatCurrency(positionCzk.unrealizedPnL)}
+                    <span className="text-sm ml-2">
+                      (
+                      {formatPercent(
+                        positionCzk.totalCost > 0
+                          ? (positionCzk.unrealizedPnL /
+                              positionCzk.totalCost) *
+                              100
+                          : 0,
+                        2,
+                        true,
+                      )}
+                      )
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-                        {/* Right: Investment + P/L for BUY, just P/L for SELL */}
-                        <div className="flex flex-col items-end flex-shrink-0">
-                          {isBuy && lotStatus && lotStatus.remaining > 0 ? (
-                            <>
-                              {/* Investment amount */}
-                              <span className="font-mono-price text-sm font-medium">
-                                {formatCurrency(tx.totalCzk)}
-                              </span>
-                              {/* Unrealized P/L */}
-                              {pnlCzk !== null && (
-                                <div className="flex items-baseline gap-1">
+          {/* No position */}
+          {!hasPosition && (
+            <div className="py-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+              Nemáte otevřenou pozici v této akcii
+            </div>
+          )}
+
+          {/* Transactions */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Transakce ({transactions.length})
+              </h2>
+            </div>
+
+            {transactionsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : transactions.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Žádné transakce</p>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  {transactions.slice(0, visibleTxCount).map((tx) => {
+                    const isBuy = tx.type === 'BUY';
+                    const lotStatus = isBuy ? getLotStatus(tx) : null;
+
+                    let pnl: number | null = null;
+                    let pnlPercent: number | null = null;
+                    let pnlCzk: number | null = null;
+
+                    // Realized P/L for SELL transactions
+                    if (
+                      !isBuy &&
+                      tx.realizedPnl !== null &&
+                      tx.realizedPnl !== undefined
+                    ) {
+                      pnl = tx.realizedPnl;
+                      pnlCzk = tx.realizedPnlCzk;
+                      const costBasisSold = tx.costBasisSold!;
+                      pnlPercent =
+                        costBasisSold > 0 ? (pnl / costBasisSold) * 100 : 0;
+                    }
+
+                    // Unrealized P/L for BUY transactions (open lots)
+                    if (
+                      isBuy &&
+                      lotStatus &&
+                      lotStatus.remaining > 0 &&
+                      tx.remainingCostBasis !== null &&
+                      tx.remainingCostBasisCzk !== null &&
+                      quote?.price
+                    ) {
+                      const priceScale = stock?.price_scale ?? 1;
+                      const currentPriceScaled = quote.price * priceScale;
+                      const remainingCostBasis = tx.remainingCostBasis;
+                      pnl =
+                        currentPriceScaled * lotStatus.remaining -
+                        remainingCostBasis;
+                      pnlPercent =
+                        remainingCostBasis > 0
+                          ? (pnl / remainingCostBasis) * 100
+                          : 0;
+                      const costBasisCzk = tx.remainingCostBasisCzk;
+                      const currentValueCzk = toCZK(
+                        currentPriceScaled * lotStatus.remaining,
+                        tx.currency,
+                        rates,
+                      );
+                      pnlCzk = currentValueCzk - costBasisCzk;
+                    }
+
+                    // Lot number for BUY, or source lot number for SELL
+                    const lotNum = isBuy
+                      ? lotNumbers.get(tx.id)
+                      : tx.sourceTransactionId
+                        ? lotNumbers.get(tx.sourceTransactionId)
+                        : undefined;
+
+                    // Lot link description (right side)
+                    let lotInfo: string | null = null;
+                    if (isBuy && lotStatus) {
+                      if (lotStatus.isFullySold) {
+                        lotInfo = `prodáno ${lotStatus.sold}/${tx.shares}`;
+                      } else if (lotStatus.sold > 0) {
+                        lotInfo = `zbývá ${lotStatus.remaining}/${tx.shares}`;
+                      }
+                    } else if (!isBuy && tx.sourceTransaction) {
+                      lotInfo = `z lotu #${lotNum ?? '?'} (${formatPrice(tx.sourceTransaction.price, tx.sourceTransaction.currency)})`;
+                    }
+
+                    const isExpanded = expandedTxId === tx.id;
+                    const isClosed =
+                      (isBuy && lotStatus?.isFullySold) || !isBuy;
+
+                    return (
+                      <div
+                        key={tx.id}
+                        className={`group rounded-xl cursor-pointer active:scale-[0.99] transition-transform ${
+                          isClosed ? 'bg-muted/15 opacity-50' : 'bg-muted/30'
+                        }`}
+                        onClick={() =>
+                          setExpandedTxId(isExpanded ? null : tx.id)
+                        }
+                      >
+                        <div className="px-3 py-2.5">
+                          {/* Header Row */}
+                          <div className="flex items-center justify-between">
+                            {/* Left: Badge + lot# + date */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
+                                >
+                                  {isBuy ? 'NÁKUP' : 'PRODEJ'}
+                                </Badge>
+                                {lotNum && (
+                                  <span className="text-[10px] font-mono-price text-muted-foreground">
+                                    #{lotNum}
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-muted-foreground">
+                                  {formatDateCzech(tx.date)}
+                                </span>
+                                {isAllPortfolios && tx.portfolioName && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    · {tx.portfolioName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Right: Investment + P/L for BUY, just P/L for SELL */}
+                            <div className="flex flex-col items-end flex-shrink-0">
+                              {isBuy && lotStatus && lotStatus.remaining > 0 ? (
+                                <>
+                                  {/* Investment amount */}
+                                  <span className="font-mono-price text-sm font-medium">
+                                    {formatCurrency(tx.remainingCostBasisCzk)}
+                                  </span>
+                                  {/* Unrealized P/L */}
+                                  {pnlCzk !== null && (
+                                    <div className="flex items-baseline gap-1">
+                                      <span
+                                        className={`font-mono-price text-[11px] ${
+                                          pnlCzk >= 0
+                                            ? 'text-positive'
+                                            : 'text-negative'
+                                        }`}
+                                      >
+                                        {pnlCzk >= 0 ? '+' : ''}
+                                        {formatCurrency(pnlCzk)}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-mono-price ${
+                                          pnlPercent! >= 0
+                                            ? 'text-positive/60'
+                                            : 'text-negative/60'
+                                        }`}
+                                      >
+                                        {formatPercent(pnlPercent!, 1, true)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </>
+                              ) : pnlCzk !== null ? (
+                                <>
                                   <span
-                                    className={`font-mono-price text-[11px] ${
+                                    className={`font-mono-price text-sm font-medium ${
                                       pnlCzk >= 0
                                         ? 'text-positive'
                                         : 'text-negative'
                                     }`}
                                   >
-                                    {pnlCzk >= 0 ? '+' : ''}
                                     {formatCurrency(pnlCzk)}
                                   </span>
                                   <span
@@ -580,127 +595,103 @@ export function StockDetail({
                                   >
                                     {formatPercent(pnlPercent!, 1, true)}
                                   </span>
-                                </div>
+                                </>
+                              ) : (
+                                <span className="font-mono-price text-sm font-medium">
+                                  {formatCurrency(tx.totalCzk)}
+                                </span>
                               )}
-                            </>
-                          ) : pnlCzk !== null ? (
-                            <>
-                              <span
-                                className={`font-mono-price text-sm font-medium ${
-                                  pnlCzk >= 0
-                                    ? 'text-positive'
-                                    : 'text-negative'
-                                }`}
-                              >
-                                {formatCurrency(pnlCzk)}
-                              </span>
-                              <span
-                                className={`text-[10px] font-mono-price ${
-                                  pnlPercent! >= 0
-                                    ? 'text-positive/60'
-                                    : 'text-negative/60'
-                                }`}
-                              >
-                                {formatPercent(pnlPercent!, 1, true)}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="font-mono-price text-sm font-medium">
-                              {formatCurrency(tx.totalCzk)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                            </div>
+                          </div>
 
-                      {/* Subrow: shares × price → current price */}
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-[11px] text-muted-foreground font-mono-price">
-                          {isBuy && lotStatus && lotStatus.remaining > 0
-                            ? `${lotStatus.remaining} ks × ${formatPrice(tx.price, tx.currency)}`
-                            : `${tx.shares} ks × ${formatPrice(tx.price, tx.currency)}`}
-                          {isBuy &&
-                            lotStatus &&
-                            lotStatus.remaining > 0 &&
-                            quote?.price && (
-                              <span className="ml-1">
-                                →{' '}
-                                {formatPrice(
-                                  quote.price * (stock?.price_scale ?? 1),
-                                  tx.currency,
+                          {/* Subrow: shares × price → current price */}
+                          <div className="flex items-center justify-between mt-0.5">
+                            <span className="text-[11px] text-muted-foreground font-mono-price">
+                              {isBuy && lotStatus && lotStatus.remaining > 0
+                                ? `${lotStatus.remaining} ks × ${formatPrice(tx.price, tx.currency)}`
+                                : `${tx.shares} ks × ${formatPrice(tx.price, tx.currency)}`}
+                              {isBuy &&
+                                lotStatus &&
+                                lotStatus.remaining > 0 &&
+                                quote?.price && (
+                                  <span className="ml-1">
+                                    →{' '}
+                                    {formatPrice(
+                                      quote.price * (stock?.price_scale ?? 1),
+                                      tx.currency,
+                                    )}
+                                  </span>
                                 )}
+                            </span>
+                            {lotInfo && (
+                              <span className="text-[11px] text-muted-foreground">
+                                {lotInfo}
                               </span>
                             )}
-                        </span>
-                        {lotInfo && (
-                          <span className="text-[11px] text-muted-foreground">
-                            {lotInfo}
-                          </span>
-                        )}
-                      </div>
+                          </div>
 
-                      {/* Expanded Details */}
-                      <div
-                        className={`grid transition-all duration-200 ease-out ${
-                          isExpanded
-                            ? 'grid-rows-[1fr] opacity-100 mt-3'
-                            : 'grid-rows-[0fr] opacity-0'
-                        }`}
-                      >
-                        <div className="overflow-hidden">
-                          {/* Action buttons */}
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs gap-1.5"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingTransaction(tx);
-                              }}
-                            >
-                              <Pencil className="h-3 w-3" />
-                              Upravit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingTransaction(tx);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              Smazat
-                            </Button>
+                          {/* Expanded Details */}
+                          <div
+                            className={`grid transition-all duration-200 ease-out ${
+                              isExpanded
+                                ? 'grid-rows-[1fr] opacity-100 mt-3'
+                                : 'grid-rows-[0fr] opacity-0'
+                            }`}
+                          >
+                            <div className="overflow-hidden">
+                              {/* Action buttons */}
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs gap-1.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTransaction(tx);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                  Upravit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingTransaction(tx);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  Smazat
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
 
-            {visibleTxCount < transactions.length && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-xs text-muted-foreground"
-                onClick={() =>
-                  setVisibleTxCount((prev) =>
-                    Math.min(prev + 10, transactions.length),
-                  )
-                }
-              >
-                Zobrazit dalších{' '}
-                {Math.min(10, transactions.length - visibleTxCount)}
-              </Button>
+                {visibleTxCount < transactions.length && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2 text-xs text-muted-foreground"
+                    onClick={() =>
+                      setVisibleTxCount((prev) =>
+                        Math.min(prev + 10, transactions.length),
+                      )
+                    }
+                  >
+                    Zobrazit dalších{' '}
+                    {Math.min(10, transactions.length - visibleTxCount)}
+                  </Button>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
-
+          </div>
         </TabsContent>
 
         <TabsContent value="poznamky">
@@ -711,6 +702,51 @@ export function StockDetail({
           <InsiderTrades ticker={ticker} />
         </TabsContent>
       </Tabs>
+
+      {/* Stock Edit Dialog */}
+      <StockFormDialog
+        stock={editStock}
+        open={!!editStock}
+        onOpenChange={(open) => !open && setEditStock(null)}
+        onSuccess={() => setEditStock(null)}
+      />
+
+      {/* Stock Delete Confirmation */}
+      <Dialog open={deleteStockOpen} onOpenChange={setDeleteStockOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Smazat {ticker}?</DialogTitle>
+            <DialogDescription>
+              Tato akce je nevratná. Smazáním akcie smažete i všechny transakce
+              a holdings s ní spojené.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteStockOpen(false)}
+              disabled={deleteStockMutation.isPending}
+            >
+              Zrušit
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteStockMutation.isPending}
+              onClick={() => {
+                if (!stock) return;
+                deleteStockMutation.mutate(stock.id, {
+                  onSuccess: () => {
+                    setDeleteStockOpen(false);
+                    onBack();
+                  },
+                });
+              }}
+            >
+              {deleteStockMutation.isPending ? 'Mažu...' : 'Smazat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Transaction Edit Modal */}
       <TransactionModal

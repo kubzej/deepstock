@@ -721,14 +721,14 @@ export function TransactionModal({
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span>Celkem</span>
+              <span>Cashflow</span>
               <span className="font-mono-price">
                 {formatPrice(totalWithFees, formData.currency)}
               </span>
             </div>
             {totalInCzk !== null && (
               <div className="flex justify-between text-sm">
-                <span>Celkem v CZK</span>
+                <span>Cashflow v CZK</span>
                 <span className="font-mono-price">
                   {formatPrice(totalInCzk, 'CZK')}
                 </span>

@@ -13,7 +13,7 @@ from app.services.portfolio import portfolio_service
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 router = APIRouter()
 
@@ -48,7 +48,29 @@ async def get_option_stats(
     Get summary statistics for option holdings.
     If portfolio_id is provided, returns stats for that portfolio only.
     """
-    return await options_service.get_stats(portfolio_id)
+    if portfolio_id:
+        if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+            raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
+        return await options_service.get_stats(portfolio_id)
+
+    holdings = await options_service.get_all_holdings_for_user(user_id)
+    today = date.today()
+    week_from_now = today + timedelta(days=7)
+    return {
+        "total_positions": len(holdings),
+        "long_positions": len([h for h in holdings if h.get("position") == "long"]),
+        "short_positions": len([h for h in holdings if h.get("position") == "short"]),
+        "expiring_this_week": len([
+            h for h in holdings
+            if h.get("expiration_date") and
+            date.fromisoformat(h["expiration_date"]) <= week_from_now
+        ]),
+        "calls": len([h for h in holdings if h.get("option_type") == "call"]),
+        "puts": len([h for h in holdings if h.get("option_type") == "put"]),
+        "total_cost": sum(float(h.get("total_cost") or 0) for h in holdings),
+        "itm_count": len([h for h in holdings if h.get("moneyness") == "ITM"]),
+        "otm_count": len([h for h in holdings if h.get("moneyness") == "OTM"]),
+    }
 
 
 # ==========================================
@@ -99,6 +121,8 @@ async def create_option_transaction(
     - ASSIGNMENT: Short option was assigned
     - EXERCISE: Long option was exercised
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     tx = await options_service.create_transaction(portfolio_id, data)
     created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
     await journal_service.create_option_journal_entry(
@@ -125,6 +149,11 @@ async def update_option_transaction(
     user_id: str = Depends(get_current_user_id)
 ):
     """Update an existing option transaction."""
+    tx = await options_service.get_transaction_by_id(transaction_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
     result = await options_service.update_transaction(transaction_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
@@ -144,6 +173,11 @@ async def delete_option_transaction(
     user_id: str = Depends(get_current_user_id)
 ):
     """Delete an option transaction."""
+    tx = await options_service.get_transaction_by_id(transaction_id)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
+    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
+        raise HTTPException(status_code=404, detail="Transakce nenalezena")
     success = await options_service.delete_transaction(transaction_id)
     if not success:
         raise HTTPException(status_code=404, detail="Transakce nenalezena")
@@ -158,6 +192,8 @@ async def delete_option_transactions_by_symbol(
     user_id: str = Depends(get_current_user_id)
 ):
     """Delete all transactions for a specific option position."""
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     count = await options_service.delete_transactions_by_symbol(portfolio_id, option_symbol)
     return {"success": True, "deleted_count": count}
 
@@ -165,17 +201,6 @@ async def delete_option_transactions_by_symbol(
 # ==========================================
 # Close Position (convenience endpoint)
 # ==========================================
-
-class ClosePositionRequest(OptionTransactionUpdate):
-    """Request to close an existing position."""
-    option_symbol: str
-    closing_action: OptionAction
-    contracts: int
-    premium: Optional[float] = None
-    close_date: date
-    fees: float = 0
-    exchange_rate_to_czk: Optional[float] = None
-    notes: Optional[str] = None
 
 
 @router.post("/{portfolio_id}/close")
@@ -194,6 +219,7 @@ async def close_option_position(
 ):
     """
     Close an existing option position.
+
     
     Validates that:
     - Position exists
@@ -206,6 +232,8 @@ async def close_option_position(
     For ASSIGNMENT (short call) or EXERCISE (long put), provide source_transaction_id
     to specify which stock lot to sell.
     """
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     try:
         tx, stock_tx = await options_service.close_position(
             portfolio_id=portfolio_id,
@@ -286,7 +314,12 @@ async def refresh_option_prices(
     Fetches live prices using yfinance and updates the cache.
     """
     # Get holdings to know which symbols to refresh
-    holdings = await options_service.get_holdings(portfolio_id)
+    if portfolio_id:
+        if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+            raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
+        holdings = await options_service.get_holdings(portfolio_id)
+    else:
+        holdings = await options_service.get_all_holdings_for_user(user_id)
     
     if not holdings:
         return {"updated": 0, "message": "No holdings to refresh"}

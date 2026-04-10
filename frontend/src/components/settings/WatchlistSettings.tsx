@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   DndContext,
   closestCenter,
@@ -40,9 +41,6 @@ import {
   useReorderWatchlists,
 } from '@/hooks/useWatchlists';
 
-interface WatchlistSettingsProps {
-  onBack: () => void;
-}
 
 // Sortable row component
 interface SortableRowProps {
@@ -109,7 +107,9 @@ function SortableRow({ watchlist, onEdit, onDelete }: SortableRowProps) {
   );
 }
 
-export function WatchlistSettings({ onBack }: WatchlistSettingsProps) {
+export function WatchlistSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const { data: watchlists = [], isLoading } = useWatchlists();
   const createMutation = useCreateWatchlist();
   const updateMutation = useUpdateWatchlist();

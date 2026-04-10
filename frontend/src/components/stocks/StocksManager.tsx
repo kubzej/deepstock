@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { searchStocks } from '@/lib/api';
 import type { Stock } from '@/lib/api';
@@ -83,11 +84,8 @@ function getStockCompleteness(stock: Stock): {
   };
 }
 
-interface StocksManagerProps {
-  onStockClick?: (ticker: string) => void;
-}
-
-export default function StocksManager({ onStockClick }: StocksManagerProps) {
+export default function StocksManager() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // React Query hooks
@@ -366,8 +364,8 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                 return (
                   <div
                     key={stock.id}
-                    className={`flex items-start gap-2 py-2 px-2 rounded hover:bg-muted/50 group break-inside-avoid ${onStockClick ? 'cursor-pointer' : ''}`}
-                    onClick={() => onStockClick?.(stock.ticker)}
+                    className="flex items-start gap-2 py-2 px-2 rounded hover:bg-muted/50 group break-inside-avoid cursor-pointer"
+                    onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
                   >
                     {/* Stock info */}
                     <div className="flex-1 min-w-0">
@@ -462,7 +460,7 @@ export default function StocksManager({ onStockClick }: StocksManagerProps) {
                   {/* Left: Stock info */}
                   <div
                     className="flex-1 min-w-0 cursor-pointer overflow-hidden"
-                    onClick={() => onStockClick?.(stock.ticker)}
+                    onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
                   >
                     <div className="flex items-center gap-2">
                       {(() => {

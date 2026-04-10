@@ -3,10 +3,10 @@
  * Shows overbought/oversold conditions with visual indicator
  */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
-import { fetchTechnicalIndicators, type TechnicalPeriod } from '@/lib/api';
+import { type TechnicalPeriod } from '@/lib/api';
+import { useTechnicalData } from '@/hooks/useTechnicalData';
 
 // ============================================================
 // TYPES
@@ -161,12 +161,7 @@ function RSIGauge({ value }: { value: number | null }) {
 export function RSIChart({ ticker }: RSIChartProps) {
   const [period, setPeriod] = useState<TechnicalPeriod>('3mo');
 
-  const { data: technicalData, isLoading } = useQuery({
-    queryKey: ['technical', ticker, period],
-    queryFn: () => fetchTechnicalIndicators(ticker, period),
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  const { data: technicalData, isLoading } = useTechnicalData(ticker, period);
 
   if (isLoading || !technicalData) {
     return (

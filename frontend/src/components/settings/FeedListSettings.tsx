@@ -2,6 +2,7 @@
  * FeedListSettings — manage X.com feed lists and their accounts
  */
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, ArrowLeft, X, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,11 +29,9 @@ import {
   type FeedList,
 } from '@/lib/api/feed';
 
-interface FeedListSettingsProps {
-  onBack: () => void;
-}
-
-export function FeedListSettings({ onBack }: FeedListSettingsProps) {
+export function FeedListSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);

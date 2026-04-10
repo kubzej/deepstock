@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot
+from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot, PortfolioSnapshot
 from app.services.performance import get_stock_performance, get_options_performance
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
@@ -46,6 +46,18 @@ async def get_all_transactions(
 async def get_all_open_lots_for_user(user_id: str = Depends(get_current_user_id)):
     """Get all open lots across all user's portfolios."""
     return await portfolio_service.get_all_open_lots_for_user(user_id)
+
+
+@router.get("/all/snapshot", response_model=PortfolioSnapshot)
+async def get_all_portfolio_snapshot(user_id: str = Depends(get_current_user_id)):
+    """Get live portfolio snapshot (value, cost basis, P/L, daily change) across all portfolios."""
+    return await portfolio_service.get_portfolio_snapshot(portfolio_id=None, user_id=user_id)
+
+
+@router.post("/all/recalculate")
+async def recalculate_all_user_holdings(user_id: str = Depends(get_current_user_id)):
+    """Recalculate holdings across all portfolios owned by the user."""
+    return await portfolio_service.recalculate_all_user_holdings(user_id)
 
 
 
@@ -141,6 +153,14 @@ async def get_available_lots(portfolio_id: str, stock_ticker: str, user_id: str 
     if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
         raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
     return await portfolio_service.get_available_lots(portfolio_id, stock_ticker)
+
+
+@router.get("/{portfolio_id}/snapshot", response_model=PortfolioSnapshot)
+async def get_portfolio_snapshot(portfolio_id: str, user_id: str = Depends(get_current_user_id)):
+    """Get live portfolio snapshot (value, cost basis, P/L, daily change) for a single portfolio."""
+    if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
+        raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
+    return await portfolio_service.get_portfolio_snapshot(portfolio_id=portfolio_id, user_id=user_id)
 
 
 @router.post("/{portfolio_id}/recalculate")

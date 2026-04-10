@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   Table,
   TableBody,
@@ -36,7 +37,7 @@ export interface Holding {
   currency: string;
   sector?: string;
   priceScale?: number;
-  totalInvestedCzk?: number;
+  totalInvestedCzk: number;
   portfolioName?: string;
 }
 
@@ -94,7 +95,6 @@ interface HoldingsTableProps {
   holdings: Holding[];
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
-  onRowClick?: (ticker: string) => void;
   showPortfolioColumn?: boolean;
 }
 
@@ -102,9 +102,9 @@ export function HoldingsTable({
   holdings,
   quotes,
   rates,
-  onRowClick,
   showPortfolioColumn = false,
 }: HoldingsTableProps) {
+  const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [expandedTickers, setExpandedTickers] = useState<Set<string>>(
@@ -129,9 +129,7 @@ export function HoldingsTable({
       const currentValue = currentPrice * scale * h.shares;
       const currentValueCzk = toCZK(currentValue, h.currency, rates);
 
-      // Use historical invested CZK if available, otherwise calculate from current rate
-      const investedCzk =
-        h.totalInvestedCzk ?? toCZK(h.avgCost * h.shares, h.currency, rates);
+      const investedCzk = h.totalInvestedCzk;
 
       const plCzk = currentValueCzk - investedCzk;
       const plPercent = investedCzk > 0 ? (plCzk / investedCzk) * 100 : 0;
@@ -391,7 +389,7 @@ export function HoldingsTable({
                   onClick={() =>
                     isExpandable
                       ? toggleExpand(holding.ticker)
-                      : onRowClick?.(holding.ticker)
+                      : navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })
                   }
                 >
                   <TableCell>
@@ -530,7 +528,7 @@ export function HoldingsTable({
                     <TableRow
                       key={`${subHolding.ticker}-${subHolding.portfolioName}`}
                       className="cursor-pointer hover:bg-muted/50 border-border bg-muted/20"
-                      onClick={() => onRowClick?.(subHolding.ticker)}
+                      onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: subHolding.ticker } })}
                     >
                       <TableCell>
                         <div className="pl-8 text-muted-foreground text-sm">
@@ -642,7 +640,7 @@ export function HoldingsTable({
                 portfolioHoldings={
                   isExpandable ? holding.portfolioHoldings : undefined
                 }
-                onClick={() => onRowClick?.(holding.ticker)}
+                onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })}
               />
             );
           })}

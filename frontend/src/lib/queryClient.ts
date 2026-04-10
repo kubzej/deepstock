@@ -32,6 +32,9 @@ export const STALE_TIMES = {
   watchlistTags: 10 * 60 * 1000,    // 10 minutes
   itemTags: 5 * 60 * 1000,          // 5 minutes
 
+  // Portfolio snapshot - live value, tied to quotes freshness
+  portfolioSnapshot: 5 * 60 * 1000, // 5 minutes
+
   // Performance analytics - expensive to compute, cache aggressively
   performance: 60 * 60 * 1000,      // 1 hour
 
@@ -113,6 +116,7 @@ export const queryKeys = {
   transactions: (portfolioId: string) => ['transactions', portfolioId] as const,
   allTransactions: () => ['transactions', 'all'] as const,
   transactionHistory: (limit: number) => ['transactionHistory', limit] as const,
+  infiniteTransactions: (pageSize: number) => ['infiniteTransactions', pageSize] as const,
   optionTransactionHistory: (limit: number) => ['optionTransactionHistory', limit] as const,
 
   // Options
@@ -127,6 +131,10 @@ export const queryKeys = {
     : ['optionStats', 'all'] as const,
   optionQuotes: (symbols: string[]) => ['optionQuotes', symbols.sort().join(',')] as const,
 
+  // Portfolio snapshot
+  portfolioSnapshot: (portfolioId: string | null) =>
+    ['portfolioSnapshot', portfolioId ?? 'all'] as const,
+
   // Performance analytics
   stockPerformance: (portfolioId: string, period: string, customFrom?: string, customTo?: string) =>
     ['stockPerformance', portfolioId, period, customFrom, customTo] as const,
@@ -139,6 +147,9 @@ export const queryKeys = {
   // Price Alerts
   alerts: () => ['alerts'] as const,
   activeAlerts: () => ['alerts', 'active'] as const,
+
+  // Technical indicators
+  technicalIndicators: (ticker: string, period: string) => ['technical', ticker, period] as const,
 
   // Market sentiment
   fearGreed: () => ['fearGreed'] as const,

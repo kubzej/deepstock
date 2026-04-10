@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,11 +30,9 @@ import {
   useDeleteJournalChannel,
 } from '@/hooks/useJournal';
 
-interface JournalChannelSettingsProps {
-  onBack: () => void;
-}
-
-export function JournalChannelSettings({ onBack }: JournalChannelSettingsProps) {
+export function JournalChannelSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const { data: allChannels = [], isLoading } = useJournalChannels();
   const { data: sections = [] } = useJournalSections();
   const createMutation = useCreateJournalChannel();

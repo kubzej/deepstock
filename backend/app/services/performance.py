@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from app.core.supabase import supabase
 from app.core.redis import get_redis
 from app.services.exchange import exchange_service
+from app.services.options_accounting import calculate_option_accounting
 from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
@@ -205,40 +206,39 @@ async def get_stock_performance(
     positions: Dict[str, float] = {}  # ticker -> shares
     invested_total_czk = 0.0
     tx_by_date: Dict[str, List[dict]] = {}
-    
+
     for tx in transactions:
         tx_date = pd.to_datetime(tx["executed_at"]).date().isoformat()
         if tx_date not in tx_by_date:
             tx_by_date[tx_date] = []
         tx_by_date[tx_date].append(tx)
-    
+
     # 7. Calculate daily portfolio value
     result_data = []
     dates = close_prices.index.tolist()
-    
+
     for date in dates:
         date_str = date.date().isoformat()
-        
+
         # Apply any transactions on this date
         if date_str in tx_by_date:
             for tx in tx_by_date[date_str]:
                 ticker = tx["stocks"]["ticker"]
                 shares = float(tx["shares"])
-                
-                # Use total_amount_czk if available, otherwise convert manually
-                if tx.get("total_amount_czk"):
-                    amount_czk = float(tx["total_amount_czk"])
-                else:
-                    total_amount = float(tx["total_amount"])
-                    rate = float(tx.get("exchange_rate_to_czk") or rates.get(tx.get("currency", "USD"), 23.5))
-                    amount_czk = total_amount * rate
-                
+                tx_rate = float(tx.get("exchange_rate_to_czk") or rates.get(tx.get("currency", "USD"), 23.5))
+
                 if tx["type"] == "BUY":
+                    # Invested = gross amount + fees (fee-inclusive cashflow)
+                    gross_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
+                    fees_czk = float(tx.get("fees") or 0) * tx_rate
+                    invested_total_czk += gross_czk + fees_czk
                     positions[ticker] = positions.get(ticker, 0) + shares
-                    invested_total_czk += amount_czk
+
                 else:  # SELL
+                    # Invested decreases by proceeds received (cashflow semantics)
+                    proceeds_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
+                    invested_total_czk -= proceeds_czk
                     positions[ticker] = positions.get(ticker, 0) - shares
-                    invested_total_czk -= amount_czk
         
         # Calculate portfolio value in CZK
         portfolio_value_czk = 0.0
@@ -362,51 +362,23 @@ async def get_options_performance(
     
     start_date = max(start_date, first_tx_date)
     
-    # 3. Calculate cumulative P/L by date
-    # Options P/L (IBKR style - P/L only at close):
-    # - STO (Sell to Open): 0 (no P/L at open)
-    # - BTO (Buy to Open): 0 (no P/L at open)
-    # - BTC/STC/EXPIRATION/ASSIGNMENT/EXERCISE: realized P/L stored in total_premium
-    
     daily_pnl: Dict[str, float] = {}
-    total_realized_pl = 0.0
-    
+    grouped_transactions: Dict[tuple[str, str], List[dict]] = {}
     for tx in transactions:
-        tx_date = pd.to_datetime(tx["date"]).date()
-        if tx_date < start_date:
-            continue
-        
-        date_str = tx_date.isoformat()
-        action = tx["action"]
-        
-        pnl = 0.0
-        
-        # Opening transactions have no P/L
-        if action in ["STO", "BTO"]:
-            pnl = 0
-        # Closing transactions: use total_premium which stores realized P/L
-        elif action in ["BTC", "STC", "EXPIRATION", "ASSIGNMENT", "EXERCISE"]:
-            # total_premium now stores the calculated realized P/L
-            # For older transactions without this, fall back to old calculation
-            if tx.get("total_premium") is not None:
-                pnl = float(tx["total_premium"])  # Can be positive or negative
-            else:
-                # Fallback for old transactions: estimate based on action
-                contracts = int(tx.get("contracts", 1))
-                premium = float(tx.get("premium", 0) or 0)
-                premium_value = premium * contracts * 100
-                if action in ["STC"]:
-                    pnl = premium_value  # Received when closing long
-                elif action in ["BTC"]:
-                    pnl = -premium_value  # Paid when closing short
-                # EXPIRATION/ASSIGNMENT/EXERCISE without total_premium: estimate as 0
-        
-        if pnl != 0:
-            total_realized_pl += pnl
-        
-        if date_str not in daily_pnl:
-            daily_pnl[date_str] = 0
-        daily_pnl[date_str] += pnl
+        key = (tx["portfolio_id"], tx["option_symbol"])
+        grouped_transactions.setdefault(key, []).append(tx)
+
+    total_realized_pl = 0.0
+    for txs in grouped_transactions.values():
+        accounting = calculate_option_accounting(txs)
+        for event in accounting.realized_events:
+            tx_date = pd.to_datetime(event.date).date()
+            if tx_date < start_date:
+                continue
+            if event.date not in daily_pnl:
+                daily_pnl[event.date] = 0.0
+            daily_pnl[event.date] += event.realized_pl_czk
+            total_realized_pl += event.realized_pl_czk
     
     # 4. Build cumulative performance
     result_data = []
@@ -440,10 +412,3 @@ async def get_options_performance(
     await redis.set(cache_key, result.model_dump_json(), ex=CacheTTL.PERFORMANCE)
     
     return result
-
-
-# Service instance
-performance_service = {
-    "get_stock_performance": get_stock_performance,
-    "get_options_performance": get_options_performance,
-}

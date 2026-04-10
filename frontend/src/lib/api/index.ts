@@ -59,6 +59,7 @@ export {
   type SourceTransaction,
   type OpenLot,
   type TransactionUpdateData,
+  type RecalculateHoldingsResult,
   type PerformancePoint,
   type PerformanceResult,
   type PerformancePeriod,
@@ -67,6 +68,7 @@ export {
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
+  recalculateAllPortfolioHoldings,
   fetchHoldings,
   fetchAllHoldings,
   fetchOpenLots,
@@ -80,6 +82,8 @@ export {
   deleteTransaction,
   fetchStockPerformance,
   fetchOptionsPerformance,
+  type PortfolioSnapshot,
+  fetchPortfolioSnapshot,
 } from './portfolio';
 
 // Stocks

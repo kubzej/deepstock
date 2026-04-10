@@ -1,62 +1,8 @@
-import { useState } from 'react';
+import { Link } from '@tanstack/react-router';
 import { List, Tag, ChevronRight, Briefcase, Bell, Info, Rss, BookOpen, Layers } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { WatchlistSettings } from '@/components/settings/WatchlistSettings';
-import { WatchlistTagSettings } from '@/components/settings/WatchlistTagSettings';
-import { PortfolioSettings } from '@/components/settings/PortfolioSettings';
-import { NotificationSettings } from '@/components/settings/NotificationSettings';
-import { FeedListSettings } from '@/components/settings/FeedListSettings';
-import { JournalSettings } from '@/components/settings/JournalSettings';
-import { JournalChannelSettings } from '@/components/settings/JournalChannelSettings';
 
-type SettingsSection =
-  | 'menu'
-  | 'portfolios'
-  | 'watchlists'
-  | 'watchlist-tags'
-  | 'notifications'
-  | 'feed-lists'
-  | 'journal-sections'
-  | 'journal-channels';
-
-interface SettingsPageProps {
-  initialSection?: SettingsSection;
-}
-
-export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
-  const [activeSection, setActiveSection] =
-    useState<SettingsSection>(initialSection);
-
-  // Render section content
-  if (activeSection === 'portfolios') {
-    return <PortfolioSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'watchlists') {
-    return <WatchlistSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'watchlist-tags') {
-    return <WatchlistTagSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'notifications') {
-    return <NotificationSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'feed-lists') {
-    return <FeedListSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'journal-sections') {
-    return <JournalSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  if (activeSection === 'journal-channels') {
-    return <JournalChannelSettings onBack={() => setActiveSection('menu')} />;
-  }
-
-  // Main menu
+export function SettingsPage() {
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -70,8 +16,8 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
           Portfolia
         </h2>
 
-        <button
-          onClick={() => setActiveSection('portfolios')}
+        <Link
+          to="/settings/portfolios"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -84,7 +30,7 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
       </div>
 
       {/* Watchlisty section */}
@@ -93,8 +39,8 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
           Watchlisty
         </h2>
 
-        <button
-          onClick={() => setActiveSection('watchlists')}
+        <Link
+          to="/settings/watchlists"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -107,10 +53,10 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
 
-        <button
-          onClick={() => setActiveSection('watchlist-tags')}
+        <Link
+          to="/settings/watchlist-tags"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -123,7 +69,7 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
       </div>
 
       {/* Notifikace section */}
@@ -132,8 +78,8 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
           Notifikace
         </h2>
 
-        <button
-          onClick={() => setActiveSection('notifications')}
+        <Link
+          to="/settings/notifications"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -146,14 +92,14 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
       </div>
 
       {/* Feed */}
       <div className="space-y-1">
         <h2 className="text-sm font-medium text-muted-foreground px-2 mb-2">Feed</h2>
-        <button
-          onClick={() => setActiveSection('feed-lists')}
+        <Link
+          to="/settings/feed-lists"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -164,15 +110,15 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             <div className="text-sm text-muted-foreground">Seznamy X účtů pro AI přehled příspěvků</div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
       </div>
 
       {/* Deník */}
       <div className="space-y-1">
         <h2 className="text-sm font-medium text-muted-foreground px-2 mb-2">Deník</h2>
 
-        <button
-          onClick={() => setActiveSection('journal-sections')}
+        <Link
+          to="/settings/journal-sections"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -185,10 +131,10 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
 
-        <button
-          onClick={() => setActiveSection('journal-channels')}
+        <Link
+          to="/settings/journal-channels"
           className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
         >
           <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
@@ -201,7 +147,7 @@ export function SettingsPage({ initialSection = 'menu' }: SettingsPageProps) {
             </div>
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </button>
+        </Link>
       </div>
 
       {/* Verze aplikace */}

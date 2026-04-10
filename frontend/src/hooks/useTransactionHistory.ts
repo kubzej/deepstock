@@ -30,7 +30,7 @@ export function useAllTransactions(limit: number = 1000) {
  */
 export function useInfiniteTransactions(pageSize: number = 100) {
   return useInfiniteQuery({
-    queryKey: ['infiniteTransactions', pageSize],
+    queryKey: queryKeys.infiniteTransactions(pageSize),
     queryFn: ({ pageParam }) =>
       fetchAllTransactionsPage(pageSize, pageParam as string | null),
     initialPageParam: null as string | null,

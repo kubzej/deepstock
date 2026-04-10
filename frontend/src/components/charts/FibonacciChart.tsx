@@ -3,7 +3,6 @@
  * Shows price with key Fibonacci support/resistance levels
  */
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   ComposedChart,
   Line,
@@ -15,8 +14,9 @@ import {
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartWrapper, type SignalType } from './ChartWrapper';
-import { fetchTechnicalIndicators, type TechnicalPeriod } from '@/lib/api';
+import { type TechnicalPeriod } from '@/lib/api';
 import { getSmartDecimals, formatPrice } from '@/lib/format';
+import { useTechnicalData } from '@/hooks/useTechnicalData';
 
 // ============================================================
 // TYPES
@@ -178,11 +178,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
 export function FibonacciChart({ ticker }: FibonacciChartProps) {
   const [period, setPeriod] = useState<TechnicalPeriod>('3mo');
 
-  const { data: technicalData, isLoading } = useQuery({
-    queryKey: ['technical', ticker, period],
-    queryFn: () => fetchTechnicalIndicators(ticker, period),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: technicalData, isLoading } = useTechnicalData(ticker, period);
 
   // Tooltip content for info icon
   const tooltipContent = (

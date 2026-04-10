@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -67,11 +68,9 @@ const TAG_COLORS = [
   '#a3e635', // light lime
 ];
 
-interface WatchlistTagSettingsProps {
-  onBack: () => void;
-}
-
-export function WatchlistTagSettings({ onBack }: WatchlistTagSettingsProps) {
+export function WatchlistTagSettings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate({ to: '/settings' });
   const { data: tags = [], isLoading } = useWatchlistTags();
   const createMutation = useCreateWatchlistTag();
   const updateMutation = useUpdateWatchlistTag();

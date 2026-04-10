@@ -4,10 +4,14 @@ Handles CRUD operations for option transactions and holdings.
 """
 import logging
 from app.core.supabase import supabase
+from app.services.options_accounting import (
+    annotate_option_transactions,
+    calculate_option_accounting,
+    preview_option_close,
+)
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 from datetime import date, datetime, timezone
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -62,19 +66,6 @@ class OptionPriceUpdate(BaseModel):
     vega: Optional[float] = None
 
 
-class OptionCloseRequest(BaseModel):
-    """Request to close an option position."""
-    closing_action: OptionAction
-    contracts: int = Field(..., gt=0)
-    close_date: date
-    premium: Optional[float] = None
-    fees: float = 0
-    exchange_rate_to_czk: Optional[float] = None
-    notes: Optional[str] = None
-    # For ASSIGNMENT (short call) or EXERCISE (long put) - need lot selection
-    source_transaction_id: Optional[str] = None
-
-
 # ==========================================
 # OCC Symbol Generator
 # ==========================================
@@ -114,6 +105,72 @@ def generate_occ_symbol(
 
 class OptionsService:
     """Service for managing option transactions."""
+
+    async def _get_transactions_for_symbols(
+        self,
+        portfolio_ids: list[str],
+        option_symbols: Optional[list[str]] = None,
+    ) -> List[dict]:
+        if not portfolio_ids:
+            return []
+
+        query = supabase.table("option_transactions") \
+            .select("*") \
+            .in_("portfolio_id", portfolio_ids) \
+            .order("date", desc=False)
+
+        if option_symbols:
+            query = query.in_("option_symbol", option_symbols)
+
+        response = query.execute()
+        return response.data or []
+
+    async def _annotate_transactions(
+        self,
+        transactions: List[dict],
+    ) -> List[dict]:
+        if not transactions:
+            return []
+
+        portfolio_ids = sorted({tx["portfolio_id"] for tx in transactions})
+        option_symbols = sorted({tx["option_symbol"] for tx in transactions})
+        context_transactions = await self._get_transactions_for_symbols(
+            portfolio_ids,
+            option_symbols=option_symbols,
+        )
+        annotated = annotate_option_transactions(context_transactions)
+        annotated_by_id = {tx["id"]: tx for tx in annotated}
+        return [{**tx, **annotated_by_id.get(tx["id"], {})} for tx in transactions]
+
+    def _overlay_holding_economics(
+        self,
+        holdings: List[dict],
+        transactions: List[dict],
+    ) -> List[dict]:
+        grouped_transactions: dict[tuple[str, str], list[dict]] = {}
+        for tx in transactions:
+            key = (tx["portfolio_id"], tx["option_symbol"])
+            grouped_transactions.setdefault(key, []).append(tx)
+
+        enriched_holdings: List[dict] = []
+        for holding in holdings:
+            key = (holding["portfolio_id"], holding["option_symbol"])
+            accounting = calculate_option_accounting(grouped_transactions.get(key, []))
+            merged = dict(holding)
+
+            if accounting.holding.position is not None:
+                merged["position"] = accounting.holding.position
+                merged["contracts"] = accounting.holding.contracts
+                merged["avg_premium"] = (
+                    round(accounting.holding.avg_premium, 4)
+                    if accounting.holding.avg_premium is not None
+                    else None
+                )
+                merged["total_cost"] = round(accounting.holding.total_cost, 4)
+
+            enriched_holdings.append(merged)
+
+        return enriched_holdings
     
     # ==========================================
     # Transactions CRUD
@@ -169,7 +226,7 @@ class OptionsService:
             del tx["portfolios"]  # Remove nested object
             result.append(tx)
         
-        return result
+        return await self._annotate_transactions(result)
     
     async def get_transaction_by_id(self, transaction_id: str) -> Optional[dict]:
         """Get a single transaction by ID."""
@@ -178,7 +235,12 @@ class OptionsService:
             .eq("id", transaction_id) \
             .single() \
             .execute()
-        return response.data
+        transaction = response.data
+        if not transaction:
+            return None
+
+        annotated = await self._annotate_transactions([transaction])
+        return annotated[0] if annotated else transaction
     
     async def create_transaction(
         self, 
@@ -217,8 +279,10 @@ class OptionsService:
         response = supabase.table("option_transactions") \
             .insert(insert_data) \
             .execute()
-        
-        return response.data[0]
+
+        created_tx = response.data[0]
+        annotated = await self._annotate_transactions([created_tx])
+        return annotated[0] if annotated else created_tx
     
     async def update_transaction(
         self, 
@@ -254,8 +318,13 @@ class OptionsService:
             .update(update_data) \
             .eq("id", transaction_id) \
             .execute()
-        
-        return response.data[0] if response.data else None
+
+        updated_tx = response.data[0] if response.data else None
+        if not updated_tx:
+            return None
+
+        annotated = await self._annotate_transactions([updated_tx])
+        return annotated[0] if annotated else updated_tx
     
     async def delete_transaction(self, transaction_id: str) -> bool:
         """Delete an option transaction."""
@@ -304,7 +373,16 @@ class OptionsService:
             query = query.eq("symbol", symbol.upper())
         
         response = query.execute()
-        return response.data
+        holdings = response.data or []
+        if not holdings:
+            return []
+
+        option_symbols = [h["option_symbol"] for h in holdings if h.get("option_symbol")]
+        transactions = await self._get_transactions_for_symbols(
+            [portfolio_id] if portfolio_id else [],
+            option_symbols=option_symbols,
+        )
+        return self._overlay_holding_economics(holdings, transactions)
     
     async def get_all_holdings_for_user(self, user_id: str) -> List[dict]:
         """
@@ -328,8 +406,17 @@ class OptionsService:
             .in_("portfolio_id", portfolio_ids) \
             .order("expiration_date", desc=False) \
             .execute()
-        
-        return response.data
+
+        holdings = response.data or []
+        if not holdings:
+            return []
+
+        option_symbols = [h["option_symbol"] for h in holdings if h.get("option_symbol")]
+        transactions = await self._get_transactions_for_symbols(
+            portfolio_ids,
+            option_symbols=option_symbols,
+        )
+        return self._overlay_holding_economics(holdings, transactions)
     
     # ==========================================
     # Option Prices
@@ -554,33 +641,25 @@ class OptionsService:
                 f"Cannot close {contracts} contracts, only {holding['contracts']} open"
             )
         
-        # Get original avg_premium for P/L calculation
+        existing_transactions = await self._get_transactions_for_symbols(
+            [portfolio_id],
+            option_symbols=[option_symbol],
+        )
+        preview = preview_option_close(
+            existing_transactions,
+            action=closing_action,
+            contracts=contracts,
+            premium=premium,
+            fees=fees,
+            exchange_rate_to_czk=exchange_rate_to_czk,
+        )
+        if preview is None:
+            raise ValueError(f"Cannot preview close for {option_symbol}")
+
         avg_premium = float(holding.get("avg_premium") or 0)
         closing_premium = float(premium) if premium else 0
-        
-        # Calculate realized P/L (IBKR style - P/L only at close)
-        # For BTC/STC: difference between open and close premium
-        # For EXPIRATION: full premium (profit for short, loss for long)
-        # For ASSIGNMENT/EXERCISE: 0 (premium transferred to stock cost basis)
-        realized_pl = 0.0
-        
-        if closing_action == "BTC":
-            # Short position close: we received avg_premium, now pay closing_premium
-            realized_pl = (avg_premium - closing_premium) * contracts * 100
-        elif closing_action == "STC":
-            # Long position close: we paid avg_premium, now receive closing_premium
-            realized_pl = (closing_premium - avg_premium) * contracts * 100
-        elif closing_action == "EXPIRATION":
-            if position == "short":
-                # Short position expired: we keep the full premium
-                realized_pl = avg_premium * contracts * 100
-            else:
-                # Long position expired: we lose the full premium
-                realized_pl = -avg_premium * contracts * 100
-        elif closing_action in ["ASSIGNMENT", "EXERCISE"]:
-            # Premium is transferred to stock cost basis, option P/L = 0
-            realized_pl = 0
-        
+        realized_pl = preview.realized_pl
+
         # Currency comes from the holding (view exposes it from the opening transaction)
         option_currency = holding.get("currency") or "USD"
 
@@ -598,6 +677,7 @@ class OptionsService:
                 exchange_rate_to_czk=exchange_rate_to_czk,
                 source_transaction_id=source_transaction_id,
                 notes=notes,
+                transferred_entry_per_share=preview.transferred_entry_per_share,
                 user_id=user_id,
             )
             linked_stock_tx_id = linked_stock_tx["id"]
@@ -620,7 +700,6 @@ class OptionsService:
             "action": closing_action,
             "contracts": contracts,
             "premium": closing_premium if closing_action in ["BTC", "STC"] else avg_premium,
-            "total_premium": realized_pl,  # Store realized P/L here for performance calculation
             "currency": option_currency,
             "exchange_rate_to_czk": exchange_rate_to_czk,
             "fees": fees,
@@ -638,7 +717,9 @@ class OptionsService:
             f"realized P/L = ${realized_pl:.2f}"
         )
 
-        return response.data[0], linked_stock_tx
+        created_tx = response.data[0]
+        annotated = await self._annotate_transactions([created_tx])
+        return (annotated[0] if annotated else created_tx), linked_stock_tx
     
     async def _create_stock_transaction_for_option_close(
         self,
@@ -650,25 +731,20 @@ class OptionsService:
         exchange_rate_to_czk: Optional[float],
         source_transaction_id: Optional[str],
         notes: Optional[str],
+        transferred_entry_per_share: float,
         user_id: Optional[str] = None,
     ) -> dict:
         """
         Create a stock transaction when an option is assigned/exercised.
         
-        For SHORT positions (ASSIGNMENT), the received premium affects the effective price:
-        - Short PUT -> ASSIGNMENT: BUY at (strike - avg_premium) = lower cost basis
-        - Short CALL -> ASSIGNMENT: SELL at (strike + avg_premium) = higher effective sale price
-        
-        For LONG positions (EXERCISE), premium is a separate sunk cost:
-        - Long CALL -> EXERCISE: BUY at strike price
-        - Long PUT -> EXERCISE: SELL at strike price
+        Fee-aware option entry economics are transferred into the effective stock price
+        on settlement so stock-side accounting stays economically consistent.
         """
         from app.services.stocks import stock_service
         
         position = holding["position"]
         option_type = holding["option_type"]
         strike_price = float(holding["strike_price"])
-        avg_premium = float(holding.get("avg_premium") or 0)
         symbol = holding["symbol"]
         shares = contracts * 100
         
@@ -680,18 +756,19 @@ class OptionsService:
         else:  # EXERCISE
             tx_type = "BUY" if option_type == "call" else "SELL"
         
-        # Calculate effective price per share
-        # Only adjust for SHORT positions (ASSIGNMENT) where we received premium
-        if closing_action == "ASSIGNMENT" and position == "short":
-            if tx_type == "BUY":
-                # Short PUT assigned: we buy at strike, but received premium lowers cost
-                effective_price = strike_price - avg_premium
-            else:
-                # Short CALL assigned: we sell at strike, but received premium increases effective sale
-                effective_price = strike_price + avg_premium
+        # Transfer fee-aware option entry economics into the linked stock price.
+        if tx_type == "BUY":
+            effective_price = (
+                strike_price - transferred_entry_per_share
+                if position == "short"
+                else strike_price + transferred_entry_per_share
+            )
         else:
-            # EXERCISE (long positions): premium was paid separately, use strike
-            effective_price = strike_price
+            effective_price = (
+                strike_price + transferred_entry_per_share
+                if position == "short"
+                else strike_price - transferred_entry_per_share
+            )
         
         # For SELL transactions, we need source_transaction_id
         if tx_type == "SELL" and not source_transaction_id:
@@ -710,8 +787,12 @@ class OptionsService:
         total_amount_czk = total_amount * exchange_rate_to_czk if exchange_rate_to_czk else None
 
         # Build note with details about the adjustment
-        if closing_action == "ASSIGNMENT" and avg_premium > 0:
-            tx_notes = f"{closing_action} from {holding['option_symbol']} (strike {strike_price} {stock_currency}, premium {avg_premium} {stock_currency})"
+        if transferred_entry_per_share > 0:
+            tx_notes = (
+                f"{closing_action} from {holding['option_symbol']} "
+                f"(strike {strike_price} {stock_currency}, "
+                f"option economics {transferred_entry_per_share:.4f} {stock_currency}/share)"
+            )
         else:
             tx_notes = f"{closing_action} from {holding['option_symbol']}"
         if notes:
@@ -739,7 +820,8 @@ class OptionsService:
         
         logger.info(
             f"Created stock {tx_type} for option {closing_action}: "
-            f"{shares} {symbol} @ ${effective_price} (strike: ${strike_price}, premium: ${avg_premium})"
+            f"{shares} {symbol} @ ${effective_price} "
+            f"(strike: ${strike_price}, transferred: ${transferred_entry_per_share})"
         )
         
         # Recalculate holding to update shares/avg_cost

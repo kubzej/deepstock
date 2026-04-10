@@ -24,13 +24,10 @@ export interface ExchangeRates {
   [key: string]: number;  // e.g., USD: 24.5 (means 1 USD = 24.5 CZK)
 }
 
-// Fallback rates if API fails (approximate values)
-export const DEFAULT_RATES: ExchangeRates = {
-  USD: 23.5,
-  EUR: 25.5,
-  GBP: 30.0,
-  CHF: 27.0,
-};
+// Empty rates — never use hardcoded fallback values.
+// When rates are unavailable the backend returns 503 and the query errors out.
+// Components check ratesError from PortfolioContext and show a warning banner.
+export const DEFAULT_RATES: ExchangeRates = {};
 
 export interface OptionQuote {
   symbol: string;
