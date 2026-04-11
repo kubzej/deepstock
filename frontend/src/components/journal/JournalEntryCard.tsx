@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pencil, Trash2, ExternalLink, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -35,6 +35,32 @@ function formatDateOnly(iso: string) {
   }).format(new Date(iso));
 }
 
+function EntryMeta({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function EntrySurface({
+  children,
+  interactive = false,
+}: {
+  children: ReactNode;
+  interactive?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-border/40 bg-muted/[0.22] px-4 py-3 ${
+        interactive ? 'transition-colors hover:bg-muted/[0.28]' : ''
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
 
 export function JournalEntryCard({
   entry,
@@ -69,9 +95,9 @@ export function JournalEntryCard({
   // ── note ──────────────────────────────────────────
   if (entry.type === 'note') {
     return (
-      <div className="rounded-lg bg-muted/30 px-4 py-3">
+      <EntrySurface>
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          <EntryMeta>
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
             {entry.updated_at && (
               <span className="text-xs text-muted-foreground/60">(upraveno)</span>
@@ -81,7 +107,7 @@ export function JournalEntryCard({
                 {formatPrice(entry.metadata.price_at_creation, 'USD')}
               </span>
             )}
-          </div>
+          </EntryMeta>
           <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="ghost"
@@ -146,7 +172,7 @@ export function JournalEntryCard({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </EntrySurface>
     );
   }
 
@@ -162,10 +188,10 @@ export function JournalEntryCard({
       : 'AI přehled';
 
     return (
-      <div className="rounded-lg bg-muted/30 overflow-hidden">
+      <EntrySurface interactive>
         {/* Clickable header */}
         <div
-          className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer select-none"
+          className="flex cursor-pointer select-none items-center justify-between gap-2"
           onClick={() => setReportExpanded(v => !v)}
         >
           <div className="flex items-center gap-2 flex-wrap">
@@ -194,7 +220,7 @@ export function JournalEntryCard({
 
         {/* Expanded report */}
         {reportExpanded && (
-          <div className="px-4 pb-3">
+          <div className="pt-3">
             <MarkdownReport content={entry.content} />
           </div>
         )}
@@ -221,17 +247,17 @@ export function JournalEntryCard({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </EntrySurface>
     );
   }
 
   // ── ext_ref ───────────────────────────────────────
   if (entry.type === 'ext_ref') {
     return (
-      <div className="rounded-lg bg-muted/30 px-4 py-3">
+      <EntrySurface>
         {/* Header: date + actions */}
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          <EntryMeta>
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
             {entry.updated_at && (
               <span className="text-xs text-muted-foreground/60">(upraveno)</span>
@@ -241,7 +267,7 @@ export function JournalEntryCard({
                 {formatPrice(entry.metadata.price_at_creation, 'USD')}
               </span>
             )}
-          </div>
+          </EntryMeta>
           <div className="flex items-center gap-1 shrink-0">
             <Button
               variant="ghost"
@@ -345,7 +371,7 @@ export function JournalEntryCard({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </EntrySurface>
     );
   }
 
@@ -357,7 +383,7 @@ export function JournalEntryCard({
     const currency = entry.metadata.currency ?? 'USD';
 
     return (
-      <div className="rounded-lg bg-muted/30 px-4 py-3 group">
+      <EntrySurface>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -382,7 +408,7 @@ export function JournalEntryCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+            className="h-7 w-7 shrink-0 text-muted-foreground/70 transition-colors hover:text-destructive"
             onClick={() => setConfirmDelete(true)}
             disabled={isDeleting}
           >
@@ -407,7 +433,7 @@ export function JournalEntryCard({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </EntrySurface>
     );
   }
 
@@ -423,7 +449,7 @@ export function JournalEntryCard({
       : '';
 
     return (
-      <div className="rounded-lg bg-muted/30 px-4 py-3 group">
+      <EntrySurface>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -453,7 +479,7 @@ export function JournalEntryCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+            className="h-7 w-7 shrink-0 text-muted-foreground/70 transition-colors hover:text-destructive"
             onClick={() => setConfirmDelete(true)}
             disabled={isDeleting}
           >
@@ -478,7 +504,7 @@ export function JournalEntryCard({
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </EntrySurface>
     );
   }
 
