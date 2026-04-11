@@ -307,9 +307,9 @@ export function AlertSuggestionsPanel({ open, onClose, stocks }: Props) {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 {s.condition_type === 'price_above' ? (
-                                  <ArrowUp className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                  <ArrowUp className="h-3.5 w-3.5 text-positive shrink-0" />
                                 ) : (
-                                  <ArrowDown className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                                  <ArrowDown className="h-3.5 w-3.5 text-negative shrink-0" />
                                 )}
                                 <span className="font-mono-price text-sm font-medium">
                                   ${s.price.toFixed(2)}

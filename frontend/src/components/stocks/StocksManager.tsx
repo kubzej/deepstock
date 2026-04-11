@@ -41,8 +41,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import {
+  EmptyState,
+  ErrorState,
+  FilteredEmptyState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
 
@@ -282,26 +288,23 @@ export default function StocksManager() {
 
   if (error && !loading) {
     return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button
-          onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ['stocks'] })
-          }
-          className="mt-4"
-        >
-          Zkusit znovu
-        </Button>
-      </div>
+      <PageShell width="full">
+        <ErrorState
+          title="Nepodařilo se načíst akcie"
+          description={error}
+          retryAction={{
+            label: 'Zkusit znovu',
+            onClick: () => queryClient.invalidateQueries({ queryKey: ['stocks'] }),
+          }}
+        />
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <PageShell width="full">
       {/* Header */}
-      <PageHeader
+      <PageIntro
         title="Akcie"
         onRefresh={() =>
           queryClient.invalidateQueries({ queryKey: ['stocks'] })
@@ -317,7 +320,7 @@ export default function StocksManager() {
       />
 
       {/* Search + Filter */}
-      <div className="space-y-3">
+      <div className="sticky top-14 md:top-0 z-10 bg-background pt-2 pb-2 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10 space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -350,68 +353,58 @@ export default function StocksManager() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : stocks.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            {searchQuery
-              ? 'Žádné akcie nenalezeny'
-              : 'Zatím nemáte žádné akcie'}
-          </p>
+          searchQuery ? (
+            <FilteredEmptyState
+              description="Zkus jiný ticker, uprav název nebo vyčisti hledání."
+              clearAction={{ label: 'Vymazat hledání', onClick: () => setSearchQuery('') }}
+            />
+          ) : (
+            <EmptyState
+              icon={Plus}
+              title="Zatím nemáte žádné akcie"
+              description="Přidej první akcii a začni budovat vlastní stock databázi."
+              action={{ label: 'Přidat akcii', onClick: openCreateDialog }}
+            />
+          )
         ) : (
-          <>
-            {/* Desktop - Multi-column (flows down then right) */}
-            <div className="hidden md:block md:columns-2 xl:columns-3 gap-8">
-              {stocks.map((stock) => {
-                const { isComplete, missing } = getStockCompleteness(stock);
-                return (
-                  <div
-                    key={stock.id}
-                    className="flex items-start gap-2 py-2 px-2 rounded hover:bg-muted/50 group break-inside-avoid cursor-pointer"
-                    onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
-                  >
-                    {/* Stock info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className={`font-bold text-sm ${isComplete ? '' : 'text-amber-500'}`}
-                            >
-                              {stock.ticker}
-                            </span>
-                          </TooltipTrigger>
-                          {!isComplete && (
-                            <TooltipContent side="top">
-                              Chybí: {missing.join(', ')}
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {stock.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 truncate">
-                        <span>{stock.currency}</span>
-                        {stock.exchange && (
-                          <>
-                            <span className="opacity-40">/</span>
-                            <span>{stock.exchange}</span>
-                          </>
+          <div className="space-y-0.5">
+            {stocks.map((stock) => {
+              const { isComplete, missing } = getStockCompleteness(stock);
+              return (
+                <div
+                  key={stock.id}
+                  className="flex items-center gap-2 py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
+                  onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
+                >
+                  {/* Stock info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`font-bold text-sm ${isComplete ? '' : 'text-warning'}`}>
+                            {stock.ticker}
+                          </span>
+                        </TooltipTrigger>
+                        {!isComplete && (
+                          <TooltipContent side="top">
+                            Chybí: {missing.join(', ')}
+                          </TooltipContent>
                         )}
-                        {stock.country && (
-                          <>
-                            <span className="opacity-40">/</span>
-                            <span>{stock.country}</span>
-                          </>
-                        )}
-                        {stock.sector && (
-                          <>
-                            <span className="opacity-40">/</span>
-                            <span className="truncate">{stock.sector}</span>
-                          </>
-                        )}
-                      </div>
+                      </Tooltip>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {stock.name}
+                      </span>
                     </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 truncate">
+                      <span><span className="opacity-50">Měna:</span> {stock.currency}</span>
+                      {stock.exchange && <span><span className="opacity-50">Burza:</span> {stock.exchange}</span>}
+                      {stock.country && <span><span className="opacity-50">Země:</span> {stock.country}</span>}
+                      {stock.sector && <span className="truncate"><span className="opacity-50">Sektor:</span> {stock.sector}</span>}
+                    </div>
+                  </div>
 
-                    {/* Actions */}
+                  {/* Actions - desktop only */}
+                  <div className="hidden md:flex">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -446,94 +439,10 @@ export default function StocksManager() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Mobile List */}
-            <div className="md:hidden space-y-1">
-              {stocks.map((stock) => (
-                <div
-                  key={stock.id}
-                  className="flex items-center justify-between py-2.5 px-3 bg-muted/30 rounded-lg"
-                >
-                  {/* Left: Stock info */}
-                  <div
-                    className="flex-1 min-w-0 cursor-pointer overflow-hidden"
-                    onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
-                  >
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const { isComplete, missing } =
-                          getStockCompleteness(stock);
-                        return (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                  isComplete ? 'bg-emerald-500' : 'bg-amber-500'
-                                }`}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {isComplete
-                                ? 'Kompletní údaje'
-                                : `Chybí: ${missing.join(', ')}`}
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })()}
-                      <span className="font-mono-price font-bold text-sm flex-shrink-0">
-                        {stock.ticker}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {stock.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground/60 truncate">
-                      <span className="flex-shrink-0">{stock.currency}</span>
-                      {stock.exchange && (
-                        <span className="flex-shrink-0">
-                          • {stock.exchange}
-                        </span>
-                      )}
-                      {stock.sector && (
-                        <span className="truncate text-muted-foreground/40">
-                          • {stock.sector}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog(stock);
-                      }}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog(stock);
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
                 </div>
-              ))}
-            </div>
-          </>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -661,7 +570,7 @@ export default function StocksManager() {
                   value={formData.price_scale}
                   onChange={handleNumberChange}
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   Poměr pro převod kotované ceny na cenu za akcii. 1 = normální,
                   0.01 = cena za 100 ks (LSE)
                 </p>
@@ -708,6 +617,6 @@ export default function StocksManager() {
         loading={saving}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

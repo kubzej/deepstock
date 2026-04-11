@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -298,8 +298,8 @@ export function AnalysisPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Analýza"
         onRefresh={handleRefresh}
         isRefreshing={isFetching}
@@ -406,6 +406,6 @@ export function AnalysisPage() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

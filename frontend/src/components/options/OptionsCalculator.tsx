@@ -284,9 +284,9 @@ function MetricCard({
 }: MetricCardProps) {
   const sentimentClass =
     sentiment === 'positive'
-      ? 'text-emerald-500'
+      ? 'text-positive'
       : sentiment === 'negative'
-        ? 'text-rose-500'
+        ? 'text-negative'
         : sentiment === 'neutral'
           ? 'text-amber-500'
           : 'text-foreground';
@@ -844,7 +844,7 @@ export function OptionsCalculator() {
                 />
               </div>
               {selectedErrors.stockPrice && (
-                <p className="text-xs text-rose-500">
+                <p className="text-xs text-destructive">
                   {selectedErrors.stockPrice}
                 </p>
               )}
@@ -868,7 +868,7 @@ export function OptionsCalculator() {
                 />
               </div>
               {selectedErrors.strike && (
-                <p className="text-xs text-rose-500">{selectedErrors.strike}</p>
+                <p className="text-xs text-destructive">{selectedErrors.strike}</p>
               )}
             </div>
 
@@ -890,7 +890,7 @@ export function OptionsCalculator() {
                 />
               </div>
               {selectedErrors.premium && (
-                <p className="text-xs text-rose-500">
+                <p className="text-xs text-destructive">
                   {selectedErrors.premium}
                 </p>
               )}
@@ -911,7 +911,7 @@ export function OptionsCalculator() {
                 className={selectedErrors.contracts ? 'border-rose-500' : ''}
               />
               {selectedErrors.contracts && (
-                <p className="text-xs text-rose-500">
+                <p className="text-xs text-destructive">
                   {selectedErrors.contracts}
                 </p>
               )}
@@ -933,7 +933,7 @@ export function OptionsCalculator() {
               />
             </div>
             {selectedErrors.expirationDate && (
-              <p className="text-xs text-rose-500">
+              <p className="text-xs text-destructive">
                 {selectedErrors.expirationDate}
               </p>
             )}
@@ -953,7 +953,7 @@ export function OptionsCalculator() {
                           | SellCallCalculation
                       ).annualizedReturn,
                     ) === 'positive'
-                      ? 'bg-emerald-500/10'
+                      ? 'bg-positive/10'
                       : getAnnualizedSentiment(
                             (
                               selectedCalculation as
@@ -962,7 +962,7 @@ export function OptionsCalculator() {
                             ).annualizedReturn,
                           ) === 'neutral'
                         ? 'bg-amber-500/10'
-                        : 'bg-rose-500/10'
+                        : 'bg-negative/10'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -980,7 +980,7 @@ export function OptionsCalculator() {
                             | SellCallCalculation
                         ).annualizedReturn,
                       ) === 'positive'
-                        ? 'text-emerald-500'
+                        ? 'text-positive'
                         : getAnnualizedSentiment(
                               (
                                 selectedCalculation as
@@ -989,7 +989,7 @@ export function OptionsCalculator() {
                               ).annualizedReturn,
                             ) === 'neutral'
                           ? 'text-amber-500'
-                          : 'text-rose-500'
+                          : 'text-negative'
                     }`}
                   >
                     {formatPercent(
@@ -1006,14 +1006,14 @@ export function OptionsCalculator() {
                   </div>
                 </div>
               ) : (
-                <div className="p-6 rounded-xl bg-rose-500/10">
+                <div className="p-6 rounded-xl bg-negative/10">
                   <div className="flex items-center gap-2 mb-2">
                     <Shield className="h-5 w-5 text-muted-foreground" />
                     <span className="text-sm uppercase tracking-wide text-muted-foreground">
                       Max. ztráta (riziko)
                     </span>
                   </div>
-                  <div className="text-4xl font-bold font-mono-price text-rose-500">
+                  <div className="text-4xl font-bold font-mono-price text-negative">
                     {formatPrice(
                       (
                         selectedCalculation as
@@ -1258,7 +1258,7 @@ export function OptionsCalculator() {
                   key={row.id}
                   className={`rounded-xl px-3 py-2.5 cursor-pointer active:scale-[0.99] transition-transform bg-muted/30 ${
                     row.status === 'invalid'
-                      ? 'bg-rose-500/5'
+                      ? 'bg-negative/5'
                       : row.status === 'incomplete'
                         ? 'bg-amber-500/5'
                         : ''
@@ -1382,7 +1382,7 @@ export function OptionsCalculator() {
                   key={row.id}
                   className={`cursor-pointer hover:bg-muted/50 border-border ${
                     row.status === 'invalid'
-                      ? 'bg-rose-500/5'
+                      ? 'bg-negative/5'
                       : row.status === 'incomplete'
                         ? 'bg-amber-500/5'
                         : ''

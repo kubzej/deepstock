@@ -103,9 +103,9 @@ const tooltipExplanation = (
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-rose-500">Nad 80: Překoupeno</p>
-      <p className="text-emerald-500">Pod 20: Přeprodáno</p>
-      <p className="text-zinc-500">Křížení %K a %D = signál</p>
+      <p className="text-negative">Nad 80: Překoupeno</p>
+      <p className="text-positive">Pod 20: Přeprodáno</p>
+      <p className="text-muted-foreground">Křížení %K a %D = signál</p>
     </div>
   </div>
 );
@@ -132,18 +132,18 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">
+          <span className="text-muted-foreground">
             {entry.dataKey === 'k' ? '%K' : '%D'}:
           </span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="font-mono-price text-foreground">
             {entry.value?.toFixed(1) ?? '—'}
           </span>
         </div>

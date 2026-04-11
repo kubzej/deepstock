@@ -186,24 +186,23 @@ export function OptionsTrades({
   return (
     <div className="space-y-4">
       {/* Filter pills */}
-      <PillGroup>
+      <PillGroup behavior="scroll" bleed>
         <PillButton
           active={filter === 'all'}
           onClick={() => setFilter('all')}
           size="md"
+          count={counts.all}
         >
-          Vše <span className="ml-1 text-muted-foreground">{counts.all}</span>
+          Vše
         </PillButton>
         {counts['long-call'] > 0 && (
           <PillButton
             active={filter === 'long-call'}
             onClick={() => setFilter('long-call')}
             size="md"
+            count={counts['long-call']}
           >
-            Long Call{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['long-call']}
-            </span>
+            Long Call
           </PillButton>
         )}
         {counts['long-put'] > 0 && (
@@ -211,11 +210,9 @@ export function OptionsTrades({
             active={filter === 'long-put'}
             onClick={() => setFilter('long-put')}
             size="md"
+            count={counts['long-put']}
           >
-            Long Put{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['long-put']}
-            </span>
+            Long Put
           </PillButton>
         )}
         {counts['short-call'] > 0 && (
@@ -223,11 +220,9 @@ export function OptionsTrades({
             active={filter === 'short-call'}
             onClick={() => setFilter('short-call')}
             size="md"
+            count={counts['short-call']}
           >
-            Short Call{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['short-call']}
-            </span>
+            Short Call
           </PillButton>
         )}
         {counts['short-put'] > 0 && (
@@ -235,11 +230,9 @@ export function OptionsTrades({
             active={filter === 'short-put'}
             onClick={() => setFilter('short-put')}
             size="md"
+            count={counts['short-put']}
           >
-            Short Put{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['short-put']}
-            </span>
+            Short Put
           </PillButton>
         )}
       </PillGroup>
@@ -312,14 +305,14 @@ export function OptionsTrades({
                               isShort
                                 ? // Short: ITM is bad, OTM with buffer is good
                                   isITM
-                                  ? 'text-rose-500'
+                                  ? 'text-negative'
                                   : h.buffer_percent > 10
-                                    ? 'text-emerald-500'
+                                    ? 'text-positive'
                                     : 'text-amber-500'
                                 : // Long: ITM is good, OTM is bad
                                   isITM
-                                  ? 'text-emerald-500'
-                                  : 'text-rose-500',
+                                  ? 'text-positive'
+                                  : 'text-negative',
                             )}
                           >
                             {formatPercent(
@@ -355,8 +348,8 @@ export function OptionsTrades({
                                   ? h.priceChangePercent <= 0
                                   : h.priceChangePercent >= 0
                               )
-                                ? 'text-emerald-500'
-                                : 'text-rose-500',
+                                ? 'text-positive'
+                                : 'text-negative',
                             )}
                           >
                             {formatPercent(h.priceChangePercent, 1, true)}
@@ -377,7 +370,7 @@ export function OptionsTrades({
                         h.dte < 0
                           ? 'text-muted-foreground'
                           : h.dte <= 7
-                            ? 'text-rose-500'
+                            ? 'text-negative'
                             : h.dte <= 21
                               ? 'text-amber-500'
                               : '',
@@ -400,7 +393,7 @@ export function OptionsTrades({
                       <div
                         className={cn(
                           'font-mono-price font-medium',
-                          h.pl >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                          h.pl >= 0 ? 'text-positive' : 'text-negative',
                         )}
                       >
                         {h.pl >= 0 ? '+' : ''}
@@ -430,11 +423,11 @@ export function OptionsTrades({
                               className={cn(
                                 isShort
                                   ? h.breakevenDistance >= 0
-                                    ? 'text-emerald-500'
-                                    : 'text-rose-500'
+                                    ? 'text-positive'
+                                    : 'text-negative'
                                   : h.breakevenDistance <= 0
-                                    ? 'text-emerald-500'
-                                    : 'text-rose-500',
+                                    ? 'text-positive'
+                                    : 'text-negative',
                               )}
                             >
                               {formatPercent(h.breakevenDistance, 1, true)}

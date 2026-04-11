@@ -46,6 +46,9 @@ import {
   formatPrice,
   formatPercent,
 } from '@/lib/format';
+import {
+  getWatchlistActiveTarget,
+} from './watchlistSignals';
 
 export type SortKey =
   | 'ticker'
@@ -69,17 +72,6 @@ interface WatchlistItemsTableProps {
   onTagsEdit: (item: WatchlistItem) => void;
   showMoveOption?: boolean;
   showWatchlistName?: boolean;
-}
-
-// Helper: check if price is at target
-function isAtBuyTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_buy_price || !quote) return false;
-  return quote.price <= item.target_buy_price;
-}
-
-function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_sell_price || !quote) return false;
-  return quote.price >= item.target_sell_price;
 }
 
 // Sort icon helper
@@ -208,8 +200,9 @@ export function WatchlistItemsTable({
         <TableBody>
           {items.map((item) => {
             const quote = quotes[item.stocks.ticker];
-            const atBuy = isAtBuyTarget(item, quote);
-            const atSell = isAtSellTarget(item, quote);
+            const activeTarget = getWatchlistActiveTarget(item, quote);
+            const atBuy = activeTarget === 'buy';
+            const atSell = activeTarget === 'sell';
             const daysUntil = getDaysUntilEarnings(quote?.earningsDate);
             const earningsBadge = formatEarningsBadge(daysUntil);
             const showBadge = shouldShowEarningsBadge(daysUntil);
@@ -217,40 +210,33 @@ export function WatchlistItemsTable({
             return (
               <TableRow
                 key={item.id}
-                className={`cursor-pointer hover:bg-muted/50 ${
+                className={`cursor-pointer border-b border-border/60 hover:bg-muted/35 ${
                   atBuy
-                    ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500'
+                    ? 'bg-positive/5'
                     : atSell
-                      ? 'bg-amber-500/5 border-l-2 border-l-amber-500'
+                      ? 'bg-amber-500/10'
                       : ''
                 }`}
                 onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
               >
                 <TableCell>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2 py-1">
                     {/* Signal indicator */}
                     {(atBuy || atSell) && (
-                      <span
-                        className={`relative flex h-2 w-2 ${atBuy ? 'mr-0.5' : ''}`}
-                      >
-                        <span
-                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                            atBuy ? 'bg-emerald-400' : 'bg-amber-400'
-                          }`}
-                        />
+                      <span className="mt-1.5 flex h-2.5 w-2.5 shrink-0 rounded-full">
                         <span
                           className={`relative inline-flex rounded-full h-2 w-2 ${
-                            atBuy ? 'bg-emerald-500' : 'bg-amber-500'
+                            atBuy ? 'bg-positive' : 'bg-amber-500'
                           }`}
                         />
                       </span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`font-bold ${
                             atBuy
-                              ? 'text-emerald-500'
+                              ? 'text-positive'
                               : atSell
                                 ? 'text-amber-500'
                                 : ''
@@ -258,38 +244,37 @@ export function WatchlistItemsTable({
                         >
                           {item.stocks.ticker}
                         </span>
-                        {/* Tags */}
                         {item.tags && item.tags.length > 0 && (
-                          <div className="flex gap-1 items-center">
+                          <div className="flex items-center gap-1">
                             {item.tags.map((tag) => (
                               <span
                                 key={tag.id}
-                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium leading-none"
+                                className="inline-flex max-w-[96px] items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
                                 style={{
                                   backgroundColor: `${tag.color}15`,
                                   color: tag.color,
                                 }}
                               >
                                 <span
-                                  className="h-1.5 w-1.5 rounded-full"
+                                  className="h-1.5 w-1.5 shrink-0 rounded-full"
                                   style={{ backgroundColor: tag.color }}
                                 />
-                                {tag.name}
+                                <span className="truncate">{tag.name}</span>
                               </span>
                             ))}
                           </div>
                         )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                          {item.stocks.name}
-                        </span>
                         {showWatchlistName &&
                           (item as WatchlistItemWithSource).watchlist_name && (
-                            <span className="text-[10px] text-muted-foreground/60 bg-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                               {(item as WatchlistItemWithSource).watchlist_name}
                             </span>
                           )}
+                      </div>
+                      <div className="mt-0.5">
+                        <span className="text-xs text-muted-foreground truncate block max-w-[220px]">
+                          {item.stocks.name}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -322,9 +307,9 @@ export function WatchlistItemsTable({
                     <span
                       className={
                         quote && quote.changePercent > 0
-                          ? 'text-emerald-500'
+                          ? 'text-positive'
                           : quote && quote.changePercent < 0
-                            ? 'text-rose-500'
+                            ? 'text-negative'
                             : ''
                       }
                     >
@@ -347,7 +332,7 @@ export function WatchlistItemsTable({
                 <TableCell
                   className={`text-right font-mono-price ${
                     atBuy
-                      ? 'text-emerald-500 font-semibold'
+                      ? 'text-positive font-semibold'
                       : 'text-muted-foreground'
                   }`}
                 >

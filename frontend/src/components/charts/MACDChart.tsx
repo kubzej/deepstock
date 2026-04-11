@@ -105,13 +105,13 @@ const tooltipExplanation = (
         <span className="text-orange-500">Signální linie</span> - EMA 9 z MACD
       </p>
       <p>
-        <span className="text-emerald-500">Histogram</span> - rozdíl MACD a
+        <span className="text-positive">Histogram</span> - rozdíl MACD a
         signálu
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-emerald-500">Bullish: MACD nad signálem</p>
-      <p className="text-rose-500">Bearish: MACD pod signálem</p>
+      <p className="text-positive">Bullish: MACD nad signálem</p>
+      <p className="text-negative">Bearish: MACD pod signálem</p>
     </div>
   </div>
 );
@@ -138,8 +138,8 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => {
         const labelMap: Record<string, string> = {
           macd: 'MACD',
@@ -152,8 +152,8 @@ function CustomTooltip({
               className="h-2 w-2 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-zinc-600">{labelMap[entry.dataKey]}:</span>
-            <span className="font-mono-price text-zinc-800">
+            <span className="text-muted-foreground">{labelMap[entry.dataKey]}:</span>
+            <span className="font-mono-price text-foreground">
               {entry.value?.toFixed(3) ?? '—'}
             </span>
           </div>

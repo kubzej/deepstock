@@ -18,8 +18,8 @@ import {
 import { useOptionQuotes } from '@/hooks/useOptionQuotes';
 import { useQuotes } from '@/hooks/useQuotes';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -145,8 +145,8 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Opce"
         subtitle={stats ? `${stats.total_positions} pozic` : undefined}
         onRefresh={handleRefresh}
@@ -219,6 +219,6 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
         loading={deleteBySymbolMutation.isPending}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

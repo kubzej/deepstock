@@ -111,15 +111,15 @@ const tooltipExplanation = (
     <p>Kumulativní objem ukazující tok peněz do/z akcie.</p>
     <div className="pt-2 space-y-1">
       <p>
-        <span className="text-emerald-500">OBV</span> - kumulativní objem
+        <span className="text-positive">OBV</span> - kumulativní objem
       </p>
       <p>
         <span className="text-orange-500">SMA</span> - klouzavý průměr OBV
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-emerald-500">Rostoucí OBV = akumulace (nákupy)</p>
-      <p className="text-rose-500">Klesající OBV = distribuce (prodeje)</p>
+      <p className="text-positive">Rostoucí OBV = akumulace (nákupy)</p>
+      <p className="text-negative">Klesající OBV = distribuce (prodeje)</p>
       <p className="text-amber-500">Divergence = možný obrat trendu</p>
     </div>
   </div>
@@ -147,18 +147,18 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">
+          <span className="text-muted-foreground">
             {entry.dataKey === 'obv' ? 'OBV' : 'SMA'}:
           </span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="font-mono-price text-foreground">
             {formatOBV(entry.value)}
           </span>
         </div>

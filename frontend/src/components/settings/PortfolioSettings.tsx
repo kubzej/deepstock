@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Pencil, Trash2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Briefcase, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   createPortfolio,
@@ -22,6 +26,15 @@ import {
   deletePortfolio,
   type Portfolio,
 } from '@/lib/api';
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilityPanel,
+  UtilitySection,
+} from './UtilityScreen';
 
 export function PortfolioSettings() {
   const navigate = useNavigate();
@@ -125,25 +138,17 @@ export function PortfolioSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header with back button */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nové portfolio
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">Portfolia</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Správa vašich investičních portfolií
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Portfolia"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nové portfolio
+          </Button>
+        }
+      />
 
       {(maintenanceMessage || error) && (
         <Alert variant={error ? 'destructive' : 'default'}>
@@ -151,77 +156,74 @@ export function PortfolioSettings() {
         </Alert>
       )}
 
-      <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3">
-        <div>
-          <div className="text-sm font-medium">Obnova dopočtů portfolia</div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Znovu sestaví agregované pozice a odvozené hodnoty ze zdrojových
-            transakcí napříč portfolii. Hodí se po větších změnách logiky nebo
-            když chceš srovnat uložené souhrny s historií transakcí.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setMaintenanceMessage(null);
-            setError(null);
-            setRecalculateOpen(true);
-          }}
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Obnovit dopočty
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
-      ) : portfolios.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Zatím nemáte žádné portfolio.</p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Vytvořit první portfolio
+      <UtilitySection title="Servisní akce">
+        <UtilityPanel className="space-y-3">
+          <div>
+            <div className="text-sm font-medium">Obnova dopočtů portfolia</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Znovu sestaví agregované pozice a odvozené hodnoty ze zdrojových
+              transakcí napříč portfolii. Hodí se po větších změnách logiky nebo
+              když chceš srovnat uložené souhrny s historií transakcí.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMaintenanceMessage(null);
+              setError(null);
+              setRecalculateOpen(true);
+            }}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Obnovit dopočty
           </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {portfolios.map((portfolio) => (
-            <div
-              key={portfolio.id}
-              className="flex items-center gap-3 px-4 py-3 bg-muted/30 rounded-lg"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-medium">{portfolio.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  Vytvořeno{' '}
-                  {new Date(portfolio.created_at).toLocaleDateString('cs-CZ')}
+        </UtilityPanel>
+      </UtilitySection>
+
+      <UtilitySection title="Portfolia">
+        {loading ? (
+          <UtilityListSkeleton />
+        ) : portfolios.length === 0 ? (
+          <UtilityEmptyState
+            icon={Briefcase}
+            title="Zatím nemáte žádné portfolio"
+            description="Vytvoř první portfolio pro sledování investic a souvisejících transakcí."
+            action={{
+              label: 'Vytvořit první portfolio',
+              onClick: openCreate,
+            }}
+          />
+        ) : (
+          <UtilityList>
+            {portfolios.map((portfolio) => (
+              <UtilityListItem
+                key={portfolio.id}
+                className="flex items-center gap-3 py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{portfolio.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Vytvořeno{' '}
+                    {new Date(portfolio.created_at).toLocaleDateString('cs-CZ')}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => openEdit(portfolio)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteData(portfolio)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                <div className="flex gap-1">
+                  <UtilityActionButton onClick={() => openEdit(portfolio)}>
+                    <Pencil className="h-4 w-4" />
+                  </UtilityActionButton>
+                  <UtilityActionButton
+                    destructive
+                    onClick={() => setDeleteData(portfolio)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </UtilityActionButton>
+                </div>
+              </UtilityListItem>
+            ))}
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -329,6 +331,6 @@ export function PortfolioSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, ArrowLeft, Search, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BookOpen, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { Button } from '@/components/ui/button';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
 import { JournalFeed } from './JournalFeed';
 import { useJournalChannels, useJournalSections } from '@/hooks/useJournal';
 import type { JournalChannel, JournalSection } from '@/lib/api/journal';
@@ -51,14 +51,17 @@ function SidebarContent({
   sections,
   activeChannelId,
   onSelect,
+  density = 'default',
 }: {
   channels: JournalChannel[];
   sections: JournalSection[];
   activeChannelId: string | null;
   onSelect: (channel: JournalChannel) => void;
+  density?: 'default' | 'compact';
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const isCompact = density === 'compact';
 
   const stockChannels = channels
     .filter((c) => c.type === 'stock')
@@ -97,11 +100,13 @@ function SidebarContent({
     return (
       <div key={section.id}>
         <button
-          className="w-full flex items-center justify-between px-2 py-2 group transition-colors"
+          className={`w-full flex items-center justify-between group transition-colors ${
+            isCompact ? 'px-2 py-1.5' : 'px-2 py-2'
+          }`}
           onClick={() => toggleSection(section.id)}
         >
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-widest text-foreground/60 group-hover:text-foreground transition-colors">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/55 group-hover:text-foreground transition-colors">
               {section.name}
             </span>
             {totalEntries > 0 && (
@@ -133,7 +138,7 @@ function SidebarContent({
   };
 
   return (
-    <div className="space-y-1 px-2">
+    <div className={`space-y-1 ${isCompact ? 'px-1.5' : 'px-2'}`}>
       {stockChannels.length > 4 && (
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
@@ -164,45 +169,76 @@ function SidebarContent({
 
 export function JournalPage() {
   const [activeChannel, setActiveChannel] = useState<JournalChannel | null>(null);
+  const [mobileShowForm, setMobileShowForm] = useState(false);
 
   const { data: channels = [], isLoading: channelsLoading } = useJournalChannels();
   const { data: sections = [] } = useJournalSections();
 
+  useEffect(() => {
+    setMobileShowForm(false);
+  }, [activeChannel?.id]);
+
   return (
-    <div className="pb-12 -mx-4 md:-mx-8 lg:-mx-12">
+    <PageShell width="full" className="pb-0" gap="md">
 
       {/* Mobile — dvě obrazovky */}
       <div className="md:hidden">
         {activeChannel ? (
           /* Obrazovka 2: feed */
           <div>
-            <div className="sticky top-0 bg-background z-10 px-4 pt-2 pb-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="-ml-2 text-muted-foreground hover:text-foreground"
-                onClick={() => setActiveChannel(null)}
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Zpět
-              </Button>
+            <div className="sticky top-[calc(56px+env(safe-area-inset-top,0px))] z-10 border-b border-border/60 bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <PageBackButton
+                    onClick={() => setActiveChannel(null)}
+                    className="-ml-2 mt-0.5 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {activeChannel.stock_name ?? activeChannel.name}
+                    </p>
+                    {activeChannel.stock_name && activeChannel.ticker && (
+                      <p className="text-xs font-mono text-muted-foreground">
+                        {activeChannel.ticker}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={mobileShowForm ? 'secondary' : 'default'}
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setMobileShowForm((value) => !value)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Přidat
+                </Button>
+              </div>
             </div>
-            <div className="px-4">
-              <JournalFeed channel={activeChannel} />
+            <div className="px-4 pt-3">
+              <JournalFeed
+                channel={activeChannel}
+                showChannelHeader={false}
+                showForm={mobileShowForm}
+                onShowFormChange={setMobileShowForm}
+              />
             </div>
           </div>
         ) : (
           /* Obrazovka 1: seznam kanálů */
           <div>
-            <div className="sticky top-0 bg-background z-10 px-4 pt-2">
-              <PageHeader title="Deník" />
+            <div className="sticky top-[calc(56px+env(safe-area-inset-top,0px))] z-10 border-b border-border/60 bg-background/95 px-4 pt-2 pb-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <PageIntro
+                title="Deník"
+                subtitle="Poznámky a záznamy k akciím i vlastním tématům"
+              />
             </div>
             {channelsLoading ? (
-              <div className="space-y-1 px-4">
+              <div className="space-y-1 px-4 pt-4">
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
             ) : (
-              <div className="px-4 pt-2">
+              <div className="px-4 pt-4">
                 <SidebarContent
                   channels={channels}
                   sections={sections}
@@ -216,44 +252,60 @@ export function JournalPage() {
       </div>
 
       {/* Desktop layout — fixed height, internal scroll only */}
-      <div className="hidden md:flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 48px)' }}>
+      <div className="hidden md:flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 72px)' }}>
         {/* Shared header */}
-        <div className="px-6 pt-4 shrink-0">
-          <PageHeader title="Deník" />
+        <div className="shrink-0">
+          <PageIntro
+            title="Deník"
+            subtitle="Poznámky a záznamy k akciím i vlastním tématům"
+          />
         </div>
 
         {/* Two-column body — takes remaining height */}
-        <div className="flex min-h-0 flex-1">
+        <div className="mt-5 flex min-h-0 flex-1 gap-6">
           {/* Sidebar — scrolls independently */}
-          <aside className="w-56 shrink-0 overflow-y-auto pt-2 pb-4">
+          <aside className="w-56 shrink-0 overflow-y-auto border-r border-border/40 pr-4 pb-4">
             {channelsLoading ? (
-              <div className="space-y-1 px-4">
+              <div className="space-y-1">
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
             ) : (
-              <SidebarContent
-                channels={channels}
-                sections={sections}
-                activeChannelId={activeChannel?.id ?? null}
-                onSelect={setActiveChannel}
-              />
+              <div className="space-y-3">
+                <div className="px-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+                    Kanály
+                  </p>
+                </div>
+                <SidebarContent
+                  channels={channels}
+                  sections={sections}
+                  activeChannelId={activeChannel?.id ?? null}
+                  onSelect={setActiveChannel}
+                  density="compact"
+                />
+              </div>
             )}
           </aside>
 
           {/* Feed — scrolls independently */}
-          <main className="flex-1 min-w-0 flex flex-col overflow-hidden px-6 pt-2 pb-4">
+          <main className="flex-1 min-w-0 flex flex-col overflow-hidden pb-4">
             {activeChannel ? (
               <JournalFeed channel={activeChannel} />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground">
-                <BookOpen className="h-10 w-10 mb-3 opacity-30" />
-                <p className="text-sm">Vyber kanál ze seznamu vlevo</p>
+                <BookOpen className="mb-4 h-10 w-10 opacity-25" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground/80">Vyber kanál ze seznamu vlevo</p>
+                  <p className="text-sm text-muted-foreground">
+                    Journal zůstává pracovní plochou, ne další hlučnou stránkou.
+                  </p>
+                </div>
               </div>
             )}
           </main>
         </div>
       </div>
 
-    </div>
+    </PageShell>
   );
 }

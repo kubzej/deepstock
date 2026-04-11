@@ -31,13 +31,13 @@ const SIGNAL_CONFIG: Record<
 > = {
   undervalued: {
     label: 'Podhodnocená',
-    color: 'text-emerald-500',
+    color: 'text-positive',
     bgColor: 'bg-muted/40',
     icon: TrendingUp,
   },
   slightly_undervalued: {
     label: 'Mírně podhodnocená',
-    color: 'text-emerald-500',
+    color: 'text-positive',
     bgColor: 'bg-muted/40',
     icon: TrendingUp,
   },
@@ -49,13 +49,13 @@ const SIGNAL_CONFIG: Record<
   },
   slightly_overvalued: {
     label: 'Mírně nadhodnocená',
-    color: 'text-rose-500',
+    color: 'text-negative',
     bgColor: 'bg-muted/40',
     icon: TrendingDown,
   },
   overvalued: {
     label: 'Nadhodnocená',
-    color: 'text-rose-500',
+    color: 'text-negative',
     bgColor: 'bg-muted/40',
     icon: TrendingDown,
   },
@@ -130,7 +130,7 @@ function CompositeCard({
             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
               <span>Potenciál</span>
               <span
-                className={`font-mono-price ${composite.upside >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+                className={`font-mono-price ${composite.upside >= 0 ? 'text-positive' : 'text-negative'}`}
               >
                 {composite.upside >= 0 ? '+' : ''}
                 {composite.upside.toFixed(1)}%
@@ -220,7 +220,7 @@ function ModelRow({
 
         {/* Upside */}
         <span
-          className={`font-mono-price text-sm w-16 text-right ${model.upside >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}
+          className={`font-mono-price text-sm w-16 text-right ${model.upside >= 0 ? 'text-positive' : 'text-negative'}`}
         >
           {model.upside >= 0 ? '+' : ''}
           {model.upside.toFixed(1)}%

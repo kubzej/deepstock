@@ -16,10 +16,18 @@ import type { JournalChannel, UrlPreview } from '@/lib/api/journal';
 
 interface JournalFeedProps {
   channel: JournalChannel;
+  showChannelHeader?: boolean;
+  showForm?: boolean;
+  onShowFormChange?: (next: boolean) => void;
 }
 
-export function JournalFeed({ channel }: JournalFeedProps) {
-  const [showForm, setShowForm] = useState(false);
+export function JournalFeed({
+  channel,
+  showChannelHeader = true,
+  showForm: controlledShowForm,
+  onShowFormChange,
+}: JournalFeedProps) {
+  const [internalShowForm, setInternalShowForm] = useState(false);
   const [content, setContent] = useState('');
   const [editorKey, setEditorKey] = useState(0);
   const [url, setUrl] = useState('');
@@ -32,6 +40,16 @@ export function JournalFeed({ channel }: JournalFeedProps) {
   const createEntry = useCreateJournalEntry(channel.id);
   const updateEntry = useUpdateJournalEntry(channel.id);
   const deleteEntry = useDeleteJournalEntry(channel.id);
+  const showForm = controlledShowForm ?? internalShowForm;
+
+  const setShowForm = (next: boolean | ((current: boolean) => boolean)) => {
+    const resolved = typeof next === 'function' ? next(showForm) : next;
+    if (onShowFormChange) {
+      onShowFormChange(resolved);
+      return;
+    }
+    setInternalShowForm(resolved);
+  };
 
   useEffect(() => {
     const el = loadMoreRef.current;
@@ -97,27 +115,35 @@ export function JournalFeed({ channel }: JournalFeedProps) {
   const entries = data?.pages.flatMap((p) => p) ?? [];
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div>
-          <h2 className="text-lg font-semibold">{channel.stock_name ?? channel.name}</h2>
-          {channel.stock_name && (
-            <p className="text-sm text-muted-foreground font-mono">{channel.ticker}</p>
-          )}
+    <div className="flex flex-col md:h-full">
+      {showChannelHeader ? (
+        <div className="mb-4 shrink-0 border-b border-border/50 pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold tracking-tight">
+                {channel.stock_name ?? channel.name}
+              </h2>
+              {channel.stock_name && channel.ticker && (
+                <p className="mt-1 text-xs font-mono text-muted-foreground">
+                  {channel.ticker}
+                </p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant={showForm ? 'secondary' : 'default'}
+              className="shrink-0 gap-1.5"
+              onClick={() => setShowForm((v) => !v)}
+            >
+              <Plus className="h-4 w-4" />
+              Přidat
+            </Button>
+          </div>
         </div>
-        <Button
-          size="sm"
-          variant={showForm ? 'secondary' : 'default'}
-          className="gap-1.5"
-          onClick={() => setShowForm((v) => !v)}
-        >
-          <Plus className="h-4 w-4" />
-          Přidat
-        </Button>
-      </div>
+      ) : null}
 
       {showForm && (
-        <div className="mb-4 shrink-0 space-y-2">
+        <div className="mb-4 shrink-0 space-y-3 rounded-xl border border-border/50 bg-background pb-1">
           <RichTextEditor
             key={editorKey}
             placeholder="Napiš poznámku… (Cmd+Enter pro odeslání)"
@@ -128,7 +154,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
 
           {/* OG preview */}
           {urlPreview && (urlPreview.title || urlPreview.description) && (
-            <div className="flex gap-3 px-3 py-2 rounded-md bg-muted/40 border border-border">
+            <div className="mx-3 flex gap-3 rounded-md border border-border bg-muted/40 px-3 py-2">
               {urlPreview.image && (
                 <img src={urlPreview.image} alt="" className="w-10 h-10 object-cover rounded shrink-0" />
               )}
@@ -141,7 +167,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
             </div>
           )}
 
-          <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-2 px-3 pb-3">
             <div className="relative flex-1">
               <Input
                 placeholder="URL odkazu (volitelné)"
@@ -161,7 +187,7 @@ export function JournalFeed({ channel }: JournalFeedProps) {
       )}
 
       {/* Entries */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="md:flex-1 md:overflow-y-auto">
         {isLoading && (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -175,12 +201,12 @@ export function JournalFeed({ channel }: JournalFeedProps) {
         )}
 
         {!isLoading && entries.length === 0 && (
-          <div className="py-12 text-center text-muted-foreground text-sm">
+          <div className="rounded-xl border border-dashed border-border/70 px-4 py-12 text-center text-sm text-muted-foreground">
             Žádné záznamy. Přidej první.
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id}

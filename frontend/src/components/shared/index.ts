@@ -7,10 +7,23 @@ export { Login } from './Login';
 
 // Layout components
 export { BrandLogo } from './BrandLogo';
-export { PageHeader } from './PageHeader';
-export { PillButton } from './PillButton';
+export {
+  PageShell,
+  PageIntro,
+  PageHero,
+  PageSection,
+  PageBackButton,
+} from './PageShell';
+export { PillButton, PillGroup } from './PillButton';
 export { PortfolioSelector } from './PortfolioSelector';
 export { EmptyState } from './EmptyState';
+export {
+  FeedbackStateFrame,
+  FilteredEmptyState,
+  ErrorState,
+  LoadingState,
+  GenerationState,
+} from './FeedbackState';
 
 // Form components
 export { CurrencySelect } from './CurrencySelect';

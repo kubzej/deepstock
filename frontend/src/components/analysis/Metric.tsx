@@ -33,8 +33,8 @@ export function Metric({
       <p
         className={cn(
           'text-lg font-mono-price font-medium',
-          colored && value > 0 && 'text-emerald-500',
-          colored && value < 0 && 'text-rose-500',
+          colored && value > 0 && 'text-positive',
+          colored && value < 0 && 'text-negative',
           !colored && 'text-foreground',
         )}
       >

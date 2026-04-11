@@ -89,8 +89,8 @@ const tooltipExplanation = (
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-rose-500">Vysoké ATR = větší riziko</p>
-      <p className="text-emerald-500">Nízké ATR = stabilní trh</p>
+      <p className="text-negative">Vysoké ATR = větší riziko</p>
+      <p className="text-positive">Nízké ATR = stabilní trh</p>
     </div>
   </div>
 );
@@ -121,23 +121,23 @@ function CustomTooltip({
   const atrAbsolute = payload[0]?.payload?.atr;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       <div className="flex items-center gap-2 text-sm">
         <span
           className="h-2 w-2 rounded-full"
           style={{ backgroundColor: COLORS.atr }}
         />
-        <span className="text-zinc-600">ATR %:</span>
-        <span className="font-mono-price text-zinc-800">
+        <span className="text-muted-foreground">ATR %:</span>
+        <span className="font-mono-price text-foreground">
           {atrPercent?.toFixed(2) ?? '—'}%
         </span>
       </div>
       {atrAbsolute !== null && (
         <div className="flex items-center gap-2 text-sm mt-1">
           <span className="h-2 w-2 rounded-full bg-purple-300" />
-          <span className="text-zinc-600">ATR:</span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="text-muted-foreground">ATR:</span>
+          <span className="font-mono-price text-foreground">
             {atrAbsolute?.toFixed(2) ?? '—'}
           </span>
         </div>

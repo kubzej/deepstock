@@ -8,7 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared/PageHeader';
+import {
+  EmptyState,
+  ErrorState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { fetchStockInfo } from '@/lib/api';
 import { ValuationSection } from '@/components/research/ValuationSection';
@@ -25,6 +30,7 @@ export function ResearchPage() {
   const [ticker, setTicker] = useState('');
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
   const [noteSheetOpen, setNoteSheetOpen] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const { data, isLoading, isFetching, dataUpdatedAt, error, refetch } =
     useQuery({
@@ -36,7 +42,7 @@ export function ResearchPage() {
 
   const { data: channels = [] } = useJournalChannels();
   const journalChannel = activeTicker
-    ? channels.find((c) => c.ticker === activeTicker) ?? null
+    ? (channels.find((c) => c.ticker === activeTicker) ?? null)
     : null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -44,14 +50,15 @@ export function ResearchPage() {
     const trimmed = ticker.trim().toUpperCase();
     if (trimmed) {
       setActiveTicker(trimmed);
+      setDescriptionExpanded(false);
     }
   };
 
   return (
     <TooltipProvider>
-      <div className="space-y-8 pb-12">
+      <PageShell width="full" gap="lg">
         {/* Header */}
-        <PageHeader
+        <PageIntro
           title="Průzkum akcie"
           onRefresh={activeTicker ? () => refetch() : undefined}
           isRefreshing={isFetching}
@@ -76,8 +83,16 @@ export function ResearchPage() {
           </Button>
         </form>
 
+        {!activeTicker && (
+          <EmptyState
+            icon={Search}
+            title="Zadej ticker k analýze"
+            description="Vyhledej akcii a otevři fundamenty, valuaci, techniku i AI analýzu na jednom místě."
+          />
+        )}
+
         {/* Loading */}
-        {isLoading && (
+        {activeTicker && isLoading && (
           <div className="space-y-6">
             <div className="space-y-2">
               <Skeleton className="h-10 w-32" />
@@ -93,17 +108,21 @@ export function ResearchPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
-            Nepodařilo se načíst data pro {activeTicker}
-          </div>
+        {activeTicker && error && (
+          <ErrorState
+            title="Nepodařilo se načíst data akcie"
+            description={`Data pro ${activeTicker} se teď nepodařilo načíst.`}
+            retryAction={{ label: 'Zkusit znovu', onClick: () => refetch() }}
+          />
         )}
 
         {/* No data */}
         {!isLoading && !error && activeTicker && !data && (
-          <div className="p-4 bg-muted rounded-lg text-muted-foreground">
-            Ticker {activeTicker} nebyl nalezen
-          </div>
+          <EmptyState
+            icon={Search}
+            title="Ticker nebyl nalezen"
+            description={`Pro ${activeTicker} jsem nenašel žádná data. Zkus jiný ticker nebo zkontroluj zápis.`}
+          />
         )}
 
         {/* Results */}
@@ -136,9 +155,29 @@ export function ResearchPage() {
 
             {/* Description */}
             {data.description && (
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {data.description}
-              </p>
+              <div className="space-y-2">
+                <p
+                  className={[
+                    'text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]',
+                    descriptionExpanded ? '' : 'line-clamp-4',
+                  ].join(' ')}
+                >
+                  {data.description}
+                </p>
+                {data.description.length > 280 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-0 text-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      setDescriptionExpanded((expanded) => !expanded)
+                    }
+                  >
+                    {descriptionExpanded ? 'Méně' : 'Více'}
+                  </Button>
+                )}
+              </div>
             )}
 
             {/* Tabs */}
@@ -183,7 +222,7 @@ export function ResearchPage() {
             onClose={() => setNoteSheetOpen(false)}
           />
         )}
-      </div>
+      </PageShell>
     </TooltipProvider>
   );
 }

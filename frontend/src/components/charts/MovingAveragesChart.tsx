@@ -86,7 +86,7 @@ const tooltipExplanation = (
   <div className="space-y-2">
     <p className="font-medium">Klouzavé průměry (SMA)</p>
     <p>
-      <span className="text-emerald-500">Cena</span> - aktuální cenový vývoj.
+      <span className="text-positive">Cena</span> - aktuální cenový vývoj.
     </p>
     <p>
       <span className="text-indigo-400">SMA 50</span> - krátkodobý trend (50
@@ -97,8 +97,8 @@ const tooltipExplanation = (
       dní).
     </p>
     <div className="pt-2 mt-2 space-y-1">
-      <p className="text-emerald-400">Bullish: Cena nad oběma SMA</p>
-      <p className="text-rose-400">Bearish: Cena pod oběma SMA</p>
+      <p className="text-positive">Bullish: Cena nad oběma SMA</p>
+      <p className="text-negative">Bearish: Cena pod oběma SMA</p>
     </div>
   </div>
 );
@@ -125,20 +125,20 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">
+          <span className="text-muted-foreground">
             {entry.dataKey === 'price' && 'Cena'}
             {entry.dataKey === 'sma50' && 'SMA 50'}
             {entry.dataKey === 'sma200' && 'SMA 200'}:
           </span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="font-mono-price text-foreground">
             {entry.value?.toFixed(2) ?? '—'}
           </span>
         </div>

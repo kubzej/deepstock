@@ -60,17 +60,17 @@ function valuationLabel(signal: ValuationSignal): {
     case 'undervalued':
       return { text: 'Podhodnocená', colorClass: 'text-emerald-600' };
     case 'slightly_undervalued':
-      return { text: 'Mírně podhodnocená', colorClass: 'text-emerald-500' };
+      return { text: 'Mírně podhodnocená', colorClass: 'text-positive' };
     case 'fair':
-      return { text: 'Férová cena', colorClass: 'text-zinc-500' };
+      return { text: 'Férová cena', colorClass: 'text-muted-foreground' };
     case 'slightly_overvalued':
       return { text: 'Mírně nadhodnocená', colorClass: 'text-amber-500' };
     case 'overvalued':
       return { text: 'Nadhodnocená', colorClass: 'text-rose-600' };
     case 'hold':
-      return { text: 'Neutrální', colorClass: 'text-zinc-500' };
+      return { text: 'Neutrální', colorClass: 'text-muted-foreground' };
     default:
-      return { text: 'Bez dat', colorClass: 'text-zinc-400' };
+      return { text: 'Bez dat', colorClass: 'text-muted-foreground/70' };
   }
 }
 
@@ -159,13 +159,13 @@ const INSIGHT_STYLE: Record<
   Insight['type'],
   { icon: React.ElementType; iconClass: string; bgClass: string }
 > = {
-  warning: { icon: X, iconClass: 'text-rose-500', bgClass: 'bg-rose-500/10' },
+  warning: { icon: X, iconClass: 'text-negative', bgClass: 'bg-negative/10' },
   positive: {
     icon: Check,
-    iconClass: 'text-emerald-500',
-    bgClass: 'bg-emerald-500/10',
+    iconClass: 'text-positive',
+    bgClass: 'bg-positive/10',
   },
-  info: { icon: Info, iconClass: 'text-zinc-400', bgClass: 'bg-zinc-400/10' },
+  info: { icon: Info, iconClass: 'text-muted-foreground/70', bgClass: 'bg-muted/60' },
 };
 
 function InsightGroup({ items }: { items: Insight[] }) {
@@ -284,8 +284,8 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
           {/* Valuation */}
           {composite && modelsUsed > 0 && (
             <div className="flex gap-2.5">
-              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-zinc-400/10">
-                <BarChart2 className="w-3 h-3 text-zinc-400" />
+              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
+                <BarChart2 className="w-3 h-3 text-muted-foreground/70" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
@@ -303,8 +303,8 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
           {/* Technical note */}
           {technicalNote && (
             <div className="flex gap-2.5">
-              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-zinc-400/10">
-                <TrendingUp className="w-3 h-3 text-zinc-400" />
+              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
+                <TrendingUp className="w-3 h-3 text-muted-foreground/70" />
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">

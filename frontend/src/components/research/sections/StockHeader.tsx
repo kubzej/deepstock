@@ -27,7 +27,7 @@ export function StockHeader({ data }: StockHeaderProps) {
           {formatCurrency(data.price, data.currency ?? 'USD')}
         </span>
         <div
-          className={`flex items-center gap-1 text-lg ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}
+          className={`flex items-center gap-1 text-lg ${isPositive ? 'text-positive' : 'text-negative'}`}
         >
           {isPositive ? (
             <TrendingUp className="w-5 h-5" />

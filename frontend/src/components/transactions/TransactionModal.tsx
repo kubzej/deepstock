@@ -422,7 +422,7 @@ export function TransactionModal({
           {/* Transaction Type Toggle - disabled in edit mode */}
           {isEditMode ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-700/60 text-zinc-300">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                 {formData.type === 'BUY' ? 'BUY' : 'SELL'}
               </span>
               <span>{formData.stockTicker}</span>

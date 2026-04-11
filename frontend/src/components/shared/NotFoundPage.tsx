@@ -8,7 +8,7 @@ export function NotFoundPage() {
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center">
       <h1 className="text-4xl font-bold text-foreground">404</h1>
       <p className="text-lg text-muted-foreground">Stránka nenalezena</p>
-      <p className="text-sm text-zinc-400 font-mono">{location.pathname}</p>
+      <p className="text-sm text-muted-foreground/70 font-mono">{location.pathname}</p>
       <Button asChild variant="outline">
         <Link to="/">Zpět na hlavní stránku</Link>
       </Button>

@@ -10,16 +10,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { Plus, Eye, Target, Filter, X } from 'lucide-react';
+import {
+  EmptyState,
+  ErrorState,
+  FilteredEmptyState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
+import { Eye, Target } from 'lucide-react';
 import {
   type WatchlistItem,
   type WatchlistItemWithSource,
-  type Quote,
 } from '@/lib/api';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,23 +43,18 @@ import {
   type SortDir,
 } from './WatchlistItemsTable';
 import {
+  FilteredMonitoringPanel,
+  WatchlistModeRail,
+  WatchlistsMobileSortRow,
+} from './WatchlistPageSections';
+import {
   WatchlistItemFormDialog,
   type WatchlistItemFormData,
 } from './WatchlistItemFormDialog';
+import { isAtBuyTarget, isAtSellTarget } from './watchlistSignals';
 
 // Special ID for filter view
 const FILTER_VIEW_ID = '__filter__';
-
-// Helper: check if price is at target
-function isAtBuyTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_buy_price || !quote) return false;
-  return quote.price <= item.target_buy_price;
-}
-
-function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_sell_price || !quote) return false;
-  return quote.price >= item.target_sell_price;
-}
 
 export function WatchlistsPage() {
   const navigate = useNavigate();
@@ -74,6 +71,9 @@ export function WatchlistsPage() {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(
     null,
   );
+  const [lastConcreteWatchlistId, setLastConcreteWatchlistId] = useState<string | null>(
+    null,
+  );
 
   // Filter view state
   const isFilterView = selectedWatchlistId === FILTER_VIEW_ID;
@@ -87,6 +87,12 @@ export function WatchlistsPage() {
       setSelectedWatchlistId(watchlists[0].id);
     }
   }, [watchlists, selectedWatchlistId]);
+
+  useEffect(() => {
+    if (selectedWatchlistId && selectedWatchlistId !== FILTER_VIEW_ID) {
+      setLastConcreteWatchlistId(selectedWatchlistId);
+    }
+  }, [selectedWatchlistId]);
 
   // Single watchlist items
   const {
@@ -167,6 +173,27 @@ export function WatchlistsPage() {
   const selectedWatchlist = watchlists.find(
     (w) => w.id === selectedWatchlistId,
   );
+
+  const handleSelectWatchlist = (watchlistId: string) => {
+    setSelectedWatchlistId(watchlistId);
+  };
+
+  const handleToggleFilteredMode = () => {
+    if (isFilterView) {
+      setSelectedWatchlistId(
+        lastConcreteWatchlistId ?? watchlists[0]?.id ?? null,
+      );
+      return;
+    }
+
+    setSelectedWatchlistId(FILTER_VIEW_ID);
+  };
+
+  const clearFilters = () => {
+    setFilterTags([]);
+    setShowAtBuyTarget(false);
+    setShowAtSellTarget(false);
+  };
 
   // Sorting
   const handleSort = (key: SortKey) => {
@@ -283,6 +310,25 @@ export function WatchlistsPage() {
   // Check if any filters are active
   const hasActiveFilters =
     filterTags.length > 0 || showAtBuyTarget || showAtSellTarget;
+
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+
+    if (showAtBuyTarget) parts.push('nákupní signál');
+    if (showAtSellTarget) parts.push('prodejní signál');
+
+    if (filterTags.length > 0) {
+      const activeTags = allTags
+        .filter((tag) => filterTags.includes(tag.id))
+        .map((tag) => tag.name);
+
+      if (activeTags.length > 0) {
+        parts.push(`tagy: ${activeTags.join(', ')}`);
+      }
+    }
+
+    return parts.length > 0 ? `Aktivní filtry: ${parts.join(' • ')}` : null;
+  }, [allTags, filterTags, showAtBuyTarget, showAtSellTarget]);
 
   // Item CRUD
   const openAddItem = () => {
@@ -422,21 +468,20 @@ export function WatchlistsPage() {
   // Error state
   if (error) {
     return (
-      <div className="space-y-4 p-4">
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button onClick={() => window.location.reload()} variant="outline">
-          Zkusit znovu
-        </Button>
-      </div>
+      <PageShell width="full">
+        <ErrorState
+          title="Nepodařilo se načíst watchlisty"
+          description={error}
+          retryAction={{ label: 'Zkusit znovu', onClick: () => window.location.reload() }}
+        />
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <PageShell width="full">
       {/* Header */}
-      <PageHeader
+      <PageIntro
         title="Watchlisty"
         onRefresh={() => {
           // Invalidate all caches - React Query will refetch them
@@ -464,148 +509,39 @@ export function WatchlistsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Watchlist toggle buttons + Filter + Add button */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex gap-1 flex-wrap">
-              {/* Filter view button */}
-              <Button
-                variant={isFilterView ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedWatchlistId(FILTER_VIEW_ID)}
-                className="h-8"
-              >
-                <Filter className="h-3.5 w-3.5 mr-1" />
-                Filtrované
-                {hasActiveFilters && (
-                  <span className="ml-1 h-2 w-2 rounded-full bg-orange-500" />
-                )}
-              </Button>
-              {/* Separator */}
-              <div className="w-px h-6 bg-border mx-1 self-center" />
-              {/* Watchlist buttons */}
-              {watchlists.map((w) => (
-                <Button
-                  key={w.id}
-                  variant={selectedWatchlistId === w.id ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedWatchlistId(w.id)}
-                  className="h-8"
-                >
-                  {w.name}
-                  <span className="ml-1.5 text-xs opacity-60">
-                    {w.item_count || 0}
-                  </span>
-                </Button>
-              ))}
-            </div>
-            <div className="flex-1" />
-            <Button
-              size="sm"
-              onClick={openAddItem}
-              disabled={!selectedWatchlistId || isFilterView}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Přidat akcii
-            </Button>
-          </div>
+          <WatchlistModeRail
+            watchlists={watchlists}
+            selectedWatchlistId={selectedWatchlistId}
+            isFilterView={isFilterView}
+            totalItemsCount={allItems.length}
+            filteredItemsCount={filteredAndSortedItems.length}
+            hasActiveFilters={hasActiveFilters}
+            filterSummary={filterSummary}
+            onSelectWatchlist={handleSelectWatchlist}
+            onSelectFilteredMode={handleToggleFilteredMode}
+          />
 
           {/* Filter panel (only in filter view) */}
           {isFilterView && (
-            <div className="flex flex-col gap-3 p-4 rounded-lg bg-muted/30 border">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Filtry</span>
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setFilterTags([]);
-                      setShowAtBuyTarget(false);
-                      setShowAtSellTarget(false);
-                    }}
-                    className="h-7 text-xs"
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Vymazat filtry
-                  </Button>
-                )}
-              </div>
-
-              {/* Target status filters */}
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setShowAtBuyTarget(!showAtBuyTarget)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    showAtBuyTarget
-                      ? 'bg-emerald-500 text-white ring-2 ring-offset-1 ring-offset-background ring-emerald-500'
-                      : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${showAtBuyTarget ? 'bg-white' : 'bg-emerald-500'}`}
-                  />
-                  Nákupní cíl
-                </button>
-                <button
-                  onClick={() => setShowAtSellTarget(!showAtSellTarget)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    showAtSellTarget
-                      ? 'bg-amber-500 text-white ring-2 ring-offset-1 ring-offset-background ring-amber-500'
-                      : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                  }`}
-                >
-                  <span
-                    className={`h-2 w-2 rounded-full ${showAtSellTarget ? 'bg-white' : 'bg-amber-500'}`}
-                  />
-                  Prodejní cíl
-                </button>
-              </div>
-
-              {/* Tag filters */}
-              {allTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {allTags.map((tag) => {
-                    const isSelected = filterTags.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        onClick={() =>
-                          setFilterTags((prev) =>
-                            isSelected
-                              ? prev.filter((id) => id !== tag.id)
-                              : [...prev, tag.id],
-                          )
-                        }
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'ring-2 ring-offset-1 ring-offset-background'
-                            : 'opacity-50 hover:opacity-80'
-                        }`}
-                        style={{
-                          backgroundColor: isSelected
-                            ? tag.color
-                            : `${tag.color}20`,
-                          color: isSelected ? '#fff' : tag.color,
-                        }}
-                      >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{
-                            backgroundColor: isSelected ? '#fff' : tag.color,
-                          }}
-                        />
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Results count */}
-              <div className="text-xs text-muted-foreground">
-                {filteredAndSortedItems.length} z {allItems.length} položek
-              </div>
-            </div>
+            <FilteredMonitoringPanel
+              allTags={allTags}
+              filterTags={filterTags}
+              showAtBuyTarget={showAtBuyTarget}
+              showAtSellTarget={showAtSellTarget}
+              filteredItemsCount={filteredAndSortedItems.length}
+              totalItemsCount={allItems.length}
+              hasActiveFilters={hasActiveFilters}
+              onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
+              onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
+              onToggleTag={(tagId) =>
+                setFilterTags((prev) =>
+                  prev.includes(tagId)
+                    ? prev.filter((id) => id !== tagId)
+                    : [...prev, tagId],
+                )
+              }
+              onClearFilters={clearFilters}
+            />
           )}
 
           {/* Items table */}
@@ -618,49 +554,39 @@ export function WatchlistsPage() {
                   ))}
                 </div>
               ) : filteredAndSortedItems.length === 0 ? (
-                <EmptyState
-                  icon={Target}
-                  title={
-                    isFilterView
-                      ? hasActiveFilters
-                        ? 'Žádné položky neodpovídají filtrům'
-                        : 'Žádné položky ve watchlistech'
-                      : 'Watchlist je prázdný'
-                  }
-                  action={
-                    !isFilterView
-                      ? { label: 'Přidat akcii', onClick: openAddItem }
-                      : undefined
-                  }
-                />
+                isFilterView ? (
+                  hasActiveFilters ? (
+                    <FilteredEmptyState
+                      description="Zkus upravit tagy nebo cílové filtry a zobraz další kandidáty."
+                      clearAction={{
+                        label: 'Vymazat filtry',
+                        onClick: clearFilters,
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Target}
+                      title="Žádné položky ve watchlistech"
+                      description="Jakmile přidáš akcie do některého watchlistu, uvidíš je i ve filtrovaném přehledu."
+                    />
+                  )
+                ) : (
+                  <EmptyState
+                    icon={Target}
+                    title="Watchlist je prázdný"
+                    description="Přidej první akcii a začni sledovat nákupní a prodejní příležitosti."
+                    action={{ label: 'Přidat akcii', onClick: openAddItem }}
+                  />
+                )
               ) : (
                 <>
                   {/* Mobile: Sort pills + Cards */}
                   <div className="md:hidden">
-                    {/* Sort pills */}
-                    <PillGroup className="pb-3 mb-2">
-                      {[
-                        { key: 'ticker' as SortKey, label: 'A-Z' },
-                        { key: 'price' as SortKey, label: 'Cena' },
-                        { key: 'change' as SortKey, label: 'Změna' },
-                        { key: 'buyTarget' as SortKey, label: 'Nákup' },
-                        { key: 'sellTarget' as SortKey, label: 'Prodej' },
-                      ].map((option) => (
-                        <PillButton
-                          key={option.key}
-                          active={sortKey === option.key}
-                          onClick={() => handleSort(option.key)}
-                          size="sm"
-                        >
-                          {option.label}
-                          {sortKey === option.key && (
-                            <span className="ml-0.5">
-                              {sortDir === 'desc' ? '↓' : '↑'}
-                            </span>
-                          )}
-                        </PillButton>
-                      ))}
-                    </PillGroup>
+                    <WatchlistsMobileSortRow
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={handleSort}
+                    />
 
                     {/* Cards */}
                     <div className="space-y-1.5">
@@ -822,6 +748,6 @@ export function WatchlistsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

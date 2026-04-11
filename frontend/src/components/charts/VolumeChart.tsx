@@ -103,19 +103,19 @@ const tooltipExplanation = (
     <p>Objem obchodů ukazuje zájem a sílu cenových pohybů.</p>
     <div className="pt-2 space-y-1">
       <p>
-        <span className="text-emerald-500">Zelené sloupce</span> - objem nad
+        <span className="text-positive">Zelené sloupce</span> - objem nad
         průměrem
       </p>
       <p>
-        <span className="text-zinc-400">Šedé sloupce</span> - objem pod průměrem
+        <span className="text-muted-foreground/70">Šedé sloupce</span> - objem pod průměrem
       </p>
       <p>
         <span className="text-orange-500">Oranžová linie</span> - 20denní průměr
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-emerald-500">Vysoký objem = silný signál</p>
-      <p className="text-zinc-500">Nízký objem = slabý signál</p>
+      <p className="text-positive">Vysoký objem = silný signál</p>
+      <p className="text-muted-foreground">Nízký objem = slabý signál</p>
     </div>
   </div>
 );
@@ -142,18 +142,18 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">
+          <span className="text-muted-foreground">
             {entry.dataKey === 'volume' ? 'Objem' : 'Průměr'}:
           </span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="font-mono-price text-foreground">
             {formatVolume(entry.value)}
           </span>
         </div>

@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Bell,
   BellOff,
   Calendar,
@@ -12,9 +11,61 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import {
+  UtilityList,
+  UtilityListItem,
+  UtilityPanel,
+  UtilitySection,
+} from './UtilityScreen';
+
+interface NotificationPreferenceRowProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+  disabled: boolean;
+  iconClassName?: string;
+}
+
+function NotificationPreferenceRow({
+  icon: Icon,
+  title,
+  description,
+  checked,
+  onCheckedChange,
+  disabled,
+  iconClassName,
+}: NotificationPreferenceRowProps) {
+  return (
+    <UtilityListItem className="flex items-center justify-between gap-4 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground ring-1 ring-border/60">
+          <Icon className={iconClassName ?? 'h-4 w-4'} />
+        </div>
+        <div>
+          <Label className="text-sm font-medium">{title}</Label>
+          {description ? (
+            <p className="text-xs text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+      />
+    </UtilityListItem>
+  );
+}
 
 export function NotificationSettings() {
   const navigate = useNavigate();
@@ -66,33 +117,30 @@ export function NotificationSettings() {
 
   if (!isSupported) {
     return (
-      <div className="space-y-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-semibold">Notifikace</h1>
-        </div>
+      <PageShell width="full">
+        <PageIntro
+          title="Notifikace"
+          leading={<PageBackButton onClick={onBack} />}
+        />
 
-        <Alert>
-          <BellOff className="h-4 w-4" />
-          <AlertDescription>
-            Váš prohlížeč nepodporuje push notifikace.
-          </AlertDescription>
-        </Alert>
-      </div>
+        <UtilitySection title="Doručování">
+          <Alert>
+            <BellOff className="h-4 w-4" />
+            <AlertDescription>
+              Váš prohlížeč nepodporuje push notifikace.
+            </AlertDescription>
+          </Alert>
+        </UtilitySection>
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-semibold">Notifikace</h1>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Notifikace"
+        leading={<PageBackButton onClick={onBack} />}
+      />
 
       {/* Permission denied warning */}
       {permissionState === 'denied' && (
@@ -105,109 +153,90 @@ export function NotificationSettings() {
         </Alert>
       )}
 
-      {/* Main toggle */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-muted/50">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Bell className="h-5 w-5 text-primary" />
+      <UtilitySection title="Doručování">
+        <UtilityPanel className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-xl bg-background/70 px-4 py-3 ring-1 ring-border/60">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <Label className="text-base font-medium">Push notifikace</Label>
+              </div>
             </div>
-            <div>
-              <Label className="text-base font-medium">Push notifikace</Label>
-              <p className="text-sm text-muted-foreground">
-                Upozornění na cenové cíle
-              </p>
+            <div className="flex items-center gap-2">
+              {subscribing && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Switch
+                checked={isSubscribed}
+                onCheckedChange={handleToggleNotifications}
+                disabled={subscribing || permissionState === 'denied'}
+              />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {subscribing && <Loader2 className="h-4 w-4 animate-spin" />}
-            <Switch
-              checked={isSubscribed}
-              onCheckedChange={handleToggleNotifications}
-              disabled={subscribing || permissionState === 'denied'}
-            />
-          </div>
-        </div>
 
-        {/* Sub-toggles - only show when subscribed */}
-        {isSubscribed && (
-          <div className="space-y-3 pl-4 border-l-2 border-muted ml-5">
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <ShoppingCart className="h-4 w-4 text-emerald-500" />
-                <div>
-                  <Label className="text-sm font-medium">Nákupní cíle</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Cílová cena pro nákup nastavená ve watchlistu
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={settings.alert_buy_enabled}
-                onCheckedChange={(v) => toggleSetting('alert_buy_enabled', v)}
-                disabled={isUpdating || settingsLoading}
-              />
-            </div>
+          {isSubscribed && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Ověření zařízení</div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTest}
+                  disabled={isTesting}
+                >
+                  {isTesting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Odeslat testovací notifikaci
+                </Button>
 
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="h-4 w-4 text-rose-500" />
-                <div>
-                  <Label className="text-sm font-medium">Prodejní cíle</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Cílová cena pro prodej nastavená ve watchlistu
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={settings.alert_sell_enabled}
-                onCheckedChange={(v) => toggleSetting('alert_sell_enabled', v)}
-                disabled={isUpdating || settingsLoading}
-              />
-            </div>
-
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-blue-500" />
-                <div>
-                  <Label className="text-sm font-medium">Earnings</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Upozornit ráno v den hlášení výsledků
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={settings.alert_earnings_enabled}
-                onCheckedChange={(v) =>
-                  toggleSetting('alert_earnings_enabled', v)
-                }
-                disabled={isUpdating || settingsLoading}
-              />
-            </div>
-
-            {/* Test notification */}
-            <div className="pt-4 space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTest}
-                disabled={isTesting}
-              >
-                {isTesting ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
+                {testResult && (
+                  <p className="text-sm text-muted-foreground">{testResult}</p>
                 )}
-                Odeslat testovací notifikaci
-              </Button>
-
-              {testResult && (
-                <p className="text-sm text-muted-foreground">{testResult}</p>
-              )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          )}
+        </UtilityPanel>
+      </UtilitySection>
+
+      {isSubscribed && (
+        <UtilitySection title="Typy upozornění">
+          <UtilityList>
+            <NotificationPreferenceRow
+              icon={ShoppingCart}
+              iconClassName="h-4 w-4 text-positive"
+              title="Nákupní cíle"
+              checked={settings.alert_buy_enabled}
+              onCheckedChange={(value) =>
+                toggleSetting('alert_buy_enabled', value)
+              }
+              disabled={isUpdating || settingsLoading}
+            />
+            <NotificationPreferenceRow
+              icon={TrendingUp}
+              iconClassName="h-4 w-4 text-negative"
+              title="Prodejní cíle"
+              checked={settings.alert_sell_enabled}
+              onCheckedChange={(value) =>
+                toggleSetting('alert_sell_enabled', value)
+              }
+              disabled={isUpdating || settingsLoading}
+            />
+            <NotificationPreferenceRow
+              icon={Calendar}
+              iconClassName="h-4 w-4 text-blue-500"
+              title="Earnings"
+              checked={settings.alert_earnings_enabled}
+              onCheckedChange={(value) =>
+                toggleSetting('alert_earnings_enabled', value)
+              }
+              disabled={isUpdating || settingsLoading}
+            />
+          </UtilityList>
+        </UtilitySection>
+      )}
+    </PageShell>
   );
 }

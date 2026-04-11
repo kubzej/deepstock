@@ -119,7 +119,7 @@ export function PerformanceChart({
             <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
               Aktuální hodnota
             </p>
-            <p className="text-lg font-mono-price font-medium text-emerald-500">
+            <p className="text-lg font-mono-price font-medium text-positive">
               {formatCurrency(currentValue, 'CZK')}
             </p>
           </div>
@@ -141,7 +141,7 @@ export function PerformanceChart({
         <Skeleton className="w-full" style={{ height }} />
       ) : data.length === 0 ? (
         <div
-          className="flex items-center justify-center text-zinc-500 text-sm"
+          className="flex items-center justify-center text-muted-foreground text-sm"
           style={{ height }}
         >
           Žádná data pro zvolené období
@@ -149,19 +149,19 @@ export function PerformanceChart({
       ) : (
         <ResponsiveContainer width="100%" height={height}>
           <ComposedChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey="date"
               tickFormatter={formatXAxisDate}
               ticks={xTicks}
-              stroke="#52525b"
+              stroke="#a1a1aa"
               fontSize={11}
               tickLine={false}
             />
             <YAxis
               domain={yDomain}
               tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-              stroke="#52525b"
+              stroke="#a1a1aa"
               fontSize={11}
               width={50}
               tickLine={false}
@@ -171,7 +171,7 @@ export function PerformanceChart({
             <Legend
               wrapperStyle={{ paddingTop: 12 }}
               formatter={(value) => (
-                <span className="text-zinc-400 text-xs">{value}</span>
+                <span className="text-muted-foreground/70 text-xs">{value}</span>
               )}
             />
 

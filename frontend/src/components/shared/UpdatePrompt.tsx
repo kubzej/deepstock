@@ -12,9 +12,9 @@ export function UpdatePrompt() {
 
   return (
     <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm">
-      <div className="bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
-        <RefreshCw className="h-4 w-4 text-emerald-400 shrink-0" />
-        <p className="flex-1 text-sm text-zinc-100">Nová verze je dostupná</p>
+      <div className="bg-foreground border border-foreground/10 rounded-xl shadow-xl px-4 py-3 flex items-center gap-3">
+        <RefreshCw className="h-4 w-4 text-positive shrink-0" />
+        <p className="flex-1 text-sm text-background">Nová verze je dostupná</p>
         <Button
           size="sm"
           variant="default"
@@ -24,7 +24,7 @@ export function UpdatePrompt() {
           Aktualizovat
         </Button>
         <button
-          className="text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="text-background/40 hover:text-background/80 transition-colors"
           onClick={() => setNeedRefresh(false)}
           aria-label="Zavřít"
         >

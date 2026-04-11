@@ -20,7 +20,6 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +29,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { Plus, Pencil, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
+import { Layers, Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
 import { type JournalSection } from '@/lib/api/journal';
 import {
   useJournalSections,
@@ -39,7 +43,14 @@ import {
   useDeleteJournalSection,
   useReorderJournalSections,
 } from '@/hooks/useJournal';
-
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilitySection,
+} from './UtilityScreen';
 
 interface SortableRowProps {
   section: JournalSection;
@@ -66,38 +77,35 @@ function SortableRow({ section, onEdit, onDelete }: SortableRowProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-4 py-2.5 bg-muted/30 rounded-lg ${
-        isDragging ? 'opacity-50 bg-muted' : ''
-      }`}
+      className={isDragging ? 'opacity-50' : ''}
     >
-      <button
-        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground touch-none"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <div className="flex-1 text-sm font-medium">
-        {section.name}
-        {section.is_system && (
-          <span className="ml-2 text-xs text-muted-foreground font-normal">pevná</span>
-        )}
-      </div>
-      {!section.is_system && (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onEdit(section)}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(section)}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+      <UtilityListItem className="flex items-center gap-3 py-2.5">
+        <button
+          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex-1 text-sm font-medium">
+          {section.name}
+          {section.is_system && (
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              pevná
+            </span>
+          )}
         </div>
-      )}
+        {!section.is_system && (
+          <div className="flex gap-1">
+            <UtilityActionButton onClick={() => onEdit(section)}>
+              <Pencil className="h-4 w-4" />
+            </UtilityActionButton>
+            <UtilityActionButton destructive onClick={() => onDelete(section)}>
+              <Trash2 className="h-4 w-4" />
+            </UtilityActionButton>
+          </div>
+        )}
+      </UtilityListItem>
     </div>
   );
 }
@@ -119,7 +127,9 @@ export function JournalSettings() {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const openCreate = () => {
@@ -139,7 +149,10 @@ export function JournalSettings() {
     setSaving(true);
     try {
       if (editing) {
-        await updateMutation.mutateAsync({ id: editing.id, data: { name: name.trim() } });
+        await updateMutation.mutateAsync({
+          id: editing.id,
+          data: { name: name.trim() },
+        });
       } else {
         await createMutation.mutateAsync({ name: name.trim() });
       }
@@ -172,64 +185,64 @@ export function JournalSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nová sekce
-        </Button>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Sekce deníku"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nová sekce
+          </Button>
+        }
+      />
 
-      <div>
-        <h1 className="text-2xl font-bold">Sekce deníku</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Přetažením změníte pořadí
-        </p>
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {sections.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground text-sm">Žádné sekce.</p>
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={sections.map((s) => s.id)}
-                strategy={verticalListSortingStrategy}
+      <UtilitySection title="Sekce">
+        {isLoading ? (
+          <UtilityListSkeleton height="h-12" />
+        ) : (
+          <UtilityList>
+            {sections.length === 0 ? (
+              <UtilityEmptyState
+                icon={Layers}
+                title="Žádné sekce"
+                description="Vytvoř první vlastní sekci pro organizaci kanálů v deníku."
+                action={{
+                  label: 'Vytvořit první sekci',
+                  onClick: openCreate,
+                }}
+              />
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
               >
-                {sections.map((section) => (
-                  <SortableRow
-                    key={section.id}
-                    section={section}
-                    onEdit={openEdit}
-                    onDelete={setDeleteData}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-          )}
-        </div>
-      )}
+                <SortableContext
+                  items={sections.map((s) => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {sections.map((section) => (
+                    <SortableRow
+                      key={section.id}
+                      section={section}
+                      onEdit={openEdit}
+                      onDelete={setDeleteData}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            )}
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Upravit sekci' : 'Nová sekce'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'Upravit sekci' : 'Nová sekce'}
+            </DialogTitle>
             <DialogDescription>
               {editing
                 ? 'Upravte název sekce.'
@@ -270,6 +283,6 @@ export function JournalSettings() {
         onConfirm={handleDelete}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }
