@@ -218,6 +218,7 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               onClick={refresh}
               disabled={isFetching}
               className="h-7 w-7"
+              title="Obnovit data"
             >
               <RefreshCw
                 className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}

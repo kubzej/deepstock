@@ -189,7 +189,7 @@ export function PageHero({
 }: PageHeroProps) {
   return (
     <section className={cn('space-y-5', className)}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 space-y-3">
           {eyebrow && (
             <div className="text-sm text-muted-foreground">{eyebrow}</div>
