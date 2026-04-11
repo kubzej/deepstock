@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
   EmptyState,
@@ -19,11 +18,10 @@ import {
   PageIntro,
   PageShell,
 } from '@/components/shared';
-import { Plus, Eye, Target, Filter, X } from 'lucide-react';
+import { Eye, Target } from 'lucide-react';
 import {
   type WatchlistItem,
   type WatchlistItemWithSource,
-  type Quote,
 } from '@/lib/api';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,23 +43,18 @@ import {
   type SortDir,
 } from './WatchlistItemsTable';
 import {
+  FilteredMonitoringPanel,
+  WatchlistModeRail,
+  WatchlistsMobileSortRow,
+} from './WatchlistPageSections';
+import {
   WatchlistItemFormDialog,
   type WatchlistItemFormData,
 } from './WatchlistItemFormDialog';
+import { isAtBuyTarget, isAtSellTarget } from './watchlistSignals';
 
 // Special ID for filter view
 const FILTER_VIEW_ID = '__filter__';
-
-// Helper: check if price is at target
-function isAtBuyTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_buy_price || !quote) return false;
-  return quote.price <= item.target_buy_price;
-}
-
-function isAtSellTarget(item: WatchlistItem, quote?: Quote): boolean {
-  if (!item.target_sell_price || !quote) return false;
-  return quote.price >= item.target_sell_price;
-}
 
 export function WatchlistsPage() {
   const navigate = useNavigate();
@@ -78,6 +71,9 @@ export function WatchlistsPage() {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(
     null,
   );
+  const [lastConcreteWatchlistId, setLastConcreteWatchlistId] = useState<string | null>(
+    null,
+  );
 
   // Filter view state
   const isFilterView = selectedWatchlistId === FILTER_VIEW_ID;
@@ -91,6 +87,12 @@ export function WatchlistsPage() {
       setSelectedWatchlistId(watchlists[0].id);
     }
   }, [watchlists, selectedWatchlistId]);
+
+  useEffect(() => {
+    if (selectedWatchlistId && selectedWatchlistId !== FILTER_VIEW_ID) {
+      setLastConcreteWatchlistId(selectedWatchlistId);
+    }
+  }, [selectedWatchlistId]);
 
   // Single watchlist items
   const {
@@ -171,6 +173,27 @@ export function WatchlistsPage() {
   const selectedWatchlist = watchlists.find(
     (w) => w.id === selectedWatchlistId,
   );
+
+  const handleSelectWatchlist = (watchlistId: string) => {
+    setSelectedWatchlistId(watchlistId);
+  };
+
+  const handleToggleFilteredMode = () => {
+    if (isFilterView) {
+      setSelectedWatchlistId(
+        lastConcreteWatchlistId ?? watchlists[0]?.id ?? null,
+      );
+      return;
+    }
+
+    setSelectedWatchlistId(FILTER_VIEW_ID);
+  };
+
+  const clearFilters = () => {
+    setFilterTags([]);
+    setShowAtBuyTarget(false);
+    setShowAtSellTarget(false);
+  };
 
   // Sorting
   const handleSort = (key: SortKey) => {
@@ -287,6 +310,25 @@ export function WatchlistsPage() {
   // Check if any filters are active
   const hasActiveFilters =
     filterTags.length > 0 || showAtBuyTarget || showAtSellTarget;
+
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+
+    if (showAtBuyTarget) parts.push('nákupní signál');
+    if (showAtSellTarget) parts.push('prodejní signál');
+
+    if (filterTags.length > 0) {
+      const activeTags = allTags
+        .filter((tag) => filterTags.includes(tag.id))
+        .map((tag) => tag.name);
+
+      if (activeTags.length > 0) {
+        parts.push(`tagy: ${activeTags.join(', ')}`);
+      }
+    }
+
+    return parts.length > 0 ? `Aktivní filtry: ${parts.join(' • ')}` : null;
+  }, [allTags, filterTags, showAtBuyTarget, showAtSellTarget]);
 
   // Item CRUD
   const openAddItem = () => {
@@ -467,132 +509,39 @@ export function WatchlistsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Watchlist toggle buttons + Filter + Add button */}
-          <div className="space-y-3 sm:space-y-0 sm:flex sm:items-start sm:gap-3">
-            <PillGroup behavior="scroll" bleed className="sm:flex-1">
-              <PillButton
-                active={isFilterView}
-                onClick={() => setSelectedWatchlistId(FILTER_VIEW_ID)}
-                size="sm"
-                count={
-                  isFilterView ? filteredAndSortedItems.length : allItems.length
-                }
-                indicatorClassName={hasActiveFilters ? 'bg-orange-500' : undefined}
-                className="pl-2.5"
-              >
-                <Filter className="h-3.5 w-3.5" />
-                Filtrované
-              </PillButton>
-              {watchlists.map((w) => (
-                <PillButton
-                  key={w.id}
-                  active={selectedWatchlistId === w.id}
-                  onClick={() => setSelectedWatchlistId(w.id)}
-                  size="sm"
-                  count={w.item_count || 0}
-                >
-                  {w.name}
-                </PillButton>
-              ))}
-            </PillGroup>
-            <div className="flex-1" />
-            <Button
-              size="sm"
-              onClick={openAddItem}
-              disabled={!selectedWatchlistId || isFilterView}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Přidat akcii
-            </Button>
-          </div>
+          <WatchlistModeRail
+            watchlists={watchlists}
+            selectedWatchlistId={selectedWatchlistId}
+            isFilterView={isFilterView}
+            totalItemsCount={allItems.length}
+            filteredItemsCount={filteredAndSortedItems.length}
+            hasActiveFilters={hasActiveFilters}
+            filterSummary={filterSummary}
+            onSelectWatchlist={handleSelectWatchlist}
+            onSelectFilteredMode={handleToggleFilteredMode}
+          />
 
           {/* Filter panel (only in filter view) */}
           {isFilterView && (
-            <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Filtry</span>
-                {hasActiveFilters && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setFilterTags([]);
-                      setShowAtBuyTarget(false);
-                      setShowAtSellTarget(false);
-                    }}
-                    className="h-7 text-xs"
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Vymazat filtry
-                  </Button>
-                )}
-              </div>
-
-              {/* Target status filters */}
-              <PillGroup>
-                <PillButton
-                  onClick={() => setShowAtBuyTarget(!showAtBuyTarget)}
-                  active={showAtBuyTarget}
-                  size="sm"
-                  indicatorClassName="bg-emerald-500"
-                  activeClassName="border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600"
-                  inactiveClassName="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15"
-                >
-                  Nákupní cíl
-                </PillButton>
-                <PillButton
-                  onClick={() => setShowAtSellTarget(!showAtSellTarget)}
-                  active={showAtSellTarget}
-                  size="sm"
-                  indicatorClassName="bg-amber-500"
-                  activeClassName="border-amber-500 bg-amber-500 text-white hover:bg-amber-500"
-                  inactiveClassName="border-amber-500/20 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
-                >
-                  Prodejní cíl
-                </PillButton>
-              </PillGroup>
-
-              {/* Tag filters */}
-              {allTags.length > 0 && (
-                <PillGroup>
-                  {allTags.map((tag) => {
-                    const isSelected = filterTags.includes(tag.id);
-                    return (
-                      <PillButton
-                        key={tag.id}
-                        onClick={() =>
-                          setFilterTags((prev) =>
-                            isSelected
-                              ? prev.filter((id) => id !== tag.id)
-                              : [...prev, tag.id],
-                          )
-                        }
-                        active={isSelected}
-                        size="sm"
-                        className={isSelected ? 'ring-2 ring-offset-1 ring-offset-background' : 'opacity-70 hover:opacity-100'}
-                        activeClassName="text-white"
-                        inactiveClassName="border-transparent"
-                        indicatorPosition="leading"
-                        indicatorClassName="bg-current"
-                        style={{
-                          backgroundColor: isSelected
-                            ? tag.color
-                            : `${tag.color}20`,
-                          color: isSelected ? '#fff' : tag.color,
-                        }}
-                      >
-                        {tag.name}
-                      </PillButton>
-                    );
-                  })}
-                </PillGroup>
-              )}
-
-              {/* Results count */}
-              <div className="text-xs text-muted-foreground">
-                {filteredAndSortedItems.length} z {allItems.length} položek
-              </div>
-            </div>
+            <FilteredMonitoringPanel
+              allTags={allTags}
+              filterTags={filterTags}
+              showAtBuyTarget={showAtBuyTarget}
+              showAtSellTarget={showAtSellTarget}
+              filteredItemsCount={filteredAndSortedItems.length}
+              totalItemsCount={allItems.length}
+              hasActiveFilters={hasActiveFilters}
+              onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
+              onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
+              onToggleTag={(tagId) =>
+                setFilterTags((prev) =>
+                  prev.includes(tagId)
+                    ? prev.filter((id) => id !== tagId)
+                    : [...prev, tagId],
+                )
+              }
+              onClearFilters={clearFilters}
+            />
           )}
 
           {/* Items table */}
@@ -611,11 +560,7 @@ export function WatchlistsPage() {
                       description="Zkus upravit tagy nebo cílové filtry a zobraz další kandidáty."
                       clearAction={{
                         label: 'Vymazat filtry',
-                        onClick: () => {
-                          setFilterTags([]);
-                          setShowAtBuyTarget(false);
-                          setShowAtSellTarget(false);
-                        },
+                        onClick: clearFilters,
                       }}
                     />
                   ) : (
@@ -637,28 +582,11 @@ export function WatchlistsPage() {
                 <>
                   {/* Mobile: Sort pills + Cards */}
                   <div className="md:hidden">
-                    {/* Sort pills */}
-                    <PillGroup behavior="scroll" bleed className="pb-3 mb-2">
-                      {[
-                        { key: 'ticker' as SortKey, label: 'A-Z' },
-                        { key: 'price' as SortKey, label: 'Cena' },
-                        { key: 'change' as SortKey, label: 'Změna' },
-                        { key: 'buyTarget' as SortKey, label: 'Nákup' },
-                        { key: 'sellTarget' as SortKey, label: 'Prodej' },
-                      ].map((option) => (
-                        <PillButton
-                          key={option.key}
-                          active={sortKey === option.key}
-                          onClick={() => handleSort(option.key)}
-                          size="sm"
-                          direction={
-                            sortKey === option.key ? sortDir : undefined
-                          }
-                        >
-                          {option.label}
-                        </PillButton>
-                      ))}
-                    </PillGroup>
+                    <WatchlistsMobileSortRow
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={handleSort}
+                    />
 
                     {/* Cards */}
                     <div className="space-y-1.5">
