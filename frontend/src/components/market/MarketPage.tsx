@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageIntro, PageSection, PageShell } from '@/components/shared/PageShell';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import {
   StockHeatmap,
@@ -68,8 +68,8 @@ export function MarketPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Přehled trhu"
         subtitle="Klíčové indikátory, sektory a makro data"
         onRefresh={handleRefresh}
@@ -84,9 +84,11 @@ export function MarketPage() {
           <TabsTrigger value="calendar">Kalendář</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-6 space-y-8">
-          <FearGreedGauge />
-          <MarketOverview />
+        <TabsContent value="overview" className="mt-6">
+          <PageSection gap="lg">
+            <FearGreedGauge />
+            <MarketOverview />
+          </PageSection>
         </TabsContent>
 
         <TabsContent value="heatmap" className="mt-6 space-y-4">
@@ -112,6 +114,6 @@ export function MarketPage() {
           <EconomicCalendar height="calc(100vh - 280px)" />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

@@ -11,10 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { Plus, Eye, Target, Filter, X } from 'lucide-react';
 import {
   type WatchlistItem,
@@ -434,9 +434,9 @@ export function WatchlistsPage() {
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <PageShell width="full">
       {/* Header */}
-      <PageHeader
+      <PageIntro
         title="Watchlisty"
         onRefresh={() => {
           // Invalidate all caches - React Query will refetch them
@@ -822,6 +822,6 @@ export function WatchlistsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

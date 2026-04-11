@@ -3,9 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { useStocks } from '@/hooks/useStocks';
 import { useQuotes } from '@/hooks/useQuotes';
 import {
@@ -264,8 +264,8 @@ export function AlertsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Cenové alerty"
         onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.alerts() })}
         isRefreshing={alertsFetching}
@@ -486,6 +486,6 @@ export function AlertsPage() {
         </div>
       )}
 
-    </div>
+    </PageShell>
   );
 }

@@ -31,7 +31,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { Plus, Pencil, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
+import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
 import { type Watchlist } from '@/lib/api';
 import {
   useWatchlists,
@@ -195,25 +196,18 @@ export function WatchlistSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header with back button */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nový watchlist
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">Watchlisty</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Přetažením změníte pořadí
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Watchlisty"
+        subtitle="Přetažením změníte pořadí"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nový watchlist
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">
@@ -312,6 +306,6 @@ export function WatchlistSettings() {
         onConfirm={handleDelete}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

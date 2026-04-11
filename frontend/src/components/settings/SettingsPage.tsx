@@ -1,11 +1,11 @@
 import { Link } from '@tanstack/react-router';
 import { List, Tag, ChevronRight, Briefcase, Bell, Info, Rss, BookOpen, Layers } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 
 export function SettingsPage() {
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Nastavení"
         subtitle="Správa portfolií, watchlistů a dalších nastavení"
       />
@@ -165,6 +165,6 @@ export function SettingsPage() {
           </span>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -23,7 +23,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       </div>
 
       {/* Main Content */}
-      <main className="md:ml-64 min-h-screen px-4 md:px-8 lg:px-12 pt-header-mobile pb-content-mobile md:pt-6 md:pb-6">
+      <main className="md:ml-64 min-h-screen px-4 md:px-6 lg:px-8 xl:px-10 pt-header-mobile pb-content-mobile md:pt-6 md:pb-8">
         {children}
       </main>
 

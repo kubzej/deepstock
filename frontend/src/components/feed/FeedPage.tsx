@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 import {
   fetchFeedLists,
@@ -141,8 +141,11 @@ export function FeedPage() {
   });
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader title="Feeds" subtitle="AI přehled příspěvků ze sledovaných účtů" />
+    <PageShell width="full">
+      <PageIntro
+        title="Feeds"
+        subtitle="AI přehled příspěvků ze sledovaných účtů"
+      />
 
       {isLoading ? (
         <div className="space-y-4">
@@ -161,6 +164,6 @@ export function FeedPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

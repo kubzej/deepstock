@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { fetchStockInfo } from '@/lib/api';
 import { ValuationSection } from '@/components/research/ValuationSection';
@@ -49,9 +49,9 @@ export function ResearchPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-8 pb-12">
+      <PageShell width="full" gap="lg">
         {/* Header */}
-        <PageHeader
+        <PageIntro
           title="Průzkum akcie"
           onRefresh={activeTicker ? () => refetch() : undefined}
           isRefreshing={isFetching}
@@ -183,7 +183,7 @@ export function ResearchPage() {
             onClose={() => setNoteSheetOpen(false)}
           />
         )}
-      </div>
+      </PageShell>
     </TooltipProvider>
   );
 }

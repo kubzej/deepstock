@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, Pencil, Trash2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import {
   createPortfolio,
@@ -125,25 +126,18 @@ export function PortfolioSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header with back button */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nové portfolio
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">Portfolia</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Správa vašich investičních portfolií
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Portfolia"
+        subtitle="Správa vašich investičních portfolií"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nové portfolio
+          </Button>
+        }
+      />
 
       {(maintenanceMessage || error) && (
         <Alert variant={error ? 'destructive' : 'default'}>
@@ -329,6 +323,6 @@ export function PortfolioSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

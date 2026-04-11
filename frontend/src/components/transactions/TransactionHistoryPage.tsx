@@ -8,8 +8,8 @@ import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { cs } from 'date-fns/locale';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -215,8 +215,8 @@ export function TransactionHistoryPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
+    <PageShell width="full">
+      <PageIntro
         title="Historie transakcí"
         onRefresh={handleRefresh}
         isRefreshing={isFetching}
@@ -619,6 +619,6 @@ export function TransactionHistoryPage() {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

@@ -41,8 +41,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PageIntro, PageShell } from '@/components/shared/PageShell';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
 
@@ -299,9 +299,9 @@ export default function StocksManager() {
   }
 
   return (
-    <div className="space-y-6 pb-12">
+    <PageShell width="full">
       {/* Header */}
-      <PageHeader
+      <PageIntro
         title="Akcie"
         onRefresh={() =>
           queryClient.invalidateQueries({ queryKey: ['stocks'] })
@@ -708,6 +708,6 @@ export default function StocksManager() {
         loading={saving}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

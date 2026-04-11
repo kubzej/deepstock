@@ -30,7 +30,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { Plus, Pencil, Trash2, ArrowLeft, GripVertical } from 'lucide-react';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
+import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
 import { type JournalSection } from '@/lib/api/journal';
 import {
   useJournalSections,
@@ -172,24 +173,18 @@ export function JournalSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nová sekce
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">Sekce deníku</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Přetažením změníte pořadí
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Sekce deníku"
+        subtitle="Přetažením změníte pořadí"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nová sekce
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">
@@ -270,6 +265,6 @@ export function JournalSettings() {
         onConfirm={handleDelete}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

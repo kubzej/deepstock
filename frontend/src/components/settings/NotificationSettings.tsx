@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Bell,
   BellOff,
   Calendar,
@@ -12,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
@@ -66,13 +66,11 @@ export function NotificationSettings() {
 
   if (!isSupported) {
     return (
-      <div className="space-y-6 pb-12">
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-semibold">Notifikace</h1>
-        </div>
+      <PageShell width="full">
+        <PageIntro
+          title="Notifikace"
+          leading={<PageBackButton onClick={onBack} />}
+        />
 
         <Alert>
           <BellOff className="h-4 w-4" />
@@ -80,19 +78,16 @@ export function NotificationSettings() {
             Váš prohlížeč nepodporuje push notifikace.
           </AlertDescription>
         </Alert>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-semibold">Notifikace</h1>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Notifikace"
+        leading={<PageBackButton onClick={onBack} />}
+      />
 
       {/* Permission denied warning */}
       {permissionState === 'denied' && (
@@ -208,6 +203,6 @@ export function NotificationSettings() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

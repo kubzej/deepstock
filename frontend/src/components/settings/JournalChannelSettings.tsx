@@ -20,7 +20,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { Plus, Pencil, Trash2, ArrowLeft } from 'lucide-react';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { type JournalChannel } from '@/lib/api/journal';
 import {
   useJournalChannels,
@@ -99,24 +100,18 @@ export function JournalChannelSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nový kanál
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">Vlastní kanály deníku</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Vlastní kanály pro osobní poznámky
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="Vlastní kanály deníku"
+        subtitle="Vlastní kanály pro osobní poznámky"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nový kanál
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">
@@ -221,6 +216,6 @@ export function JournalChannelSettings() {
         onConfirm={handleDelete}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

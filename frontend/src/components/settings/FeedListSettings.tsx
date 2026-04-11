@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, ArrowLeft, X, Loader2, Pencil } from 'lucide-react';
+import { Plus, Trash2, X, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
 import {
   fetchFeedLists,
   createFeedList,
@@ -119,25 +120,18 @@ export function FeedListSettings() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Zpět
-        </Button>
-        <Button onClick={openCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Nový seznam
-        </Button>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold">X.com Feed listy</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Seznamy účtů pro AI přehled příspěvků
-        </p>
-      </div>
+    <PageShell width="full">
+      <PageIntro
+        title="X.com Feed listy"
+        subtitle="Seznamy účtů pro AI přehled příspěvků"
+        leading={<PageBackButton onClick={onBack} />}
+        actions={
+          <Button onClick={openCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Nový seznam
+          </Button>
+        }
+      />
 
       {isLoading ? (
         <div className="space-y-2">
@@ -297,6 +291,6 @@ export function FeedListSettings() {
         onConfirm={handleDelete}
         variant="destructive"
       />
-    </div>
+    </PageShell>
   );
 }

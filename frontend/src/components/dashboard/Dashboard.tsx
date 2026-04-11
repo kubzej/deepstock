@@ -10,6 +10,7 @@ import { RefreshCw, TrendingUp, AlertTriangle } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PageHero, PageShell } from '@/components/shared/PageShell';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
 
@@ -136,7 +137,7 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
   // Loading state - only show skeleton on initial load (no data yet)
   if (isInitialLoading) {
     return (
-      <div className="space-y-6 pb-12">
+      <PageShell width="full">
         <div className="space-y-4">
           <Skeleton className="h-6 w-32" />
           <Skeleton className="h-12 w-64" />
@@ -147,7 +148,7 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
           </div>
         </div>
         <Skeleton className="h-64 w-full" />
-      </div>
+      </PageShell>
     );
   }
 
@@ -168,18 +169,16 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
   // Empty portfolio state
   if (holdings.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="mb-8">
-          <p className="text-muted-foreground text-sm mb-1">
-            {portfolio?.name ?? 'Portfolio'}
-          </p>
-          <h1 className="text-4xl md:text-5xl font-bold font-mono-price mb-4">
-            {formatCurrency(0)}
-          </h1>
-        </div>
+      <PageShell width="full" gap="lg">
+        <PageHero
+          eyebrow={portfolio?.name ?? 'Portfolio'}
+          title={
+            <h1 className="text-4xl md:text-5xl font-bold font-mono-price">
+              {formatCurrency(0)}
+            </h1>
+          }
+        />
 
-        {/* Empty state */}
         <EmptyState
           icon={TrendingUp}
           title="Prázdné portfolio"
@@ -190,21 +189,25 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               : undefined
           }
         />
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-muted-foreground text-sm">
-            {isAllPortfolios
-              ? 'Všechna portfolia'
-              : (portfolio?.name ?? 'Portfolio')}
-          </p>
-          <div className="flex items-center gap-2">
+    <PageShell width="full" gap="lg">
+      <PageHero
+        eyebrow={
+          isAllPortfolios
+            ? 'Všechna portfolia'
+            : (portfolio?.name ?? 'Portfolio')
+        }
+        title={
+          <h1 className="text-4xl md:text-5xl font-bold font-mono-price">
+            {formatCurrency(totalValueCzk)}
+          </h1>
+        }
+        actions={
+          <>
             <DataFreshnessIndicator
               dataUpdatedAt={dataUpdatedAt}
               isFetching={isFetching}
@@ -220,15 +223,9 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
                 className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
               />
             </Button>
-          </div>
-        </div>
-
-        {/* Main Value */}
-        <h1 className="text-4xl md:text-5xl font-bold font-mono-price mb-4">
-          {formatCurrency(totalValueCzk)}
-        </h1>
-
-        {/* Stats row below */}
+          </>
+        }
+      >
         <div className="flex flex-wrap gap-x-8 gap-y-3">
           {/* Daily Change */}
           <div>
@@ -330,7 +327,7 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
             </span>
           </div>
         </div>
-      </div>
+      </PageHero>
 
       {/* Exchange rate fallback warning */}
       {ratesError && (
@@ -389,6 +386,6 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
           />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

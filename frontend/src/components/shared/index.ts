@@ -7,7 +7,13 @@ export { Login } from './Login';
 
 // Layout components
 export { BrandLogo } from './BrandLogo';
-export { PageHeader } from './PageHeader';
+export {
+  PageShell,
+  PageIntro,
+  PageHero,
+  PageSection,
+  PageBackButton,
+} from './PageShell';
 export { PillButton } from './PillButton';
 export { PortfolioSelector } from './PortfolioSelector';
 export { EmptyState } from './EmptyState';
