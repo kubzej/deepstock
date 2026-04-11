@@ -42,7 +42,13 @@ import {
 } from '@/components/ui/tooltip';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  EmptyState,
+  ErrorState,
+  FilteredEmptyState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
 
@@ -282,19 +288,16 @@ export default function StocksManager() {
 
   if (error && !loading) {
     return (
-      <div className="p-4">
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button
-          onClick={() =>
-            queryClient.invalidateQueries({ queryKey: ['stocks'] })
-          }
-          className="mt-4"
-        >
-          Zkusit znovu
-        </Button>
-      </div>
+      <PageShell width="full">
+        <ErrorState
+          title="Nepodařilo se načíst akcie"
+          description={error}
+          retryAction={{
+            label: 'Zkusit znovu',
+            onClick: () => queryClient.invalidateQueries({ queryKey: ['stocks'] }),
+          }}
+        />
+      </PageShell>
     );
   }
 
@@ -350,11 +353,19 @@ export default function StocksManager() {
             <Skeleton className="h-10 w-full" />
           </div>
         ) : stocks.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            {searchQuery
-              ? 'Žádné akcie nenalezeny'
-              : 'Zatím nemáte žádné akcie'}
-          </p>
+          searchQuery ? (
+            <FilteredEmptyState
+              description="Zkus jiný ticker, uprav název nebo vyčisti hledání."
+              clearAction={{ label: 'Vymazat hledání', onClick: () => setSearchQuery('') }}
+            />
+          ) : (
+            <EmptyState
+              icon={Plus}
+              title="Zatím nemáte žádné akcie"
+              description="Přidej první akcii a začni budovat vlastní stock databázi."
+              action={{ label: 'Přidat akcii', onClick: openCreateDialog }}
+            />
+          )
         ) : (
           <>
             {/* Desktop - Multi-column (flows down then right) */}

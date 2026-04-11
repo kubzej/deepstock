@@ -6,7 +6,9 @@
  */
 import { useMemo, useCallback } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { Filter } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
+import { EmptyState } from '@/components/shared';
 import type { Quote, ExchangeRates } from '@/lib/api';
 import type { Holding } from './HoldingsTable';
 import { formatPrice, toCZK } from '@/lib/format';
@@ -288,9 +290,11 @@ export function PortfolioHeatmap({
 
   if (heatmapData.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground">
-        Žádné pozice k zobrazení
-      </div>
+      <EmptyState
+        icon={Filter}
+        title="Žádné pozice k zobrazení"
+        description="Jakmile bude portfolio obsahovat oceněné pozice, zobrazí se tady heatmapa rozložení."
+      />
     );
   }
 

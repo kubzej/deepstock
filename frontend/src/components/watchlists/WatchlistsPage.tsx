@@ -10,11 +10,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  EmptyState,
+  ErrorState,
+  FilteredEmptyState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { Plus, Eye, Target, Filter, X } from 'lucide-react';
 import {
   type WatchlistItem,
@@ -422,14 +426,13 @@ export function WatchlistsPage() {
   // Error state
   if (error) {
     return (
-      <div className="space-y-4 p-4">
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button onClick={() => window.location.reload()} variant="outline">
-          Zkusit znovu
-        </Button>
-      </div>
+      <PageShell width="full">
+        <ErrorState
+          title="Nepodařilo se načíst watchlisty"
+          description={error}
+          retryAction={{ label: 'Zkusit znovu', onClick: () => window.location.reload() }}
+        />
+      </PageShell>
     );
   }
 
@@ -602,21 +605,34 @@ export function WatchlistsPage() {
                   ))}
                 </div>
               ) : filteredAndSortedItems.length === 0 ? (
-                <EmptyState
-                  icon={Target}
-                  title={
-                    isFilterView
-                      ? hasActiveFilters
-                        ? 'Žádné položky neodpovídají filtrům'
-                        : 'Žádné položky ve watchlistech'
-                      : 'Watchlist je prázdný'
-                  }
-                  action={
-                    !isFilterView
-                      ? { label: 'Přidat akcii', onClick: openAddItem }
-                      : undefined
-                  }
-                />
+                isFilterView ? (
+                  hasActiveFilters ? (
+                    <FilteredEmptyState
+                      description="Zkus upravit tagy nebo cílové filtry a zobraz další kandidáty."
+                      clearAction={{
+                        label: 'Vymazat filtry',
+                        onClick: () => {
+                          setFilterTags([]);
+                          setShowAtBuyTarget(false);
+                          setShowAtSellTarget(false);
+                        },
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={Target}
+                      title="Žádné položky ve watchlistech"
+                      description="Jakmile přidáš akcie do některého watchlistu, uvidíš je i ve filtrovaném přehledu."
+                    />
+                  )
+                ) : (
+                  <EmptyState
+                    icon={Target}
+                    title="Watchlist je prázdný"
+                    description="Přidej první akcii a začni sledovat nákupní a prodejní příležitosti."
+                    action={{ label: 'Přidat akcii', onClick: openAddItem }}
+                  />
+                )
               ) : (
                 <>
                   {/* Mobile: Sort pills + Cards */}

@@ -6,11 +6,16 @@ import { useQuery } from '@tanstack/react-query';
 import { Rss, RefreshCw, Loader2, Bot } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  EmptyState,
+  ErrorState,
+  GenerationState,
+  LoadingState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 import {
   fetchFeedLists,
@@ -100,20 +105,21 @@ function FeedListCard({ list }: { list: FeedList }) {
           {/* Error */}
           {error && (
             <div className="px-4 pb-3">
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <ErrorState
+                title="Souhrn se nepodařilo vygenerovat"
+                description={error}
+                retryAction={{ label: 'Zkusit znovu', onClick: () => handleGenerate(true) }}
+              />
             </div>
           )}
 
           {/* Loading state */}
           {loading && (
-            <div className="px-4 pb-4 flex items-center gap-3 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium">Načítám příspěvky a analyzuji...</p>
-                <p className="text-xs">Může trvat 1-2 minuty.</p>
-              </div>
+            <div className="px-4 pb-4">
+              <GenerationState
+                title="Generuji souhrn feedu..."
+                description="Načítám příspěvky a připravuji AI souhrn. Může to trvat 1 až 2 minuty."
+              />
             </div>
           )}
 
@@ -149,14 +155,18 @@ export function FeedPage() {
 
       {isLoading ? (
         <div className="space-y-4">
-          <Skeleton className="h-40 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
+          <LoadingState
+            title="Načítám feed listy..."
+            description="Připravuji dostupné seznamy účtů pro AI souhrny."
+            lines={2}
+          />
         </div>
       ) : lists.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-          <Rss className="w-10 h-10 opacity-30" />
-          <p className="text-sm">Žádné feed listy. Vytvoř je v Nastavení → X.com Feed listy.</p>
-        </div>
+        <EmptyState
+          icon={Rss}
+          title="Žádné feed listy"
+          description="Nejdřív si vytvoř feed list v Nastavení → X.com Feed listy."
+        />
       ) : (
         <div className="space-y-4">
           {lists.map((list) => (

@@ -9,8 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, TrendingUp, AlertTriangle } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { PageHero, PageShell } from '@/components/shared/PageShell';
+import { EmptyState, ErrorState, PageHero, PageShell } from '@/components/shared';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
 
@@ -155,14 +154,13 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 p-4">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button onClick={refresh} variant="outline">
-          Zkusit znovu
-        </Button>
-      </div>
+      <PageShell width="full">
+        <ErrorState
+          title="Nepodařilo se načíst portfolio"
+          description={error}
+          retryAction={{ label: 'Zkusit znovu', onClick: refresh }}
+        />
+      </PageShell>
     );
   }
 

@@ -4,11 +4,15 @@
  */
 import { useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { Bot, RefreshCw, Download, Loader2 } from 'lucide-react';
+import { Bot, RefreshCw, Download, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generateReport, getCachedReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
+import {
+  EmptyState,
+  ErrorState,
+  GenerationState,
+} from '@/components/shared';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 
 const REPORT_TYPES: ReportType[] = ['full_analysis', 'technical_analysis', 'briefing'];
@@ -17,47 +21,6 @@ interface AIResearchSectionProps {
   ticker: string;
   currentPrice: number | null | undefined;
 }
-
-function LoadingState({ isTechnical = false }: { isTechnical?: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-      <Loader2 className="w-8 h-8 animate-spin" />
-      <div className="text-center space-y-1">
-        <p className="font-medium">Generuji report...</p>
-        <p className="text-sm">
-          {isTechnical
-            ? 'Analyzuji technické indikátory. Může trvat 10–20 sekund.'
-            : 'Vyhledávám zprávy a analyzuji data. Může trvat 30–60 sekund.'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <Alert variant="destructive">
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
-  );
-}
-
-function EmptyState({ onGenerate }: { onGenerate: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 gap-4 text-muted-foreground">
-      <Bot className="w-12 h-12 opacity-30" />
-      <div className="text-center space-y-1">
-        <p className="font-medium text-foreground">AI analýza ještě nebyla vygenerována</p>
-        <p className="text-sm">Klikni na tlačítko níže pro spuštění analýzy.</p>
-      </div>
-      <Button onClick={onGenerate} className="mt-2">
-        <Bot className="w-4 h-4 mr-2" />
-        Vygenerovat report
-      </Button>
-    </div>
-  );
-}
-
 
 export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionProps) {
   const [activeReportType, setActiveReportType] = useState<ReportType>('full_analysis');
@@ -155,10 +118,30 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
         {/* Report content area */}
         {REPORT_TYPES.map((type) => (
           <TabsContent key={type} value={type} className="mt-6">
-            {isLoading && <LoadingState isTechnical={type === 'technical_analysis'} />}
-            {error && !isLoading && <ErrorState message={error} />}
+            {isLoading && (
+              <GenerationState
+                title="Generuji AI report..."
+                description={
+                  type === 'technical_analysis'
+                    ? 'Analyzuji technické indikátory. Může to trvat 10 až 20 sekund.'
+                    : 'Vyhledávám zprávy a skládám AI analýzu. Může to trvat 30 až 60 sekund.'
+                }
+              />
+            )}
+            {error && !isLoading && (
+              <ErrorState
+                title="Nepodařilo se vygenerovat AI report"
+                description={error}
+                retryAction={{ label: 'Zkusit znovu', onClick: () => handleGenerate(true) }}
+              />
+            )}
             {!isLoading && !error && !currentReport && (
-              <EmptyState onGenerate={() => handleGenerate()} />
+              <EmptyState
+                icon={type === 'technical_analysis' ? Search : Bot}
+                title="AI analýza ještě není připravená"
+                description="Spusť generování a připravím report pro aktuální ticker a zvolený typ analýzy."
+                action={{ label: 'Vygenerovat report', onClick: () => handleGenerate() }}
+              />
             )}
             {!isLoading && currentReport && <MarkdownReport content={currentReport.markdown} />}
           </TabsContent>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState, LoadingState } from '@/components/shared';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
 import { RichTextEditor } from '@/components/journal/RichTextEditor';
 import {
@@ -66,23 +66,21 @@ export function StockJournalTab({ ticker }: StockJournalTabProps) {
 
   if (channelsLoading) {
     return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="py-4 border-b border-border">
-            <Skeleton className="h-3 w-32 mb-2" />
-            <Skeleton className="h-4 w-full mb-1" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        ))}
-      </div>
+      <LoadingState
+        title="Načítám journal..."
+        description="Připravuji poznámky a historii k této akcii."
+        lines={3}
+      />
     );
   }
 
   if (!channel) {
     return (
-      <div className="py-12 text-center text-muted-foreground text-sm">
-        Pro tuto akcii nebyl nalezen journal kanál.
-      </div>
+      <EmptyState
+        icon={Plus}
+        title="Journal kanál nebyl nalezen"
+        description="Pro tuhle akcii zatím není dostupný propojený journal kanál."
+      />
     );
   }
 
@@ -143,21 +141,20 @@ export function StockJournalTab({ ticker }: StockJournalTabProps) {
 
       {/* Entries */}
       {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="py-4 border-b border-border">
-              <Skeleton className="h-3 w-32 mb-2" />
-              <Skeleton className="h-4 w-full mb-1" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          ))}
-        </div>
+        <LoadingState
+          title="Načítám poznámky..."
+          description="Chvilku strpení, připravuji poslední journal entries."
+          lines={3}
+        />
       )}
 
       {!isLoading && entries.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground text-sm">
-          Žádné poznámky. Přidej první.
-        </div>
+        <EmptyState
+          icon={Plus}
+          title="Žádné poznámky"
+          description="Přidej první poznámku a začni si budovat investiční kontext přímo u akcie."
+          action={{ label: 'Přidat poznámku', onClick: () => setShowForm(true) }}
+        />
       )}
 
       <div className="space-y-2">

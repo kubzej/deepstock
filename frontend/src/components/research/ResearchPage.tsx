@@ -8,7 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  EmptyState,
+  ErrorState,
+  PageIntro,
+  PageShell,
+} from '@/components/shared';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { fetchStockInfo } from '@/lib/api';
 import { ValuationSection } from '@/components/research/ValuationSection';
@@ -76,8 +81,16 @@ export function ResearchPage() {
           </Button>
         </form>
 
+        {!activeTicker && (
+          <EmptyState
+            icon={Search}
+            title="Zadej ticker k analýze"
+            description="Vyhledej akcii a otevři fundamenty, valuaci, techniku i AI analýzu na jednom místě."
+          />
+        )}
+
         {/* Loading */}
-        {isLoading && (
+        {activeTicker && isLoading && (
           <div className="space-y-6">
             <div className="space-y-2">
               <Skeleton className="h-10 w-32" />
@@ -93,17 +106,21 @@ export function ResearchPage() {
         )}
 
         {/* Error */}
-        {error && (
-          <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
-            Nepodařilo se načíst data pro {activeTicker}
-          </div>
+        {activeTicker && error && (
+          <ErrorState
+            title="Nepodařilo se načíst data akcie"
+            description={`Data pro ${activeTicker} se teď nepodařilo načíst.`}
+            retryAction={{ label: 'Zkusit znovu', onClick: () => refetch() }}
+          />
         )}
 
         {/* No data */}
         {!isLoading && !error && activeTicker && !data && (
-          <div className="p-4 bg-muted rounded-lg text-muted-foreground">
-            Ticker {activeTicker} nebyl nalezen
-          </div>
+          <EmptyState
+            icon={Search}
+            title="Ticker nebyl nalezen"
+            description={`Pro ${activeTicker} jsem nenašel žádná data. Zkus jiný ticker nebo zkontroluj zápis.`}
+          />
         )}
 
         {/* Results */}
