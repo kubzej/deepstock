@@ -29,7 +29,7 @@ export function DateRangeFilter({
 
   return (
     <div className="space-y-3">
-      <PillGroup>
+      <PillGroup behavior="scroll" bleed>
         {DATE_PRESETS.map((p) => (
           <PillButton
             key={p.value}
@@ -42,7 +42,7 @@ export function DateRangeFilter({
       </PillGroup>
 
       {preset === 'CUSTOM' && (
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
           <div className="flex items-center gap-2">
             <Label className="text-sm text-muted-foreground">Od</Label>
             <Input

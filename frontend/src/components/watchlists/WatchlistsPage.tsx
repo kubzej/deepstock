@@ -465,39 +465,33 @@ export function WatchlistsPage() {
       ) : (
         <div className="space-y-4">
           {/* Watchlist toggle buttons + Filter + Add button */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex gap-1 flex-wrap">
-              {/* Filter view button */}
-              <Button
-                variant={isFilterView ? 'default' : 'outline'}
-                size="sm"
+          <div className="space-y-3 sm:space-y-0 sm:flex sm:items-start sm:gap-3">
+            <PillGroup behavior="scroll" bleed className="sm:flex-1">
+              <PillButton
+                active={isFilterView}
                 onClick={() => setSelectedWatchlistId(FILTER_VIEW_ID)}
-                className="h-8"
+                size="sm"
+                count={
+                  isFilterView ? filteredAndSortedItems.length : allItems.length
+                }
+                indicatorClassName={hasActiveFilters ? 'bg-orange-500' : undefined}
+                className="pl-2.5"
               >
-                <Filter className="h-3.5 w-3.5 mr-1" />
+                <Filter className="h-3.5 w-3.5" />
                 Filtrované
-                {hasActiveFilters && (
-                  <span className="ml-1 h-2 w-2 rounded-full bg-orange-500" />
-                )}
-              </Button>
-              {/* Separator */}
-              <div className="w-px h-6 bg-border mx-1 self-center" />
-              {/* Watchlist buttons */}
+              </PillButton>
               {watchlists.map((w) => (
-                <Button
+                <PillButton
                   key={w.id}
-                  variant={selectedWatchlistId === w.id ? 'default' : 'outline'}
-                  size="sm"
+                  active={selectedWatchlistId === w.id}
                   onClick={() => setSelectedWatchlistId(w.id)}
-                  className="h-8"
+                  size="sm"
+                  count={w.item_count || 0}
                 >
                   {w.name}
-                  <span className="ml-1.5 text-xs opacity-60">
-                    {w.item_count || 0}
-                  </span>
-                </Button>
+                </PillButton>
               ))}
-            </div>
+            </PillGroup>
             <div className="flex-1" />
             <Button
               size="sm"
@@ -511,7 +505,7 @@ export function WatchlistsPage() {
 
           {/* Filter panel (only in filter view) */}
           {isFilterView && (
-            <div className="flex flex-col gap-3 p-4 rounded-lg bg-muted/30 border">
+            <div className="flex flex-col gap-3 rounded-2xl border bg-muted/20 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Filtry</span>
                 {hasActiveFilters && (
@@ -532,42 +526,36 @@ export function WatchlistsPage() {
               </div>
 
               {/* Target status filters */}
-              <div className="flex flex-wrap gap-1.5">
-                <button
+              <PillGroup>
+                <PillButton
                   onClick={() => setShowAtBuyTarget(!showAtBuyTarget)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    showAtBuyTarget
-                      ? 'bg-emerald-500 text-white ring-2 ring-offset-1 ring-offset-background ring-emerald-500'
-                      : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
-                  }`}
+                  active={showAtBuyTarget}
+                  size="sm"
+                  indicatorClassName="bg-emerald-500"
+                  activeClassName="border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-600"
+                  inactiveClassName="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15"
                 >
-                  <span
-                    className={`h-2 w-2 rounded-full ${showAtBuyTarget ? 'bg-white' : 'bg-emerald-500'}`}
-                  />
                   Nákupní cíl
-                </button>
-                <button
+                </PillButton>
+                <PillButton
                   onClick={() => setShowAtSellTarget(!showAtSellTarget)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    showAtSellTarget
-                      ? 'bg-amber-500 text-white ring-2 ring-offset-1 ring-offset-background ring-amber-500'
-                      : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                  }`}
+                  active={showAtSellTarget}
+                  size="sm"
+                  indicatorClassName="bg-amber-500"
+                  activeClassName="border-amber-500 bg-amber-500 text-white hover:bg-amber-500"
+                  inactiveClassName="border-amber-500/20 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15"
                 >
-                  <span
-                    className={`h-2 w-2 rounded-full ${showAtSellTarget ? 'bg-white' : 'bg-amber-500'}`}
-                  />
                   Prodejní cíl
-                </button>
-              </div>
+                </PillButton>
+              </PillGroup>
 
               {/* Tag filters */}
               {allTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+                <PillGroup>
                   {allTags.map((tag) => {
                     const isSelected = filterTags.includes(tag.id);
                     return (
-                      <button
+                      <PillButton
                         key={tag.id}
                         onClick={() =>
                           setFilterTags((prev) =>
@@ -576,11 +564,13 @@ export function WatchlistsPage() {
                               : [...prev, tag.id],
                           )
                         }
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'ring-2 ring-offset-1 ring-offset-background'
-                            : 'opacity-50 hover:opacity-80'
-                        }`}
+                        active={isSelected}
+                        size="sm"
+                        className={isSelected ? 'ring-2 ring-offset-1 ring-offset-background' : 'opacity-70 hover:opacity-100'}
+                        activeClassName="text-white"
+                        inactiveClassName="border-transparent"
+                        indicatorPosition="leading"
+                        indicatorClassName="bg-current"
                         style={{
                           backgroundColor: isSelected
                             ? tag.color
@@ -588,17 +578,11 @@ export function WatchlistsPage() {
                           color: isSelected ? '#fff' : tag.color,
                         }}
                       >
-                        <span
-                          className="h-1.5 w-1.5 rounded-full"
-                          style={{
-                            backgroundColor: isSelected ? '#fff' : tag.color,
-                          }}
-                        />
                         {tag.name}
-                      </button>
+                      </PillButton>
                     );
                   })}
-                </div>
+                </PillGroup>
               )}
 
               {/* Results count */}
@@ -638,7 +622,7 @@ export function WatchlistsPage() {
                   {/* Mobile: Sort pills + Cards */}
                   <div className="md:hidden">
                     {/* Sort pills */}
-                    <PillGroup className="pb-3 mb-2">
+                    <PillGroup behavior="scroll" bleed className="pb-3 mb-2">
                       {[
                         { key: 'ticker' as SortKey, label: 'A-Z' },
                         { key: 'price' as SortKey, label: 'Cena' },
@@ -651,13 +635,11 @@ export function WatchlistsPage() {
                           active={sortKey === option.key}
                           onClick={() => handleSort(option.key)}
                           size="sm"
+                          direction={
+                            sortKey === option.key ? sortDir : undefined
+                          }
                         >
                           {option.label}
-                          {sortKey === option.key && (
-                            <span className="ml-0.5">
-                              {sortDir === 'desc' ? '↓' : '↑'}
-                            </span>
-                          )}
                         </PillButton>
                       ))}
                     </PillGroup>

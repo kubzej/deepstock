@@ -186,24 +186,23 @@ export function OptionsTrades({
   return (
     <div className="space-y-4">
       {/* Filter pills */}
-      <PillGroup>
+      <PillGroup behavior="scroll" bleed>
         <PillButton
           active={filter === 'all'}
           onClick={() => setFilter('all')}
           size="md"
+          count={counts.all}
         >
-          Vše <span className="ml-1 text-muted-foreground">{counts.all}</span>
+          Vše
         </PillButton>
         {counts['long-call'] > 0 && (
           <PillButton
             active={filter === 'long-call'}
             onClick={() => setFilter('long-call')}
             size="md"
+            count={counts['long-call']}
           >
-            Long Call{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['long-call']}
-            </span>
+            Long Call
           </PillButton>
         )}
         {counts['long-put'] > 0 && (
@@ -211,11 +210,9 @@ export function OptionsTrades({
             active={filter === 'long-put'}
             onClick={() => setFilter('long-put')}
             size="md"
+            count={counts['long-put']}
           >
-            Long Put{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['long-put']}
-            </span>
+            Long Put
           </PillButton>
         )}
         {counts['short-call'] > 0 && (
@@ -223,11 +220,9 @@ export function OptionsTrades({
             active={filter === 'short-call'}
             onClick={() => setFilter('short-call')}
             size="md"
+            count={counts['short-call']}
           >
-            Short Call{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['short-call']}
-            </span>
+            Short Call
           </PillButton>
         )}
         {counts['short-put'] > 0 && (
@@ -235,11 +230,9 @@ export function OptionsTrades({
             active={filter === 'short-put'}
             onClick={() => setFilter('short-put')}
             size="md"
+            count={counts['short-put']}
           >
-            Short Put{' '}
-            <span className="ml-1 text-muted-foreground">
-              {counts['short-put']}
-            </span>
+            Short Put
           </PillButton>
         )}
       </PillGroup>

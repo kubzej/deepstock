@@ -283,11 +283,19 @@ export function AlertsPage() {
       <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-3">
         <div className="md:order-first md:flex-1">
           <PillGroup>
-            <PillButton active={filterView === 'active'} onClick={() => setFilterView('active')}>
-              Aktivní ({activeCount})
+            <PillButton
+              active={filterView === 'active'}
+              onClick={() => setFilterView('active')}
+              count={activeCount}
+            >
+              Aktivní
             </PillButton>
-            <PillButton active={filterView === 'inactive'} onClick={() => setFilterView('inactive')}>
-              Neaktivní ({inactiveCount})
+            <PillButton
+              active={filterView === 'inactive'}
+              onClick={() => setFilterView('inactive')}
+              count={inactiveCount}
+            >
+              Neaktivní
             </PillButton>
           </PillGroup>
         </div>

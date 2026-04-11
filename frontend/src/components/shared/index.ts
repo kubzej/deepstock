@@ -14,7 +14,7 @@ export {
   PageSection,
   PageBackButton,
 } from './PageShell';
-export { PillButton } from './PillButton';
+export { PillButton, PillGroup } from './PillButton';
 export { PortfolioSelector } from './PortfolioSelector';
 export { EmptyState } from './EmptyState';
 

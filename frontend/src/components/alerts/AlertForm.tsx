@@ -130,12 +130,20 @@ export function AlertForm({
           {editingRangeAlert ? (
             <div className="space-y-2">
               <Label>Podmínka</Label>
-              <div className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground w-full">
-                <div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium flex-1 gap-1.5 bg-violet-600 text-white">
+              <ToggleGroup
+                type="single"
+                value="price_both"
+                className="w-full"
+              >
+                <ToggleGroupItem
+                  value="price_both"
+                  disabled
+                  className="flex-1 gap-1.5 border-violet-600 bg-violet-600 text-white disabled:opacity-100"
+                >
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   Cenové pásmo
-                </div>
-              </div>
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           ) : (
             <div className="space-y-2">

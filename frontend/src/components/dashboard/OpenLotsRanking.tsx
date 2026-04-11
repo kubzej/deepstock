@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { PillButton } from '@/components/shared/PillButton';
+import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import {
   formatCurrency,
   formatPercent,
@@ -324,7 +324,7 @@ export function OpenLotsRanking({
   return (
     <div className="pb-12">
       {/* Sort Pills */}
-      <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+      <PillGroup behavior="scroll" bleed className="pb-3 mb-2">
         {[
           { key: 'plCzk' as SortKey, label: 'P/L' },
           { key: 'plPercent' as SortKey, label: '%' },
@@ -339,17 +339,13 @@ export function OpenLotsRanking({
               active={isActive}
               onClick={() => handleSort(option.key)}
               size="sm"
+              direction={isActive ? sortDirection : undefined}
             >
               {option.label}
-              {isActive && (
-                <span className="ml-0.5">
-                  {sortDirection === 'desc' ? '↓' : '↑'}
-                </span>
-              )}
             </PillButton>
           );
         })}
-      </div>
+      </PillGroup>
 
       {/* Lot Rows */}
       <div className="space-y-1">

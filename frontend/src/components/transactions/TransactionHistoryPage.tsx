@@ -230,9 +230,9 @@ export function TransactionHistoryPage() {
         </TabsList>
 
         {/* Filters */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 mt-4">
+        <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border bg-muted/20 p-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:p-4">
           {/* Search */}
-          <div className="relative col-span-2 sm:flex-1 sm:min-w-[200px] sm:max-w-[300px]">
+          <div className="relative sm:col-span-2 lg:flex-1 lg:min-w-[220px] lg:max-w-[320px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Hledat ticker nebo název..."
@@ -247,7 +247,7 @@ export function TransactionHistoryPage() {
             value={typeFilter}
             onValueChange={(v) => setTypeFilter(v as TransactionTypeFilter)}
           >
-            <SelectTrigger className="w-full sm:w-[120px]">
+            <SelectTrigger className="w-full sm:w-[120px] lg:w-[120px]">
               <SelectValue placeholder="Typ" />
             </SelectTrigger>
             <SelectContent>
@@ -264,7 +264,7 @@ export function TransactionHistoryPage() {
               value={optionTypeFilter}
               onValueChange={(v) => setOptionTypeFilter(v as OptionTypeFilter)}
             >
-              <SelectTrigger className="w-full sm:w-[120px]">
+              <SelectTrigger className="w-full lg:w-[120px]">
                 <SelectValue placeholder="Put/Call" />
               </SelectTrigger>
               <SelectContent>
@@ -277,7 +277,7 @@ export function TransactionHistoryPage() {
 
           {/* Portfolio Filter */}
           <Select value={portfolioFilter} onValueChange={setPortfolioFilter}>
-            <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectTrigger className="w-full lg:w-[150px]">
               <SelectValue placeholder="Portfolio" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +297,7 @@ export function TransactionHistoryPage() {
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full sm:w-[140px]"
+              className="w-full lg:w-[140px]"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -306,7 +306,7 @@ export function TransactionHistoryPage() {
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full sm:w-[140px]"
+              className="w-full lg:w-[140px]"
             />
           </div>
         </div>
