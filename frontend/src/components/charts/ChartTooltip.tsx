@@ -59,8 +59,8 @@ export function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg pointer-events-auto">
-      {label && <p className="text-xs text-zinc-500 mb-2">{label}</p>}
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg pointer-events-auto">
+      {label && <p className="text-xs text-muted-foreground mb-2">{label}</p>}
       {payload.map((entry) => {
         const displayLabel = labelMap[entry.dataKey] ?? entry.dataKey;
         const displayValue = formatValue
@@ -73,8 +73,8 @@ export function ChartTooltip({
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-zinc-600">{displayLabel}:</span>
-            <span className="font-mono-price text-zinc-800">
+            <span className="text-muted-foreground">{displayLabel}:</span>
+            <span className="font-mono-price text-foreground">
               {displayValue}
             </span>
           </div>

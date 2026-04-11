@@ -8,8 +8,8 @@ import type { SingleAlertItem, RangeAlertItem, AlertDisplayItem } from './types'
 import { formatConditionValue } from './types';
 
 const CONDITION_ICONS: Record<AlertConditionType, React.ReactNode> = {
-  price_above: <ArrowUp className="h-4 w-4 text-emerald-500" />,
-  price_below: <ArrowDown className="h-4 w-4 text-rose-500" />,
+  price_above: <ArrowUp className="h-4 w-4 text-positive" />,
+  price_below: <ArrowDown className="h-4 w-4 text-negative" />,
   percent_change_day: <Percent className="h-4 w-4 text-blue-500" />,
 };
 

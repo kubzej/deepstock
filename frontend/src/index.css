@@ -5,33 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Dark theme colors - DeepStock One */
-  --color-background: #09090b;
-  --color-foreground: #fafafa;
-  --color-card: #18181b;
-  --color-card-foreground: #fafafa;
-  --color-muted: #27272a;
-  --color-muted-foreground: #a1a1aa;
-  --color-border: #27272a;
-  --color-input: #27272a;
-  --color-ring: #3f3f46;
-
   /* Sentiment colors */
   --color-positive: #10b981;
   --color-negative: #ef4444;
   --color-warning: #f59e0b;
 
-  /* Primary accent */
-  --color-primary: #6366f1;
-  --color-primary-foreground: #fafafa;
-
   /* Monospace for prices */
   --font-mono: "Geist Mono", "JetBrains Mono", monospace;
-}
-
-body {
-  @apply bg-background text-foreground antialiased;
-  font-family: system-ui, -apple-system, sans-serif;
 }
 
 /* Utility for price/number display */
@@ -82,30 +62,43 @@ body {
 }
 
 :root {
+  /* Base */
   --radius: 0.625rem;
+
+  /* Backgrounds */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
+
+  /* Interactive */
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+
+  /* Muted / Helper */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  /* Borders / Inputs */
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+
+  /* Charts */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Sidebar */
   --sidebar: oklch(0.97 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -116,46 +109,31 @@ body {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
+/* Typography scale — Tailwind classes to use per role
+   page-title:    text-2xl font-bold tracking-tight
+   section-title: text-base font-semibold
+   label:         text-xs font-medium text-muted-foreground uppercase tracking-wide
+   body:          text-sm text-foreground
+   helper:        text-xs text-muted-foreground
+   mono-price:    font-mono tabular-nums (use class: font-mono-price)
+*/
+
+/* Radius scale — which rounded-* class to use per element type
+   rounded-full  → avatar, badge, switch, radio, indicator dot
+   rounded-sm    → menu item hover area, list item
+   rounded-md    → button, input, textarea, select, tooltip, popover, skeleton
+   rounded-lg    → pill button, small container, alert, table wrapper, code block
+   rounded-xl    → card, dialog, panel, elevated block
+   rounded-2xl   → tab group container, toggle group, large feedback state
+*/
 
 @layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: system-ui, -apple-system, sans-serif;
   }
   /* Remove outline from all recharts elements */
   .recharts-wrapper *,

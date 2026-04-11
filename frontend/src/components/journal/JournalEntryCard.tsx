@@ -361,7 +361,7 @@ export function JournalEntryCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
-              <span className={`text-xs font-semibold tracking-widest uppercase ${isBuy ? 'text-emerald-500' : 'text-rose-500'}`}>
+              <span className={`text-xs font-semibold tracking-widest uppercase ${isBuy ? 'text-positive' : 'text-negative'}`}>
                 {isBuy ? 'Nákup' : 'Prodej'}
               </span>
               <span className="text-sm font-semibold">{entry.metadata.ticker}</span>

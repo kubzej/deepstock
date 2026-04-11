@@ -84,7 +84,7 @@ export function WatchlistItemCard({
     <div
       className={`bg-muted/30 rounded-xl cursor-pointer active:scale-[0.99] transition-transform ${
         atBuyTarget
-          ? 'ring-1 ring-emerald-500/50 bg-emerald-500/5'
+          ? 'ring-1 ring-positive/50 bg-positive/5'
           : atSellTarget
             ? 'ring-1 ring-amber-500/50 bg-amber-500/5'
             : ''
@@ -108,7 +108,7 @@ export function WatchlistItemCard({
                   />
                   <span
                     className={`relative inline-flex rounded-full h-2 w-2 ${
-                      atBuyTarget ? 'bg-emerald-500' : 'bg-amber-500'
+                      atBuyTarget ? 'bg-positive' : 'bg-amber-500'
                     }`}
                   />
                 </span>
@@ -116,7 +116,7 @@ export function WatchlistItemCard({
               <span
                 className={`font-bold text-sm ${
                   atBuyTarget
-                    ? 'text-emerald-500'
+                    ? 'text-positive'
                     : atSellTarget
                       ? 'text-amber-500'
                       : ''
@@ -191,7 +191,7 @@ export function WatchlistItemCard({
               <div className="flex items-center justify-end gap-1">
                 <span
                   className={`text-[10px] font-mono-price ${
-                    isDayPositive ? 'text-emerald-500' : 'text-rose-500'
+                    isDayPositive ? 'text-positive' : 'text-negative'
                   }`}
                 >
                   {quote ? formatPercent(quote.changePercent) : '—'}
@@ -280,7 +280,7 @@ export function WatchlistItemCard({
                   Nákupní cíl
                 </span>
                 <span
-                  className={`font-mono-price ${atBuyTarget ? 'text-emerald-500 font-semibold' : ''}`}
+                  className={`font-mono-price ${atBuyTarget ? 'text-positive font-semibold' : ''}`}
                 >
                   {item.target_buy_price
                     ? formatPrice(item.target_buy_price, item.stocks.currency)

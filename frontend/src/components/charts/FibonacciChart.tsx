@@ -160,8 +160,8 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
   const price = payload.find((p) => p.dataKey === 'price')?.value;
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white px-3 py-2 shadow-lg">
-      <p className="text-xs text-zinc-500">{label}</p>
+    <div className="rounded-md border border-border bg-background px-3 py-2 shadow-lg">
+      <p className="text-xs text-muted-foreground">{label}</p>
       {price !== undefined && (
         <p className="text-sm font-medium" style={{ color: COLORS.price }}>
           Cena: {formatPrice(price)}
@@ -208,7 +208,7 @@ export function FibonacciChart({ ticker }: FibonacciChartProps) {
           <span className="font-medium">78.6%</span> - hluboká korekce
         </li>
       </ul>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-muted-foreground">
         Úrovně fungují jako potenciální support/rezistence.
       </p>
     </div>
@@ -237,7 +237,7 @@ export function FibonacciChart({ ticker }: FibonacciChartProps) {
         period={period}
         onPeriodChange={setPeriod}
       >
-        <div className="flex h-[300px] items-center justify-center text-sm text-zinc-500">
+        <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
           Žádná data pro Fibonacci
         </div>
       </ChartWrapper>
@@ -357,14 +357,14 @@ export function FibonacciChart({ ticker }: FibonacciChartProps) {
               className="h-2 w-4 rounded-sm"
               style={{ backgroundColor: info.color }}
             />
-            <span className="text-zinc-600">{info.label}</span>
+            <span className="text-muted-foreground">{info.label}</span>
           </div>
         ))}
       </div>
 
       {/* Current Position Info */}
       {fibonacciPosition !== null && fibonacciPosition !== undefined && (
-        <div className="mt-2 text-center text-xs text-zinc-500">
+        <div className="mt-2 text-center text-xs text-muted-foreground">
           Aktuální pozice:{' '}
           <span className="font-medium">{fibonacciPosition.toFixed(1)}%</span>
           {nearestFibLevel !== null && nearestFibLevel !== undefined && (

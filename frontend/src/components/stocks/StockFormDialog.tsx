@@ -225,7 +225,7 @@ export function StockFormDialog({
                 value={formData.price_scale}
                 onChange={handleNumberChange}
               />
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 Poměr pro převod kotované ceny na cenu za akcii. 1 = normální,
                 0.01 = cena za 100 ks (LSE)
               </p>

@@ -195,7 +195,7 @@ export function AlertForm({
             <div className="space-y-3">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
-                  <ArrowDown className="h-3.5 w-3.5 text-rose-500" />
+                  <ArrowDown className="h-3.5 w-3.5 text-negative" />
                   Dolní hranice - pod ($)
                 </Label>
                 <Input
@@ -209,7 +209,7 @@ export function AlertForm({
               </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
-                  <ArrowUp className="h-3.5 w-3.5 text-emerald-500" />
+                  <ArrowUp className="h-3.5 w-3.5 text-positive" />
                   Horní hranice - nad ($)
                 </Label>
                 <Input

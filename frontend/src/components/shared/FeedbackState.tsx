@@ -32,11 +32,11 @@ export function FeedbackStateFrame({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-3xl border border-border/70 bg-muted/20 px-6 py-14 text-center',
+        'flex flex-col items-center justify-center rounded-2xl border border-border/70 bg-muted/20 px-6 py-14 text-center',
         className,
       )}
     >
-      <div className="mb-5 rounded-2xl bg-background p-4 shadow-sm ring-1 ring-border/60">
+      <div className="mb-5 rounded-xl bg-background p-4 shadow-sm ring-1 ring-border/60">
         <Icon className="h-7 w-7 text-muted-foreground" />
       </div>
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
@@ -122,7 +122,7 @@ export function LoadingState({
   className,
 }: LoadingStateProps) {
   return (
-    <div className={cn('rounded-3xl border border-border/70 bg-muted/20 p-6', className)}>
+    <div className={cn('rounded-2xl border border-border/70 bg-muted/20 p-6', className)}>
       <div className="space-y-2">
         <Skeleton className="h-6 w-40" />
         <Skeleton className="h-4 w-64 max-w-full" />

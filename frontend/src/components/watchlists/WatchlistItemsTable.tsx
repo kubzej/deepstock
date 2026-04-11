@@ -219,7 +219,7 @@ export function WatchlistItemsTable({
                 key={item.id}
                 className={`cursor-pointer hover:bg-muted/50 ${
                   atBuy
-                    ? 'bg-emerald-500/5 border-l-2 border-l-emerald-500'
+                    ? 'bg-positive/5 border-l-2 border-l-positive'
                     : atSell
                       ? 'bg-amber-500/5 border-l-2 border-l-amber-500'
                       : ''
@@ -240,7 +240,7 @@ export function WatchlistItemsTable({
                         />
                         <span
                           className={`relative inline-flex rounded-full h-2 w-2 ${
-                            atBuy ? 'bg-emerald-500' : 'bg-amber-500'
+                            atBuy ? 'bg-positive' : 'bg-amber-500'
                           }`}
                         />
                       </span>
@@ -250,7 +250,7 @@ export function WatchlistItemsTable({
                         <span
                           className={`font-bold ${
                             atBuy
-                              ? 'text-emerald-500'
+                              ? 'text-positive'
                               : atSell
                                 ? 'text-amber-500'
                                 : ''
@@ -322,9 +322,9 @@ export function WatchlistItemsTable({
                     <span
                       className={
                         quote && quote.changePercent > 0
-                          ? 'text-emerald-500'
+                          ? 'text-positive'
                           : quote && quote.changePercent < 0
-                            ? 'text-rose-500'
+                            ? 'text-negative'
                             : ''
                       }
                     >
@@ -347,7 +347,7 @@ export function WatchlistItemsTable({
                 <TableCell
                   className={`text-right font-mono-price ${
                     atBuy
-                      ? 'text-emerald-500 font-semibold'
+                      ? 'text-positive font-semibold'
                       : 'text-muted-foreground'
                   }`}
                 >

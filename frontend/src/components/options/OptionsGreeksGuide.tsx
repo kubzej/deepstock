@@ -217,7 +217,7 @@ export function OptionsGreeksGuide() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div className="p-3 rounded-lg bg-background/40">
               <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-positive" />
                 <span className="text-xs uppercase tracking-wide text-muted-foreground">
                   Pro kupující
                 </span>
@@ -226,7 +226,7 @@ export function OptionsGreeksGuide() {
             </div>
             <div className="p-3 rounded-lg bg-background/40">
               <div className="flex items-center gap-1.5 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <div className="w-1.5 h-1.5 rounded-full bg-negative" />
                 <span className="text-xs uppercase tracking-wide text-muted-foreground">
                   Pro prodávající
                 </span>
@@ -290,8 +290,8 @@ export function OptionsGreeksGuide() {
                         <div
                           className={cn(
                             'text-sm font-medium',
-                            data.sentiment === 'positive' && 'text-emerald-500',
-                            data.sentiment === 'negative' && 'text-rose-500',
+                            data.sentiment === 'positive' && 'text-positive',
+                            data.sentiment === 'negative' && 'text-negative',
                             data.sentiment === 'neutral' && 'text-amber-500',
                           )}
                         >
@@ -305,11 +305,11 @@ export function OptionsGreeksGuide() {
                 {/* Focus & Avoid */}
                 <div className="space-y-2 text-sm">
                   <div className="flex gap-1.5">
-                    <div className="w-1 h-1 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+                    <div className="w-1 h-1 rounded-full bg-positive mt-1.5 shrink-0" />
                     <p className="text-foreground">{strategy.focus}</p>
                   </div>
                   <div className="flex gap-1.5">
-                    <div className="w-1 h-1 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                    <div className="w-1 h-1 rounded-full bg-negative mt-1.5 shrink-0" />
                     <p className="text-foreground">{strategy.avoid}</p>
                   </div>
                 </div>
@@ -320,16 +320,16 @@ export function OptionsGreeksGuide() {
           {/* Legend */}
           <div className="flex gap-4 justify-center text-xs text-muted-foreground">
             <span>
-              <span className="text-emerald-500">+++</span> silně +
+              <span className="text-positive">+++</span> silně +
             </span>
             <span>
-              <span className="text-emerald-500">+</span> mírně +
+              <span className="text-positive">+</span> mírně +
             </span>
             <span>
               <span className="text-amber-500">−</span> mírně −
             </span>
             <span>
-              <span className="text-rose-500">−−−</span> silně −
+              <span className="text-negative">−−−</span> silně −
             </span>
           </div>
         </div>

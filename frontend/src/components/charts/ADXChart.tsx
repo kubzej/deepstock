@@ -100,17 +100,17 @@ const tooltipExplanation = (
         <span className="text-purple-500">ADX</span> - síla trendu
       </p>
       <p>
-        <span className="text-emerald-500">+DI</span> - bullish směr
+        <span className="text-positive">+DI</span> - bullish směr
       </p>
       <p>
-        <span className="text-rose-500">-DI</span> - bearish směr
+        <span className="text-negative">-DI</span> - bearish směr
       </p>
     </div>
     <div className="pt-2 space-y-1">
       <p className="text-purple-500">ADX nad 25 = silný trend</p>
-      <p className="text-zinc-500">ADX pod 20 = slabý/žádný trend</p>
-      <p className="text-emerald-500">+DI nad -DI = bullish směr</p>
-      <p className="text-rose-500">-DI nad +DI = bearish směr</p>
+      <p className="text-muted-foreground">ADX pod 20 = slabý/žádný trend</p>
+      <p className="text-positive">+DI nad -DI = bullish směr</p>
+      <p className="text-negative">-DI nad +DI = bearish směr</p>
     </div>
   </div>
 );
@@ -143,16 +143,16 @@ function CustomTooltip({
   };
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">{labelMap[entry.dataKey]}:</span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="text-muted-foreground">{labelMap[entry.dataKey]}:</span>
+          <span className="font-mono-price text-foreground">
             {entry.value?.toFixed(1) ?? '—'}
           </span>
         </div>

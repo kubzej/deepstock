@@ -60,7 +60,7 @@ function SignalBadge({ signal }: { signal: SignalType }) {
     },
     neutral: {
       label: 'Neutrální',
-      className: 'bg-zinc-100 text-zinc-600',
+      className: 'bg-muted text-muted-foreground',
     },
   };
 
@@ -90,7 +90,7 @@ function EvaluationBox({
     <div className="flex items-start gap-3 rounded-lg bg-white p-3">
       {signal && <SignalBadge signal={signal} />}
       {evaluation && (
-        <p className="text-sm text-zinc-600 leading-relaxed">{evaluation}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{evaluation}</p>
       )}
     </div>
   );
@@ -114,12 +114,12 @@ export function ChartWrapper({
       {/* Header with title, tooltip and period selector */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-800">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
             {title}
           </h3>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="text-zinc-500 hover:text-zinc-300 transition-colors">
+              <button className="text-muted-foreground hover:text-foreground transition-colors">
                 <Info className="h-4 w-4" />
               </button>
             </TooltipTrigger>

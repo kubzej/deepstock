@@ -66,9 +66,9 @@ const tooltipExplanation = (
     <p className="font-medium">RSI (Relative Strength Index)</p>
     <p>Oscilátor měřící sílu a rychlost cenových změn na škále 0-100.</p>
     <div className="pt-2 space-y-1">
-      <p className="text-rose-500">Nad 70: Překoupeno (riziko poklesu)</p>
-      <p className="text-emerald-500">Pod 30: Přeprodáno (potenciál růstu)</p>
-      <p className="text-zinc-500">30-70: Neutrální zóna</p>
+      <p className="text-negative">Nad 70: Překoupeno (riziko poklesu)</p>
+      <p className="text-positive">Pod 30: Přeprodáno (potenciál růstu)</p>
+      <p className="text-muted-foreground">30-70: Neutrální zóna</p>
     </div>
   </div>
 );
@@ -101,7 +101,7 @@ function RSIGauge({ value }: { value: number | null }) {
             </span>
           </div>
           <div className="flex-[40] flex items-center justify-center">
-            <span className="text-xs font-medium text-zinc-600">Neutrální</span>
+            <span className="text-xs font-medium text-foreground/70">Neutrální</span>
           </div>
           <div className="flex-[30] flex items-center justify-center">
             <span className="text-xs font-medium text-white drop-shadow">
@@ -116,8 +116,8 @@ function RSIGauge({ value }: { value: number | null }) {
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-300"
             style={{ left: `${position}%` }}
           >
-            <div className="w-10 h-10 rounded-full bg-white border-2 border-zinc-300 shadow-lg flex items-center justify-center">
-              <span className="text-xs font-bold text-zinc-800">
+            <div className="w-10 h-10 rounded-full bg-white border-2 border-border shadow-lg flex items-center justify-center">
+              <span className="text-xs font-bold text-foreground">
                 {value.toFixed(0)}
               </span>
             </div>
@@ -126,7 +126,7 @@ function RSIGauge({ value }: { value: number | null }) {
       </div>
 
       {/* Scale numbers */}
-      <div className="flex justify-between text-xs text-zinc-500 px-1">
+      <div className="flex justify-between text-xs text-muted-foreground px-1">
         <span>0</span>
         <span>30</span>
         <span>70</span>
@@ -139,15 +139,15 @@ function RSIGauge({ value }: { value: number | null }) {
           <p className="text-sm font-medium text-emerald-600">
             &lt;30 Přeprodáno
           </p>
-          <p className="text-xs text-zinc-500">Možný odraz</p>
+          <p className="text-xs text-muted-foreground">Možný odraz</p>
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-zinc-700">30-70 Neutrální</p>
-          <p className="text-xs text-zinc-500">Normální momentum</p>
+          <p className="text-sm font-medium text-foreground/80">30-70 Neutrální</p>
+          <p className="text-xs text-muted-foreground">Normální momentum</p>
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-rose-600">&gt;70 Překoupeno</p>
-          <p className="text-xs text-zinc-500">Možný pokles</p>
+          <p className="text-xs text-muted-foreground">Možný pokles</p>
         </div>
       </div>
     </div>

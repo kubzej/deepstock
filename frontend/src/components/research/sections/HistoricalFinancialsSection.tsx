@@ -19,18 +19,18 @@ const fmtLarge = (v: number | null) => (v == null ? '—' : formatLargeNumber(v)
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
 const clrGrowth = (v: number | null) =>
-  v == null ? '' : v > 0 ? 'text-emerald-500' : v < 0 ? 'text-rose-500' : '';
+  v == null ? '' : v > 0 ? 'text-positive' : v < 0 ? 'text-negative' : '';
 
 const clrMul = (v: number | null, lo: number, hi: number) =>
-  v == null ? '' : v < lo ? 'text-emerald-500' : v > hi ? 'text-rose-500' : '';
+  v == null ? '' : v < lo ? 'text-positive' : v > hi ? 'text-negative' : '';
 
 const clrMgn = (v: number | null, good: number, bad: number) =>
   v == null
     ? ''
     : v > good
-      ? 'text-emerald-500'
+      ? 'text-positive'
       : v < bad
-        ? 'text-rose-500'
+        ? 'text-negative'
         : '';
 
 // ── Tooltips ──────────────────────────────────────────────────────────────────

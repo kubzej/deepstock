@@ -95,7 +95,7 @@ const tooltipExplanation = (
     <p>Měří volatilitu a identifikuje překoupené/přeprodané úrovně.</p>
     <div className="pt-2 space-y-1">
       <p>
-        <span className="text-emerald-500">Cena</span> - aktuální cenový vývoj
+        <span className="text-positive">Cena</span> - aktuální cenový vývoj
       </p>
       <p>
         <span className="text-indigo-400">Horní/Dolní pásmo</span> - 2
@@ -106,8 +106,8 @@ const tooltipExplanation = (
       </p>
     </div>
     <div className="pt-2 space-y-1">
-      <p className="text-emerald-500">Cena u dolního pásma = potenciál růstu</p>
-      <p className="text-rose-500">Cena u horního pásma = riziko poklesu</p>
+      <p className="text-positive">Cena u dolního pásma = potenciál růstu</p>
+      <p className="text-negative">Cena u horního pásma = riziko poklesu</p>
     </div>
   </div>
 );
@@ -141,16 +141,16 @@ function CustomTooltip({
   };
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-3 shadow-lg">
-      <p className="text-xs text-zinc-500 mb-2">{label}</p>
+    <div className="rounded-lg border border-border bg-background p-3 shadow-lg">
+      <p className="text-xs text-muted-foreground mb-2">{label}</p>
       {payload.map((entry) => (
         <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-zinc-600">{labelMap[entry.dataKey]}:</span>
-          <span className="font-mono-price text-zinc-800">
+          <span className="text-muted-foreground">{labelMap[entry.dataKey]}:</span>
+          <span className="font-mono-price text-foreground">
             {entry.value?.toFixed(2) ?? '—'}
           </span>
         </div>

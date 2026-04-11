@@ -196,7 +196,7 @@ export function PriceChart({
             </span>
             <span
               className={`text-sm font-mono-price ${
-                displayData.isPositive ? 'text-emerald-500' : 'text-rose-500'
+                displayData.isPositive ? 'text-positive' : 'text-negative'
               }`}
             >
               {displayData.isPositive ? '+' : ''}

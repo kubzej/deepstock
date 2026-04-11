@@ -155,7 +155,7 @@ export function SettingsPage() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5" />
           <span className="font-mono">{__APP_COMMIT__}</span>
-          <span className="text-zinc-600">·</span>
+          <span className="text-muted-foreground">·</span>
           <span>
             {new Date(__BUILD_DATE__).toLocaleDateString('cs-CZ', {
               day: 'numeric',

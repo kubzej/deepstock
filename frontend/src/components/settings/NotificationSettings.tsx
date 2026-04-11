@@ -129,7 +129,7 @@ export function NotificationSettings() {
           <div className="space-y-3 pl-4 border-l-2 border-muted ml-5">
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
-                <ShoppingCart className="h-4 w-4 text-emerald-500" />
+                <ShoppingCart className="h-4 w-4 text-positive" />
                 <div>
                   <Label className="text-sm font-medium">Nákupní cíle</Label>
                   <p className="text-xs text-muted-foreground">
@@ -146,7 +146,7 @@ export function NotificationSettings() {
 
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
-                <TrendingUp className="h-4 w-4 text-rose-500" />
+                <TrendingUp className="h-4 w-4 text-negative" />
                 <div>
                   <Label className="text-sm font-medium">Prodejní cíle</Label>
                   <p className="text-xs text-muted-foreground">
