@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -13,8 +12,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
+import { Plus, Pencil, Tag, Trash2 } from 'lucide-react';
 import { type WatchlistTag } from '@/lib/api';
 import {
   useWatchlistTags,
@@ -22,6 +25,14 @@ import {
   useUpdateWatchlistTag,
   useDeleteWatchlistTag,
 } from '@/hooks/useWatchlistTags';
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilitySection,
+} from './UtilityScreen';
 
 // Predefined colors for tags - expanded palette
 const TAG_COLORS = [
@@ -137,7 +148,6 @@ export function WatchlistTagSettings() {
     <PageShell width="full">
       <PageIntro
         title="Watchlist tagy"
-        subtitle="Tagy pro organizaci položek"
         leading={<PageBackButton onClick={onBack} />}
         actions={
           <Button onClick={openCreate} size="sm">
@@ -147,54 +157,47 @@ export function WatchlistTagSettings() {
         }
       />
 
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
-      ) : tags.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            Žádné tagy. Vytvořte první pro organizaci položek ve watchlistech.
-          </p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Vytvořit první tag
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {tags.map((tag) => (
-            <div
-              key={tag.id}
-              className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 rounded-lg"
-            >
-              <div
-                className="h-4 w-4 rounded-full flex-shrink-0"
-                style={{ backgroundColor: tag.color || TAG_COLORS[0] }}
-              />
-              <div className="flex-1 text-sm">{tag.name}</div>
-              <div className="flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => openEdit(tag)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteData(tag)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <UtilitySection title="Tagy">
+        {isLoading ? (
+          <UtilityListSkeleton height="h-12" />
+        ) : tags.length === 0 ? (
+          <UtilityEmptyState
+            icon={Tag}
+            title="Žádné tagy"
+            description="Vytvoř první tag pro organizaci položek ve watchlistech."
+            action={{
+              label: 'Vytvořit první tag',
+              onClick: openCreate,
+            }}
+          />
+        ) : (
+          <UtilityList>
+            {tags.map((tag) => (
+              <UtilityListItem
+                key={tag.id}
+                className="flex items-center gap-3 py-2.5"
+              >
+                <div
+                  className="h-4 w-4 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: tag.color || TAG_COLORS[0] }}
+                />
+                <div className="flex-1 text-sm">{tag.name}</div>
+                <div className="flex gap-1">
+                  <UtilityActionButton onClick={() => openEdit(tag)}>
+                    <Pencil className="h-4 w-4" />
+                  </UtilityActionButton>
+                  <UtilityActionButton
+                    destructive
+                    onClick={() => setDeleteData(tag)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </UtilityActionButton>
+                </div>
+              </UtilityListItem>
+            ))}
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

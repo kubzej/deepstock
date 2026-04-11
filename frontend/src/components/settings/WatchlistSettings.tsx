@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -31,8 +30,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
+import { List, Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
 import { type Watchlist } from '@/lib/api';
 import {
   useWatchlists,
@@ -41,7 +44,14 @@ import {
   useDeleteWatchlist,
   useReorderWatchlists,
 } from '@/hooks/useWatchlists';
-
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilitySection,
+} from './UtilityScreen';
 
 // Sortable row component
 interface SortableRowProps {
@@ -69,41 +79,36 @@ function SortableRow({ watchlist, onEdit, onDelete }: SortableRowProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-4 py-3 bg-muted/30 rounded-lg ${
-        isDragging ? 'opacity-50 bg-muted' : ''
-      }`}
+      className={isDragging ? 'opacity-50' : ''}
     >
-      <button
-        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground touch-none"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium">{watchlist.name}</div>
-        {watchlist.description && (
-          <div className="text-sm text-muted-foreground truncate">
-            {watchlist.description}
-          </div>
-        )}
-      </div>
-      <div className="text-sm text-muted-foreground whitespace-nowrap">
-        {watchlist.item_count || 0} položek
-      </div>
-      <div className="flex gap-1">
-        <Button variant="ghost" size="icon" onClick={() => onEdit(watchlist)}>
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onDelete(watchlist)}
-          className="text-destructive hover:text-destructive"
+      <UtilityListItem className="flex items-center gap-3 py-3">
+        <button
+          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground touch-none"
+          {...attributes}
+          {...listeners}
         >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">{watchlist.name}</div>
+          {watchlist.description && (
+            <div className="text-sm text-muted-foreground truncate">
+              {watchlist.description}
+            </div>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground whitespace-nowrap">
+          {watchlist.item_count || 0} položek
+        </div>
+        <div className="flex gap-1">
+          <UtilityActionButton onClick={() => onEdit(watchlist)}>
+            <Pencil className="h-4 w-4" />
+          </UtilityActionButton>
+          <UtilityActionButton destructive onClick={() => onDelete(watchlist)}>
+            <Trash2 className="h-4 w-4" />
+          </UtilityActionButton>
+        </div>
+      </UtilityListItem>
     </div>
   );
 }
@@ -199,7 +204,6 @@ export function WatchlistSettings() {
     <PageShell width="full">
       <PageIntro
         title="Watchlisty"
-        subtitle="Přetažením změníte pořadí"
         leading={<PageBackButton onClick={onBack} />}
         actions={
           <Button onClick={openCreate} size="sm">
@@ -209,43 +213,43 @@ export function WatchlistSettings() {
         }
       />
 
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      ) : watchlists.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Žádné watchlisty.</p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Vytvořit první watchlist
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={watchlists.map((w) => w.id)}
-              strategy={verticalListSortingStrategy}
+      <UtilitySection title="Seznamy ke sledování">
+        {isLoading ? (
+          <UtilityListSkeleton items={3} height="h-16" />
+        ) : watchlists.length === 0 ? (
+          <UtilityEmptyState
+            icon={List}
+            title="Žádné watchlisty"
+            description="Vytvoř první watchlist pro sledování akcií a kandidátů."
+            action={{
+              label: 'Vytvořit první watchlist',
+              onClick: openCreate,
+            }}
+          />
+        ) : (
+          <UtilityList>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {watchlists.map((w) => (
-                <SortableRow
-                  key={w.id}
-                  watchlist={w}
-                  onEdit={openEdit}
-                  onDelete={setDeleteData}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
+              <SortableContext
+                items={watchlists.map((w) => w.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {watchlists.map((w) => (
+                  <SortableRow
+                    key={w.id}
+                    watchlist={w}
+                    onEdit={openEdit}
+                    onDelete={setDeleteData}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

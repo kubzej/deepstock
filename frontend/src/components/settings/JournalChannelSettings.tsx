@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -20,8 +19,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
+import { BookOpen, Plus, Pencil, Trash2 } from 'lucide-react';
 import { type JournalChannel } from '@/lib/api/journal';
 import {
   useJournalChannels,
@@ -30,6 +33,14 @@ import {
   useUpdateJournalChannel,
   useDeleteJournalChannel,
 } from '@/hooks/useJournal';
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilitySection,
+} from './UtilityScreen';
 
 export function JournalChannelSettings() {
   const navigate = useNavigate();
@@ -74,7 +85,10 @@ export function JournalChannelSettings() {
           data: { name: name.trim(), section_id: sectionId },
         });
       } else {
-        await createMutation.mutateAsync({ name: name.trim(), section_id: sectionId });
+        await createMutation.mutateAsync({
+          name: name.trim(),
+          section_id: sectionId,
+        });
       }
       setDialogOpen(false);
     } catch (err) {
@@ -103,7 +117,6 @@ export function JournalChannelSettings() {
     <PageShell width="full">
       <PageIntro
         title="Vlastní kanály deníku"
-        subtitle="Vlastní kanály pro osobní poznámky"
         leading={<PageBackButton onClick={onBack} />}
         actions={
           <Button onClick={openCreate} size="sm">
@@ -113,54 +126,56 @@ export function JournalChannelSettings() {
         }
       />
 
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
-      ) : customChannels.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Žádné vlastní kanály.</p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Vytvořit první kanál
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {customChannels.map((channel) => (
-            <div
-              key={channel.id}
-              className="flex items-center gap-3 px-4 py-2.5 bg-muted/30 rounded-lg"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium">{channel.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {getSectionName(channel.section_id)} · {channel.entry_count} poznámek
+      <UtilitySection title="Kanály">
+        {isLoading ? (
+          <UtilityListSkeleton height="h-12" />
+        ) : customChannels.length === 0 ? (
+          <UtilityEmptyState
+            icon={BookOpen}
+            title="Žádné vlastní kanály"
+            description="Vytvoř první kanál pro vlastní poznámky a osobní zápisky."
+            action={{
+              label: 'Vytvořit první kanál',
+              onClick: openCreate,
+            }}
+          />
+        ) : (
+          <UtilityList>
+            {customChannels.map((channel) => (
+              <UtilityListItem
+                key={channel.id}
+                className="flex items-center gap-3 py-2.5"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">{channel.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {getSectionName(channel.section_id)} · {channel.entry_count}{' '}
+                    poznámek
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" onClick={() => openEdit(channel)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setDeleteData(channel)}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+                <div className="flex gap-1">
+                  <UtilityActionButton onClick={() => openEdit(channel)}>
+                    <Pencil className="h-4 w-4" />
+                  </UtilityActionButton>
+                  <UtilityActionButton
+                    destructive
+                    onClick={() => setDeleteData(channel)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </UtilityActionButton>
+                </div>
+              </UtilityListItem>
+            ))}
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Upravit kanál' : 'Nový kanál'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'Upravit kanál' : 'Nový kanál'}
+            </DialogTitle>
             <DialogDescription>
               {editing
                 ? 'Upravte název nebo sekci kanálu.'
@@ -200,7 +215,10 @@ export function JournalChannelSettings() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Zrušit
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim() || !sectionId || saving}>
+            <Button
+              onClick={handleSave}
+              disabled={!name.trim() || !sectionId || saving}
+            >
               {saving ? 'Ukládám...' : editing ? 'Uložit' : 'Vytvořit'}
             </Button>
           </DialogFooter>

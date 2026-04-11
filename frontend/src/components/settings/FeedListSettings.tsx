@@ -4,12 +4,11 @@
 import { useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, X, Loader2, Pencil } from 'lucide-react';
+import { Plus, Rss, Trash2, X, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +18,19 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+} from '@/components/shared/PageShell';
+import {
+  UtilityActionButton,
+  UtilityEmptyState,
+  UtilityList,
+  UtilityListItem,
+  UtilityListSkeleton,
+  UtilitySection,
+} from './UtilityScreen';
 import {
   fetchFeedLists,
   createFeedList,
@@ -49,7 +60,8 @@ export function FeedListSettings() {
     queryFn: fetchFeedLists,
   });
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['feed-lists'] });
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ['feed-lists'] });
 
   const openCreate = () => {
     setEditing(null);
@@ -70,7 +82,11 @@ export function FeedListSettings() {
     setSaving(true);
     try {
       if (editing) {
-        await updateFeedList(editing.id, name.trim(), description.trim() || undefined);
+        await updateFeedList(
+          editing.id,
+          name.trim(),
+          description.trim() || undefined,
+        );
       } else {
         await createFeedList(name.trim(), description.trim() || undefined);
       }
@@ -123,127 +139,154 @@ export function FeedListSettings() {
     <PageShell width="full">
       <PageIntro
         title="X.com Feed listy"
-        subtitle="Seznamy účtů pro AI přehled příspěvků"
         leading={<PageBackButton onClick={onBack} />}
         actions={
-          <Button onClick={openCreate} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Nový seznam
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate({ to: '/feed' })}
+            >
+              Otevřít Feed
+            </Button>
+            <Button onClick={openCreate} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Nový seznam
+            </Button>
+          </div>
         }
       />
 
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      ) : lists.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Žádné feed listy.</p>
-          <Button onClick={openCreate} className="mt-4">
-            <Plus className="h-4 w-4 mr-2" />
-            Vytvořit první seznam
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {lists.map((list) => {
-            const isExpanded = expandedId === list.id;
-            const accounts = list.feed_list_accounts ?? [];
-            return (
-              <div key={list.id} className="bg-muted/30 rounded-lg overflow-hidden">
-                <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => setExpandedId(isExpanded ? null : list.id)}
+      <UtilitySection title="Feed listy">
+        {isLoading ? (
+          <UtilityListSkeleton items={2} height="h-16" />
+        ) : lists.length === 0 ? (
+          <UtilityEmptyState
+            icon={Rss}
+            title="Žádné feed listy"
+            description="Vytvoř první seznam účtů, ze kterého bude Feed generovat AI souhrny."
+            action={{
+              label: 'Vytvořit první seznam',
+              onClick: openCreate,
+            }}
+          />
+        ) : (
+          <UtilityList>
+            {lists.map((list) => {
+              const isExpanded = expandedId === list.id;
+              const accounts = list.feed_list_accounts ?? [];
+              return (
+                <UtilityListItem
+                  key={list.id}
+                  className="overflow-hidden px-0 py-0"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium">{list.name}</div>
-                    {list.description && (
-                      <div className="text-sm text-muted-foreground truncate">{list.description}</div>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    {accounts.length} účtů
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => { e.stopPropagation(); openEdit(list); }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(list); }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="border-t border-border/50 px-4 py-3 space-y-3">
-                    {accounts.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {accounts.map((a) => (
-                          <div
-                            key={a.username}
-                            className="flex items-center gap-1 bg-background rounded-full px-3 py-1 text-sm border border-border"
-                          >
-                            <span className="text-muted-foreground">@</span>
-                            <span>{a.username}</span>
-                            <button
-                              onClick={() => handleRemoveAccount(list.id, a.username)}
-                              className="ml-1 text-muted-foreground hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="@username"
-                        value={newUsername[list.id] || ''}
-                        onChange={(e) =>
-                          setNewUsername((prev) => ({ ...prev, [list.id]: e.target.value }))
-                        }
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddAccount(list.id)}
-                        className="h-9 text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        className="h-9 shrink-0"
-                        onClick={() => handleAddAccount(list.id)}
-                        disabled={addingAccount === list.id}
+                  <div
+                    className="flex cursor-pointer items-center gap-3 px-4 py-3"
+                    onClick={() => setExpandedId(isExpanded ? null : list.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{list.name}</div>
+                      {list.description && (
+                        <div className="text-sm text-muted-foreground truncate">
+                          {list.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground whitespace-nowrap">
+                      {accounts.length} účtů
+                    </div>
+                    <div className="flex gap-1">
+                      <UtilityActionButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(list);
+                        }}
                       >
-                        {addingAccount === list.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Plus className="h-4 w-4" />
-                        )}
-                      </Button>
+                        <Pencil className="h-4 w-4" />
+                      </UtilityActionButton>
+                      <UtilityActionButton
+                        destructive
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(list);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </UtilityActionButton>
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+
+                  {isExpanded && (
+                    <div className="space-y-3 border-t border-border/50 px-4 py-3">
+                      {accounts.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {accounts.map((a) => (
+                            <div
+                              key={a.username}
+                              className="flex items-center gap-1 bg-background rounded-full px-3 py-1 text-sm border border-border"
+                            >
+                              <span className="text-muted-foreground">@</span>
+                              <span>{a.username}</span>
+                              <button
+                                onClick={() =>
+                                  handleRemoveAccount(list.id, a.username)
+                                }
+                                className="ml-1 text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="@username"
+                          value={newUsername[list.id] || ''}
+                          onChange={(e) =>
+                            setNewUsername((prev) => ({
+                              ...prev,
+                              [list.id]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) =>
+                            e.key === 'Enter' && handleAddAccount(list.id)
+                          }
+                          className="h-9 text-sm"
+                        />
+                        <Button
+                          size="sm"
+                          className="h-9 shrink-0"
+                          onClick={() => handleAddAccount(list.id)}
+                          disabled={addingAccount === list.id}
+                        >
+                          {addingAccount === list.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </UtilityListItem>
+              );
+            })}
+          </UtilityList>
+        )}
+      </UtilitySection>
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? 'Upravit seznam' : 'Nový seznam'}</DialogTitle>
+            <DialogTitle>
+              {editing ? 'Upravit seznam' : 'Nový seznam'}
+            </DialogTitle>
             <DialogDescription>
-              {editing ? 'Upravte název nebo prompt seznamu.' : 'Vytvořte nový X.com feed seznam.'}
+              {editing
+                ? 'Upravte název nebo prompt seznamu.'
+                : 'Vytvořte nový X.com feed seznam.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
