@@ -30,6 +30,7 @@ export function ResearchPage() {
   const [ticker, setTicker] = useState('');
   const [activeTicker, setActiveTicker] = useState<string | null>(null);
   const [noteSheetOpen, setNoteSheetOpen] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const { data, isLoading, isFetching, dataUpdatedAt, error, refetch } =
     useQuery({
@@ -41,7 +42,7 @@ export function ResearchPage() {
 
   const { data: channels = [] } = useJournalChannels();
   const journalChannel = activeTicker
-    ? channels.find((c) => c.ticker === activeTicker) ?? null
+    ? (channels.find((c) => c.ticker === activeTicker) ?? null)
     : null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,6 +50,7 @@ export function ResearchPage() {
     const trimmed = ticker.trim().toUpperCase();
     if (trimmed) {
       setActiveTicker(trimmed);
+      setDescriptionExpanded(false);
     }
   };
 
@@ -153,9 +155,29 @@ export function ResearchPage() {
 
             {/* Description */}
             {data.description && (
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {data.description}
-              </p>
+              <div className="space-y-2">
+                <p
+                  className={[
+                    'text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]',
+                    descriptionExpanded ? '' : 'line-clamp-4',
+                  ].join(' ')}
+                >
+                  {data.description}
+                </p>
+                {data.description.length > 280 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto px-0 text-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      setDescriptionExpanded((expanded) => !expanded)
+                    }
+                  >
+                    {descriptionExpanded ? 'Méně' : 'Více'}
+                  </Button>
+                )}
+              </div>
             )}
 
             {/* Tabs */}
