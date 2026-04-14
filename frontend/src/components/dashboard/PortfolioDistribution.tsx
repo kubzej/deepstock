@@ -15,16 +15,16 @@ interface PortfolioDistributionProps {
 
 // Color palette for distribution bars
 const COLORS = [
-  'bg-blue-500',
-  'bg-emerald-500',
-  'bg-amber-500',
-  'bg-rose-500',
+  'bg-violet-500',
+  'bg-fuchsia-500',
   'bg-purple-500',
-  'bg-cyan-500',
-  'bg-orange-500',
-  'bg-pink-500',
   'bg-indigo-500',
-  'bg-teal-500',
+  'bg-violet-400',
+  'bg-fuchsia-400',
+  'bg-purple-400',
+  'bg-indigo-400',
+  'bg-violet-300',
+  'bg-fuchsia-300',
 ];
 
 export function PortfolioDistribution({

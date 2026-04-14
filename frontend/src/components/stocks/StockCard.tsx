@@ -123,14 +123,14 @@ export function StockCard({
             </span>
             {/* Pre-market price */}
             {quote?.preMarketPrice != null && (
-              <span className="text-[10px] font-mono-price text-orange-500">
+              <span className="text-[10px] font-mono-price text-warning">
                 → {formatPrice(quote.preMarketPrice, currency)}
               </span>
             )}
             {/* After-hours price */}
             {quote?.postMarketPrice != null &&
               quote?.preMarketPrice == null && (
-                <span className="text-[10px] font-mono-price text-violet-500">
+                <span className="text-[10px] font-mono-price text-sky-500">
                   → {formatPrice(quote.postMarketPrice, currency)}
                 </span>
               )}
@@ -143,14 +143,14 @@ export function StockCard({
             </span>
             {/* Pre-market change */}
             {quote?.preMarketChangePercent != null && (
-              <span className="text-[10px] font-mono-price text-orange-500">
+              <span className="text-[10px] font-mono-price text-warning">
                 {formatPercent(quote.preMarketChangePercent, 1, true)}
               </span>
             )}
             {/* After-hours change */}
             {quote?.postMarketChangePercent != null &&
               quote?.preMarketChangePercent == null && (
-                <span className="text-[10px] font-mono-price text-violet-500">
+                <span className="text-[10px] font-mono-price text-sky-500">
                   {formatPercent(quote.postMarketChangePercent, 1, true)}
                 </span>
               )}

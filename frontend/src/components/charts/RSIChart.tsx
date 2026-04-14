@@ -89,7 +89,7 @@ function RSIGauge({ value }: { value: number | null }) {
           className="h-10 rounded-full"
           style={{
             background:
-              'linear-gradient(to right, #10b981 0%, #10b981 15%, #86efac 25%, #e5e7eb 40%, #e5e7eb 60%, #fca5a5 75%, #ef4444 85%, #ef4444 100%)',
+              'linear-gradient(to right, var(--chart-positive) 0%, var(--chart-positive) 15%, var(--chart-lime) 25%, color-mix(in srgb, var(--muted) 82%, white) 40%, color-mix(in srgb, var(--muted) 82%, white) 60%, color-mix(in srgb, var(--chart-negative) 45%, white) 75%, var(--chart-negative) 85%, var(--chart-negative) 100%)',
           }}
         />
 
@@ -116,7 +116,7 @@ function RSIGauge({ value }: { value: number | null }) {
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 transition-all duration-300"
             style={{ left: `${position}%` }}
           >
-            <div className="w-10 h-10 rounded-full bg-white border-2 border-border shadow-lg flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border bg-background shadow-lg">
               <span className="text-xs font-bold text-foreground">
                 {value.toFixed(0)}
               </span>
@@ -136,7 +136,7 @@ function RSIGauge({ value }: { value: number | null }) {
       {/* Zone explanations */}
       <div className="grid grid-cols-3 gap-4 pt-2">
         <div className="text-center">
-          <p className="text-sm font-medium text-emerald-600">
+          <p className="text-sm font-medium text-positive">
             &lt;30 Přeprodáno
           </p>
           <p className="text-xs text-muted-foreground">Možný odraz</p>
@@ -146,7 +146,7 @@ function RSIGauge({ value }: { value: number | null }) {
           <p className="text-xs text-muted-foreground">Normální momentum</p>
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-rose-600">&gt;70 Překoupeno</p>
+          <p className="text-sm font-medium text-negative">&gt;70 Překoupeno</p>
           <p className="text-xs text-muted-foreground">Možný pokles</p>
         </div>
       </div>
@@ -188,7 +188,7 @@ export function RSIChart({ ticker }: RSIChartProps) {
       period={period}
       onPeriodChange={setPeriod}
     >
-      <div className="bg-white rounded-lg p-6">
+      <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-xs">
         <RSIGauge value={currentRsi} />
       </div>
     </ChartWrapper>

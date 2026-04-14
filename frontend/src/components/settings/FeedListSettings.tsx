@@ -149,7 +149,7 @@ export function FeedListSettings() {
             >
               Otevřít Feed
             </Button>
-            <Button onClick={openCreate} size="sm">
+            <Button onClick={openCreate}>
               <Plus className="h-4 w-4 mr-2" />
               Nový seznam
             </Button>

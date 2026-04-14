@@ -19,7 +19,7 @@ import { useOptionQuotes } from '@/hooks/useOptionQuotes';
 import { useQuotes } from '@/hooks/useQuotes';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -167,11 +167,13 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as OptionsTab)}
       >
-        <TabsList>
-          <TabsTrigger value="positions">Pozice</TabsTrigger>
-          <TabsTrigger value="calculator">Kalkulačka</TabsTrigger>
-          <TabsTrigger value="greeks">Greeks</TabsTrigger>
-        </TabsList>
+        <PageTopRail>
+          <TabsList>
+            <TabsTrigger value="positions">Pozice</TabsTrigger>
+            <TabsTrigger value="calculator">Kalkulačka</TabsTrigger>
+            <TabsTrigger value="greeks">Greeks</TabsTrigger>
+          </TabsList>
+        </PageTopRail>
 
         <TabsContent value="positions" className="mt-4">
           {isLoading ? (

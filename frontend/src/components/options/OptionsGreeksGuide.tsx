@@ -25,7 +25,7 @@ const greeksData: Record<Exclude<SectionType, 'strategies'>, GreekData> = {
   delta: {
     symbol: 'Δ',
     name: 'Delta',
-    color: 'from-blue-500/20 to-blue-600/5',
+    color: 'from-violet-500/22 to-violet-600/6',
     tagline: 'Směrová citlivost',
     description:
       'O kolik se změní cena opce, když se podkladová akcie pohne o $1.',
@@ -37,7 +37,7 @@ const greeksData: Record<Exclude<SectionType, 'strategies'>, GreekData> = {
   theta: {
     symbol: 'Θ',
     name: 'Theta',
-    color: 'from-amber-500/20 to-amber-600/5',
+    color: 'from-fuchsia-500/18 to-fuchsia-700/6',
     tagline: 'Časový rozklad',
     description: 'Kolik hodnoty opce ztratí každý den jen kvůli plynutí času.',
     range: 'Vždy záporná (opce ztrácí hodnotu)',
@@ -48,7 +48,7 @@ const greeksData: Record<Exclude<SectionType, 'strategies'>, GreekData> = {
   gamma: {
     symbol: 'Γ',
     name: 'Gamma',
-    color: 'from-purple-500/20 to-purple-600/5',
+    color: 'from-purple-500/22 to-purple-700/8',
     tagline: 'Akcelerace delty',
     description: 'Jak rychle se mění delta, když se pohne cena akcie.',
     range: 'Vždy kladná, nejvyšší u ATM opcí',
@@ -59,7 +59,7 @@ const greeksData: Record<Exclude<SectionType, 'strategies'>, GreekData> = {
   vega: {
     symbol: 'ν',
     name: 'Vega',
-    color: 'from-emerald-500/20 to-emerald-600/5',
+    color: 'from-indigo-500/20 to-violet-700/8',
     tagline: 'Citlivost na volatilitu',
     description:
       'O kolik se změní cena opce, když se implied volatilita změní o 1%.',

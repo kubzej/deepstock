@@ -3,6 +3,7 @@
  * Shared components for embedding TradingView widgets
  */
 import { useEffect, useRef, memo } from 'react';
+import { useTheme } from '@/contexts/ThemeContext';
 
 // ============================================================
 // Generic Widget Container
@@ -208,6 +209,7 @@ export function SymbolOverview({
   height = 300,
   chartType = 'area',
 }: SymbolOverviewProps) {
+  const { theme } = useTheme();
   const tvSymbol = toTradingViewSymbol(symbol, exchange);
 
   return (
@@ -219,7 +221,7 @@ export function SymbolOverview({
         width: '100%',
         height,
         locale: 'en',
-        colorTheme: 'light',
+        colorTheme: theme,
         autosize: false,
         showVolume: true,
         showMA: false,
@@ -273,6 +275,7 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
   hideLegend = false,
   studies = [],
 }: AdvancedChartProps) {
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const containerId = useRef(
     `tradingview_${Math.random().toString(36).substring(7)}`,
@@ -306,7 +309,7 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
           symbol: tvSymbol,
           interval: interval,
           timezone: 'Europe/Prague',
-          theme: 'light',
+          theme,
           style: '1', // Candles
           locale: 'en',
           enable_publishing: false,
@@ -334,12 +337,12 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
       container.innerHTML = '';
       // Note: Script remains in head (cached by browser)
     };
-  }, [tvSymbol, interval, hideTopToolbar, hideLegend, JSON.stringify(studies)]);
+  }, [tvSymbol, interval, hideTopToolbar, hideLegend, theme, JSON.stringify(studies)]);
 
   return (
     <div
       ref={containerRef}
-      className="w-full rounded-lg overflow-hidden bg-zinc-900"
+      className="w-full overflow-hidden rounded-lg border border-border/60 bg-card/80"
       style={{ height: `${height}px` }}
     />
   );
@@ -385,6 +388,7 @@ export function StockHeatmap({
   height = 'calc(100vh - 200px)',
   blockColor = 'change',
 }: StockHeatmapProps) {
+  const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -413,7 +417,7 @@ export function StockHeatmap({
       blockSize: 'market_cap_basic',
       blockColor,
       locale: 'en',
-      colorTheme: 'light',
+      colorTheme: theme,
       hasTopBar: true,
       isZoomEnabled: true,
       hasSymbolTooltip: true,
@@ -433,7 +437,7 @@ export function StockHeatmap({
     return () => {
       container.innerHTML = '';
     };
-  }, [dataSource, blockColor]);
+  }, [dataSource, blockColor, theme]);
 
   return (
     <div
@@ -465,6 +469,7 @@ export function TechnicalAnalysis({
   height = 450,
   showIntervalTabs = true,
 }: TechnicalAnalysisProps) {
+  const { theme } = useTheme();
   const tvSymbol = toTradingViewSymbol(symbol, exchange);
 
   return (
@@ -479,7 +484,7 @@ export function TechnicalAnalysis({
         showIntervalTabs,
         displayMode: 'multiple',
         locale: 'en',
-        colorTheme: 'dark',
+        colorTheme: theme,
       }}
       height={height}
     />
@@ -503,13 +508,14 @@ export function EconomicCalendar({
   height = 'calc(100vh - 200px)',
   countries = ['us'],
 }: EconomicCalendarProps) {
+  const { theme } = useTheme();
   return (
     <TradingViewWidget
       scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-events.js"
       config={{
         width: '100%',
         height: '100%',
-        colorTheme: 'light',
+        colorTheme: theme,
         isTransparent: false,
         locale: 'en',
         importanceFilter: '1',
@@ -541,6 +547,7 @@ export function MiniChart({
   height = 220,
   dateRange = '3M',
 }: MiniChartProps) {
+  const { theme } = useTheme();
   const tvSymbol = toTradingViewSymbol(symbol, exchange);
 
   return (
@@ -552,7 +559,7 @@ export function MiniChart({
         height,
         locale: 'en',
         dateRange,
-        colorTheme: 'dark',
+        colorTheme: theme,
         isTransparent: true,
         autosize: false,
         largeChartUrl: '',
@@ -579,11 +586,12 @@ export function MarketOverviewWidget({
   height = 'calc(100vh - 250px)',
   showSymbolLogo = true,
 }: MarketOverviewWidgetProps) {
+  const { theme } = useTheme();
   return (
     <TradingViewWidget
       scriptUrl="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js"
       config={{
-        colorTheme: 'light',
+        colorTheme: theme,
         dateRange: '1D',
         showChart: true,
         locale: 'en',
@@ -596,12 +604,14 @@ export function MarketOverviewWidget({
         plotLineColorGrowing: 'rgba(16, 185, 129, 1)',
         plotLineColorFalling: 'rgba(239, 68, 68, 1)',
         gridLineColor: 'rgba(240, 243, 250, 0)',
-        scaleFontColor: 'rgba(120, 123, 134, 1)',
+        scaleFontColor:
+          theme === 'dark' ? 'rgba(226, 232, 240, 0.88)' : 'rgba(120, 123, 134, 1)',
         belowLineFillColorGrowing: 'rgba(16, 185, 129, 0.12)',
         belowLineFillColorFalling: 'rgba(239, 68, 68, 0.12)',
         belowLineFillColorGrowingBottom: 'rgba(16, 185, 129, 0)',
         belowLineFillColorFallingBottom: 'rgba(239, 68, 68, 0)',
-        symbolActiveColor: 'rgba(16, 185, 129, 0.12)',
+        symbolActiveColor:
+          theme === 'dark' ? 'rgba(52, 211, 153, 0.18)' : 'rgba(16, 185, 129, 0.12)',
         tabs: [
           {
             title: 'Indices',

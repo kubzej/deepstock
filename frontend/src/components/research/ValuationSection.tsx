@@ -163,8 +163,8 @@ function UpsideBar({ upside }: { upside: number }) {
     <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
       {/* Gradient background */}
       <div className="absolute inset-0 flex">
-        <div className="w-1/2 bg-gradient-to-r from-rose-500/20 to-transparent" />
-        <div className="w-1/2 bg-gradient-to-r from-transparent to-emerald-500/20" />
+        <div className="w-1/2 bg-gradient-to-r from-primary/20 to-transparent" />
+        <div className="w-1/2 bg-gradient-to-r from-transparent to-primary/35" />
       </div>
       {/* Position indicator */}
       <div

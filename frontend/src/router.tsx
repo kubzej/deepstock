@@ -18,6 +18,7 @@ import { StocksManager, StockDetail } from '@/components/stocks';
 import { TransactionHistoryPage } from '@/components/transactions';
 import { WatchlistsPage } from '@/components/watchlists';
 import {
+  AppearanceSettings,
   SettingsPage,
   PortfolioSettings,
   WatchlistSettings,
@@ -178,6 +179,12 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
+const settingsAppearanceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/appearance',
+  component: AppearanceSettings,
+});
+
 const settingsPortfoliosRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/portfolios',
@@ -240,6 +247,7 @@ const routeTree = rootRoute.addChildren([
   researchRoute,
   journalRoute,
   settingsRoute,
+  settingsAppearanceRoute,
   settingsPortfoliosRoute,
   settingsWatchlistsRoute,
   settingsWatchlistTagsRoute,

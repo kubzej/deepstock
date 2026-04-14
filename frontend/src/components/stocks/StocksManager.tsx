@@ -47,6 +47,7 @@ import {
   ErrorState,
   FilteredEmptyState,
   PageIntro,
+  PageTopRail,
   PageShell,
 } from '@/components/shared';
 import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
@@ -320,7 +321,7 @@ export default function StocksManager() {
       />
 
       {/* Search + Filter */}
-      <div className="sticky top-14 md:top-0 z-10 bg-background pt-2 pb-2 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10 space-y-3">
+      <PageTopRail>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -342,7 +343,7 @@ export default function StocksManager() {
             <TabsTrigger value="incomplete">Nekompletní</TabsTrigger>
           </TabsList>
         </Tabs>
-      </div>
+      </PageTopRail>
 
       {/* Stocks List */}
       <div>

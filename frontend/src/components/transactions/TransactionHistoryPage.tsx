@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -224,13 +224,14 @@ export function TransactionHistoryPage() {
       />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-        <TabsList>
-          <TabsTrigger value="stocks">Akcie</TabsTrigger>
-          <TabsTrigger value="options">Opce</TabsTrigger>
-        </TabsList>
+        <PageTopRail>
+          <TabsList>
+            <TabsTrigger value="stocks">Akcie</TabsTrigger>
+            <TabsTrigger value="options">Opce</TabsTrigger>
+          </TabsList>
 
-        {/* Filters */}
-        <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border bg-muted/20 p-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:p-4">
+          {/* Filters */}
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border bg-muted/20 p-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:p-4">
           {/* Search */}
           <div className="relative sm:col-span-2 lg:flex-1 lg:min-w-[220px] lg:max-w-[320px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -309,7 +310,8 @@ export function TransactionHistoryPage() {
               className="w-full lg:w-[140px]"
             />
           </div>
-        </div>
+          </div>
+        </PageTopRail>
 
         {/* Stock Transactions Table */}
         <TabsContent value="stocks" className="mt-4">

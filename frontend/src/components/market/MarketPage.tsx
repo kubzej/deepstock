@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageIntro, PageSection, PageShell } from '@/components/shared/PageShell';
+import { PageIntro, PageSection, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import {
   StockHeatmap,
@@ -78,11 +78,13 @@ export function MarketPage() {
       />
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
-          <TabsTrigger value="overview">Přehled</TabsTrigger>
-          <TabsTrigger value="heatmap">Heatmapy</TabsTrigger>
-          <TabsTrigger value="calendar">Kalendář</TabsTrigger>
-        </TabsList>
+        <PageTopRail>
+          <TabsList>
+            <TabsTrigger value="overview">Přehled</TabsTrigger>
+            <TabsTrigger value="heatmap">Heatmapy</TabsTrigger>
+            <TabsTrigger value="calendar">Kalendář</TabsTrigger>
+          </TabsList>
+        </PageTopRail>
 
         <TabsContent value="overview" className="mt-6">
           <PageSection gap="lg">

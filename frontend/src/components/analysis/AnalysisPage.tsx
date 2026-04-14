@@ -6,7 +6,7 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -307,12 +307,14 @@ export function AnalysisPage() {
       />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-        <TabsList>
-          <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
-          <TabsTrigger value="stocks">Akcie</TabsTrigger>
-          <TabsTrigger value="options">Opce</TabsTrigger>
-          <TabsTrigger value="ai">AI Poradce</TabsTrigger>
-        </TabsList>
+        <PageTopRail>
+          <TabsList>
+            <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
+            <TabsTrigger value="stocks">Akcie</TabsTrigger>
+            <TabsTrigger value="options">Opce</TabsTrigger>
+            <TabsTrigger value="ai">AI Poradce</TabsTrigger>
+          </TabsList>
+        </PageTopRail>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           {/* Value mode toggle */}

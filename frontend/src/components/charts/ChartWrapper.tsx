@@ -52,15 +52,15 @@ function SignalBadge({ signal }: { signal: SignalType }) {
   const config = {
     bullish: {
       label: 'Bullish',
-      className: 'bg-emerald-50 text-emerald-700',
+      className: 'bg-positive/12 text-positive',
     },
     bearish: {
       label: 'Bearish',
-      className: 'bg-rose-50 text-rose-700',
+      className: 'bg-negative/12 text-negative',
     },
     neutral: {
       label: 'Neutrální',
-      className: 'bg-muted text-muted-foreground',
+      className: 'bg-muted/80 text-muted-foreground',
     },
   };
 
@@ -87,7 +87,7 @@ function EvaluationBox({
   evaluation?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg bg-white p-3">
+    <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-card/80 p-3 shadow-xs">
       {signal && <SignalBadge signal={signal} />}
       {evaluation && (
         <p className="text-sm text-muted-foreground leading-relaxed">{evaluation}</p>

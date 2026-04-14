@@ -285,7 +285,7 @@ export function WatchlistItemsTable({
                       ? formatPrice(quote.price, item.stocks.currency)
                       : '—'}
                     {quote?.preMarketPrice && (
-                      <div className="text-[10px] text-orange-500">
+                      <div className="text-[10px] text-warning">
                         {formatPrice(
                           quote.preMarketPrice,
                           item.stocks.currency,
@@ -293,7 +293,7 @@ export function WatchlistItemsTable({
                       </div>
                     )}
                     {quote?.postMarketPrice && (
-                      <div className="text-[10px] text-violet-500">
+                      <div className="text-[10px] text-sky-500">
                         {formatPrice(
                           quote.postMarketPrice,
                           item.stocks.currency,
@@ -317,13 +317,13 @@ export function WatchlistItemsTable({
                     </span>
                     {quote?.preMarketChangePercent !== undefined &&
                       quote?.preMarketChangePercent !== null && (
-                        <div className="text-[10px] text-orange-500">
+                        <div className="text-[10px] text-warning">
                           {formatPercent(quote.preMarketChangePercent)}
                         </div>
                       )}
                     {quote?.postMarketChangePercent !== undefined &&
                       quote?.postMarketChangePercent !== null && (
-                        <div className="text-[10px] text-violet-500">
+                        <div className="text-[10px] text-sky-500">
                           {formatPercent(quote.postMarketChangePercent)}
                         </div>
                       )}

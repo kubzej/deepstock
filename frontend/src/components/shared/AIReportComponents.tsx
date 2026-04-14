@@ -34,7 +34,7 @@ export function ReportMeta({ generated_at, cached, model_used }: ReportMetaProps
           cache
         </Badge>
       ) : (
-        <Badge variant="outline" className="text-xs py-0 border-green-500/40 text-green-600 dark:text-green-400">
+        <Badge variant="outline" className="border-positive/35 text-xs py-0 text-positive">
           nový
         </Badge>
       )}

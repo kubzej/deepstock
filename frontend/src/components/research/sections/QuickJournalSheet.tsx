@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Loader2 } from 'lucide-react';
+import { BookOpen, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,23 +51,39 @@ export function QuickJournalSheet({ channel, open, onClose }: QuickJournalSheetP
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-[420px] flex flex-col gap-0 p-0 sm:rounded-l-lg overflow-hidden">
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="z-[60] flex h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden border-l-0 p-0 sm:max-w-[420px] sm:border-l sm:rounded-l-lg"
+      >
         {/* Header */}
-        <SheetHeader className="px-5 py-4 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-            <SheetTitle className="text-sm font-semibold tracking-normal">
-              Deník{' '}
-              <span className="text-muted-foreground font-mono font-normal">
-                {channel.ticker}
-              </span>
-            </SheetTitle>
+        <SheetHeader className="shrink-0 border-b border-border/60 bg-background/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-5 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5 pr-2">
+              <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <SheetTitle className="truncate text-sm font-semibold tracking-normal">
+                Deník{' '}
+                <span className="font-mono font-normal text-muted-foreground">
+                  {channel.ticker}
+                </span>
+              </SheetTitle>
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+              onClick={handleClose}
+              aria-label="Zavřít poznámky"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* Note composer */}
-          <div className="px-4 py-4 shrink-0 space-y-2">
+          <div className="shrink-0 border-b border-border/50 px-4 py-4 sm:px-4">
             <RichTextEditor
               key={editorKey}
               placeholder="Zapiš poznámku k analýze… (⌘↵ pro uložení)"
@@ -75,7 +91,7 @@ export function QuickJournalSheet({ channel, open, onClose }: QuickJournalSheetP
               onSubmit={handleSubmit}
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="mt-3 flex gap-2">
               <Button
                 size="sm"
                 onClick={handleSubmit}
@@ -94,7 +110,7 @@ export function QuickJournalSheet({ channel, open, onClose }: QuickJournalSheetP
           </div>
 
           {/* Entries */}
-          <div className="flex-1 px-4 py-4 space-y-2">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] space-y-2">
             {isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (

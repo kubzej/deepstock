@@ -23,23 +23,23 @@ const VERDICT_CONFIG: Record<
 > = {
   explore: {
     label: 'Stojí za průzkum',
-    colorClass: 'text-emerald-700',
-    bgClass: 'bg-emerald-50',
+    colorClass: 'text-positive',
+    bgClass: 'bg-positive/12',
   },
   watch: {
     label: 'Sleduj, čekej',
-    colorClass: 'text-amber-700',
-    bgClass: 'bg-amber-50',
+    colorClass: 'text-warning',
+    bgClass: 'bg-warning/12',
   },
   mixed: {
     label: 'Smíšené signály',
-    colorClass: 'text-amber-700',
-    bgClass: 'bg-amber-50',
+    colorClass: 'text-warning',
+    bgClass: 'bg-warning/12',
   },
   skip: {
     label: 'Přeskoč',
-    colorClass: 'text-rose-700',
-    bgClass: 'bg-rose-50',
+    colorClass: 'text-negative',
+    bgClass: 'bg-negative/12',
   },
 };
 
@@ -58,7 +58,7 @@ function valuationLabel(signal: ValuationSignal): {
 } {
   switch (signal) {
     case 'undervalued':
-      return { text: 'Podhodnocená', colorClass: 'text-emerald-600' };
+      return { text: 'Podhodnocená', colorClass: 'text-positive' };
     case 'slightly_undervalued':
       return { text: 'Mírně podhodnocená', colorClass: 'text-positive' };
     case 'fair':
@@ -66,7 +66,7 @@ function valuationLabel(signal: ValuationSignal): {
     case 'slightly_overvalued':
       return { text: 'Mírně nadhodnocená', colorClass: 'text-amber-500' };
     case 'overvalued':
-      return { text: 'Nadhodnocená', colorClass: 'text-rose-600' };
+      return { text: 'Nadhodnocená', colorClass: 'text-negative' };
     case 'hold':
       return { text: 'Neutrální', colorClass: 'text-muted-foreground' };
     default:

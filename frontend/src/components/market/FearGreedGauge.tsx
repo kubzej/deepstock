@@ -47,7 +47,7 @@ export function FearGreedGauge() {
       <div className="relative py-1.5">
         {/* Tick — thin line, sticks out above + below the bar */}
         <div
-          className="absolute inset-y-0 w-px bg-white/70 rounded-full z-10"
+          className="absolute inset-y-0 z-10 w-px rounded-full bg-background/85 shadow-[0_0_0_1px_var(--border)]"
           style={{ left: `${pct}%`, transform: 'translateX(-50%)' }}
         />
         {/* Gradient bar */}

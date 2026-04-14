@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Palette,
   Bell,
   BookOpen,
   Briefcase,
@@ -16,6 +17,7 @@ export interface SettingsCatalogItem {
     | '/settings/portfolios'
     | '/settings/watchlists'
     | '/settings/watchlist-tags'
+    | '/settings/appearance'
     | '/settings/notifications'
     | '/settings/feed-lists'
     | '/settings/journal-sections'
@@ -53,6 +55,18 @@ export const SETTINGS_CATALOG: SettingsCatalogSection[] = [
           'Tagy pro označování a filtrování položek ve watchlistech.',
         to: '/settings/watchlist-tags',
         icon: Tag,
+      },
+    ],
+  },
+  {
+    title: 'Vzhled a prostředí',
+    description: 'Vizuální režim a preference rozhraní aplikace.',
+    items: [
+      {
+        title: 'Vzhled',
+        description: 'Přepnutí mezi světlým a tmavým režimem aplikace.',
+        to: '/settings/appearance',
+        icon: Palette,
       },
     ],
   },
