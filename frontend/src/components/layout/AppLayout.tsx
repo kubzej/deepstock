@@ -18,7 +18,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <MobileHeader />
 
       {/* Exchange rates error banner */}
-      <div className="md:ml-64">
+      <div className="pt-header-mobile md:ml-64 md:pt-0">
         <ExchangeRatesBanner />
       </div>
 

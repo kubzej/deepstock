@@ -33,7 +33,7 @@ const COLORS = {
   volumeAbove: 'rgb(16 185 129)', // emerald-500
   volumeBelow: 'rgb(161 161 170)', // zinc-400
   average: 'rgb(249 115 22)', // orange-500
-  axis: 'hsl(var(--muted-foreground))',
+  axis: 'var(--muted-foreground)',
 };
 
 // ============================================================

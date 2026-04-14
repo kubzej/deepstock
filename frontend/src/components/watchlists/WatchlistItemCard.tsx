@@ -92,10 +92,10 @@ export function WatchlistItemCard({
     <div
       className={`cursor-pointer rounded-xl transition-transform active:scale-[0.99] ${
         atBuyTarget
-          ? 'bg-positive/8'
+          ? 'bg-positive/10'
           : atSellTarget
-            ? 'bg-amber-500/12'
-            : 'bg-background/90'
+            ? 'bg-warning/14'
+            : 'bg-muted/40'
       }`}
       onClick={handleClick}
     >
@@ -110,7 +110,7 @@ export function WatchlistItemCard({
                   atBuyTarget
                     ? 'text-positive'
                     : atSellTarget
-                      ? 'text-amber-500'
+                      ? 'text-warning'
                       : ''
                 }`}
               >
@@ -149,7 +149,7 @@ export function WatchlistItemCard({
                 </span>
               )}
               {showWatchlistName && watchlistName && (
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                <span className="rounded-full bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground">
                   {watchlistName}
                 </span>
               )}
@@ -167,12 +167,12 @@ export function WatchlistItemCard({
                   {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
                 </span>
                 {quote?.preMarketPrice && (
-                  <span className="font-mono-price text-[10px] text-orange-500">
+                  <span className="font-mono-price text-[10px] text-warning">
                     → {formatPrice(quote.preMarketPrice, item.stocks.currency)}
                   </span>
                 )}
                 {quote?.postMarketPrice && (
-                  <span className="font-mono-price text-[10px] text-violet-500">
+                  <span className="font-mono-price text-[10px] text-sky-500">
                     → {formatPrice(quote.postMarketPrice, item.stocks.currency)}
                   </span>
                 )}
@@ -185,13 +185,13 @@ export function WatchlistItemCard({
                 </span>
                 {quote?.preMarketChangePercent !== undefined &&
                   quote?.preMarketChangePercent !== null && (
-                    <span className="font-mono-price text-[10px] text-orange-500">
+                    <span className="font-mono-price text-[10px] text-warning">
                       ({formatPercent(quote.preMarketChangePercent)})
                     </span>
                   )}
                 {quote?.postMarketChangePercent !== undefined &&
                   quote?.postMarketChangePercent !== null && (
-                    <span className="font-mono-price text-[10px] text-violet-500">
+                    <span className="font-mono-price text-[10px] text-sky-500">
                       ({formatPercent(quote.postMarketChangePercent)})
                     </span>
                   )}
@@ -259,8 +259,8 @@ export function WatchlistItemCard({
                 target.active
                   ? target.key === 'buy'
                     ? 'bg-positive/10'
-                    : 'bg-amber-500/10'
-                  : 'bg-muted/35'
+                    : 'bg-warning/10'
+                  : 'bg-background/75'
               }`}
             >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -271,7 +271,7 @@ export function WatchlistItemCard({
                   target.active
                     ? target.key === 'buy'
                       ? 'text-positive'
-                      : 'text-amber-600'
+                      : 'text-warning'
                     : ''
                 }`}
               >
@@ -314,7 +314,7 @@ export function WatchlistItemCard({
 
             {/* Notes */}
             {item.notes && (
-              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5 whitespace-pre-wrap">
+              <p className="rounded-md bg-background/80 px-2 py-1.5 whitespace-pre-wrap text-xs text-muted-foreground">
                 {item.notes}
               </p>
             )}

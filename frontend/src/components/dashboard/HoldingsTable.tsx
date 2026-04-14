@@ -431,7 +431,7 @@ export function HoldingsTable({
                     </div>
                     {/* Pre-market price */}
                     {holding.quote?.preMarketPrice != null && (
-                      <div className="text-[10px] text-orange-500">
+                      <div className="text-[10px] text-warning">
                         {formatPrice(
                           holding.quote.preMarketPrice,
                           holding.currency,
@@ -441,7 +441,7 @@ export function HoldingsTable({
                     {/* After-hours price (only if no pre-market) */}
                     {holding.quote?.postMarketPrice != null &&
                       holding.quote?.preMarketPrice == null && (
-                        <div className="text-[10px] text-violet-500">
+                        <div className="text-[10px] text-sky-500">
                           {formatPrice(
                             holding.quote.postMarketPrice,
                             holding.currency,
@@ -463,7 +463,7 @@ export function HoldingsTable({
                       </Badge>
                       {/* Pre-market change */}
                       {holding.quote?.preMarketChangePercent != null && (
-                        <span className="text-[10px] font-mono-price text-orange-500">
+                        <span className="text-[10px] font-mono-price text-warning">
                           {formatPercent(
                             holding.quote.preMarketChangePercent,
                             2,
@@ -474,7 +474,7 @@ export function HoldingsTable({
                       {/* After-hours change (only if no pre-market) */}
                       {holding.quote?.postMarketChangePercent != null &&
                         holding.quote?.preMarketChangePercent == null && (
-                          <span className="text-[10px] font-mono-price text-violet-500">
+                          <span className="text-[10px] font-mono-price text-sky-500">
                             {formatPercent(
                               holding.quote.postMarketChangePercent,
                               2,

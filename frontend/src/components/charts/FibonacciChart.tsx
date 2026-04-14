@@ -49,7 +49,7 @@ const COLORS = {
   fib618: 'rgb(59 130 246)', // blue-500
   fib786: 'rgb(6 182 212)', // cyan-500
   fib100: 'rgb(34 197 94)', // green-500 (100%)
-  axis: 'hsl(var(--muted-foreground))',
+  axis: 'var(--muted-foreground)',
 };
 
 const FIBONACCI_LABELS: Record<string, { label: string; color: string }> = {

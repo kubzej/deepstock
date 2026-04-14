@@ -16,9 +16,10 @@ import {
   ErrorState,
   FilteredEmptyState,
   PageIntro,
+  PageTopRail,
   PageShell,
 } from '@/components/shared';
-import { Eye, Target } from 'lucide-react';
+import { Eye, Plus, Target } from 'lucide-react';
 import {
   type WatchlistItem,
   type WatchlistItemWithSource,
@@ -173,6 +174,10 @@ export function WatchlistsPage() {
   const selectedWatchlist = watchlists.find(
     (w) => w.id === selectedWatchlistId,
   );
+  const targetWatchlistIdForNewItem =
+    isFilterView
+      ? (lastConcreteWatchlistId ?? watchlists[0]?.id ?? null)
+      : selectedWatchlistId;
 
   const handleSelectWatchlist = (watchlistId: string) => {
     setSelectedWatchlistId(watchlistId);
@@ -332,6 +337,12 @@ export function WatchlistsPage() {
 
   // Item CRUD
   const openAddItem = () => {
+    if (!targetWatchlistIdForNewItem) return;
+
+    if (selectedWatchlistId !== targetWatchlistIdForNewItem) {
+      setSelectedWatchlistId(targetWatchlistIdForNewItem);
+    }
+
     setEditingItem(null);
     setAddItemDialogOpen(true);
   };
@@ -342,14 +353,14 @@ export function WatchlistsPage() {
   };
 
   const handleSaveItem = async (formData: WatchlistItemFormData) => {
-    if (!selectedWatchlistId) return;
+    if (!targetWatchlistIdForNewItem) return;
 
     setItemSaving(true);
     try {
       if (editingItem) {
         await updateItemMutation.mutateAsync({
           itemId: editingItem.id,
-          watchlistId: selectedWatchlistId,
+          watchlistId: targetWatchlistIdForNewItem,
           targetBuyPrice: formData.buyTarget
             ? parseFloat(formData.buyTarget)
             : null,
@@ -362,7 +373,7 @@ export function WatchlistsPage() {
       } else {
         if (!formData.ticker.trim()) return;
         await addItemMutation.mutateAsync({
-          watchlistId: selectedWatchlistId,
+          watchlistId: targetWatchlistIdForNewItem,
           ticker: formData.ticker.trim().toUpperCase(),
           targetBuyPrice: formData.buyTarget
             ? parseFloat(formData.buyTarget)
@@ -483,6 +494,19 @@ export function WatchlistsPage() {
       {/* Header */}
       <PageIntro
         title="Watchlisty"
+        actions={
+          !isFilterView && selectedWatchlist ? (
+            <Button onClick={openAddItem}>
+              <Plus className="mr-2 h-4 w-4" />
+              Přidat akcii
+            </Button>
+          ) : targetWatchlistIdForNewItem ? (
+            <Button onClick={openAddItem} variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Přidat do watchlistu
+            </Button>
+          ) : null
+        }
         onRefresh={() => {
           // Invalidate all caches - React Query will refetch them
           queryClient.invalidateQueries({ queryKey: ['watchlists'] });
@@ -509,40 +533,42 @@ export function WatchlistsPage() {
         />
       ) : (
         <div className="space-y-4">
-          <WatchlistModeRail
-            watchlists={watchlists}
-            selectedWatchlistId={selectedWatchlistId}
-            isFilterView={isFilterView}
-            totalItemsCount={allItems.length}
-            filteredItemsCount={filteredAndSortedItems.length}
-            hasActiveFilters={hasActiveFilters}
-            filterSummary={filterSummary}
-            onSelectWatchlist={handleSelectWatchlist}
-            onSelectFilteredMode={handleToggleFilteredMode}
-          />
-
-          {/* Filter panel (only in filter view) */}
-          {isFilterView && (
-            <FilteredMonitoringPanel
-              allTags={allTags}
-              filterTags={filterTags}
-              showAtBuyTarget={showAtBuyTarget}
-              showAtSellTarget={showAtSellTarget}
-              filteredItemsCount={filteredAndSortedItems.length}
+          <PageTopRail>
+            <WatchlistModeRail
+              watchlists={watchlists}
+              selectedWatchlistId={selectedWatchlistId}
+              isFilterView={isFilterView}
               totalItemsCount={allItems.length}
+              filteredItemsCount={filteredAndSortedItems.length}
               hasActiveFilters={hasActiveFilters}
-              onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
-              onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
-              onToggleTag={(tagId) =>
-                setFilterTags((prev) =>
-                  prev.includes(tagId)
-                    ? prev.filter((id) => id !== tagId)
-                    : [...prev, tagId],
-                )
-              }
-              onClearFilters={clearFilters}
+              filterSummary={filterSummary}
+              onSelectWatchlist={handleSelectWatchlist}
+              onSelectFilteredMode={handleToggleFilteredMode}
             />
-          )}
+
+            {/* Filter panel (only in filter view) */}
+            {isFilterView && (
+              <FilteredMonitoringPanel
+                allTags={allTags}
+                filterTags={filterTags}
+                showAtBuyTarget={showAtBuyTarget}
+                showAtSellTarget={showAtSellTarget}
+                filteredItemsCount={filteredAndSortedItems.length}
+                totalItemsCount={allItems.length}
+                hasActiveFilters={hasActiveFilters}
+                onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
+                onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
+                onToggleTag={(tagId) =>
+                  setFilterTags((prev) =>
+                    prev.includes(tagId)
+                      ? prev.filter((id) => id !== tagId)
+                      : [...prev, tagId],
+                  )
+                }
+                onClearFilters={clearFilters}
+              />
+            )}
+          </PageTopRail>
 
           {/* Items table */}
           {(selectedWatchlist || isFilterView) && (

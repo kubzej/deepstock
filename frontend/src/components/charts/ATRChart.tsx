@@ -31,7 +31,7 @@ interface ATRChartProps {
 const COLORS = {
   atr: 'rgb(168 85 247)', // purple-500
   atrFill: 'rgba(168, 85, 247, 0.15)',
-  axis: 'hsl(var(--muted-foreground))',
+  axis: 'var(--muted-foreground)',
 };
 
 // ============================================================

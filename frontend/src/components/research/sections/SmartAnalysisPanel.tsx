@@ -23,23 +23,23 @@ const VERDICT_CONFIG: Record<
 > = {
   explore: {
     label: 'Stojí za průzkum',
-    colorClass: 'text-emerald-700',
-    bgClass: 'bg-emerald-50',
+    colorClass: 'text-positive',
+    bgClass: 'bg-positive/12',
   },
   watch: {
     label: 'Sleduj, čekej',
-    colorClass: 'text-amber-700',
-    bgClass: 'bg-amber-50',
+    colorClass: 'text-warning',
+    bgClass: 'bg-warning/12',
   },
   mixed: {
     label: 'Smíšené signály',
-    colorClass: 'text-amber-700',
-    bgClass: 'bg-amber-50',
+    colorClass: 'text-warning',
+    bgClass: 'bg-warning/12',
   },
   skip: {
     label: 'Přeskoč',
-    colorClass: 'text-rose-700',
-    bgClass: 'bg-rose-50',
+    colorClass: 'text-negative',
+    bgClass: 'bg-negative/12',
   },
 };
 
@@ -58,7 +58,7 @@ function valuationLabel(signal: ValuationSignal): {
 } {
   switch (signal) {
     case 'undervalued':
-      return { text: 'Podhodnocená', colorClass: 'text-emerald-600' };
+      return { text: 'Podhodnocená', colorClass: 'text-positive' };
     case 'slightly_undervalued':
       return { text: 'Mírně podhodnocená', colorClass: 'text-positive' };
     case 'fair':
@@ -66,7 +66,7 @@ function valuationLabel(signal: ValuationSignal): {
     case 'slightly_overvalued':
       return { text: 'Mírně nadhodnocená', colorClass: 'text-amber-500' };
     case 'overvalued':
-      return { text: 'Nadhodnocená', colorClass: 'text-rose-600' };
+      return { text: 'Nadhodnocená', colorClass: 'text-negative' };
     case 'hold':
       return { text: 'Neutrální', colorClass: 'text-muted-foreground' };
     default:
@@ -201,7 +201,7 @@ interface SmartAnalysisPanelProps {
 }
 
 export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const insights: Insight[] = data.insights ?? [];
   if (insights.length === 0 && !data.valuation) return null;
@@ -244,79 +244,89 @@ export function SmartAnalysisPanel({ data }: SmartAnalysisPanelProps) {
 
       {/* Body */}
       {open && (
-        <div className="px-5 pb-5 pt-4 space-y-5">
-          {/* Warnings */}
-          {warnings.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Rizika
-              </p>
-              <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
-                <InsightGroup items={warnings} />
-              </div>
-            </div>
-          )}
-
-          {/* Positives */}
-          {positives.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Pozitiva
-              </p>
-              <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
-                <InsightGroup items={positives} />
-              </div>
-            </div>
-          )}
-
-          {/* Info */}
-          {infos.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Ostatní
-              </p>
-              <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
-                <InsightGroup items={infos} />
-              </div>
-            </div>
-          )}
-
-          {/* Valuation */}
-          {composite && modelsUsed > 0 && (
-            <div className="flex gap-2.5">
-              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
-                <BarChart2 className="w-3 h-3 text-muted-foreground/70" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Valuace:{' '}
-                  <span className={valLabel.colorClass}>{valLabel.text}</span>
+        <>
+          <div className="px-5 pb-5 pt-4 space-y-5">
+            {/* Warnings */}
+            {warnings.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Rizika
                 </p>
-                <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                  Kompozitní signál z {modelsUsed} valuačních modelů (DCF, P/E
-                  peers, DDM…)
-                </p>
+                <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
+                  <InsightGroup items={warnings} />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Technical note */}
-          {technicalNote && (
-            <div className="flex gap-2.5">
-              <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
-                <TrendingUp className="w-3 h-3 text-muted-foreground/70" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  Pozice v pásmu
+            {/* Positives */}
+            {positives.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Pozitiva
                 </p>
-                <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                  {technicalNote.replace('Technika: cena je ', '')}
-                </p>
+                <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
+                  <InsightGroup items={positives} />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {/* Info */}
+            {infos.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Ostatní
+                </p>
+                <div className="grid gap-x-8 gap-y-3 md:grid-cols-2 lg:grid-cols-3">
+                  <InsightGroup items={infos} />
+                </div>
+              </div>
+            )}
+
+            {/* Valuation */}
+            {composite && modelsUsed > 0 && (
+              <div className="flex gap-2.5">
+                <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
+                  <BarChart2 className="w-3 h-3 text-muted-foreground/70" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Valuace:{' '}
+                    <span className={valLabel.colorClass}>{valLabel.text}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                    Kompozitní signál z {modelsUsed} valuačních modelů (DCF, P/E
+                    peers, DDM…)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Technical note */}
+            {technicalNote && (
+              <div className="flex gap-2.5">
+                <div className="mt-0.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center bg-muted/60">
+                  <TrendingUp className="w-3 h-3 text-muted-foreground/70" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Pozice v pásmu
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
+                    {technicalNote.replace('Technika: cena je ', '')}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="flex w-full items-center justify-center border-t border-border/40 px-5 py-3 text-muted-foreground transition-colors hover:bg-muted/20 hover:text-foreground"
+            onClick={() => setOpen(false)}
+            aria-label="Sbalit sekci Smart analýza"
+          >
+            <ChevronDown className="h-4 w-4 rotate-180" />
+          </button>
+        </>
       )}
     </div>
   );

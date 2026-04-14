@@ -10,7 +10,7 @@ import { formatConditionValue } from './types';
 const CONDITION_ICONS: Record<AlertConditionType, React.ReactNode> = {
   price_above: <ArrowUp className="h-4 w-4 text-positive" />,
   price_below: <ArrowDown className="h-4 w-4 text-negative" />,
-  percent_change_day: <Percent className="h-4 w-4 text-blue-500" />,
+  percent_change_day: <Percent className="h-4 w-4 text-sky-500" />,
 };
 
 interface CardActionsProps {
@@ -59,7 +59,7 @@ export function SingleAlertCard({ item, onEdit, onDelete, onToggle, onReset, res
   return (
     <div
       className={`rounded-lg px-3 py-2 ${
-        alert.is_triggered ? 'bg-amber-500/10' : alert.is_enabled ? 'bg-muted/30' : 'bg-muted/20 opacity-60'
+        alert.is_triggered ? 'bg-warning/10' : alert.is_enabled ? 'bg-muted/30' : 'bg-muted/20 opacity-60'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -77,7 +77,7 @@ export function SingleAlertCard({ item, onEdit, onDelete, onToggle, onReset, res
             </span>
           )}
           {alert.is_triggered && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30">
+            <Badge variant="outline" className="h-[18px] border-warning/30 px-1.5 py-0 text-[10px] text-warning">
               <Check className="h-3 w-3 mr-0.5" />
               Dokončeno
             </Badge>
@@ -120,13 +120,13 @@ export function RangeAlertCard({ item, onEditRange, onDelete, onToggle, onReset,
   return (
     <div
       className={`rounded-lg px-3 py-2 ${
-        item.is_triggered ? 'bg-amber-500/10' : item.is_enabled ? 'bg-muted/30' : 'bg-muted/20 opacity-60'
+        item.is_triggered ? 'bg-warning/10' : item.is_enabled ? 'bg-muted/30' : 'bg-muted/20 opacity-60'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <ArrowUpDown className="h-4 w-4 text-violet-500" />
+            <ArrowUpDown className="h-4 w-4 text-sky-500" />
             <span className="font-mono-price text-sm">
               ${item.belowAlert.condition_value.toFixed(2)} – ${item.aboveAlert.condition_value.toFixed(2)}
             </span>
@@ -138,7 +138,7 @@ export function RangeAlertCard({ item, onEditRange, onDelete, onToggle, onReset,
             </span>
           )}
           {item.is_triggered && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-[18px] text-amber-500 border-amber-500/30">
+            <Badge variant="outline" className="h-[18px] border-warning/30 px-1.5 py-0 text-[10px] text-warning">
               <Check className="h-3 w-3 mr-0.5" />
               Dokončeno
             </Badge>

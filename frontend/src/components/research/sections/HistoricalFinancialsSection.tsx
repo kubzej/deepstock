@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Info, ChevronDown } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -258,9 +257,9 @@ function Table({
                 <th
                   key={i}
                   className={[
-                    'text-right py-2.5 px-3 whitespace-nowrap text-xs font-medium',
+                    'px-3 py-2.5 text-right text-xs font-medium whitespace-nowrap',
                     isLtm
-                      ? 'text-foreground font-semibold'
+                      ? 'bg-muted/40 text-foreground font-semibold'
                       : isFwd
                         ? 'text-violet-400'
                         : isAvg
@@ -318,13 +317,13 @@ function Table({
                   const isAvg = i === avgIdx;
                   const color = isAvg || isFwd ? '' : row.clr ? row.clr(v) : '';
 
-                  return (
-                    <td
-                      key={i}
-                      className={[
-                        'py-2 px-3 text-right text-sm font-mono-price tabular-nums',
+                return (
+                  <td
+                    key={i}
+                    className={[
+                        'px-3 py-2 text-right text-sm font-mono-price tabular-nums',
                         isLtm
-                          ? `font-semibold ${color}`
+                          ? `bg-muted/20 font-semibold ${color}`
                           : isFwd
                             ? 'text-violet-400'
                             : isAvg
@@ -347,7 +346,7 @@ function Table({
 
 // ── Collapsible Section ──────────────────────────────────────────────────────
 
-function CollapsibleSection({
+function SectionBlock({
   label,
   tableProps,
   rows,
@@ -356,26 +355,18 @@ function CollapsibleSection({
   tableProps: { years: string[]; ltmIdx: number };
   rows: Row[];
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
     <div className="rounded-xl border overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-muted/40 transition-colors"
-      >
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          {label}
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="px-4 pb-4">
-          <Table {...tableProps} rows={rows} />
+      <div className="w-full px-5 py-3 text-left">
+        <div className="min-w-0">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </span>
         </div>
-      )}
+      </div>
+      <div className="border-t border-border/50 px-4 pb-4 pt-2">
+        <Table {...tableProps} rows={rows} />
+      </div>
     </div>
   );
 }
@@ -667,7 +658,7 @@ export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-3">
       {sections.map(({ label, rows }) => (
-        <CollapsibleSection
+        <SectionBlock
           key={label}
           label={label}
           tableProps={tableProps}

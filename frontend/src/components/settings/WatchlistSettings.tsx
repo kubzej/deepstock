@@ -206,7 +206,7 @@ export function WatchlistSettings() {
         title="Watchlisty"
         leading={<PageBackButton onClick={onBack} />}
         actions={
-          <Button onClick={openCreate} size="sm">
+          <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
             Nový watchlist
           </Button>

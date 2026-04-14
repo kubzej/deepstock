@@ -7,7 +7,7 @@
     <!-- App Identity -->
     <title>DeepStock</title>
     <meta name="description" content="Portfolio tracker a analýza investic" />
-    <meta name="theme-color" content="#18181b" />
+    <meta name="theme-color" content="#ffffff" />
     
     <!-- PWA / iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -22,6 +22,29 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var key = 'deepstock-theme';
+        var theme = 'light';
+
+        try {
+          var stored = window.localStorage.getItem(key);
+          if (stored === 'light' || stored === 'dark') {
+            theme = stored;
+          }
+        } catch {}
+
+        var root = document.documentElement;
+        root.classList.toggle('dark', theme === 'dark');
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+          meta.setAttribute('content', theme === 'dark' ? '#232323' : '#ffffff');
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

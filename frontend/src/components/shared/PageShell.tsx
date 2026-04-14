@@ -50,6 +50,24 @@ export function PageShell({
   );
 }
 
+interface PageTopRailProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export function PageTopRail({ children, className }: PageTopRailProps) {
+  return (
+    <div
+      className={cn(
+        'sticky top-14 z-10 -mx-4 space-y-3 bg-background px-4 pb-2 pt-2 md:top-0 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 xl:-mx-10 xl:px-10',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface PageActionBarProps {
   actions?: ReactNode;
   onRefresh?: () => void;

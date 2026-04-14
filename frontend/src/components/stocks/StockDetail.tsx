@@ -192,10 +192,11 @@ export function StockDetail() {
   const stockName = stock.name;
   const stockCurrency = stock.currency || 'USD';
   const stockSector = stock.sector;
+  const priceScale = stock.price_scale ?? 1;
 
   // Price info from quotes
-  const currentPrice = quote?.price ?? 0;
-  const dailyChange = quote?.change ?? 0;
+  const currentPrice = (quote?.price ?? 0) * priceScale;
+  const dailyChange = (quote?.change ?? 0) * priceScale;
   const dailyChangePercent = quote?.changePercent ?? 0;
 
   // Position metrics (only if holding exists)
@@ -464,7 +465,6 @@ export function StockDetail() {
                       tx.remainingCostBasisCzk !== null &&
                       quote?.price
                     ) {
-                      const priceScale = stock?.price_scale ?? 1;
                       const currentPriceScaled = quote.price * priceScale;
                       const remainingCostBasis = tx.remainingCostBasis;
                       pnl =
@@ -618,8 +618,8 @@ export function StockDetail() {
                                 quote?.price && (
                                   <span className="ml-1">
                                     →{' '}
-                                    {formatPrice(
-                                      quote.price * (stock?.price_scale ?? 1),
+                                      {formatPrice(
+                                      quote.price * priceScale,
                                       tx.currency,
                                     )}
                                   </span>

@@ -12,6 +12,7 @@ export {
   PageIntro,
   PageHero,
   PageSection,
+  PageTopRail,
   PageBackButton,
 } from './PageShell';
 export { PillButton, PillGroup } from './PillButton';

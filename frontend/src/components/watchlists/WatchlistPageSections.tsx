@@ -35,7 +35,7 @@ export function WatchlistModeRail({
             key={watchlist.id}
             active={!isFilterView && selectedWatchlistId === watchlist.id}
             onClick={() => onSelectWatchlist(watchlist.id)}
-            size="sm"
+            size="md"
             count={watchlist.item_count || 0}
           >
             {watchlist.name}
@@ -47,7 +47,7 @@ export function WatchlistModeRail({
         <PillButton
           active={isFilterView}
           onClick={onSelectFilteredMode}
-          size="sm"
+          size="md"
           count={isFilterView ? filteredItemsCount : totalItemsCount}
           indicatorClassName={hasActiveFilters ? 'bg-amber-500' : undefined}
         >
@@ -100,7 +100,7 @@ export function FilteredMonitoringPanel({
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="h-8 shrink-0 text-xs"
+            className="h-9 shrink-0 text-sm"
           >
             <X className="mr-1 h-3 w-3" />
             Vymazat filtry
@@ -117,7 +117,7 @@ export function FilteredMonitoringPanel({
             <PillButton
               onClick={onToggleBuyTarget}
               active={showAtBuyTarget}
-              size="sm"
+              size="md"
               indicatorClassName="bg-positive"
               activeClassName="border-transparent bg-positive/12 text-positive hover:bg-positive/16"
               inactiveClassName="border-transparent bg-positive/6 text-positive/80 hover:bg-positive/10"
@@ -127,7 +127,7 @@ export function FilteredMonitoringPanel({
             <PillButton
               onClick={onToggleSellTarget}
               active={showAtSellTarget}
-              size="sm"
+              size="md"
               indicatorClassName="bg-amber-500"
               activeClassName="border-transparent bg-amber-500/12 text-amber-600 hover:bg-amber-500/16"
               inactiveClassName="border-transparent bg-amber-500/6 text-amber-700 hover:bg-amber-500/10"
@@ -151,7 +151,7 @@ export function FilteredMonitoringPanel({
                     key={tag.id}
                     onClick={() => onToggleTag(tag.id)}
                     active={isSelected}
-                    size="sm"
+                    size="md"
                     indicatorPosition="leading"
                     indicatorClassName="bg-current"
                     activeClassName="border-transparent text-white shadow-sm"
@@ -201,7 +201,7 @@ export function WatchlistsMobileSortRow({
           key={option.key}
           active={sortKey === option.key}
           onClick={() => onSort(option.key)}
-          size="sm"
+          size="md"
           direction={sortKey === option.key ? sortDir : undefined}
         >
           {option.label}

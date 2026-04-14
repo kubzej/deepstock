@@ -5,6 +5,13 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -26,6 +33,11 @@ interface WatchlistItemFormDialogProps {
   onSave: (data: WatchlistItemFormData) => Promise<void>;
   saving?: boolean;
   holding?: Holding | null;
+  watchlists?: Array<{ id: string; name: string }>;
+  selectedWatchlistId?: string | null;
+  onSelectedWatchlistChange?: (watchlistId: string) => void;
+  initialTicker?: string;
+  initialSector?: string | null;
 }
 
 export interface WatchlistItemFormData {
@@ -43,6 +55,11 @@ export function WatchlistItemFormDialog({
   onSave,
   saving = false,
   holding,
+  watchlists,
+  selectedWatchlistId,
+  onSelectedWatchlistChange,
+  initialTicker,
+  initialSector,
 }: WatchlistItemFormDialogProps) {
   // Form state
   const [ticker, setTicker] = useState('');
@@ -65,15 +82,15 @@ export function WatchlistItemFormDialog({
         setNotes(editingItem.notes || '');
         setSector(editingItem.sector || editingItem.stocks.sector || '');
       } else {
-        setTicker('');
+        setTicker(initialTicker?.trim().toUpperCase() || '');
         setBuyTarget('');
         setSellTarget('');
         setNotes('');
-        setSector('');
+        setSector(initialSector || '');
       }
       setAiError(null);
     }
-  }, [open, editingItem]);
+  }, [open, editingItem, initialSector, initialTicker]);
 
   const handleSubmit = async () => {
     await onSave({
@@ -117,7 +134,9 @@ export function WatchlistItemFormDialog({
     }
   };
 
-  const isValid = editingItem || ticker.trim().length > 0;
+  const hasWatchlistSelection =
+    editingItem || !watchlists?.length || !!selectedWatchlistId;
+  const isValid = (editingItem || ticker.trim().length > 0) && hasWatchlistSelection;
   const canAiSuggest = !!(editingItem?.stocks.ticker || ticker.trim().length > 0);
 
   return (
@@ -136,6 +155,27 @@ export function WatchlistItemFormDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 overflow-y-auto flex-1 py-2">
+          {!editingItem && watchlists && watchlists.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="watchlist">Watchlist</Label>
+              <Select
+                value={selectedWatchlistId ?? undefined}
+                onValueChange={onSelectedWatchlistChange}
+              >
+                <SelectTrigger id="watchlist" className="w-full">
+                  <SelectValue placeholder="Vyberte watchlist..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {watchlists.map((watchlist) => (
+                    <SelectItem key={watchlist.id} value={watchlist.id}>
+                      {watchlist.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {!editingItem && (
             <div className="space-y-2">
               <Label htmlFor="ticker">Ticker</Label>

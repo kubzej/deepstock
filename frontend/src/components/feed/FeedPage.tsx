@@ -195,7 +195,6 @@ export function FeedPage() {
         actions={
           <Button
             variant="outline"
-            size="sm"
             onClick={() => navigate({ to: '/settings/feed-lists' })}
           >
             Spravovat feed listy

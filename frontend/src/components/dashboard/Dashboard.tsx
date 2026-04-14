@@ -253,10 +253,10 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
                 Pre-market
               </span>
-              <span className="text-lg font-mono-price font-semibold text-orange-500">
+              <span className="text-lg font-mono-price font-semibold text-warning">
                 {formatCurrency(extendedHoursData.preMarketChangeCzk)}
               </span>
-              <span className="text-sm font-mono-price ml-1.5 text-orange-500/70">
+              <span className="text-sm font-mono-price ml-1.5 text-warning/70">
                 {formatPercent(
                   extendedHoursData.preMarketChangePercent,
                   1,
@@ -266,16 +266,16 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
             </div>
           )}
 
-          {/* After-hours Change - show only if data available */}
+          {/* After-market Change - show only if data available */}
           {extendedHoursData.hasPostMarket && (
             <div>
               <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-                After-hours
+                After-market
               </span>
-              <span className="text-lg font-mono-price font-semibold text-violet-500">
+              <span className="text-lg font-mono-price font-semibold text-sky-500">
                 {formatCurrency(extendedHoursData.postMarketChangeCzk)}
               </span>
-              <span className="text-sm font-mono-price ml-1.5 text-violet-500/70">
+              <span className="text-sm font-mono-price ml-1.5 text-sky-500/70">
                 {formatPercent(
                   extendedHoursData.postMarketChangePercent,
                   1,

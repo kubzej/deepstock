@@ -438,13 +438,13 @@ export function TransactionModal({
             >
               <ToggleGroupItem
                 value="BUY"
-                className="flex-1 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                className="flex-1 data-[state=on]:bg-positive data-[state=on]:text-white"
               >
                 NÁKUP
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="SELL"
-                className="flex-1 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
+                className="flex-1 data-[state=on]:bg-negative data-[state=on]:text-white"
               >
                 PRODEJ
               </ToggleGroupItem>

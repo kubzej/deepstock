@@ -10,7 +10,7 @@ interface RichTextContentProps {
 export function RichTextContent({ html, className = '' }: RichTextContentProps) {
   return (
     <div
-      className={`prose prose-sm dark:prose-invert max-w-none ${className}`}
+      className={`theme-prose prose prose-sm dark:prose-invert max-w-none ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

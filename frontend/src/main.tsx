@@ -6,13 +6,16 @@ import { queryClient } from './lib/queryClient';
 import './index.css';
 import { router } from './router';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

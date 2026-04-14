@@ -104,12 +104,12 @@ function CompositeCard({
 
   return (
     <div className={`rounded-lg p-5 ${signal.bgColor}`}>
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
             Férová hodnota
           </p>
-          <div className="flex items-baseline gap-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-2xl font-mono-price font-bold">
               {formatCurrency(composite.fairValue, currency)}
             </span>
@@ -125,8 +125,8 @@ function CompositeCard({
       </div>
 
       {composite.upside !== null && (
-        <div className="mt-4 flex items-center gap-4">
-          <div className="flex-1">
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="min-w-0 flex-1">
             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
               <span>Potenciál</span>
               <span
@@ -138,7 +138,7 @@ function CompositeCard({
             </div>
             <UpsideBar upside={composite.upside} />
           </div>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground sm:text-right">
             {composite.modelsUsed}{' '}
             {composite.modelsUsed === 1
               ? 'model'
@@ -163,8 +163,8 @@ function UpsideBar({ upside }: { upside: number }) {
     <div className="relative h-1.5 rounded-full bg-muted overflow-hidden">
       {/* Gradient background */}
       <div className="absolute inset-0 flex">
-        <div className="w-1/2 bg-gradient-to-r from-rose-500/20 to-transparent" />
-        <div className="w-1/2 bg-gradient-to-r from-transparent to-emerald-500/20" />
+        <div className="w-1/2 bg-gradient-to-r from-primary/20 to-transparent" />
+        <div className="w-1/2 bg-gradient-to-r from-transparent to-primary/35" />
       </div>
       {/* Position indicator */}
       <div
@@ -201,40 +201,54 @@ function ModelRow({
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full py-2.5 flex items-center gap-3 hover:bg-muted/20 transition-colors text-left rounded"
+        className="w-full rounded px-1 py-3 text-left transition-colors hover:bg-muted/20"
       >
-        {/* Method name with horizon badge */}
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="text-sm truncate">{model.method}</span>
-          <span
-            className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${horizonBadge.color}`}
-          >
-            {horizonBadge.label}
-          </span>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+          <div className="flex min-w-0 items-start justify-between gap-3 md:flex-1 md:items-center">
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="text-sm truncate">{model.method}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${horizonBadge.color}`}
+                >
+                  {horizonBadge.label}
+                </span>
+              </div>
+            </div>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <ConfIcon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${conf.color}`} />
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs">Spolehlivost: {conf.label}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 pl-0 text-left md:flex md:items-center md:gap-3 md:pl-0">
+            <div className="space-y-0.5 md:w-24 md:text-right">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground md:hidden">
+                Fér. hodnota
+              </p>
+              <span className="font-mono-price text-sm">
+                {formatCurrency(model.fairValue, currency)}
+              </span>
+            </div>
+
+            <div className="space-y-0.5 md:w-16 md:text-right">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground md:hidden">
+                Potenciál
+              </p>
+              <span
+                className={`font-mono-price text-sm ${model.upside >= 0 ? 'text-positive' : 'text-negative'}`}
+              >
+                {model.upside >= 0 ? '+' : ''}
+                {model.upside.toFixed(1)}%
+              </span>
+            </div>
+          </div>
         </div>
-
-        {/* Fair value */}
-        <span className="font-mono-price text-sm">
-          {formatCurrency(model.fairValue, currency)}
-        </span>
-
-        {/* Upside */}
-        <span
-          className={`font-mono-price text-sm w-16 text-right ${model.upside >= 0 ? 'text-positive' : 'text-negative'}`}
-        >
-          {model.upside >= 0 ? '+' : ''}
-          {model.upside.toFixed(1)}%
-        </span>
-
-        {/* Confidence */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <ConfIcon className={`w-3.5 h-3.5 ${conf.color} shrink-0`} />
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            <p className="text-xs">Spolehlivost: {conf.label}</p>
-          </TooltipContent>
-        </Tooltip>
       </button>
 
       {expanded && (
@@ -378,11 +392,10 @@ export function ValuationSection({ data }: { data: StockInfo }) {
       {/* Models list */}
       <div>
         {/* Table header */}
-        <div className="flex items-center gap-3 pb-2 text-xs text-muted-foreground uppercase tracking-wide">
+        <div className="hidden items-center gap-3 pb-2 text-xs text-muted-foreground uppercase tracking-wide md:flex">
           <div className="flex-1">Metoda</div>
           <div className="w-24 text-right">Fér. hodnota</div>
           <div className="w-16 text-right">Potenciál</div>
-          <div className="w-3.5" />
           <div className="w-3.5" />
         </div>
 

@@ -99,7 +99,7 @@ export function RichTextEditor({
   return (
     <div className="border border-input rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-ring">
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b border-border bg-muted/40">
+      <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/40 px-2 py-1">
         <Toggle
           size="sm"
           pressed={editor.isActive('heading', { level: 2 })}
@@ -199,7 +199,7 @@ export function RichTextEditor({
       {/* Editor area */}
       <EditorContent
         editor={editor}
-        className="prose prose-sm dark:prose-invert max-w-none px-3 py-2 min-h-[100px] focus:outline-none [&_.tiptap]:outline-none [&_.tiptap]:min-h-[80px] [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.tiptap_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none [&_.tiptap_p.is-editor-empty:first-child::before]:float-left [&_.tiptap_p.is-editor-empty:first-child::before]:h-0 [&_.tiptap_img]:max-w-full [&_.tiptap_img]:rounded-md"
+        className="theme-prose prose prose-sm dark:prose-invert max-w-none px-3 py-2 min-h-[100px] overflow-x-hidden focus:outline-none [&_.tiptap]:min-h-[80px] [&_.tiptap]:outline-none [&_.tiptap]:break-words [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none [&_.tiptap_p.is-editor-empty:first-child::before]:float-left [&_.tiptap_p.is-editor-empty:first-child::before]:h-0 [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.tiptap_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.tiptap_img]:max-w-full [&_.tiptap_img]:rounded-md"
       />
     </div>
   );

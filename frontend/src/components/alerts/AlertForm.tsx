@@ -138,7 +138,7 @@ export function AlertForm({
                 <ToggleGroupItem
                   value="price_both"
                   disabled
-                  className="flex-1 gap-1.5 border-violet-600 bg-violet-600 text-white disabled:opacity-100"
+                  className="flex-1 gap-1.5 border-primary bg-primary text-primary-foreground disabled:opacity-100"
                 >
                   <ArrowUpDown className="h-3.5 w-3.5" />
                   Cenové pásmo
@@ -158,14 +158,14 @@ export function AlertForm({
               >
                 <ToggleGroupItem
                   value="price_above"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-positive data-[state=on]:text-white"
                 >
                   <ArrowUp className="h-3.5 w-3.5" />
                   Nad
                 </ToggleGroupItem>
                 <ToggleGroupItem
                   value="price_below"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-rose-600 data-[state=on]:text-white"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-negative data-[state=on]:text-white"
                 >
                   <ArrowDown className="h-3.5 w-3.5" />
                   Pod
@@ -173,7 +173,7 @@ export function AlertForm({
                 {!editingAlert && (
                   <ToggleGroupItem
                     value="price_both"
-                    className="flex-1 gap-1.5 data-[state=on]:bg-violet-600 data-[state=on]:text-white"
+                    className="flex-1 gap-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
                     <ArrowUpDown className="h-3.5 w-3.5" />
                     Obě
@@ -181,7 +181,7 @@ export function AlertForm({
                 )}
                 <ToggleGroupItem
                   value="percent_change_day"
-                  className="flex-1 gap-1.5 data-[state=on]:bg-blue-600 data-[state=on]:text-white"
+                  className="flex-1 gap-1.5 data-[state=on]:bg-sky-600 data-[state=on]:text-white"
                 >
                   <Percent className="h-3.5 w-3.5" />
                   ±%

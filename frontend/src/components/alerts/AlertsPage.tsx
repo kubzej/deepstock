@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
-import { PageIntro, PageShell } from '@/components/shared/PageShell';
+import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { useStocks } from '@/hooks/useStocks';
 import { useQuotes } from '@/hooks/useQuotes';
 import {
@@ -280,43 +280,65 @@ export function AlertsPage() {
         </Alert>
       )}
 
-      <div className="space-y-2 md:space-y-0 md:flex md:items-center md:gap-3">
-        <div className="md:order-first md:flex-1">
-          <PillGroup>
-            <PillButton
-              active={filterView === 'active'}
-              onClick={() => setFilterView('active')}
-              count={activeCount}
-            >
-              Aktivní
-            </PillButton>
-            <PillButton
-              active={filterView === 'inactive'}
-              onClick={() => setFilterView('inactive')}
-              count={inactiveCount}
-            >
-              Neaktivní
-            </PillButton>
-          </PillGroup>
+      <PageTopRail>
+        <div className="space-y-2 md:flex md:items-center md:gap-3 md:space-y-0">
+          <div className="md:order-first md:flex-1">
+            <PillGroup>
+              <PillButton
+                active={filterView === 'active'}
+                onClick={() => setFilterView('active')}
+                count={activeCount}
+              >
+                Aktivní
+              </PillButton>
+              <PillButton
+                active={filterView === 'inactive'}
+                onClick={() => setFilterView('inactive')}
+                count={inactiveCount}
+              >
+                Neaktivní
+              </PillButton>
+            </PillGroup>
+          </div>
+          <div className="flex items-center justify-between md:order-last md:justify-end md:gap-2">
+            {!isSelectMode && (
+              <>
+                <Button onClick={() => setIsSuggestionsPanelOpen(true)} variant="outline">
+                  <Bot className="mr-1.5 h-4 w-4" />
+                  Návrhy AI
+                </Button>
+                <Button onClick={() => setIsSelectMode(true)} variant="outline">
+                  Vybrat
+                </Button>
+                <Button onClick={openCreateForm}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Nový alert
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex items-center justify-between md:order-last md:justify-end md:gap-2">
-          {!isSelectMode && (
-            <>
-              <Button onClick={() => setIsSuggestionsPanelOpen(true)} size="sm" variant="outline">
-                <Bot className="h-4 w-4 mr-1" />
-                Návrhy AI
-              </Button>
-              <Button onClick={() => setIsSelectMode(true)} size="sm" variant="outline">
-                Vybrat
-              </Button>
-              <Button onClick={openCreateForm} size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Nový alert
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+
+        {!alertsLoading && filteredAlerts.length > 0 && (
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filtrovat ticker..."
+              value={tickerFilter}
+              onChange={(e) => setTickerFilter(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {tickerFilter && (
+              <button
+                onClick={() => setTickerFilter('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </PageTopRail>
 
       {alertsLoading && (
         <div className="space-y-3">
@@ -339,26 +361,6 @@ export function AlertsPage() {
             filterView === 'active' ? { label: 'Vytvořit alert', onClick: openCreateForm } : undefined
           }
         />
-      )}
-
-      {!alertsLoading && filteredAlerts.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Filtrovat ticker..."
-            value={tickerFilter}
-            onChange={(e) => setTickerFilter(e.target.value)}
-            className="pl-9 pr-9"
-          />
-          {tickerFilter && (
-            <button
-              onClick={() => setTickerFilter('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
       )}
 
       {!alertsLoading && filteredAlerts.length > 0 && (

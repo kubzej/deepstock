@@ -18,7 +18,7 @@ export function UpdatePrompt() {
         <Button
           size="sm"
           variant="default"
-          className="bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 h-7 px-3 text-xs"
+          className="h-7 shrink-0 bg-positive px-3 text-xs text-white hover:bg-positive/90"
           onClick={() => updateServiceWorker(true)}
         >
           Aktualizovat
