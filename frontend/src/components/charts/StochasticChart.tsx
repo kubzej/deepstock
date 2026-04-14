@@ -35,8 +35,8 @@ const COLORS = {
   dLine: 'rgb(249 115 22)', // orange-500
   overbought: 'rgba(244, 63, 94, 0.1)', // rose-500 light
   oversold: 'rgba(16, 185, 129, 0.1)', // emerald-500 light
-  axis: 'hsl(var(--muted-foreground))',
-  reference: 'rgba(113, 113, 122, 0.3)',
+  axis: 'var(--muted-foreground)',
+  reference: 'var(--chart-reference)',
 };
 
 const OVERBOUGHT = 80;

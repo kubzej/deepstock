@@ -33,7 +33,7 @@ const COLORS = {
   obv: 'rgb(16 185 129)', // emerald-500
   obvFill: 'rgba(16, 185, 129, 0.1)',
   sma: 'rgb(249 115 22)', // orange-500
-  axis: 'hsl(var(--muted-foreground))',
+  axis: 'var(--muted-foreground)',
 };
 
 // ============================================================

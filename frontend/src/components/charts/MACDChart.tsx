@@ -35,8 +35,8 @@ const COLORS = {
   signal: 'rgb(249 115 22)', // orange-500
   histogramPositive: 'rgb(16 185 129)', // emerald-500
   histogramNegative: 'rgb(244 63 94)', // rose-500
-  axis: 'hsl(var(--muted-foreground))',
-  zero: 'rgba(113, 113, 122, 0.3)',
+  axis: 'var(--muted-foreground)',
+  zero: 'var(--chart-reference)',
 };
 
 // ============================================================

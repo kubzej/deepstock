@@ -157,8 +157,8 @@ const COLORS = {
   priceGradient: 'rgba(16, 185, 129, 0.1)',
   sma50: 'rgb(99 102 241)', // indigo-500 - medium term
   sma200: 'rgb(168 85 247)', // purple-500 - long term
-  axis: 'hsl(var(--muted-foreground))',
-  grid: 'rgba(63, 63, 70, 0.5)',
+  axis: 'var(--muted-foreground)',
+  grid: 'var(--chart-grid)',
 };
 
 export function MovingAveragesChart({ ticker }: MovingAveragesChartProps) {

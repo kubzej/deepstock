@@ -35,8 +35,8 @@ const COLORS = {
   plusDI: 'rgb(16 185 129)', // emerald-500 - bullish direction
   minusDI: 'rgb(244 63 94)', // rose-500 - bearish direction
   strongTrend: 'rgba(168, 85, 247, 0.08)',
-  axis: 'hsl(var(--muted-foreground))',
-  reference: 'rgba(113, 113, 122, 0.3)',
+  axis: 'var(--muted-foreground)',
+  reference: 'var(--chart-reference)',
 };
 
 const STRONG_TREND_THRESHOLD = 25;

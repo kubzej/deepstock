@@ -109,7 +109,7 @@ export function PriceChart({
   // Calculate if current price is up or down vs first price
   const priceChange = useMemo(() => {
     if (chartData.length < 2)
-      return { isPositive: true, color: 'hsl(var(--chart-1))' };
+      return { isPositive: true, color: 'var(--chart-1)' };
     const first = chartData[0].close;
     const last = chartData[chartData.length - 1].close;
     const isPositive = last >= first;
@@ -229,7 +229,7 @@ export function PriceChart({
 
       {/* Main chart */}
       <div
-        className="w-full border-0"
+        className="w-full rounded-xl border border-border/50 bg-card/45 p-3"
         style={{ height }}
         onMouseLeave={handleMouseLeave}
       >
@@ -260,7 +260,7 @@ export function PriceChart({
             <XAxis
               dataKey="date"
               tickFormatter={(date) => formatXAxisDate(date, selectedRange)}
-              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
               axisLine={false}
               tickLine={false}
               minTickGap={50}
@@ -269,7 +269,7 @@ export function PriceChart({
             <YAxis
               domain={priceDomain}
               tickFormatter={(value) => formatNumber(value, yAxisDecimals)}
-              tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
               axisLine={false}
               tickLine={false}
               orientation="right"

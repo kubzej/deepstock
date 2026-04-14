@@ -35,7 +35,7 @@ const COLORS = {
   bands: 'rgb(99 102 241)', // indigo-500
   bandsFill: 'rgba(99, 102, 241, 0.1)',
   middle: 'rgb(168 85 247)', // purple-500
-  axis: 'hsl(var(--muted-foreground))',
+  axis: 'var(--muted-foreground)',
 };
 
 // ============================================================

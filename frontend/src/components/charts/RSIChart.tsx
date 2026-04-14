@@ -188,9 +188,7 @@ export function RSIChart({ ticker }: RSIChartProps) {
       period={period}
       onPeriodChange={setPeriod}
     >
-      <div className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-xs">
-        <RSIGauge value={currentRsi} />
-      </div>
+      <RSIGauge value={currentRsi} />
     </ChartWrapper>
   );
 }

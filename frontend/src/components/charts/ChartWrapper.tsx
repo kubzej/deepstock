@@ -149,7 +149,9 @@ export function ChartWrapper({
       </div>
 
       {/* Chart */}
-      <div>{children}</div>
+      <div className="rounded-2xl border border-border/60 bg-card/45 p-4 shadow-xs">
+        {children}
+      </div>
 
       {/* Evaluation section */}
       {(signal || evaluation) && (

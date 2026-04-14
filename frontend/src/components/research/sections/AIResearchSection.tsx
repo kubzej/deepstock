@@ -3,11 +3,12 @@
  * Requires: npm install react-markdown
  */
 import { useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { Bot, RefreshCw, Download, Loader2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateReport, getCachedReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
+import { queryKeys } from '@/lib/queryClient';
 import {
   EmptyState,
   ErrorState,
@@ -23,6 +24,7 @@ interface AIResearchSectionProps {
 }
 
 export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionProps) {
+  const queryClient = useQueryClient();
   const [activeReportType, setActiveReportType] = useState<ReportType>('full_analysis');
   const [generated, setGenerated] = useState<Partial<Record<ReportType, AIResearchReport>>>({});
   const [loading, setLoading] = useState<ReportType | null>(null);
@@ -53,6 +55,13 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
       const period = '3mo';
       const report = await generateReport(ticker, currentPrice, activeReportType, forceRefresh, period);
       setGenerated((prev) => ({ ...prev, [activeReportType]: report }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() }),
+        queryClient.invalidateQueries({ queryKey: ['journalEntries'] }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.journalEntriesByTicker(ticker),
+        }),
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {
@@ -77,13 +86,23 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
     <div className="space-y-4">
       <Tabs value={activeReportType} onValueChange={(v) => setActiveReportType(v as ReportType)}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <TabsList>
-              <TabsTrigger value="full_analysis">Plná analýza</TabsTrigger>
-              <TabsTrigger value="technical_analysis">Technická analýza</TabsTrigger>
-              <TabsTrigger value="briefing">Kvartální briefing</TabsTrigger>
-            </TabsList>
-
+          <div className="min-w-0 flex-1">
+            <div className="-mx-1 overflow-x-auto px-1 pb-1">
+              <TabsList className="inline-flex min-w-max">
+                <TabsTrigger value="full_analysis">
+                  <span className="sm:hidden">Plná</span>
+                  <span className="hidden sm:inline">Plná analýza</span>
+                </TabsTrigger>
+                <TabsTrigger value="technical_analysis">
+                  <span className="sm:hidden">Technická</span>
+                  <span className="hidden sm:inline">Technická analýza</span>
+                </TabsTrigger>
+                <TabsTrigger value="briefing">
+                  <span className="sm:hidden">Briefing</span>
+                  <span className="hidden sm:inline">Kvartální briefing</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
           {currentReport && (

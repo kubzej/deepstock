@@ -1,4 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 
 export function ExchangeRatesBanner() {
@@ -7,11 +8,14 @@ export function ExchangeRatesBanner() {
   if (!ratesError) return null;
 
   return (
-    <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-4 py-2.5 flex items-center gap-2.5">
+    <Alert
+      variant="destructive"
+      className="rounded-none border-0 bg-destructive/8 px-4 py-2.5 text-sm shadow-none"
+    >
       <AlertTriangle className="h-4 w-4 shrink-0" />
-      <span>
+      <AlertDescription>
         Kurzy měn nejsou dostupné — CZK hodnoty mohou být nepřesné.
-      </span>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
