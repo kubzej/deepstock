@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
  * US Stock Market hours (Eastern Time):
  * - Pre-market: 4:00 AM - 9:30 AM ET
  * - Regular: 9:30 AM - 4:00 PM ET
- * - After-hours: 4:00 PM - 8:00 PM ET
+ * - After-market: 4:00 PM - 8:00 PM ET
  * - Closed: 8:00 PM - 4:00 AM ET (and weekends)
  */
 export type MarketStatus = 'pre-market' | 'open' | 'after-hours' | 'closed';
@@ -45,9 +45,9 @@ export function getUSMarketStatus(): MarketStatusInfo {
     return { status: 'open', label: 'Trh otevřen', labelShort: 'Live' };
   }
 
-  // After-hours: 4:00 PM - 8:00 PM ET (960 - 1200 minutes)
+  // After-market: 4:00 PM - 8:00 PM ET (960 - 1200 minutes)
   if (timeInMinutes >= 960 && timeInMinutes < 1200) {
-    return { status: 'after-hours', label: 'After-hours', labelShort: 'AH' };
+    return { status: 'after-hours', label: 'After-market', labelShort: 'After' };
   }
 
   // Closed: before 4 AM or after 8 PM

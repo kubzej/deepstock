@@ -266,11 +266,11 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
             </div>
           )}
 
-          {/* After-hours Change - show only if data available */}
+          {/* After-market Change - show only if data available */}
           {extendedHoursData.hasPostMarket && (
             <div>
               <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-                After-hours
+                After-market
               </span>
               <span className="text-lg font-mono-price font-semibold text-sky-500">
                 {formatCurrency(extendedHoursData.postMarketChangeCzk)}
