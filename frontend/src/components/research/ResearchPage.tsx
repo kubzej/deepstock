@@ -198,6 +198,7 @@ export function ResearchPage() {
       queryFn: () => fetchStockInfo(activeTicker!),
       enabled: !!activeTicker,
       staleTime: 5 * 60 * 1000,
+      retry: false,
     });
 
   const { data: channels = [] } = useJournalChannels();

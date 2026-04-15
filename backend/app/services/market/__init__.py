@@ -15,7 +15,7 @@ from app.core.redis import get_redis
 # Import modular functions
 from .quotes import get_quotes, get_price_history
 from .options_quotes import get_option_quotes
-from .stock_info import get_stock_info
+from .stock_info import get_stock_info, StockInfoUnavailableError
 from .technical import get_technical_indicators
 from .financials import get_historical_financials
 

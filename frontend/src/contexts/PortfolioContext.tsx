@@ -300,6 +300,7 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['portfolios'] }),
       queryClient.invalidateQueries({ queryKey: ['holdings'] }),
       queryClient.invalidateQueries({ queryKey: ['openLots'] }),
+      queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] }),
       queryClient.invalidateQueries({ queryKey: ['quotes'] }),
       queryClient.invalidateQueries({ queryKey: ['exchangeRates'] }),
       queryClient.invalidateQueries({ queryKey: ['transactions'] }),

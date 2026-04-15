@@ -56,6 +56,7 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
       queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
@@ -81,6 +82,7 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
       queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
@@ -108,6 +110,7 @@ export function useUpdateTransaction() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
+      queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
       queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });

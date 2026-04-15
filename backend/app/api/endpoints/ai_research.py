@@ -18,6 +18,7 @@ from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
+from app.services.market.stock_info import StockInfoUnavailableError
 from app.ai.research_service import build_cache_key
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,13 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
 
     # Fetch yfinance data (uses existing cache)
     redis = get_redis()
-    stock_data = await market_service.get_stock_info(ticker)
+    try:
+        stock_data = await market_service.get_stock_info(ticker)
+    except StockInfoUnavailableError:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Stock data provider is temporarily unavailable for {ticker}",
+        )
     if not stock_data:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found")
 
@@ -122,7 +129,13 @@ async def download_pdf(
                 detail="Report není v cache. Nejprve vygenerujte report nebo předejte current_price."
             )
         # Generate on-the-fly
-        stock_data = await market_service.get_stock_info(ticker)
+        try:
+            stock_data = await market_service.get_stock_info(ticker)
+        except StockInfoUnavailableError:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Stock data provider is temporarily unavailable for {ticker}",
+            )
         if not stock_data:
             raise HTTPException(status_code=404, detail=f"Ticker {ticker} not found")
 

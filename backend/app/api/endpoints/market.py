@@ -2,6 +2,7 @@ import json
 import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.market import market_service
+from app.services.market.stock_info import StockInfoUnavailableError
 from app.services.exchange import exchange_service
 from app.core.auth import get_current_user_id
 from app.core.redis import get_redis
@@ -61,9 +62,15 @@ async def get_stock_info(ticker: str, user_id: str = Depends(get_current_user_id
     Get detailed stock info including fundamentals and valuation.
     Returns price, valuation ratios, margins, growth metrics, analyst targets.
     """
-    result = await market_service.get_stock_info(ticker.upper())
+    try:
+        result = await market_service.get_stock_info(ticker.upper())
+    except StockInfoUnavailableError:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Stock data provider is temporarily unavailable for {ticker.upper()}",
+        )
     if result is None:
-        return {"error": "Ticker not found"}
+        raise HTTPException(status_code=404, detail=f"Ticker {ticker.upper()} not found")
     return result
 
 
@@ -140,4 +147,3 @@ async def get_technical_indicators(ticker: str, period: str = "1y", user_id: str
     if result is None:
         return {"error": "Unable to calculate technical indicators for this ticker"}
     return result
-
