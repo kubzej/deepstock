@@ -16,14 +16,14 @@ Strategy:
 class CacheTTL:
     # ── Market data ───────────────────────────────────────────────
     QUOTE_BASIC = 300               # 5 min  — price, change, volume
-    QUOTE_EXTENDED = 3600           # 1 hour — pre/post market, earnings date
+    QUOTE_EXTENDED = 14400          # 4 hours — pre/post market, earnings date
     OPTION_QUOTE = 300               # 5 min  — aligned with frontend staleTime
     PRICE_HISTORY_INTRADAY = 60     # 1 min  — 1d / 5d charts
     PRICE_HISTORY_SHORT = 3600      # 1 hour — 1mo / 3mo charts
     PRICE_HISTORY_LONG = 86400      # 24 hours — 6mo+ charts
 
     # ── Research ──────────────────────────────────────────────────
-    STOCK_INFO = 300                # 5 min  — fundamentals + valuation
+    STOCK_INFO = 1800               # 30 min — fundamentals + valuation (data mění se max. kvartálně)
     TECHNICAL_RAW = 3600            # 1 hour — 2y raw OHLCV + computed indicators
     TECHNICAL_SIGNALS = 300         # 5 min  — filtered signals per period
 
