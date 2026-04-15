@@ -296,7 +296,7 @@ path.recharts-area-area {
 /* Mobile main content - accounts for header + safe area */
 @media (max-width: 767px) {
   .pt-header-mobile {
-    padding-top: calc(64px + env(safe-area-inset-top, 0px));
+    padding-top: calc(64px + env(safe-area-inset-top, 0px) + 8px);
   }
   
   .pb-content-mobile {

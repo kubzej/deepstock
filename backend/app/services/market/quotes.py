@@ -134,15 +134,18 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         return None
 
 
-async def _fetch_and_cache_extended_data(redis, ticker: str):
+async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0):
     """
     Fetch extended data in background and cache it.
     Fire-and-forget - errors are logged but don't propagate.
+    delay: seconds to wait before fetching (used to stagger burst requests)
     """
     try:
+        if delay > 0:
+            await asyncio.sleep(delay)
         loop = asyncio.get_event_loop()
         ext_data = await loop.run_in_executor(_executor, _fetch_extended_data_sync, ticker)
-        
+
         if ext_data:
             await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=CacheTTL.QUOTE_EXTENDED)
             logger.debug(f"Cached extended data for {ticker}")
@@ -182,7 +185,13 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
                 threads=True
             )
             
-            if not df.empty:
+            if df.empty:
+                logger.warning(
+                    "yf.download() returned empty DataFrame for %d tickers %s — "
+                    "possible Yahoo Finance rate limit (429) or connectivity issue",
+                    len(missing_basic), missing_basic,
+                )
+            else:
                 for t in missing_basic:
                     try:
                         ticker_data = _normalize_ticker_data(df, t)
@@ -256,12 +265,11 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
             missing_extended.append(t)
     
     # Fire-and-forget: schedule background fetch for missing extended data
-    # This doesn't block the response - data will be in cache for next request
+    # Staggered with 0.5s delay per ticker to avoid burst on Yahoo Finance
     if missing_extended:
-        for t in missing_extended:
-            # Create background task that won't block response
-            asyncio.create_task(_fetch_and_cache_extended_data(redis, t))
-        logger.debug(f"Scheduled background fetch for {len(missing_extended)} tickers")
+        for i, t in enumerate(missing_extended):
+            asyncio.create_task(_fetch_and_cache_extended_data(redis, t, delay=i * 0.5))
+        logger.debug(f"Scheduled staggered background fetch for {len(missing_extended)} tickers")
     
     return results
 

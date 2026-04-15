@@ -12,6 +12,10 @@ from app.services.market.financials import get_historical_financials
 logger = logging.getLogger(__name__)
 
 
+class StockInfoUnavailableError(Exception):
+    """Raised when upstream market data is temporarily unavailable."""
+
+
 # ============================================================
 # SECTOR RULES CONFIGURATION
 # ============================================================
@@ -2132,5 +2136,40 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         return result
         
     except Exception as e:
-        logger.error(f"Error fetching stock info for {ticker}: {e}")
-        return None
+        error_text = str(e).lower()
+        is_timeout = "timed out" in error_text or "failed to perform, curl" in error_text
+        is_throttled = "429" in error_text or "too many requests" in error_text
+        is_upstream_500 = "request failed" in error_text or "http error 500" in error_text
+        is_tls_error = "tls connect error" in error_text or "openssl_internal" in error_text
+
+        if is_throttled:
+            logger.warning(
+                "Stock info upstream appears throttled for %s (Yahoo/yfinance 429): %s",
+                ticker,
+                e,
+            )
+        elif is_timeout:
+            logger.warning(
+                "Stock info upstream timed out for %s (likely Yahoo throttle/degradation): %s",
+                ticker,
+                e,
+            )
+        elif is_tls_error:
+            logger.warning(
+                "Stock info upstream TLS/connectivity issue for %s: %s",
+                ticker,
+                e,
+            )
+        else:
+            logger.error(f"Error fetching stock info for {ticker}: {e}")
+
+        if (
+            is_timeout
+            or is_throttled
+            or is_upstream_500
+            or is_tls_error
+        ):
+            raise StockInfoUnavailableError(
+                f"Upstream provider temporarily unavailable for {ticker}"
+            ) from e
+        raise

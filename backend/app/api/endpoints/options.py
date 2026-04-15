@@ -12,6 +12,7 @@ from app.services.options import (
 from app.services.portfolio import portfolio_service
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
+from app.core.redis import get_redis
 from typing import Optional, List
 from datetime import date, datetime, timedelta
 
@@ -313,6 +314,11 @@ async def refresh_option_prices(
     Refresh option prices from Yahoo Finance for all holdings.
     Fetches live prices using yfinance and updates the cache.
     """
+    redis = get_redis()
+    cooldown_key = f"option_refresh_cooldown:{user_id}"
+    if await redis.get(cooldown_key):
+        return {"updated": 0, "message": "Refresh byl nedávno proveden, zkuste za chvíli"}
+
     # Get holdings to know which symbols to refresh
     if portfolio_id:
         if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
@@ -329,7 +335,9 @@ async def refresh_option_prices(
     
     # Fetch live prices
     results = await options_service.fetch_live_prices(option_symbols)
-    
+
+    await redis.set(cooldown_key, "1", ex=300)  # 5min cooldown
+
     return {
         "updated": len(results),
         "total": len(option_symbols),
