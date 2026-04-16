@@ -34,6 +34,8 @@ frontend/dist/
 # IDE
 .vscode/*
 !.vscode/extensions.json
+!.vscode/mcp.json
+.cursor/mcp.json
 .idea/
 *.swp
 *.swo
