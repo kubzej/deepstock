@@ -114,6 +114,31 @@ Returns:
 - note metadata
 - full `content`
 
+### `save_stock_journal_note(ticker, content)`
+
+Use only when the user explicitly wants to save a stock-specific takeaway from
+the current single-ticker conversation.
+
+Input:
+
+- `ticker`: target stock symbol
+- `content`: final user-approved plain-text note
+
+Returns:
+
+- created entry ID
+- resolved stock ticker
+- resolved journal channel ID
+- saved plaintext content
+- metadata for the created note
+
+Important:
+
+- This is intentionally the only MCP write-back tool
+- Backend resolves the stock journal channel; the agent does not choose a channel ID
+- Content is stored as a normal `note` entry, not as raw transcript
+- This should be used only after explicit user approval
+
 ### `get_investment_activity(ticker)`
 
 Use for full trade history and option detail.
@@ -324,6 +349,23 @@ Returns:
 }
 ```
 
+## `save_stock_journal_note`
+
+```json
+{
+  "entry_id": "uuid",
+  "ticker": "NVDA",
+  "channel_id": "uuid",
+  "created_at": "2026-04-17T10:00:00Z",
+  "content_plaintext": "Pulled back into support. Keep watching margins.",
+  "metadata": {
+    "ticker": "NVDA",
+    "source": "mcp_stock_note",
+    "price_at_creation": 110.0
+  }
+}
+```
+
 ## `get_investment_activity`
 
 ```json
@@ -343,6 +385,7 @@ Returns:
 - `journal_context.reports[]` and archive `reports[]` are previews, not full report content
 - `position_summary.total_cost` is the open-position cost basis in the instrument currency
 - `get_investment_activity` is the full transaction detail endpoint
+- `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML
 - `get_portfolio_context` defaults to aggregated multi-portfolio scope; holdings and transactions retain portfolio identity
 - `get_portfolio_performance` is the analytical layer above transactions, not a raw transaction dump
 - `get_market_context` intentionally stays compact: sentiment + FX + macro quotes only

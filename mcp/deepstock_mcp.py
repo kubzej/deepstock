@@ -86,6 +86,18 @@ async def _api_get(path: str, params: dict | None = None) -> dict:
         return response.json()
 
 
+async def _api_post(path: str, payload: dict) -> dict:
+    token = await _get_token()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"{API_URL}{path}",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        response.raise_for_status()
+        return response.json()
+
+
 @mcp.tool()
 async def list_portfolios() -> dict:
     """
@@ -228,6 +240,25 @@ async def get_note_content(note_id: str) -> dict:
     note_id: the UUID from journal_context.notes[].id or research_archive notes[].id
     """
     return await _api_get(f"/api/mcp/note/{note_id}")
+
+
+@mcp.tool()
+async def save_stock_journal_note(ticker: str, content: str) -> dict:
+    """
+    Save a plain-text journal note for a specific stock ticker.
+
+    Use only after the user explicitly wants to save a stock-specific insight
+    from the current conversation. This tool is intentionally narrow: the
+    backend resolves the stock journal channel and stores the note as a normal
+    `note` entry for that ticker.
+
+    ticker: stock symbol for the current single-stock conversation
+    content: final user-approved plain-text note to save
+    """
+    return await _api_post(
+        "/api/mcp/stock-journal-note",
+        {"ticker": ticker.upper(), "content": content},
+    )
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ Builds a ticker-specific dossier from existing DeepStock domains:
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import re
 from datetime import datetime, timezone
@@ -21,7 +22,7 @@ from app.core.supabase import supabase
 from app.core.cache import CacheTTL
 from app.core.redis import get_redis
 from app.services.exchange import exchange_service
-from app.services.journal import journal_service
+from app.services.journal import EntryCreate, journal_service
 from app.services.market import market_service
 from app.services.options import options_service
 from app.services.performance import get_options_performance, get_stock_performance
@@ -94,6 +95,17 @@ def _preview_text(content: str, max_chars: int = 280) -> str:
     if len(preview) > max_chars:
         return preview[:max_chars].rstrip() + "..."
     return preview
+
+
+def _plain_text_note_to_html(content: str) -> str:
+    normalized = content.replace("\r\n", "\n").strip()
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", normalized) if part.strip()]
+    if not paragraphs:
+        return "<p></p>"
+    return "".join(
+        f"<p>{html.escape(paragraph).replace(chr(10), '<br>')}</p>"
+        for paragraph in paragraphs
+    )
 
 
 def _serialize_note_preview(entry: dict) -> dict:
@@ -786,6 +798,33 @@ class ResearchContextService:
             "type": row.get("type") or "note",
             "content": row.get("content") or "",
             "metadata": row.get("metadata") or {},
+        }
+
+    async def save_stock_journal_note(self, ticker: str, content: str, user_id: str) -> dict:
+        normalized_ticker = ticker.upper()
+        channel = await journal_service.get_channel_by_ticker(normalized_ticker, user_id=user_id)
+        if not channel:
+            raise ValueError(f"Stock journal channel for {normalized_ticker} not found")
+
+        entry = await journal_service.create_entry(
+            EntryCreate(
+                channel_id=channel["id"],
+                type="note",
+                content=_plain_text_note_to_html(content),
+                metadata={
+                    "ticker": normalized_ticker,
+                    "source": "mcp_stock_note",
+                },
+            ),
+            redis=get_redis(),
+        )
+        return {
+            "entry_id": entry.get("id"),
+            "ticker": normalized_ticker,
+            "channel_id": channel["id"],
+            "created_at": entry.get("created_at"),
+            "content_plaintext": content,
+            "metadata": entry.get("metadata") or {},
         }
 
     async def get_investment_activity(self, ticker: str, user_id: str) -> dict:

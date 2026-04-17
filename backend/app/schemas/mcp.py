@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TickerInfoResponse(BaseModel):
@@ -240,6 +240,36 @@ class NoteContentResponse(BaseModel):
     updated_at: Optional[str] = None
     type: str = "note"
     content: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SaveStockJournalNoteRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=20)
+    content: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("ticker")
+    @classmethod
+    def validate_ticker(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("Ticker cannot be empty")
+        return normalized
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Content cannot be empty")
+        return stripped
+
+
+class SaveStockJournalNoteResponse(BaseModel):
+    entry_id: str
+    ticker: str
+    channel_id: str
+    created_at: Optional[str] = None
+    content_plaintext: str
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

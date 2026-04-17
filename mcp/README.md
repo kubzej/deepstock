@@ -15,6 +15,7 @@ Exposes DeepStock research data as tools for Claude Code, Cursor, or any MCP-com
 | `get_research_archive` | Report and note previews for a ticker |
 | `get_report_content` | Full markdown content of a specific report by ID |
 | `get_note_content` | Full content of a specific journal note by ID |
+| `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker |
 | `get_investment_activity` | Transaction history, cost basis, open option positions |
 
 See [CONTRACT.md](CONTRACT.md) for the response shapes, field semantics, and
@@ -34,11 +35,14 @@ Recommended call flow:
    - `get_report_content` for one specific full report
    - `get_note_content` for one specific full note
    - `get_technical_history` for technical follow-up
+5. Only if the user explicitly wants to save a takeaway from a single-stock chat:
+   - `save_stock_journal_note` with the final approved plain-text note
 
 This is intentional:
 
 - `get_stock_context` is summary-first so the first chat turn stays readable
 - full-fidelity data are still available via the drilldown tools
+- `save_stock_journal_note` is the only write tool and stays intentionally narrow
 
 ## Prerequisites
 

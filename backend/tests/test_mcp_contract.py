@@ -7,6 +7,8 @@ from app.schemas.mcp import (
     PortfolioPerformanceResponse,
     ReportContentResponse,
     ResearchArchiveResponse,
+    SaveStockJournalNoteRequest,
+    SaveStockJournalNoteResponse,
     StockContextResponse,
     TechnicalHistoryResponse,
 )
@@ -201,6 +203,33 @@ def test_detail_contracts_accept_full_content_payloads():
     assert note.type == "note"
     assert technical.period == "6mo"
     assert activity.position_summary.currency == "USD"
+
+
+def test_save_stock_journal_note_contract_accepts_writeback_shape():
+    request = SaveStockJournalNoteRequest.model_validate(
+        {
+            "ticker": " nvda ",
+            "content": "Conviction is improving after the recent pullback.\n\nKeep watching margins.",
+        }
+    )
+    response = SaveStockJournalNoteResponse.model_validate(
+        {
+            "entry_id": "note-1",
+            "ticker": "NVDA",
+            "channel_id": "channel-1",
+            "created_at": "2026-04-17T10:00:00Z",
+            "content_plaintext": "Conviction is improving after the recent pullback.\n\nKeep watching margins.",
+            "metadata": {
+                "ticker": "NVDA",
+                "source": "mcp_stock_note",
+                "price_at_creation": 110.0,
+            },
+        }
+    )
+
+    assert request.ticker == "NVDA"
+    assert request.content.startswith("Conviction")
+    assert response.metadata["source"] == "mcp_stock_note"
 
 
 def test_portfolio_and_market_contracts_accept_expected_shapes():

@@ -1,7 +1,7 @@
 """
 MCP endpoints for DeepStock-backed chat workflows.
 
-Read-only endpoints that expose ticker-specific context for external chat agents.
+Summary-first MCP endpoints and narrow write-back actions for external chat agents.
 """
 from typing import Optional
 
@@ -19,6 +19,8 @@ from app.schemas.mcp import (
     PortfolioPerformanceResponse,
     ReportContentResponse,
     ResearchArchiveResponse,
+    SaveStockJournalNoteRequest,
+    SaveStockJournalNoteResponse,
     StockContextResponse,
     TechnicalHistoryResponse,
 )
@@ -166,6 +168,24 @@ async def get_note_content(
     del request
     try:
         return await research_context_service.get_note_content(note_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/stock-journal-note", response_model=SaveStockJournalNoteResponse)
+@limiter.limit("10/minute")
+async def save_stock_journal_note(
+    request: Request,
+    payload: SaveStockJournalNoteRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        return await research_context_service.save_stock_journal_note(
+            ticker=payload.ticker,
+            content=payload.content,
+            user_id=user_id,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
