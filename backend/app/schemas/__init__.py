@@ -31,6 +31,18 @@ from .price_alerts import (
     PriceAlertResetRequest,
     PriceAlertTriggerInfo,
 )
+from .mcp import (
+    GlobalMarketContextResponse,
+    StockContextResponse,
+    InvestmentActivityResponse,
+    TechnicalHistoryResponse,
+    ResearchArchiveResponse,
+    ReportContentResponse,
+    NoteContentResponse,
+    PortfolioContextResponse,
+    PortfolioListResponse,
+    PortfolioPerformanceResponse,
+)
 
 __all__ = [
     # Portfolio
@@ -54,4 +66,15 @@ __all__ = [
     "PriceAlertResponse",
     "PriceAlertResetRequest",
     "PriceAlertTriggerInfo",
+    # MCP
+    "StockContextResponse",
+    "InvestmentActivityResponse",
+    "TechnicalHistoryResponse",
+    "ResearchArchiveResponse",
+    "ReportContentResponse",
+    "NoteContentResponse",
+    "PortfolioListResponse",
+    "PortfolioContextResponse",
+    "PortfolioPerformanceResponse",
+    "GlobalMarketContextResponse",
 ]

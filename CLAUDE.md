@@ -34,6 +34,37 @@ cd frontend && npm run dev
 
 All calculations (scores, indicators, aggregations) happen in Python. Frontend is presentation only. Frontend NEVER calls external APIs directly — always through FastAPI.
 
+### MCP Is A Public Contract
+
+DeepStock is also an MCP provider consumed by external agents. Treat the MCP surface as a public integration contract, not just internal backend glue.
+
+When changing chat, research, journal, portfolio-context, performance, or market-context behavior, always consider both:
+
+1. DeepStock internal implementation
+2. The external MCP contract agents depend on
+
+Rules:
+
+- `backend/app/api/endpoints/mcp.py` and `mcp/deepstock_mcp.py` are public integration surface
+- prefer summary-first default tools/endpoints, with separate drilldown tools for full detail
+- do not silently rename or reshape MCP payloads without updating docs and downstream agent instructions
+- full-content endpoints for user data must always be scoped to the authenticated user
+- multi-portfolio behavior must be explicit; never rely on a hidden active-portfolio assumption
+
+If MCP changes, update these together:
+
+- `backend/app/api/endpoints/mcp.py`
+- `backend/app/services/research_context.py`
+- `backend/app/schemas/mcp.py`
+- `mcp/deepstock_mcp.py`
+- `mcp/CONTRACT.md`
+- `mcp/README.md`
+
+Felix depends on this contract too. If tool names, tool purpose, response shape, or recommended call order change, keep the mirrored Felix prompts aligned:
+
+- `../felix/.agents/skills/felix-invest/SKILL.md`
+- `../felix/.claude/commands/felix.invest.md`
+
 ### yfinance Rate Limiting — BE CAREFUL
 
 yfinance hits Yahoo Finance which aggressively rate-limits. Follow these rules strictly:

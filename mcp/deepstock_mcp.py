@@ -87,13 +87,63 @@ async def _api_get(path: str, params: dict | None = None) -> dict:
 
 
 @mcp.tool()
+async def list_portfolios() -> dict:
+    """
+    List available portfolios for the authenticated DeepStock user.
+
+    Use this when the user refers to a specific portfolio by name, or when
+    you need to decide whether to talk about all portfolios or one of them.
+    """
+    return await _api_get("/api/mcp/portfolios")
+
+
+@mcp.tool()
+async def get_portfolio_context(portfolio_id: str = "") -> dict:
+    """
+    Get the current portfolio state: holdings, snapshot, sector exposure,
+    recent transactions, and open-lot summary.
+
+    Leave portfolio_id empty to aggregate across all portfolios.
+    """
+    params = {"portfolio_id": portfolio_id} if portfolio_id else None
+    return await _api_get("/api/mcp/portfolio-context", params=params)
+
+
+@mcp.tool()
+async def get_portfolio_performance(period: str = "1Y", portfolio_id: str = "") -> dict:
+    """
+    Get historical portfolio performance over time.
+
+    Returns stock and options performance for the requested period.
+    Leave portfolio_id empty to aggregate across all portfolios.
+    """
+    params = {"period": period}
+    if portfolio_id:
+        params["portfolio_id"] = portfolio_id
+    return await _api_get("/api/mcp/portfolio-performance", params=params)
+
+
+@mcp.tool()
+async def get_market_context() -> dict:
+    """
+    Get the current market backdrop used for portfolio conversations.
+
+    Returns Fear & Greed sentiment, core FX rates to CZK, and quotes for the
+    same macro tickers tracked in the DeepStock market overview.
+    """
+    return await _api_get("/api/mcp/market-context")
+
+
+@mcp.tool()
 async def get_stock_context(ticker: str) -> dict:
     """
-    Get full research dossier for a ticker.
+    Get the default chat entry point for a ticker.
 
-    Returns ticker info, your journal notes and AI reports, investment activity
-    (stock + options), watchlist targets, and current market context with
-    fundamentals, valuation, smart analysis, and technical summary.
+    Returns a lean cross-domain summary: company identity, journal previews,
+    position/watchlist summary, and market context. Use this first when the
+    user asks about a stock. If you need full detail, follow up with the
+    drilldown tools below instead of expecting full transactions or full
+    journal content inline.
 
     Use this as the first call when the user asks about any stock.
     """
@@ -125,10 +175,12 @@ async def get_technical_history(
 @mcp.tool()
 async def get_research_archive(ticker: str, limit: int = 10) -> dict:
     """
-    Get older AI research reports and journal notes for a ticker.
+    Get report and note previews for a ticker.
 
     Use for questions like "what did I think about this stock 6 months ago"
-    or when comparing current state to historical research.
+    or when comparing current state to historical research. This returns
+    preview/index data; fetch the full body with get_report_content or
+    get_note_content only when needed.
 
     limit: number of reports/notes to return (1-50)
     """
@@ -163,6 +215,19 @@ async def get_report_content(report_id: str) -> dict:
     report_id: the UUID from get_research_archive reports[].id
     """
     return await _api_get(f"/api/mcp/report/{report_id}")
+
+
+@mcp.tool()
+async def get_note_content(note_id: str) -> dict:
+    """
+    Get full content of a specific journal note.
+
+    Use after get_stock_context or get_research_archive when a note preview
+    looks relevant and you need the full text.
+
+    note_id: the UUID from journal_context.notes[].id or research_archive notes[].id
+    """
+    return await _api_get(f"/api/mcp/note/{note_id}")
 
 
 if __name__ == "__main__":

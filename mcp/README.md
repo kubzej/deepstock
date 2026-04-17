@@ -6,11 +6,39 @@ Exposes DeepStock research data as tools for Claude Code, Cursor, or any MCP-com
 
 | Tool | Description |
 |---|---|
-| `get_stock_context` | Full research dossier — fundamentals, valuation, technicals, journal, activity |
+| `list_portfolios` | List available portfolios and their snapshot summaries |
+| `get_portfolio_context` | Current holdings/snapshot context for all portfolios or one selected portfolio |
+| `get_portfolio_performance` | Historical stock/options performance for all portfolios or one selected portfolio |
+| `get_market_context` | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview |
+| `get_stock_context` | Default first call — lean ticker summary across journal, activity, watchlist, and market |
 | `get_technical_history` | Detailed indicator history (RSI, MACD, Bollinger, ADX, Fibonacci, …) |
-| `get_research_archive` | Older AI reports and journal notes for a ticker |
+| `get_research_archive` | Report and note previews for a ticker |
 | `get_report_content` | Full markdown content of a specific report by ID |
+| `get_note_content` | Full content of a specific journal note by ID |
 | `get_investment_activity` | Transaction history, cost basis, open option positions |
+
+See [CONTRACT.md](CONTRACT.md) for the response shapes, field semantics, and
+tool-selection guidance.
+
+## How To Use The Surface
+
+Recommended call flow:
+
+1. If the conversation is portfolio-level, start with `list_portfolios()` and/or `get_portfolio_context()`
+2. If the conversation is market-level, start with `get_market_context()`
+3. If the conversation is ticker-level, start with `get_stock_context("NVDA")`
+4. Then only fetch the branch you actually need:
+   - `get_portfolio_performance` for historical portfolio performance
+   - `get_investment_activity` for full trade history
+   - `get_research_archive` to browse older notes/reports
+   - `get_report_content` for one specific full report
+   - `get_note_content` for one specific full note
+   - `get_technical_history` for technical follow-up
+
+This is intentional:
+
+- `get_stock_context` is summary-first so the first chat turn stays readable
+- full-fidelity data are still available via the drilldown tools
 
 ## Prerequisites
 

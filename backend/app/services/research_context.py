@@ -11,18 +11,58 @@ Builds a ticker-specific dossier from existing DeepStock domains:
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Iterable, Literal, Optional
 
+import httpx
 from app.core.supabase import supabase
+from app.core.cache import CacheTTL
+from app.core.redis import get_redis
+from app.services.exchange import exchange_service
 from app.services.journal import journal_service
 from app.services.market import market_service
 from app.services.options import options_service
+from app.services.performance import get_options_performance, get_stock_performance
 from app.services.portfolio import portfolio_service
 from app.services.stocks import stock_service
 
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
+
+MACRO_MARKET_INDICATORS = [
+    {
+        "ticker": "GLD",
+        "name": "Zlato",
+        "description": "Safe haven. Roste pri nejistote a inflaci.",
+        "inverted": False,
+    },
+    {
+        "ticker": "TLT",
+        "name": "Dluhopisy 20Y",
+        "description": "Dlouhodobe US Treasury. Roste = flight to safety, pada = sazby nahoru.",
+        "inverted": False,
+    },
+    {
+        "ticker": "HYG",
+        "name": "High Yield",
+        "description": "Junk bonds. Kdyz pada = risk-off, investori se boji.",
+        "inverted": False,
+    },
+    {
+        "ticker": "UUP",
+        "name": "Dolar",
+        "description": "Silny dolar = tlak na emerging markets a komodity.",
+        "inverted": False,
+    },
+    {
+        "ticker": "USO",
+        "name": "Ropa",
+        "description": "Cena ropy. Ovlivnuje inflaci a energeticky sektor.",
+        "inverted": False,
+    },
+]
 
 
 def _iso_now() -> str:
@@ -49,6 +89,26 @@ def _serialize_journal_entry(entry: dict) -> dict:
     }
 
 
+def _preview_text(content: str, max_chars: int = 280) -> str:
+    preview = (content or "").strip()
+    if len(preview) > max_chars:
+        return preview[:max_chars].rstrip() + "..."
+    return preview
+
+
+def _serialize_note_preview(entry: dict) -> dict:
+    content = re.sub(r"<[^>]+>", " ", entry.get("content") or "")
+    content = re.sub(r"\s+", " ", content).strip()
+    return {
+        "id": entry.get("id"),
+        "created_at": entry.get("created_at"),
+        "updated_at": entry.get("updated_at"),
+        "type": entry.get("type") or "note",
+        "preview": _preview_text(content),
+        "metadata": entry.get("metadata") or {},
+    }
+
+
 def _serialize_ai_report(entry: dict, include_full_content: bool) -> dict:
     metadata = entry.get("metadata") or {}
     base = {
@@ -61,10 +121,11 @@ def _serialize_ai_report(entry: dict, include_full_content: bool) -> dict:
         return {**base, "content": entry.get("content") or ""}
 
     content = entry.get("content") or ""
-    preview = content[:400].strip()
-    if len(content) > 400:
-        preview += "..."
-    return {**base, "preview": preview}
+    return {
+        **base,
+        "preview": _preview_text(content, max_chars=400),
+        "content_length": len(content),
+    }
 
 
 def _serialize_stock_transaction(transaction: dict) -> dict:
@@ -268,7 +329,118 @@ def _pick_technical_history(technical_data: dict, indicators: Optional[set[str]]
     return history
 
 
+def _serialize_portfolio_summary(portfolio: dict, snapshot: Optional[dict] = None) -> dict:
+    return {
+        "id": portfolio["id"],
+        "name": portfolio["name"],
+        "description": portfolio.get("description"),
+        "snapshot": snapshot,
+    }
+
+
+def _serialize_portfolio_holding(holding: dict, quote: Optional[dict], fx_rate: float) -> dict:
+    stock = holding.get("stocks") or {}
+    shares = float(holding.get("shares") or 0)
+    price_scale = float(stock.get("price_scale") or 1)
+    current_price = _coerce_float((quote or {}).get("price"))
+    current_value_czk = current_price * price_scale * shares * fx_rate if current_price is not None else None
+    invested_czk = float(holding.get("total_invested_czk") or 0)
+    unrealized_pnl_czk = current_value_czk - invested_czk if current_value_czk is not None else None
+    unrealized_pnl_pct = (
+        (unrealized_pnl_czk / invested_czk * 100) if unrealized_pnl_czk is not None and invested_czk > 0 else None
+    )
+    return {
+        "portfolio_id": holding.get("portfolio_id"),
+        "portfolio_name": holding.get("portfolio_name"),
+        "ticker": stock.get("ticker") or "",
+        "name": stock.get("name") or "",
+        "shares": shares,
+        "avg_cost": float(holding.get("avg_cost_per_share") or 0),
+        "currency": stock.get("currency") or "USD",
+        "sector": stock.get("sector"),
+        "total_invested_czk": invested_czk,
+        "current_price": current_price,
+        "current_value_czk": round(current_value_czk, 2) if current_value_czk is not None else None,
+        "unrealized_pnl_czk": round(unrealized_pnl_czk, 2) if unrealized_pnl_czk is not None else None,
+        "unrealized_pnl_pct": round(unrealized_pnl_pct, 4) if unrealized_pnl_pct is not None else None,
+    }
+
+
+def _build_sector_exposure(holdings: list[dict]) -> list[dict]:
+    totals: dict[str, float] = {}
+    for holding in holdings:
+        sector = holding.get("sector") or "Unknown"
+        value_czk = float(holding.get("current_value_czk") or 0)
+        if value_czk <= 0:
+            continue
+        totals[sector] = totals.get(sector, 0.0) + value_czk
+
+    grand_total = sum(totals.values())
+    if grand_total <= 0:
+        return []
+
+    exposure = [
+        {
+            "sector": sector,
+            "value_czk": round(value_czk, 2),
+            "weight_pct": round(value_czk / grand_total * 100, 2),
+        }
+        for sector, value_czk in totals.items()
+    ]
+    exposure.sort(key=lambda item: item["value_czk"], reverse=True)
+    return exposure
+
+
+def _performance_to_payload(result: Any) -> dict:
+    return {
+        "total_return": result.total_return,
+        "total_return_pct": result.total_return_pct,
+        "benchmark_return_pct": result.benchmark_return_pct,
+        "data": [point.model_dump() for point in result.data],
+    }
+
+
 class ResearchContextService:
+    async def _get_fear_greed_snapshot(self) -> dict:
+        redis = get_redis()
+        cache_key = "market:fear_greed"
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+                headers={"User-Agent": "Mozilla/5.0 (compatible; DeepStock/1.0)"},
+            )
+            response.raise_for_status()
+            raw = response.json()
+
+        fg = raw["fear_and_greed"]
+        result = {
+            "score": round(fg["score"], 1),
+            "rating": fg["rating"],
+            "previousClose": round(fg["previous_close"], 1),
+            "previousWeek": round(fg["previous_1_week"], 1),
+            "previousMonth": round(fg["previous_1_month"], 1),
+            "previousYear": round(fg["previous_1_year"], 1),
+        }
+        await redis.setex(cache_key, CacheTTL.FEAR_GREED, json.dumps(result))
+        return result
+
+    async def _resolve_portfolio_scope(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+    ) -> tuple[str, list[dict], Optional[dict]]:
+        portfolios = await portfolio_service.get_user_portfolios(user_id)
+        if portfolio_id:
+            portfolio = next((item for item in portfolios if item["id"] == portfolio_id), None)
+            if not portfolio:
+                raise ValueError(f"Portfolio {portfolio_id} not found")
+            return portfolio_id, [portfolio], portfolio
+        return "all", portfolios, None
+
     async def _get_stock_row(self, ticker: str) -> Optional[dict]:
         return await stock_service.get_by_ticker(ticker)
 
@@ -276,16 +448,20 @@ class ResearchContextService:
         self,
         ticker: str,
         user_id: str,
-        notes_limit: int = 30,
-        full_report_limit: int = 2,
-        archive_report_limit: int = 10,
+        notes_preview_limit: int = 5,
+        report_preview_limit: int = 3,
     ) -> dict:
         channel = await journal_service.get_channel_by_ticker(ticker, user_id=user_id)
         if not channel:
             return {
+                "note_count": 0,
+                "report_count": 0,
+                "latest_note_at": None,
+                "latest_report_at": None,
+                "has_more_notes": False,
+                "has_more_reports": False,
                 "notes": [],
-                "ai_reports": {"full": [], "archive": []},
-                "external_refs": [],
+                "reports": [],
             }
 
         entries = await journal_service.get_entries(
@@ -294,29 +470,24 @@ class ResearchContextService:
             user_id=user_id,
         )
 
-        notes = [_serialize_journal_entry(entry) for entry in entries if entry.get("type") == "note"][:notes_limit]
+        note_entries = [entry for entry in entries if entry.get("type") == "note"]
         ai_report_entries = [entry for entry in entries if entry.get("type") == "ai_report"]
-        full_reports = [
-            _serialize_ai_report(entry, include_full_content=True)
-            for entry in ai_report_entries[:full_report_limit]
-        ]
-        archive_reports = [
-            _serialize_ai_report(entry, include_full_content=False)
-            for entry in ai_report_entries[full_report_limit:full_report_limit + archive_report_limit]
-        ]
-        external_refs = [
-            _serialize_journal_entry(entry)
-            for entry in entries
-            if entry.get("type") == "ext_ref"
-        ][:10]
 
         return {
-            "notes": notes,
-            "ai_reports": {
-                "full": full_reports,
-                "archive": archive_reports,
-            },
-            "external_refs": external_refs,
+            "note_count": len(note_entries),
+            "report_count": len(ai_report_entries),
+            "latest_note_at": note_entries[0].get("created_at") if note_entries else None,
+            "latest_report_at": ai_report_entries[0].get("created_at") if ai_report_entries else None,
+            "has_more_notes": len(note_entries) > notes_preview_limit,
+            "has_more_reports": len(ai_report_entries) > report_preview_limit,
+            "notes": [
+                _serialize_note_preview(entry)
+                for entry in note_entries[:notes_preview_limit]
+            ],
+            "reports": [
+                _serialize_ai_report(entry, include_full_content=False)
+                for entry in ai_report_entries[:report_preview_limit]
+            ],
         }
 
     async def _build_activity_context(self, ticker: str, user_id: str, stock_price: Optional[float]) -> dict:
@@ -384,15 +555,23 @@ class ResearchContextService:
 
         return {
             "position_summary": position_summary,
-            "stock_transactions": stock_transactions,
+            "stock_transaction_count": len(stock_transactions),
+            "latest_stock_transaction_at": (
+                stock_transactions[0].get("executed_at") if stock_transactions else None
+            ),
+            "has_more_stock_transactions": len(stock_transactions) >= 100,
             "option_summary": option_summary,
-            "option_transactions": [_serialize_option_transaction(tx) for tx in option_transactions],
+            "option_transaction_count": len(option_transactions),
+            "latest_option_transaction_at": (
+                option_transactions[0].get("date") if option_transactions else None
+            ),
+            "has_more_option_transactions": len(option_transactions) >= 100,
         }
 
     async def _build_watchlist_context(self, ticker: str, user_id: str) -> dict:
         stock = await self._get_stock_row(ticker)
         if not stock:
-            return {"items": []}
+            return {"count": 0, "items": []}
 
         watchlist_rows = supabase.table("watchlists") \
             .select("id, name") \
@@ -400,7 +579,7 @@ class ResearchContextService:
             .execute()
         watchlist_names = {row["id"]: row["name"] for row in (watchlist_rows.data or [])}
         if not watchlist_names:
-            return {"items": []}
+            return {"count": 0, "items": []}
 
         item_rows = supabase.table("watchlist_items") \
             .select("*") \
@@ -413,7 +592,7 @@ class ResearchContextService:
         for item in item_rows.data or []:
             item["watchlist_name"] = watchlist_names.get(item.get("watchlist_id"), "")
             items.append(_serialize_watchlist_item(item))
-        return {"items": items}
+        return {"count": len(items), "items": items}
 
     def _build_ticker_info(self, stock_info: dict) -> dict:
         return {
@@ -520,9 +699,7 @@ class ResearchContextService:
     async def get_stock_context(self, ticker: str, user_id: str) -> dict:
         normalized_ticker = ticker.upper()
         stock_info, market_context = await self._build_market_context(normalized_ticker)
-        journal_context = await self._build_journal_context(
-            normalized_ticker, user_id=user_id, full_report_limit=0
-        )
+        journal_context = await self._build_journal_context(normalized_ticker, user_id=user_id)
         activity_context = await self._build_activity_context(
             normalized_ticker,
             user_id=user_id,
@@ -557,7 +734,7 @@ class ResearchContextService:
             if entry.get("type") == "ai_report"
         ][:limit]
         notes = [
-            _serialize_journal_entry(entry)
+            _serialize_note_preview(entry)
             for entry in entries
             if entry.get("type") == "note"
         ][:limit]
@@ -571,13 +748,16 @@ class ResearchContextService:
 
     async def get_report_content(self, report_id: str, user_id: str) -> dict:
         entry = supabase.table("journal_entries") \
-            .select("id, created_at, content, metadata") \
+            .select("id, created_at, content, metadata, type, journal_channels!inner(user_id)") \
             .eq("id", report_id) \
+            .eq("journal_channels.user_id", user_id) \
             .single() \
             .execute()
         row = entry.data
         if not row:
             raise ValueError(f"Report {report_id} not found")
+        if row.get("type") != "ai_report":
+            raise ValueError(f"Entry {report_id} is not an AI report")
         metadata = row.get("metadata") or {}
         return {
             "id": row.get("id"),
@@ -585,6 +765,27 @@ class ResearchContextService:
             "report_type": metadata.get("report_type"),
             "model": metadata.get("model"),
             "content": row.get("content") or "",
+        }
+
+    async def get_note_content(self, note_id: str, user_id: str) -> dict:
+        entry = supabase.table("journal_entries") \
+            .select("id, created_at, updated_at, content, metadata, type, journal_channels!inner(user_id)") \
+            .eq("id", note_id) \
+            .eq("journal_channels.user_id", user_id) \
+            .single() \
+            .execute()
+        row = entry.data
+        if not row:
+            raise ValueError(f"Note {note_id} not found")
+        if row.get("type") != "note":
+            raise ValueError(f"Entry {note_id} is not a note")
+        return {
+            "id": row.get("id"),
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+            "type": row.get("type") or "note",
+            "content": row.get("content") or "",
+            "metadata": row.get("metadata") or {},
         }
 
     async def get_investment_activity(self, ticker: str, user_id: str) -> dict:
@@ -596,10 +797,41 @@ class ResearchContextService:
             user_id=user_id,
             stock_price=stock_price,
         )
+        full_stock_transactions: list[dict] = []
+        full_option_transactions: list[dict] = []
+
+        stock = await self._get_stock_row(normalized_ticker)
+        portfolios = await portfolio_service.get_user_portfolios(user_id)
+        portfolio_ids = [portfolio["id"] for portfolio in portfolios]
+        portfolio_names = {portfolio["id"]: portfolio["name"] for portfolio in portfolios}
+
+        if stock and portfolio_ids:
+            response = supabase.table("transactions") \
+                .select("*, source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \
+                .in_("portfolio_id", portfolio_ids) \
+                .eq("stock_id", stock["id"]) \
+                .order("executed_at", desc=True) \
+                .limit(100) \
+                .execute()
+            annotated = await portfolio_service._annotate_transactions(response.data or [])
+            for tx in annotated:
+                tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
+            full_stock_transactions = [_serialize_stock_transaction(tx) for tx in annotated]
+
+        option_transactions = await options_service.get_transactions(
+            user_id=user_id,
+            symbol=normalized_ticker,
+            limit=100,
+        )
+        full_option_transactions = [_serialize_option_transaction(tx) for tx in option_transactions]
+
         return {
             "ticker": normalized_ticker,
             "generated_at": _iso_now(),
-            **activity_context,
+            "position_summary": activity_context["position_summary"],
+            "stock_transactions": full_stock_transactions,
+            "option_summary": activity_context["option_summary"],
+            "option_transactions": full_option_transactions,
         }
 
     async def get_technical_history(
@@ -634,6 +866,139 @@ class ResearchContextService:
                 "volume_signal": technical_data.get("volumeSignal"),
             },
             "history": _pick_technical_history(technical_data, indicators=selected),
+        }
+
+    async def list_portfolios(self, user_id: str) -> dict:
+        portfolios = await portfolio_service.get_user_portfolios(user_id)
+        portfolio_summaries = []
+        for portfolio in portfolios:
+            snapshot = await portfolio_service.get_portfolio_snapshot(portfolio["id"], user_id)
+            portfolio_summaries.append(
+                _serialize_portfolio_summary(portfolio, snapshot.model_dump())
+            )
+        return {
+            "generated_at": _iso_now(),
+            "portfolio_count": len(portfolio_summaries),
+            "portfolios": portfolio_summaries,
+        }
+
+    async def get_portfolio_context(self, user_id: str, portfolio_id: Optional[str] = None) -> dict:
+        scope, portfolios, scoped_portfolio = await self._resolve_portfolio_scope(user_id, portfolio_id)
+
+        if scoped_portfolio:
+            holdings_raw = await portfolio_service.get_holdings(scoped_portfolio["id"])
+            for holding in holdings_raw:
+                holding["portfolio_name"] = scoped_portfolio["name"]
+            transactions_raw = await portfolio_service.get_transactions(scoped_portfolio["id"], limit=10)
+            for tx in transactions_raw:
+                tx["portfolio_name"] = scoped_portfolio["name"]
+            open_lots = await portfolio_service.get_all_open_lots(scoped_portfolio["id"])
+            aggregate_snapshot = await portfolio_service.get_portfolio_snapshot(scoped_portfolio["id"], user_id)
+        else:
+            holdings_raw = await portfolio_service.get_all_holdings(user_id)
+            transactions_page = await portfolio_service.get_all_transactions(user_id, limit=10)
+            transactions_raw = transactions_page["data"]
+            open_lots = await portfolio_service.get_all_open_lots_for_user(user_id)
+            aggregate_snapshot = await portfolio_service.get_portfolio_snapshot(None, user_id)
+
+        tickers = sorted({
+            (holding.get("stocks") or {}).get("ticker")
+            for holding in holdings_raw
+            if (holding.get("stocks") or {}).get("ticker")
+        })
+        quotes = await market_service.get_quotes(tickers) if tickers else {}
+        exchange_rates = await exchange_service.get_rates()
+
+        holdings = []
+        for holding in holdings_raw:
+            stock = holding.get("stocks") or {}
+            ticker = stock.get("ticker")
+            currency = stock.get("currency") or "USD"
+            rate = float(exchange_rates.get(currency, 1.0))
+            holdings.append(_serialize_portfolio_holding(holding, quotes.get(ticker), rate))
+
+        holdings.sort(key=lambda item: float(item.get("current_value_czk") or 0), reverse=True)
+
+        portfolio_summaries = []
+        for portfolio in portfolios:
+            snapshot = await portfolio_service.get_portfolio_snapshot(portfolio["id"], user_id)
+            portfolio_summaries.append(
+                _serialize_portfolio_summary(portfolio, snapshot.model_dump())
+            )
+
+        open_lot_tickers = sorted({lot.get("ticker") for lot in open_lots if lot.get("ticker")})
+        return {
+            "scope": scope,
+            "generated_at": _iso_now(),
+            "portfolio_count": len(portfolio_summaries),
+            "portfolios": portfolio_summaries,
+            "aggregate_snapshot": aggregate_snapshot.model_dump(),
+            "holdings": holdings,
+            "sector_exposure": _build_sector_exposure(holdings),
+            "recent_transactions": [_serialize_stock_transaction(tx) for tx in transactions_raw],
+            "open_lots_summary": {
+                "count": len(open_lots),
+                "tickers": open_lot_tickers,
+            },
+        }
+
+    async def get_portfolio_performance(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        period: str = "1Y",
+    ) -> dict:
+        scope, _, _ = await self._resolve_portfolio_scope(user_id, portfolio_id)
+        stock_result, options_result = await asyncio.gather(
+            get_stock_performance(user_id, portfolio_id=portfolio_id, period=period),
+            get_options_performance(user_id, portfolio_id=portfolio_id, period=period),
+        )
+        return {
+            "scope": scope,
+            "generated_at": _iso_now(),
+            "period": period,
+            "stock_performance": _performance_to_payload(stock_result),
+            "options_performance": _performance_to_payload(options_result),
+        }
+
+    async def get_market_context(self, user_id: str) -> dict:
+        del user_id  # auth required, but market context itself is shared
+        fear_greed, exchange_rates, macro_quotes = await asyncio.gather(
+            self._get_fear_greed_snapshot(),
+            exchange_service.get_rates(),
+            market_service.get_quotes([item["ticker"] for item in MACRO_MARKET_INDICATORS]),
+        )
+        selected_rates = {
+            currency: float(exchange_rates.get(currency, 1.0))
+            for currency in ["USD", "EUR", "GBP", "CZK"]
+            if currency in exchange_rates
+        }
+        macro_context = []
+        for item in MACRO_MARKET_INDICATORS:
+            quote = macro_quotes.get(item["ticker"], {})
+            macro_context.append({
+                "ticker": item["ticker"],
+                "name": item["name"],
+                "description": item["description"],
+                "inverted": item["inverted"],
+                "price": _coerce_float(quote.get("price")),
+                "change_percent": _coerce_float(quote.get("changePercent")),
+                "volume": _coerce_float(quote.get("volume")),
+                "avg_volume": _coerce_float(quote.get("avgVolume")),
+                "last_updated": quote.get("lastUpdated"),
+            })
+        return {
+            "generated_at": _iso_now(),
+            "sentiment": {
+                "score": _coerce_float(fear_greed.get("score")),
+                "rating": fear_greed.get("rating"),
+                "previous_close": _coerce_float(fear_greed.get("previousClose")),
+                "previous_week": _coerce_float(fear_greed.get("previousWeek")),
+                "previous_month": _coerce_float(fear_greed.get("previousMonth")),
+                "previous_year": _coerce_float(fear_greed.get("previousYear")),
+            },
+            "fx": {"rates_to_czk": selected_rates},
+            "macro_quotes": macro_context,
         }
 
 
