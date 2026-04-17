@@ -1,6 +1,6 @@
 # DeepStock MCP Server
 
-Exposes DeepStock research data as tools for Claude Code, Cursor, or any MCP-compatible client.
+Exposes DeepStock research data as tools for Claude Code, Cursor, Claude.ai, or any MCP-compatible client.
 
 ## Tools
 
@@ -18,113 +18,73 @@ Exposes DeepStock research data as tools for Claude Code, Cursor, or any MCP-com
 | `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker |
 | `get_investment_activity` | Transaction history, cost basis, open option positions |
 
-See [CONTRACT.md](CONTRACT.md) for the response shapes, field semantics, and
-tool-selection guidance.
-
-## How To Use The Surface
-
-Recommended call flow:
-
-1. If the conversation is portfolio-level, start with `list_portfolios()` and/or `get_portfolio_context()`
-2. If the conversation is market-level, start with `get_market_context()`
-3. If the conversation is ticker-level, start with `get_stock_context("NVDA")`
-4. Then only fetch the branch you actually need:
-   - `get_portfolio_performance` for historical portfolio performance
-   - `get_investment_activity` for full trade history
-   - `get_research_archive` to browse older notes/reports
-   - `get_report_content` for one specific full report
-   - `get_note_content` for one specific full note
-   - `get_technical_history` for technical follow-up
-5. Only if the user explicitly wants to save a takeaway from a single-stock chat:
-   - `save_stock_journal_note` with the final approved plain-text note
-
-This is intentional:
-
-- `get_stock_context` is summary-first so the first chat turn stays readable
-- full-fidelity data are still available via the drilldown tools
-- `save_stock_journal_note` is the only write tool and stays intentionally narrow
-
-## Prerequisites
-
-- Python 3.12+
-- DeepStock backend running (default: `http://localhost:8000`)
-- Supabase credentials (from your project dashboard)
-
-## Install dependencies
-
-```bash
-cd mcp
-pip install mcp httpx pyjwt
-```
-
-Or if the project uses uv:
-
-```bash
-cd mcp
-uv pip install mcp httpx pyjwt
-```
-
-## Environment variables
-
-The server needs 3 variables from your Supabase project (**Settings → API**):
-
-| Variable | Where to find it |
-|---|---|
-| `SUPABASE_URL` | Settings → API → Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Settings → API → service_role key |
-| `SUPABASE_JWT_SECRET` | Settings → API → JWT Settings → JWT Secret |
-
-Optional:
-
-| Variable | Default | Description |
-|---|---|---|
-| `DEEPSTOCK_API_URL` | `http://localhost:8000` | Backend URL (change for remote deploy) |
+See [CONTRACT.md](CONTRACT.md) for response shapes, field semantics, and tool-selection guidance.
 
 ---
 
-## Setup: Claude Code
+## Setup: Local (Docker)
 
-MCP config lives in `.mcp.json` at the root of the **client project** (e.g. the Felix repo, not deepstock).
-This file is gitignored in that project — create it manually on each machine.
+The MCP server runs as a Docker container alongside the backend.
+
+```bash
+docker compose up deepstock-mcp
+```
+
+Add to `.mcp.json` in your client project (e.g. the Felix repo):
 
 ```json
 {
   "mcpServers": {
     "deepstock": {
-      "command": "/opt/homebrew/bin/python3.13",
-      "args": ["/absolute/path/to/deepstock/mcp/deepstock_mcp.py"],
-      "env": {
-        "DEEPSTOCK_API_URL": "http://localhost:8000",
-        "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key",
-        "SUPABASE_JWT_SECRET": "your-jwt-secret"
-      }
+      "url": "http://localhost:8001/mcp"
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/deepstock` and the Python path (`which python3`) with the actual values on your machine.
-
-After saving, restart Claude Code — MCP subprocess loads at session start.
+Restart your MCP client (Claude Code / Cursor). Verify: ask the client to call `get_stock_context("AAPL")`.
 
 ---
 
-## New machine checklist
+## Setup: Remote (Railway)
 
-1. Clone the repo
-2. Start the backend: `docker compose up -d`
-3. Get Supabase credentials from the dashboard
-4. Create the config file for your client (see above)
-5. Restart the client (Claude Code / Cursor / VS Code)
-6. Verify: ask the client to call `get_stock_context("AAPL")` — should return data
+The MCP server is deployed as a Railway service. No local clone needed.
+
+Add to `.mcp.json` in your client project:
+
+```json
+{
+  "mcpServers": {
+    "deepstock": {
+      "url": "https://<your-mcp-service>.railway.app/mcp"
+    }
+  }
+}
+```
+
+For Claude.ai (web or mobile): add the URL directly in Claude.ai Project settings → MCP servers.
+
+---
+
+## Environment variables
+
+Set in Railway dashboard (remote) or `backend/.env` (local Docker — shared with backend):
+
+| Variable | Description |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
+| `SUPABASE_JWT_SECRET` | Supabase JWT secret |
+| `DEEPSTOCK_API_URL` | Backend URL — `http://backend:8000` (Docker) or Railway backend URL (remote) |
+
+---
 
 ## Troubleshooting
 
-**Tools don't appear after config change** — MCP subprocess loads at client startup. Restart the IDE/Claude Code window.
+**Tools don't appear after config change** — MCP client loads at startup. Restart Claude Code / Cursor.
 
-**`SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET must be set`** — env vars missing or not passed correctly in the config file.
+**`SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET must be set`** — env vars missing.
 
-**`No users found in Supabase project`** — the service role key doesn't match the `SUPABASE_URL` project.
+**`No users found in Supabase project`** — service role key doesn't match the Supabase URL.
 
-**Connection refused on `http://localhost:8000`** — backend isn't running. Run `docker compose up -d` first.
+**Connection refused on `http://localhost:8001`** — MCP container isn't running. Run `docker compose up deepstock-mcp`.

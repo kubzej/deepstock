@@ -15,13 +15,21 @@ import time
 import httpx
 import jwt
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 API_URL = os.environ.get("DEEPSTOCK_API_URL", "http://localhost:8000")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+PORT = int(os.environ.get("PORT", 8001))
 
-mcp = FastMCP("deepstock")
+mcp = FastMCP("deepstock", host="0.0.0.0", port=PORT)
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok"})
 
 _cached_token: str = ""
 _token_expires_at: float = 0.0
@@ -262,4 +270,4 @@ async def save_stock_journal_note(ticker: str, content: str) -> dict:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="streamable-http")
