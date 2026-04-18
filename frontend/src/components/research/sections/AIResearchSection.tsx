@@ -142,8 +142,8 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
                 title="Generuji AI report..."
                 description={
                   type === 'technical_analysis'
-                    ? 'Analyzuji technické indikátory. Může to trvat 10 až 20 sekund.'
-                    : 'Vyhledávám zprávy a skládám AI analýzu. Může to trvat 30 až 60 sekund.'
+                    ? 'Analyzuji technické indikátory.'
+                    : 'Vyhledávám zprávy a skládám AI analýzu.'
                 }
               />
             )}

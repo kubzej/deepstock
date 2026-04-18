@@ -134,8 +134,34 @@ Returns:
 
 Important:
 
-- This is intentionally the only MCP write-back tool
+ - This is one of the intentionally narrow MCP write-back tools
 - Backend resolves the stock journal channel; the agent does not choose a channel ID
+- Content is stored as a normal `note` entry, not as raw transcript
+- This should be used only after explicit user approval
+
+### `save_portfolio_journal_note(portfolio_id, content)`
+
+Use only when the user explicitly wants to save a portfolio-specific takeaway
+from the current single-portfolio conversation.
+
+Input:
+
+- `portfolio_id`: target portfolio ID
+- `content`: final user-approved plain-text note
+
+Returns:
+
+- created entry ID
+- resolved portfolio ID
+- resolved portfolio name
+- resolved journal channel ID
+- saved plaintext content
+- metadata for the created note
+
+Important:
+
+- This is a narrow write-back tool for one concrete portfolio
+- Backend resolves the portfolio journal channel; the agent does not choose a channel ID
 - Content is stored as a normal `note` entry, not as raw transcript
 - This should be used only after explicit user approval
 
@@ -366,6 +392,24 @@ Returns:
 }
 ```
 
+## `save_portfolio_journal_note`
+
+```json
+{
+  "entry_id": "uuid",
+  "portfolio_id": "uuid",
+  "portfolio_name": "Main",
+  "channel_id": "uuid",
+  "created_at": "2026-04-17T10:00:00Z",
+  "content_plaintext": "Still concentrated in semis. Next adds should improve diversification.",
+  "metadata": {
+    "portfolio_id": "uuid",
+    "portfolio_name": "Main",
+    "source": "mcp_portfolio_note"
+  }
+}
+```
+
 ## `get_investment_activity`
 
 ```json
@@ -386,6 +430,7 @@ Returns:
 - `position_summary.total_cost` is the open-position cost basis in the instrument currency
 - `get_investment_activity` is the full transaction detail endpoint
 - `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML
+- `save_portfolio_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML
 - `get_portfolio_context` defaults to aggregated multi-portfolio scope; holdings and transactions retain portfolio identity
 - `get_portfolio_performance` is the analytical layer above transactions, not a raw transaction dump
 - `get_market_context` intentionally stays compact: sentiment + FX + macro quotes only

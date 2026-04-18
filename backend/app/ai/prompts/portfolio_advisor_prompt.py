@@ -20,34 +20,27 @@ SYSTEM_PROMPT = """Jsi zkušený portfolio poradce. Analyzuješ akciové portfol
 
 6. **Zachovej neutrální tón.** Nepředstírej, že víš, co trh udělá. Uváděj rizika i příležitosti.
 
+7. **Bez duplicit.** Neopakuj stejný problém nebo stejný ticker ve více sekcích stejnými slovy. V závěru pouze syntetizuj důsledky.
+
 ## STRUKTURA VÝSTUPU
 
 ## Přehled portfolia
-Krátké shrnutí — celkový stav, počet pozic, investovaná hodnota.
+Krátké shrnutí celkového stavu portfolia: velikost, aktuální hodnota, P/L, počet pozic a hlavní charakter portfolia.
 
-## Sektorová a měnová expozice
-Uveď konkrétní % rozložení podle sektorů a měn (data jsou připravena v kontextu). Upozorni na přílišnou koncentraci v jednom sektoru (>50 %) nebo jedné měně (>80 %).
+## Expozice a koncentrace
+Uveď konkrétní rozložení podle sektorů a měn, největší pozice a případnou koncentraci. Pokud je portfolio příliš koncentrované v jednom sektoru, měně nebo tickeru, pojmenuj to jasně. Sem zahrň i poměr akciových a opčních pozic, ale pouze pokud je z dat zřejmý.
 
-## Alokace: akcie vs. opce
-Porovnej expozici akciových pozic (investovaná hodnota) vůči opčním pozicím (vázaný kapitál / prémiový příjem). Pokud je poměr nevyvážený, navrhni konkrétní kroky ke korekci.
+## Klíčové pozice
+Vyber nejdůležitější pozice v portfoliu. U každé stručně vysvětli, co pomáhá nebo škodí: trend, RSI, P/L, velikost pozice nebo role v portfoliu. Nevyjmenovávej vše; soustřeď se na 3–5 nejrelevantnějších tickerů.
 
-## Expirující opce
-Pokud existují opce označené [URGENTNÍ] (≤30 dní) nebo [BRZY] (≤60 dní), jmenuj je a navrhni akci s ohledem na pozici (SHORT = prodaná opce, přijatá prémie, riziko assignment; LONG = koupená opce, zaplacená prémie, riziko ztráty prémie). Pokud žádné nejsou, tuto sekci vynech.
+## Opce a časová rizika
+Pokud existují opce nebo blízké expirace, shrň hlavní opční rizika a priority. Zvlášť upozorni na pozice označené [URGENTNÍ] (≤30 dní) nebo [BRZY] (≤60 dní), zejména u short opcí. Pokud žádné relevantní opční riziko není, sekci vynech.
 
-## Makro kontext portfolia
-Pokud jsou k dispozici data o Fedu a stavu S&P 500, uveď stručně jak makroekonomické podmínky ovlivňují sektory v portfoliu. Pokud data nejsou, tuto sekci vynech.
-
-## Silné stránky
-Co funguje — pozice v trendu, profitabilní holdingy s konkrétními čísly.
-
-## Rizika a slabiny
-Kde je koncentrace, technické varovné signály, přeprodané/překoupené pozice.
+## Makro a kontext
+Pokud jsou k dispozici data o Fedu a stavu S&P 500, stručně vysvětli, jak současné makro podmínky dopadají na sektory nebo typy pozic v portfoliu. Pokud z makra neplyne nic podstatného, buď stručný. Pokud data nejsou, sekci vynech.
 
 ## Doporučení
-2–4 konkrétní akční kroky (např. "Zvážit snížení pozice v X kvůli RSI 78 a resistenci na $Y").
-
-## Nedávná aktivita
-Krátký komentář k posledním transakcím — zda dávají smysl v kontextu portfolia."""
+2–4 konkrétní akční kroky seřazené podle priority. Každý krok musí být navázaný na konkrétní ticker, koncentraci, expiraci nebo trend. Pokud poslední transakce naznačují směr portfolia, krátce to zohledni zde místo samostatné duplicitní sekce."""
 
 
 def build_user_prompt(portfolio_context: str, transactions_context: str, options_context: str = "", macro_context: str = "") -> str:
@@ -68,7 +61,12 @@ def build_user_prompt(portfolio_context: str, transactions_context: str, options
 Vytvoř strukturovaný report podle zadané struktury. Pouze Markdown, žádný jiný text."""
 
 
-def format_portfolio_context(holdings: list[dict], quotes: dict, tech_data: dict[str, dict]) -> str:
+def format_portfolio_context(
+    holdings: list[dict],
+    quotes: dict,
+    tech_data: dict[str, dict],
+    snapshot: dict | None = None,
+) -> str:
     """Format holdings with quotes and tech signals into a compact context string."""
 
     def f(v, d=2):
@@ -81,22 +79,25 @@ def format_portfolio_context(holdings: list[dict], quotes: dict, tech_data: dict
 
     lines = []
     total_value_czk = 0.0
+    total_cost_czk = 0.0
     sector_czk: dict[str, float] = {}
     currency_czk: dict[str, float] = {}
+    enriched_positions: list[dict] = []
 
     for h in holdings:
         # ticker, currency, sector, price_scale are nested inside the joined "stocks" object
         stock_info = h.get("stocks") or {}
         ticker = stock_info.get("ticker") or h.get("ticker", "?")
         shares = h.get("shares", 0)
-        avg_cost = h.get("avg_cost_per_share", 0)
+        avg_cost = h.get("avg_cost_per_share") or h.get("avg_cost") or 0
         currency = stock_info.get("currency") or h.get("currency", "USD")
         sector = stock_info.get("sector") or h.get("sector") or "N/A"
-        invested_czk = h.get("total_invested_czk") or 0
+        invested_czk = float(h.get("total_invested_czk") or 0)
         # price_scale converts raw yfinance price to user-facing currency unit
         # e.g. LSE stocks quote in pence → scale 0.01 → GBP
         price_scale = float(stock_info.get("price_scale") or h.get("price_scale") or 1.0)
         total_value_czk += invested_czk
+        total_cost_czk += invested_czk
         sector_czk[sector] = sector_czk.get(sector, 0.0) + invested_czk
         currency_czk[currency] = currency_czk.get(currency, 0.0) + invested_czk
 
@@ -104,6 +105,7 @@ def format_portfolio_context(holdings: list[dict], quotes: dict, tech_data: dict
         raw_price = quote.get("price")
         current_price = (raw_price * price_scale) if raw_price is not None else None
         change_pct = quote.get("changePercent")
+        current_value_czk = float(h.get("current_value_czk") or 0)
 
         tech = tech_data.get(ticker) or {}
         rsi = tech.get("rsi14")
@@ -131,26 +133,65 @@ def format_portfolio_context(holdings: list[dict], quotes: dict, tech_data: dict
             line += f" | SMA200: ${f(sma200)}"
 
         lines.append(line)
+        enriched_positions.append({
+            "ticker": ticker,
+            "sector": sector,
+            "currency": currency,
+            "invested_czk": invested_czk,
+            "current_value_czk": current_value_czk,
+            "unrealized_pct": unrealized_pct,
+            "trend": trend,
+            "rsi": rsi,
+        })
+
+    snapshot = snapshot or {}
+    snapshot_value = snapshot.get("total_value_czk")
+    snapshot_cost = snapshot.get("total_cost_czk")
+    snapshot_pnl = snapshot.get("total_pnl_czk")
+    snapshot_pnl_pct = snapshot.get("total_pnl_percent")
+    daily_change_czk = snapshot.get("daily_change_czk")
+    daily_change_pct = snapshot.get("daily_change_percent")
 
     header = f"Celkem pozic: {len(holdings)}"
-    if total_value_czk > 0:
+    if snapshot_value is not None:
+        header += f" | Aktuální hodnota: ~{snapshot_value:,.0f} CZK"
+    elif total_value_czk > 0:
         header += f" | Investováno celkem: ~{total_value_czk:,.0f} CZK"
+    if snapshot_cost is not None:
+        header += f" | Náklad: ~{snapshot_cost:,.0f} CZK"
+    elif total_cost_czk > 0:
+        header += f" | Náklad: ~{total_cost_czk:,.0f} CZK"
+    if snapshot_pnl is not None:
+        pnl_sign = "+" if snapshot_pnl >= 0 else ""
+        header += f" | P/L: {pnl_sign}{snapshot_pnl:,.0f} CZK ({pct(snapshot_pnl_pct)})"
+    if daily_change_czk is not None:
+        day_sign = "+" if daily_change_czk >= 0 else ""
+        header += f" | Dnes: {day_sign}{daily_change_czk:,.0f} CZK ({pct(daily_change_pct)})"
 
     # Sector breakdown
-    if sector_czk and total_value_czk > 0:
+    exposure_base = snapshot_cost or total_cost_czk or total_value_czk
+    if sector_czk and exposure_base > 0:
         sector_parts = sorted(sector_czk.items(), key=lambda x: x[1], reverse=True)
         sector_str = " | ".join(
-            f"{s}: {v / total_value_czk * 100:.0f}%" for s, v in sector_parts
+            f"{s}: {v / exposure_base * 100:.0f}%" for s, v in sector_parts
         )
         header += f"\nSektory: {sector_str}"
 
     # Currency breakdown
-    if currency_czk and total_value_czk > 0:
+    if currency_czk and exposure_base > 0:
         currency_parts = sorted(currency_czk.items(), key=lambda x: x[1], reverse=True)
         currency_str = " | ".join(
-            f"{c}: {v / total_value_czk * 100:.0f}%" for c, v in currency_parts
+            f"{c}: {v / exposure_base * 100:.0f}%" for c, v in currency_parts
         )
         header += f"\nMěny: {currency_str}"
+
+    if enriched_positions and exposure_base > 0:
+        top_positions = sorted(enriched_positions, key=lambda p: p["invested_czk"], reverse=True)[:5]
+        top_str = " | ".join(
+            f"{p['ticker']}: {p['invested_czk'] / exposure_base * 100:.0f}%"
+            for p in top_positions
+        )
+        header += f"\nNejvětší pozice: {top_str}"
 
     return header + "\n\n" + "\n".join(lines)
 
@@ -166,6 +207,11 @@ def format_options_context(option_holdings: list[dict]) -> str:
     lines = []
     total_premium_value = 0.0
     total_contracts = 0
+    long_positions = 0
+    short_positions = 0
+    urgent_count = 0
+    soon_count = 0
+    underlyings: set[str] = set()
 
     for pos in option_holdings:
         symbol = pos.get("symbol", "?")
@@ -179,6 +225,11 @@ def format_options_context(option_holdings: list[dict]) -> str:
         unrealized_pnl = pos.get("unrealized_pnl")
 
         total_contracts += abs(net_contracts or 0)
+        underlyings.add(symbol)
+        if position == "long":
+            long_positions += 1
+        elif position == "short":
+            short_positions += 1
         if avg_premium and net_contracts:
             total_premium_value += abs(net_contracts) * avg_premium * 100
 
@@ -190,8 +241,10 @@ def format_options_context(option_holdings: list[dict]) -> str:
                 days_left = (exp_date - today).days
                 if days_left <= 30:
                     urgency = f" [URGENTNÍ — {days_left}d]"
+                    urgent_count += 1
                 elif days_left <= 60:
                     urgency = f" [BRZY — {days_left}d]"
+                    soon_count += 1
             except ValueError:
                 pass
 
@@ -204,8 +257,13 @@ def format_options_context(option_holdings: list[dict]) -> str:
         lines.append(line)
 
     summary = f"Celkem opčních pozic: {len(option_holdings)} | Celkem kontraktů: {total_contracts}"
+    summary += f" | LONG: {long_positions} | SHORT: {short_positions}"
     if total_premium_value > 0:
         summary += f" | Celková prémie (vázaný kapitál): ~${total_premium_value:,.0f}"
+    if underlyings:
+        summary += f"\nPodklady s opcemi: {', '.join(sorted(underlyings))}"
+    if urgent_count or soon_count:
+        summary += f"\nČasová rizika: urgentní ≤30d: {urgent_count} | brzy ≤60d: {soon_count}"
 
     return summary + "\n\n" + "\n".join(lines)
 
@@ -216,6 +274,10 @@ def format_transactions_context(transactions: list[dict]) -> str:
         return "Žádné transakce."
 
     lines = []
+    buy_count = 0
+    sell_count = 0
+    buy_shares_by_ticker: dict[str, float] = {}
+    sell_shares_by_ticker: dict[str, float] = {}
     for tx in transactions:
         ticker = tx.get("ticker") or (tx.get("stocks") or {}).get("ticker", "?")
         tx_type = tx.get("type", "?")
@@ -224,6 +286,21 @@ def format_transactions_context(transactions: list[dict]) -> str:
         currency = tx.get("currency", "USD")
         date = (tx.get("executed_at") or tx.get("date", ""))[:10]
 
+        if tx_type == "BUY":
+            buy_count += 1
+            buy_shares_by_ticker[ticker] = buy_shares_by_ticker.get(ticker, 0.0) + float(shares or 0)
+        elif tx_type == "SELL":
+            sell_count += 1
+            sell_shares_by_ticker[ticker] = sell_shares_by_ticker.get(ticker, 0.0) + float(shares or 0)
+
         lines.append(f"{date} | {tx_type} {shares} ks {ticker} @ ${price:.2f} {currency}")
 
-    return "\n".join(lines)
+    summary_parts = [f"BUY: {buy_count}", f"SELL: {sell_count}"]
+    if buy_shares_by_ticker:
+        top_buy = max(buy_shares_by_ticker.items(), key=lambda item: item[1])
+        summary_parts.append(f"Nejvíc přikupováno: {top_buy[0]} ({top_buy[1]:.2f} ks)")
+    if sell_shares_by_ticker:
+        top_sell = max(sell_shares_by_ticker.items(), key=lambda item: item[1])
+        summary_parts.append(f"Nejvíc redukováno: {top_sell[0]} ({top_sell[1]:.2f} ks)")
+
+    return " | ".join(summary_parts) + "\n\n" + "\n".join(lines)

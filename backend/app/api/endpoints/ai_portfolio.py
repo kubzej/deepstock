@@ -38,6 +38,37 @@ class PortfolioAdvisorResponse(BaseModel):
     model_used: str = ""
 
 
+async def _save_portfolio_report_to_journal(
+    portfolio_id: str,
+    portfolio_name: str,
+    markdown: str,
+    model_used: str,
+    user_id: str,
+) -> None:
+    try:
+        from app.services.journal import journal_service, EntryCreate
+
+        channel = await journal_service.get_channel_by_portfolio_id(portfolio_id, user_id=user_id)
+        if not channel:
+            return
+
+        await journal_service.create_entry(EntryCreate(
+            channel_id=channel["id"],
+            type="ai_report",
+            content=markdown,
+            metadata={
+                "report_type": "portfolio_overview",
+                "portfolio_id": portfolio_id,
+                "portfolio_name": portfolio_name,
+                "model": model_used,
+            },
+        ))
+    except Exception as e:
+        logger.warning(
+            f"Failed to save portfolio advisor report to journal ({portfolio_id}): {e}"
+        )
+
+
 @router.get("/portfolio-advisor", response_model=PortfolioAdvisorResponse)
 async def get_cached_portfolio_advisor(
     portfolio_id: Optional[str] = None,
@@ -73,9 +104,11 @@ async def generate_portfolio_advisor(
     force_refresh = payload.force_refresh
 
     # Verify portfolio ownership if specific portfolio requested
+    target_portfolio = None
     if portfolio_id:
         portfolios = await portfolio_service.get_user_portfolios(user_id)
-        if not any(p["id"] == portfolio_id for p in portfolios):
+        target_portfolio = next((p for p in portfolios if p["id"] == portfolio_id), None)
+        if not target_portfolio:
             raise HTTPException(status_code=404, detail="Portfolio nenalezeno.")
 
     redis = get_redis()
@@ -89,11 +122,13 @@ async def generate_portfolio_advisor(
             data = json.loads(cached)
             return PortfolioAdvisorResponse(**data, cached=True)
 
-    # Fetch holdings
+    # Fetch holdings + live portfolio snapshot
     if portfolio_id:
         holdings = await portfolio_service.get_holdings(portfolio_id)
+        portfolio_snapshot = await portfolio_service.get_portfolio_snapshot(portfolio_id=portfolio_id, user_id=user_id)
     else:
         holdings = await portfolio_service.get_all_holdings(user_id)
+        portfolio_snapshot = await portfolio_service.get_portfolio_snapshot(portfolio_id=None, user_id=user_id)
 
     if not holdings:
         raise HTTPException(
@@ -130,7 +165,7 @@ async def generate_portfolio_advisor(
     if portfolio_id:
         transactions = await portfolio_service.get_transactions(portfolio_id, limit=50)
     else:
-        transactions = await portfolio_service.get_all_transactions(user_id, limit=50)
+        transactions = (await portfolio_service.get_all_transactions(user_id, limit=50)).get("data", [])
 
     # Fetch open option positions
     if portfolio_id:
@@ -147,7 +182,7 @@ async def generate_portfolio_advisor(
         format_options_context,
     )
 
-    portfolio_context = format_portfolio_context(holdings, quotes, tech_data)
+    portfolio_context = format_portfolio_context(holdings, quotes, tech_data, snapshot=portfolio_snapshot.model_dump())
     transactions_context = format_transactions_context(transactions or [])
     options_context = format_options_context(option_holdings or [])
     macro_context = tavily_client.format_results(macro_results) if macro_results else ""
@@ -167,6 +202,15 @@ async def generate_portfolio_advisor(
         }
 
         await redis.set(cache_key, json.dumps(result_data), ex=86400)
+
+        if target_portfolio:
+            await _save_portfolio_report_to_journal(
+                portfolio_id=portfolio_id,
+                portfolio_name=target_portfolio["name"],
+                markdown=content,
+                model_used=model_used,
+                user_id=user_id,
+            )
 
         return PortfolioAdvisorResponse(**result_data, cached=False)
 

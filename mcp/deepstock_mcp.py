@@ -269,5 +269,23 @@ async def save_stock_journal_note(ticker: str, content: str) -> dict:
     )
 
 
+@mcp.tool()
+async def save_portfolio_journal_note(portfolio_id: str, content: str) -> dict:
+    """
+    Save a plain-text journal note for a specific portfolio.
+
+    Use only after the user explicitly wants to save a portfolio-specific
+    takeaway from the current conversation. The backend resolves the
+    portfolio journal channel and stores the note as a normal `note` entry.
+
+    portfolio_id: target portfolio ID for the current single-portfolio conversation
+    content: final user-approved plain-text note to save
+    """
+    return await _api_post(
+        "/api/mcp/portfolio-journal-note",
+        {"portfolio_id": portfolio_id, "content": content},
+    )
+
+
 if __name__ == "__main__":
     mcp.run(transport="streamable-http")

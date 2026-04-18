@@ -827,6 +827,44 @@ class ResearchContextService:
             "metadata": entry.get("metadata") or {},
         }
 
+    async def save_portfolio_journal_note(self, portfolio_id: str, content: str, user_id: str) -> dict:
+        portfolio = supabase.table("portfolios") \
+            .select("id, name") \
+            .eq("id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .single() \
+            .execute()
+        portfolio_row = portfolio.data
+        if not portfolio_row:
+            raise ValueError(f"Portfolio {portfolio_id} not found")
+
+        channel = await journal_service.get_channel_by_portfolio_id(portfolio_id, user_id=user_id)
+        if not channel:
+            raise ValueError(f"Portfolio journal channel for {portfolio_id} not found")
+
+        entry = await journal_service.create_entry(
+            EntryCreate(
+                channel_id=channel["id"],
+                type="note",
+                content=_plain_text_note_to_html(content),
+                metadata={
+                    "portfolio_id": portfolio_id,
+                    "portfolio_name": portfolio_row["name"],
+                    "source": "mcp_portfolio_note",
+                },
+            ),
+            redis=get_redis(),
+        )
+        return {
+            "entry_id": entry.get("id"),
+            "portfolio_id": portfolio_id,
+            "portfolio_name": portfolio_row["name"],
+            "channel_id": channel["id"],
+            "created_at": entry.get("created_at"),
+            "content_plaintext": content,
+            "metadata": entry.get("metadata") or {},
+        }
+
     async def get_investment_activity(self, ticker: str, user_id: str) -> dict:
         normalized_ticker = ticker.upper()
         stock_info = await market_service.get_stock_info(normalized_ticker)

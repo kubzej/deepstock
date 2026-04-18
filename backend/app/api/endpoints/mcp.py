@@ -19,6 +19,8 @@ from app.schemas.mcp import (
     PortfolioPerformanceResponse,
     ReportContentResponse,
     ResearchArchiveResponse,
+    SavePortfolioJournalNoteRequest,
+    SavePortfolioJournalNoteResponse,
     SaveStockJournalNoteRequest,
     SaveStockJournalNoteResponse,
     StockContextResponse,
@@ -183,6 +185,24 @@ async def save_stock_journal_note(
     try:
         return await research_context_service.save_stock_journal_note(
             ticker=payload.ticker,
+            content=payload.content,
+            user_id=user_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/portfolio-journal-note", response_model=SavePortfolioJournalNoteResponse)
+@limiter.limit("10/minute")
+async def save_portfolio_journal_note(
+    request: Request,
+    payload: SavePortfolioJournalNoteRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        return await research_context_service.save_portfolio_journal_note(
+            portfolio_id=payload.portfolio_id,
             content=payload.content,
             user_id=user_id,
         )

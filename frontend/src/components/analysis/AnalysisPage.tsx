@@ -312,7 +312,7 @@ export function AnalysisPage() {
             <TabsTrigger value="overview">Diverzifikace</TabsTrigger>
             <TabsTrigger value="stocks">Akcie</TabsTrigger>
             <TabsTrigger value="options">Opce</TabsTrigger>
-            <TabsTrigger value="ai">AI Poradce</TabsTrigger>
+            <TabsTrigger value="ai">AI přehled</TabsTrigger>
           </TabsList>
         </PageTopRail>
 

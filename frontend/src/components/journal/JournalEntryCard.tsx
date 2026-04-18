@@ -77,6 +77,7 @@ export function JournalEntryCard({
   const portfolioName = entry.metadata.portfolio_id
     ? (portfolios.find(p => p.id === entry.metadata.portfolio_id)?.name ?? null)
     : null;
+  const reportPortfolioName = entry.metadata.portfolio_name ?? portfolioName;
 
   const handleSaveEdit = () => {
     if (editContent.trim() === entry.content.trim()) {
@@ -182,6 +183,7 @@ export function JournalEntryCard({
       briefing: 'Kvartální briefing',
       full_analysis: 'Plná analýza',
       technical_analysis: 'Technická analýza',
+      portfolio_overview: 'AI přehled portfolia',
     };
     const label = entry.metadata.report_type
       ? reportTypeLabel[entry.metadata.report_type] ?? 'AI přehled'
@@ -201,6 +203,9 @@ export function JournalEntryCard({
             <span className="text-sm font-medium">{label}</span>
             {entry.metadata.ticker && (
               <span className="text-xs text-muted-foreground">{entry.metadata.ticker}</span>
+            )}
+            {!entry.metadata.ticker && reportPortfolioName && (
+              <span className="text-xs text-muted-foreground">{reportPortfolioName}</span>
             )}
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
           </div>

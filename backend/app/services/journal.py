@@ -110,9 +110,9 @@ class JournalService:
     # ------------------------------------------
 
     async def get_channels(self, user_id: str) -> List[dict]:
-        """All channels with entry count and stock name for stock channels."""
+        """All channels with entry count and linked entity labels for system channels."""
         response = supabase.table("journal_channels") \
-            .select("*, entry_count:journal_entries(count), stock:stocks(name)") \
+            .select("*, entry_count:journal_entries(count), stock:stocks(name), portfolio:portfolios(name)") \
             .eq("user_id", user_id) \
             .order("type") \
             .order("name") \
@@ -124,6 +124,8 @@ class JournalService:
             ch["entry_count"] = count[0]["count"] if count else 0
             stock = ch.pop("stock", None)
             ch["stock_name"] = stock["name"] if stock else None
+            portfolio = ch.pop("portfolio", None)
+            ch["portfolio_name"] = portfolio["name"] if portfolio else None
             channels.append(ch)
         return channels
 
@@ -146,6 +148,27 @@ class JournalService:
                 "ticker": ticker.upper(),
                 "sort_order": 0,
                 "user_id": resolved_user_id,
+            }) \
+            .execute()
+        return response.data[0]
+
+    async def get_or_create_portfolio_channel(self, portfolio_id: str, portfolio_name: str, user_id: str) -> dict:
+        """Called when a portfolio is created. Idempotent."""
+        existing = supabase.table("journal_channels") \
+            .select("*") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        if existing.data:
+            return existing.data[0]
+
+        response = supabase.table("journal_channels") \
+            .insert({
+                "type": "portfolio",
+                "name": portfolio_name,
+                "portfolio_id": portfolio_id,
+                "sort_order": 0,
+                "user_id": user_id,
             }) \
             .execute()
         return response.data[0]
@@ -193,6 +216,22 @@ class JournalService:
         if user_id:
             query = query.eq("user_id", user_id)
         response = query.execute()
+        return response.data[0] if response.data else None
+
+    async def get_channel_by_portfolio_id(self, portfolio_id: str, user_id: str) -> Optional[dict]:
+        response = supabase.table("journal_channels") \
+            .select("*") \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
+        return response.data[0] if response.data else None
+
+    async def update_portfolio_channel_name(self, portfolio_id: str, portfolio_name: str, user_id: str) -> Optional[dict]:
+        response = supabase.table("journal_channels") \
+            .update({"name": portfolio_name}) \
+            .eq("portfolio_id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .execute()
         return response.data[0] if response.data else None
 
     async def verify_channel_ownership(self, channel_id: str, user_id: str) -> bool:
@@ -330,6 +369,7 @@ class JournalService:
         ticker: str,
         transaction_id: str,
         portfolio_id: str,
+        user_id: str,
         action: str,
         shares: float,
         price: float,
@@ -340,7 +380,7 @@ class JournalService:
     ) -> None:
         """Create a journal entry for a stock transaction. Fire-and-forget safe."""
         try:
-            channel = await self.get_channel_by_ticker(ticker)
+            channel = await self.get_channel_by_ticker(ticker, user_id=user_id)
             if not channel:
                 return
             supabase.table("journal_entries").insert({
@@ -399,6 +439,7 @@ class JournalService:
         ticker: str,
         option_transaction_id: str,
         portfolio_id: str,
+        user_id: str,
         action: str,
         option_type: str,
         strike: float,
@@ -411,7 +452,7 @@ class JournalService:
     ) -> None:
         """Create a journal entry for an option transaction. Fire-and-forget safe."""
         try:
-            channel = await self.get_channel_by_ticker(ticker)
+            channel = await self.get_channel_by_ticker(ticker, user_id=user_id)
             if not channel:
                 return
             supabase.table("journal_entries").insert({

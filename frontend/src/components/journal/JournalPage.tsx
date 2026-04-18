@@ -67,6 +67,10 @@ function SidebarContent({
     .filter((c) => c.type === 'stock')
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const portfolioChannels = channels
+    .filter((c) => c.type === 'portfolio')
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const customChannels = channels.filter((c) => c.type === 'custom');
 
   const toggleSection = (id: string) => {
@@ -79,20 +83,28 @@ function SidebarContent({
 
   const renderSectionBlock = (section: JournalSection) => {
     const isCollapsed = collapsedSections.has(section.id);
-    let sectionChannels = section.is_system
-      ? stockChannels
-      : customChannels.filter((c) => c.section_id === section.id);
+    const normalizedSectionName = section.name.trim().toLowerCase();
+    const isStockSystemSection = section.is_system && normalizedSectionName === 'akcie';
+    const isPortfolioSystemSection = section.is_system && normalizedSectionName === 'portfolia';
 
-    if (section.is_system && search.trim()) {
+    let sectionChannels = isStockSystemSection
+      ? stockChannels
+      : isPortfolioSystemSection
+        ? portfolioChannels
+        : customChannels.filter((c) => c.section_id === section.id);
+
+    if (isStockSystemSection && search.trim()) {
       sectionChannels = sectionChannels.filter((c) =>
         c.name.toLowerCase().includes(search.toLowerCase())
       );
     }
 
-    const emptyLabel = section.is_system && search.trim()
+    const emptyLabel = isStockSystemSection && search.trim()
       ? 'Žádné výsledky'
-      : section.is_system
+      : isStockSystemSection
         ? 'Žádné akcie'
+        : isPortfolioSystemSection
+          ? 'Žádná portfolia'
         : 'Prázdná sekce';
 
     const totalEntries = sectionChannels.reduce((sum, c) => sum + c.entry_count, 0);

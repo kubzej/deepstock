@@ -320,11 +320,17 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
 
 # ─── Journal auto-save ─────────────────────────────────────────────────────────
 
-async def _save_report_to_journal(ticker: str, markdown: str, report_type: str, model_used: str) -> None:
+async def _save_report_to_journal(
+    ticker: str,
+    markdown: str,
+    report_type: str,
+    model_used: str,
+    user_id: str,
+) -> None:
     """Auto-save generated AI report to journal channel for this ticker (fire-and-forget)."""
     try:
         from app.services.journal import journal_service, EntryCreate
-        channel = await journal_service.get_channel_by_ticker(ticker)
+        channel = await journal_service.get_channel_by_ticker(ticker, user_id=user_id)
         if not channel:
             return
         await journal_service.create_entry(EntryCreate(
@@ -360,6 +366,7 @@ async def generate_research_report(
     stock_data: dict,
     force_refresh: bool = False,
     period: str = "3mo",
+    user_id: Optional[str] = None,
 ) -> dict:
     """
     Generate an AI research report for the given ticker.
@@ -424,7 +431,14 @@ async def generate_research_report(
             logger.info(f"TA report cached at {cache_key}")
         except Exception as e:
             logger.warning(f"Failed to cache TA report for {ticker}: {e}")
-        await _save_report_to_journal(ticker, markdown_content, report_type, model_used)
+        if user_id:
+            await _save_report_to_journal(
+                ticker,
+                markdown_content,
+                report_type,
+                model_used,
+                user_id=user_id,
+            )
         return result
 
     # ── Fundamental reports (briefing / full_analysis) ───────────────────────────
@@ -539,5 +553,12 @@ async def generate_research_report(
     except Exception as e:
         logger.warning(f"Failed to cache report for {ticker}: {e}")
 
-    await _save_report_to_journal(ticker, markdown_content, report_type, model_used)
+    if user_id:
+        await _save_report_to_journal(
+            ticker,
+            markdown_content,
+            report_type,
+            model_used,
+            user_id=user_id,
+        )
     return result

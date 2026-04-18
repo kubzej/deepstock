@@ -159,7 +159,7 @@ function FeedListCard({ list }: { list: FeedList }) {
             <div className="px-4 pb-4">
               <GenerationState
                 title="Generuji souhrn feedu..."
-                description="Načítám příspěvky a připravuji AI souhrn. Může to trvat 1 až 2 minuty."
+                description="Načítám příspěvky a připravuji AI souhrn."
               />
             </div>
           )}

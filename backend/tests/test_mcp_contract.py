@@ -7,6 +7,8 @@ from app.schemas.mcp import (
     PortfolioPerformanceResponse,
     ReportContentResponse,
     ResearchArchiveResponse,
+    SavePortfolioJournalNoteRequest,
+    SavePortfolioJournalNoteResponse,
     SaveStockJournalNoteRequest,
     SaveStockJournalNoteResponse,
     StockContextResponse,
@@ -230,6 +232,34 @@ def test_save_stock_journal_note_contract_accepts_writeback_shape():
     assert request.ticker == "NVDA"
     assert request.content.startswith("Conviction")
     assert response.metadata["source"] == "mcp_stock_note"
+
+
+def test_save_portfolio_journal_note_contract_accepts_writeback_shape():
+    request = SavePortfolioJournalNoteRequest.model_validate(
+        {
+            "portfolio_id": " portfolio-main ",
+            "content": "Portfolio is still too concentrated in semis.\n\nNext adds should improve diversification.",
+        }
+    )
+    response = SavePortfolioJournalNoteResponse.model_validate(
+        {
+            "entry_id": "note-2",
+            "portfolio_id": "portfolio-main",
+            "portfolio_name": "Main",
+            "channel_id": "channel-2",
+            "created_at": "2026-04-17T10:00:00Z",
+            "content_plaintext": "Portfolio is still too concentrated in semis.\n\nNext adds should improve diversification.",
+            "metadata": {
+                "portfolio_id": "portfolio-main",
+                "portfolio_name": "Main",
+                "source": "mcp_portfolio_note",
+            },
+        }
+    )
+
+    assert request.portfolio_id == "portfolio-main"
+    assert request.content.startswith("Portfolio")
+    assert response.metadata["source"] == "mcp_portfolio_note"
 
 
 def test_portfolio_and_market_contracts_accept_expected_shapes():

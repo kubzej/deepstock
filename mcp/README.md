@@ -16,6 +16,7 @@ Exposes DeepStock research data as tools for Claude Code, Cursor, Claude.ai, or 
 | `get_report_content` | Full markdown content of a specific report by ID |
 | `get_note_content` | Full content of a specific journal note by ID |
 | `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker |
+| `save_portfolio_journal_note` | Save a user-approved plain-text note into the journal for one portfolio |
 | `get_investment_activity` | Transaction history, cost basis, open option positions |
 
 See [CONTRACT.md](CONTRACT.md) for response shapes, field semantics, and tool-selection guidance.

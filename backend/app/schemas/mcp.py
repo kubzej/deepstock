@@ -273,6 +273,37 @@ class SaveStockJournalNoteResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SavePortfolioJournalNoteRequest(BaseModel):
+    portfolio_id: str = Field(min_length=1, max_length=100)
+    content: str = Field(min_length=1, max_length=10000)
+
+    @field_validator("portfolio_id")
+    @classmethod
+    def validate_portfolio_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Portfolio ID cannot be empty")
+        return normalized
+
+    @field_validator("content")
+    @classmethod
+    def validate_portfolio_content(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Content cannot be empty")
+        return stripped
+
+
+class SavePortfolioJournalNoteResponse(BaseModel):
+    entry_id: str
+    portfolio_id: str
+    portfolio_name: str
+    channel_id: str
+    created_at: Optional[str] = None
+    content_plaintext: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class PortfolioSnapshotResponse(BaseModel):
     total_value_czk: float
     total_cost_czk: float

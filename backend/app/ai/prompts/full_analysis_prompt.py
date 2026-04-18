@@ -32,7 +32,10 @@ trh přehlížet. Optimismus musí být podložen stejně přísně jako kritika
    v kontextu nebo z citovaných webových zdrojů. Nikdy je nedoplňuj z vlastní paměti –
    ta může být zastaralá o měsíce nebo roky.
 
-6. **Kvalita nad rozsahem.** Raději kratší, přesný report než dlouhý plný spekulací."""
+6. **Kvalita nad rozsahem.** Raději kratší, přesný report než dlouhý plný spekulací.
+
+7. **Bez duplicit.** Každé téma pokryj právě jednou. Neopakuj stejné argumenty napříč
+   sekcemi; v závěru z nich pouze vyvozuj investiční důsledky."""
 
 
 def build_user_prompt(
@@ -80,110 +83,68 @@ Odrážky používej výhradně při dělení, třídění nebo kategorizaci inf
 
 ### Struktura analýzy:
 
-**1. Obchodní model a zdroje příjmů**
-Detailně popiš, čím se společnost zabývá a jak generuje peníze. Co jsou hlavní revenue streams?
-Jaké jsou strukturální výhody tohoto modelu?
+**1. Byznys, trh a zdroje příjmů**
+Detailně popiš, čím se společnost zabývá, jak generuje peníze a na jakém trhu působí.
+Vysvětli hlavní revenue streams, strukturu poptávky, klíčové segmenty, tempo a povahu růstu trhu.
+Pojmenuj, zda jde o rostoucí, stagnující nebo cyklický trh, a jaká je aktuální pozice firmy.
 
-**2. Konkurenční výhoda (moat) a srovnání s peers**
-V čem se společnost odlišuje od konkurence? Co ji chrání? Porovnej ji s klíčovými konkurenty –
-valuačně (P/E, EV/EBITDA, marže) i byznysově. Je prémiové nebo diskontní ocenění oprávněné?
-Kde má firma navrch a kde zaostává?
+**2. Konkurenční výhoda, peers a ocenění**
+V čem se společnost odlišuje od konkurence a co ji chrání? Porovnej ji s klíčovými konkurenty
+byznysově i valuačně (P/E, EV/EBITDA, marže), pokud jsou data dostupná. Je prémiové nebo
+diskontní ocenění oprávněné? Kde má firma navrch a kde zaostává?
 
-**3. Hodnocení managementu (1–10)**
-Proveď průzkum o vedení společnosti a ohodnoť je. Zohledni jejich track record, strategická
-rozhodnutí, komunikaci s investory a schopnost realizovat plány. Uveď konkrétní příklady
-úspěchů i selhání.
-
-**4. Kapitálová alokace**
-Jak management nakládá s volným cash flow? Analyzuj:
-- Buybacky: Jsou aktivní? Nakupuje firma akcie při rozumných valuacích, nebo přeplácí?
+**3. Management a kapitálová alokace**
+Zhodnoť vedení společnosti a ohodnoť management na škále 1–10. Zohledni track record,
+strategická rozhodnutí, komunikaci s investory a schopnost realizovat plány. Současně
+zhodnoť, jak management nakládá s kapitálem:
+- Buybacky: Jsou disciplinované, nebo firma přeplácí vlastní akcie?
 - Dividendy: Politika, udržitelnost payout ratio, historie růstu
-- Akvizice: Disciplinovanost při M&A, historická úspěšnost integrací
+- Akvizice: Disciplína při M&A a historická úspěšnost integrací
 - Organické investice vs. návratnost kapitálu (ROIC vs. WACC)
-Celkové hodnocení: Je management dobrým správcem kapitálu akcionářů?
+Celkově odpověz: je management dobrým správcem kapitálu akcionářů?
 
-**5. Insider aktivita – signál zevnitř**
-Na základě SEC Form 4 dat výše: Jsou insider nákupy signifikantní (vysoká hodnota, více
-insiderů najednou, CEO/CFO)? Jsou prodeje rutinní nebo alarmující? Jak koresponduje
-insider chování s aktuální valuací? Pokud data chybí, konstatuj to.
+**4. Insider aktivita – signál zevnitř**
+Na základě SEC Form 4 dat výše posuď, zda jsou insider nákupy signifikantní a zda jsou
+prodeje rutinní nebo alarmující. Zohledni i ekonomicky ekvivalentní prodeje, pokud jsou
+ve zdrojích popsány. Pokud data chybí, konstatuj to.
 
-**6. Analýza trhu**
-Popiš trh, na kterém společnost působí – velikost TAM, dynamiku, tempo růstu a klíčové trendy.
-Jaká je pozice firmy v tomto trhu? Roste trh nebo stagnuje?
+**5. Rizika a skeptický pohled**
+Identifikuj a roztřiď konkrétní rizika do kategorií: byznysová, regulační/právní, finanční
+a makro/geopolitická. Pro každé uveď, co konkrétně hrozí a co by muselo nastat, aby se
+riziko materializovalo. Poté přidej skeptický pohled: co by na firmě napadl short seller
+nebo forenzní analytik. Hledej konkrétně účetní volby, insider chování neodpovídající
+narativu, regulatorní korespondenci, litigation nebo témata, kterým se management vyhýbá.
+Pokud nic takového neexistuje, napiš to explicitně.
 
-**7. Riziková analýza**
-Identifikuj a roztřiď konkrétní rizika do kategorií — ne generické "tržní riziko":
-- **Byznysová:** konkurence, ztráta zákazníků, technologická zastaralost, selhání klíčového produktu
-- **Regulační/právní:** regulace, licence, soudní spory, compliance
-- **Finanční:** dluh, likvidita, měnové riziko, závislost na komoditních cenách
-- **Makro/geopolitická:** geopolitické události, cla, sankce, sezónní výkyvy
-Pro každé riziko uveď: co konkrétně hrozí a co by muselo nastat, aby se riziko materializovalo.
+**6. Makro, geopolitika a sektorové katalyzátory**
+Z výsledků vyhledávání zhodnoť, zda jsou pro titul nebo sektor tailwind či headwind:
+- Makro: Fed sazby, inflace, stav S&P 500
+- Geopolitika a regulace: konflikty, sankce, cla, regulační změny
+- Sektorové a sezónní vlivy: komoditní cykly, poptávkové špičky, kapacitní omezení,
+  energetická politika nebo jiné specifické katalyzátory v příštích 6–12 měsících
+Nakonec vysvětli, jak toto prostředí dopadá konkrétně na tuto firmu.
 
-**7b. Pohled skeptika — co by napadl short seller**
-Přijmi roli analytika s přístupem k SEC filingům a alternativním datům. Hledej konkrétně:
-- Účetní volby, které management mohl udělat ve svůj prospěch (metrika bez průmyslové
-  analogie, adj. čísla výrazně lepší než GAAP, změny metodiky bez vysvětlení)
-- Insider chování, které neodpovídá narativu (PVFC, 10b5-1 plány uzavřené při vysokém kurzu,
-  cashless exercises — hledej ekonomický ekvivalent prodeje, ne jen "S" transakce v Form 4)
-- Regulatorní korespondenci (SEC comment letters, dohledové akce, probíhající litigation)
-- Témata, která management aktivně neprobírá nebo odpovídá vágně na earnings calls
-Pokud nic takového neexistuje — konstatuj to explicitně. Tato sekce nesmí být generická —
-buď konkrétní nebo ji vynech.
+**7. Co trh může přehlížet**
+Identifikuj, co může být v aktuální ceně špatně naceněné nebo podceněné. Zaměř se jen na
+body, které ještě nezazněly výše jako prostý popis firmy nebo seznam rizik. Hledej skutečné
+tržní neefektivity: skrytou hodnotu, podceněný katalyzátor, strukturální změnu v odvětví,
+nebo naopak riziko, které trh bagatelizuje.
 
-**8. Investiční teze – oba pohledy**
-Vycházej z rizik identifikovaných v sekcích 7 a 7b a z fundamentů. Nepřepisuj rizika znovu —
-převeď je do investičních scénářů:
-*Bear case (výchozí perspektiva):* Které konkrétní riziko by celou investiční tezi zničilo?
-Jaký scénář (regulační rozhodnutí, výsledky, účetní restatement, makro šok) by ho spustil,
-na jakém časovém horizontu a jak by reagovala cena akcie?
-*Bull case (podmíněný):* Proč investice při ceně {current_price} USD bude fungovat? Jaké jsou
-konkrétní katalyzátory a co přesně musí nastat, aby se teze naplnila? Pokud jsou podmínky
-spekulativní nebo závisí na více věcech najednou, řekni to jasně.
+**8. Investiční teze a verdikt**
+Převeď předchozí zjištění do investičních scénářů bez opakování celé analýzy:
+- *Bear case:* Které konkrétní riziko by investiční tezi zničilo, co by ho spustilo,
+  na jakém horizontu a jak by pravděpodobně reagovala cena akcie?
+- *Bull case:* Proč investice při ceně {current_price} USD může fungovat? Jaké jsou
+  konkrétní katalyzátory a co přesně musí nastat, aby se teze naplnila?
 
-**9. Makro a geopolitický kontext**
-Z výsledků vyhledávání zhodnoť:
-- **Makro:** Fed sazby, inflace, stav S&P 500 — jsou tailwind nebo headwind pro tento titul/sektor?
-- **Geopolitika:** Probíhající konflikty, sankce, obchodní války nebo regulační změny, které mohou
-  ovlivnit nabídku, poptávku nebo marže v tomto sektoru. Pokud nic relevantního není, konstatuj to.
-- **Sektorové a sezónní katalyzátory:** Specifické trendy daného odvětví — sezónní poptávka,
-  komoditní cykly, kapacitní omezení, energetická politika apod. Co pohání nebo brzdí sektor
-  jako celek v nejbližších 6–12 měsících?
-- **Momentum firmy:** Jak koresponduje makro/geopolitické prostředí s aktuální pozicí této konkrétní firmy?
-
-**10. Tržní neefektivity (co trh přehlíží)**
-Identifikuj, co trh může nesprávně oceňovat nebo podceňovat. Kde se skrývá skrytá hodnota?
-Příklady: geopolitický katalyzátor, který trh ignoruje; sezónní poptávkový spike, který analytici
-neprojektují; regulační změna, která prospěje firmě jinak než konkurenci; strukturální posun
-v odvětví, který není v konsenzuálním ocenění. Co analytici systematicky přehlížejí?
-
-**11. Souhrn analytických reportů**
-Shrň názory, argumenty a projekce analytiků z nejnovějších reportů (po posledním kvartálu).
-Jaký je konsenzus? Kde jsou největší neshody? Průměrný price target a konsenzus Buy/Hold/Sell.
-
-**12. Závěrečné hodnocení – investiční verdikt**
-
-Zhodnoť akci z pohledu tří různých strategií. Pro každou buď konkrétní — pokud setup neexistuje,
-řekni to jasně. Nevymýšlej příležitost tam, kde žádná není.
-
+Poté dej závěrečný verdikt z pohledu tří strategií:
 - **Dlouhodobá pozice (3–5+ let):** Koupit / Přikoupit / Čekat / Vyhnout se — a proč.
-  Je akcie při {current_price} USD fundamentálně podhodnocená, férová, nebo drahá?
-  Co musí firma splnit, aby teze za 3–5 let platila?
-
-- **Střednědobý katalyzátorový trade (3–18 měsíců):** Existuje konkrétní katalyzátor
-  (výsledky, regulační rozhodnutí, produktový launch, M&A, licenční prodloužení), který může
-  přecenit akcii v horizontu měsíců? Jaká je pravděpodobnost a kdy nejpozději se to rozhodne?
-  Pokud žádný střednědobý katalyzátor neexistuje, konstatuj to.
-
-- **Krátkodobý / sezónní trade (1–3 měsíce):** Existuje sezónní vzorec, poptávkový spike
-  nebo technický setup (vycházej ze sekcí 9 a 10), který vytváří krátkodobou příležitost?
-  Pokud ano: jaký je setup, vstupní logika a co by pozici zastavilo?
-  Pokud ne — explicitně napiš, že krátkodobý setup neexistuje nebo je rizikový.
-
+- **Střednědobý katalyzátorový trade (3–18 měsíců):** Existuje konkrétní katalyzátor,
+  který může akcii přecenit? Pokud ne, řekni to jasně.
+- **Krátkodobý / sezónní trade (1–3 měsíce):** Existuje smysluplný setup? Pokud ne,
+  explicitně napiš, že krátkodobý setup neexistuje nebo je rizikový.
 - **Klíčový risk teze:** Jedna věc, která by zničila investiční příběh bez ohledu na horizont.
-  Pojmenuj konkrétně — ne "tržní riziko".
-
-- **Vstupní body:** Pro každou relevantní strategii výše: při jaké ceně teze dává smysl?
-  Existuje lepší vstupní bod a co by ho spustilo?
+- **Vstupní body:** Pro které z výše uvedených strategií dává aktuální nebo jiná cena smysl?
 
 ---
 

@@ -167,7 +167,22 @@ class PortfolioService:
                 "description": data.description
             }) \
             .execute()
-        return response.data[0]
+        portfolio = response.data[0]
+
+        try:
+            from app.services.journal import journal_service
+            await journal_service.get_or_create_portfolio_channel(
+                portfolio["id"],
+                portfolio["name"],
+                user_id=user_id,
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Could not create journal channel for portfolio {portfolio['id']}: {e}"
+            )
+
+        return portfolio
     
     async def update_portfolio(self, portfolio_id: str, user_id: str, data: 'PortfolioUpdate') -> dict:
         """Update a portfolio. Verifies ownership."""
@@ -192,8 +207,23 @@ class PortfolioService:
             .eq("id", portfolio_id) \
             .eq("user_id", user_id) \
             .execute()
-        
-        return response.data[0] if response.data else None
+
+        portfolio = response.data[0] if response.data else None
+        if portfolio and data.name is not None:
+            try:
+                from app.services.journal import journal_service
+                await journal_service.update_portfolio_channel_name(
+                    portfolio_id=portfolio_id,
+                    portfolio_name=portfolio["name"],
+                    user_id=user_id,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    f"Could not rename journal channel for portfolio {portfolio_id}: {e}"
+                )
+
+        return portfolio
     
     async def delete_portfolio(self, portfolio_id: str, user_id: str) -> bool:
         """Delete a portfolio and all related data. Verifies ownership."""

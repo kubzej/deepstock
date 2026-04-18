@@ -120,6 +120,7 @@ async def add_transaction(portfolio_id: str, data: TransactionCreate, user_id: s
             ticker=data.stock_ticker,
             transaction_id=tx["id"],
             portfolio_id=portfolio_id,
+            user_id=user_id,
             action=tx["type"],
             shares=tx["shares"],
             price=tx["price_per_share"],

@@ -92,6 +92,7 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
             stock_data=stock_data,
             force_refresh=payload.force_refresh,
             period=payload.period,
+            user_id=user_id,
         )
         return result
     except ValueError as e:
@@ -146,6 +147,7 @@ async def download_pdf(
             report_type=report_type,
             stock_data=stock_data,
             period=period,
+            user_id=user_id,
         )
     else:
         report = json.loads(cached)

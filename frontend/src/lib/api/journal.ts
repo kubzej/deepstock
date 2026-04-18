@@ -15,15 +15,17 @@ export interface JournalSection {
 
 export interface JournalChannel {
   id: string;
-  type: 'stock' | 'custom';
+  type: 'stock' | 'portfolio' | 'custom';
   name: string;
   stock_id: string | null;
+  portfolio_id: string | null;
   ticker: string | null;
   section_id: string | null;
   sort_order: number;
   created_at: string;
   entry_count: number;
   stock_name: string | null;
+  portfolio_name: string | null;
 }
 
 export type JournalEntryType = 'note' | 'ai_report' | 'ext_ref' | 'transaction' | 'option_trade';
@@ -57,8 +59,10 @@ export interface JournalEntry {
     // note
     price_at_creation?: number;
     // ai_report
-    report_type?: 'research' | 'technical' | 'full_analysis';
+    report_type?: 'briefing' | 'technical_analysis' | 'full_analysis' | 'portfolio_overview';
     ticker?: string;
+    portfolio_id?: string;
+    portfolio_name?: string;
     model?: string;
     // ext_ref
     url?: string;
@@ -70,7 +74,6 @@ export interface JournalEntry {
     discord_author?: string;
     // transaction / option_trade shared
     action?: string;
-    portfolio_id?: string;
     // transaction
     shares?: number;
     price?: number;
@@ -258,4 +261,3 @@ export async function deleteJournalEntry(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error('Chyba při mazání poznámky');
 }
-
