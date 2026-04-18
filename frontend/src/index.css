@@ -9,6 +9,7 @@
   --color-positive: #10b981;
   --color-negative: #ef4444;
   --color-warning: #f59e0b;
+  --color-info: #0ea5e9;
 
   /* Monospace for prices */
   --font-mono: "Geist Mono", "JetBrains Mono", monospace;

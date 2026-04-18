@@ -2,21 +2,23 @@
 
 Exposes DeepStock research data as tools for Claude Code, Cursor, Claude.ai, or any MCP-compatible client.
 
+Primary use case: conversational investing chat with personal DeepStock data in online clients such as Claude.ai, ChatGPT, or Perplexity. This is not meant to be a broad app-integration surface. The write-back scope stays intentionally narrow: explicit note saves only.
+
 ## Tools
 
 | Tool | Description |
 |---|---|
 | `list_portfolios` | List available portfolios and their snapshot summaries |
 | `get_portfolio_context` | Current holdings/snapshot context for all portfolios or one selected portfolio |
-| `get_portfolio_performance` | Historical stock/options performance for all portfolios or one selected portfolio |
+| `get_portfolio_performance` | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL` |
 | `get_market_context` | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview |
 | `get_stock_context` | Default first call — lean ticker summary across journal, activity, watchlist, and market |
-| `get_technical_history` | Detailed indicator history (RSI, MACD, Bollinger, ADX, Fibonacci, …) |
+| `get_technical_history` | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list |
 | `get_research_archive` | Report and note previews for a ticker |
-| `get_report_content` | Full markdown content of a specific report by ID |
-| `get_note_content` | Full content of a specific journal note by ID |
-| `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker |
-| `save_portfolio_journal_note` | Save a user-approved plain-text note into the journal for one portfolio |
+| `get_report_content` | Full report content by ID, with explicit `content_format="markdown"` |
+| `get_note_content` | Full note content by ID, normalized to AI-friendly plain text with `content_format="plain_text"` |
+| `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker; response echoes canonical plain-text content |
+| `save_portfolio_journal_note` | Save a user-approved plain-text note into the journal for one portfolio; response echoes canonical plain-text content |
 | `get_investment_activity` | Transaction history, cost basis, open option positions |
 
 See [CONTRACT.md](CONTRACT.md) for response shapes, field semantics, and tool-selection guidance.
@@ -89,3 +91,16 @@ Set in Railway dashboard (remote) or `backend/.env` (local Docker — shared wit
 **`No users found in Supabase project`** — service role key doesn't match the Supabase URL.
 
 **Connection refused on `http://localhost:8001`** — MCP container isn't running. Run `docker compose up deepstock-mcp`.
+
+## Error behavior
+
+The MCP server normalizes backend and network failures into chat-friendly tool errors:
+
+- not found: the requested ticker, note, report, or portfolio does not exist for the authenticated user
+- invalid input: unsupported period or indicator selection
+- auth failed: MCP server misconfiguration or invalid backend auth
+- rate limit hit: retry later
+- upstream provider unavailable: market data provider or backend dependency is temporarily down
+- API unreachable / timed out: backend or network problem between MCP and DeepStock API
+
+See [CONTRACT.md](CONTRACT.md) for field semantics and content-format rules.

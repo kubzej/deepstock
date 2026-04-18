@@ -2,7 +2,8 @@
 DeepStock MCP Server
 
 Standalone MCP server that exposes DeepStock research data as tools
-for use in Cursor, VS Code Copilot, or any MCP-compatible client.
+for conversational use in Claude.ai, ChatGPT, Perplexity, Cursor,
+or any MCP-compatible client.
 
 Configuration (environment variables):
   DEEPSTOCK_API_URL              Backend URL, default: http://localhost:8000
@@ -12,6 +13,8 @@ Configuration (environment variables):
 """
 import os
 import time
+from typing import Literal
+
 import httpx
 import jwt
 from mcp.server.fastmcp import FastMCP
@@ -25,6 +28,21 @@ JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
 PORT = int(os.environ.get("PORT", 8001))
 
 mcp = FastMCP("deepstock", host="0.0.0.0", port=PORT)
+
+PortfolioPerformancePeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
+TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
+TechnicalIndicator = Literal[
+    "price",
+    "rsi",
+    "macd",
+    "bollinger",
+    "volume",
+    "stochastic",
+    "atr",
+    "obv",
+    "adx",
+    "fibonacci",
+]
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -48,20 +66,28 @@ def _mint_token(user_id: str, ttl_seconds: int = 3600) -> str:
 
 
 async def _get_user_id() -> str:
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(
-            f"{SUPABASE_URL}/auth/v1/admin/users",
-            headers={
-                "apikey": SERVICE_ROLE_KEY,
-                "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
-            },
-            params={"per_page": 1},
-        )
-        response.raise_for_status()
-        users = response.json().get("users", [])
-        if not users:
-            raise RuntimeError("No users found in Supabase project")
-        return users[0]["id"]
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SUPABASE_URL}/auth/v1/admin/users",
+                headers={
+                    "apikey": SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {SERVICE_ROLE_KEY}",
+                },
+                params={"per_page": 1},
+            )
+            response.raise_for_status()
+            users = response.json().get("users", [])
+            if not users:
+                raise RuntimeError("No users found in Supabase project")
+            return users[0]["id"]
+    except httpx.HTTPStatusError as exc:
+        detail = _extract_error_detail(exc.response)
+        raise RuntimeError(f"Failed to resolve DeepStock MCP user: {detail}") from exc
+    except httpx.TimeoutException as exc:
+        raise RuntimeError("Timed out while resolving DeepStock MCP user.") from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError(f"Cannot reach Supabase while resolving MCP user: {exc}") from exc
 
 
 async def _get_token() -> str:
@@ -72,7 +98,7 @@ async def _get_token() -> str:
 
     if not SERVICE_ROLE_KEY or not JWT_SECRET:
         raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET must be set in ~/.cursor/mcp.json"
+            "SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET must be configured for the DeepStock MCP server"
         )
 
     user_id = await _get_user_id()
@@ -82,28 +108,69 @@ async def _get_token() -> str:
     return _cached_token
 
 
-async def _api_get(path: str, params: dict | None = None) -> dict:
+def _extract_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if isinstance(detail, str) and detail.strip():
+            return detail.strip()
+    if response.text.strip():
+        return response.text.strip()
+    return f"HTTP {response.status_code}"
+
+
+def _raise_api_error(exc: httpx.HTTPStatusError) -> None:
+    response = exc.response
+    detail = _extract_error_detail(response)
+    status = response.status_code
+
+    if status == 404:
+        raise RuntimeError(f"DeepStock data not found: {detail}") from exc
+    if status == 400:
+        raise RuntimeError(f"DeepStock invalid input: {detail}") from exc
+    if status in {401, 403}:
+        raise RuntimeError(f"DeepStock authentication failed: {detail}") from exc
+    if status == 429:
+        raise RuntimeError(f"DeepStock rate limit hit: {detail}. Retry later.") from exc
+    if status in {502, 503, 504}:
+        raise RuntimeError(
+            f"DeepStock upstream provider is temporarily unavailable: {detail}. Retry later."
+        ) from exc
+
+    raise RuntimeError(f"DeepStock API request failed ({status}): {detail}") from exc
+
+
+async def _api_request(method: str, path: str, *, params: dict | None = None, payload: dict | None = None) -> dict:
     token = await _get_token()
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.get(
-            f"{API_URL}{path}",
-            params=params,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.request(
+                method,
+                f"{API_URL}{path}",
+                params=params,
+                json=payload,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as exc:
+        _raise_api_error(exc)
+    except httpx.TimeoutException as exc:
+        raise RuntimeError("DeepStock API timed out. Retry later.") from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError(f"DeepStock API is unreachable: {exc}") from exc
+
+
+async def _api_get(path: str, params: dict | None = None) -> dict:
+    return await _api_request("GET", path, params=params)
 
 
 async def _api_post(path: str, payload: dict) -> dict:
-    token = await _get_token()
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            f"{API_URL}{path}",
-            json=payload,
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        response.raise_for_status()
-        return response.json()
+    return await _api_request("POST", path, payload=payload)
 
 
 @mcp.tool()
@@ -130,12 +197,17 @@ async def get_portfolio_context(portfolio_id: str = "") -> dict:
 
 
 @mcp.tool()
-async def get_portfolio_performance(period: str = "1Y", portfolio_id: str = "") -> dict:
+async def get_portfolio_performance(
+    period: PortfolioPerformancePeriod = "1Y",
+    portfolio_id: str = "",
+) -> dict:
     """
     Get historical portfolio performance over time.
 
     Returns stock and options performance for the requested period.
     Leave portfolio_id empty to aggregate across all portfolios.
+
+    period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
     """
     params = {"period": period}
     if portfolio_id:
@@ -173,8 +245,8 @@ async def get_stock_context(ticker: str) -> dict:
 @mcp.tool()
 async def get_technical_history(
     ticker: str,
-    period: str = "6mo",
-    indicators: str = "price,rsi,macd,bollinger,volume",
+    period: TechnicalPeriod = "6mo",
+    indicators: list[TechnicalIndicator] | None = None,
 ) -> dict:
     """
     Get detailed technical indicator history for a ticker.
@@ -183,12 +255,13 @@ async def get_technical_history(
     when the compact technicals in get_stock_context aren't enough.
 
     period: 1w | 1mo | 3mo | 6mo | 1y | 2y
-    indicators: comma-separated list from: price, rsi, macd, bollinger,
-                volume, stochastic, atr, obv, adx, fibonacci
+    indicators: optional list from: price, rsi, macd, bollinger, volume,
+                stochastic, atr, obv, adx, fibonacci
     """
+    indicator_param = ",".join(indicators) if indicators else None
     return await _api_get(
         f"/api/mcp/technical-history/{ticker.upper()}",
-        params={"period": period, "indicators": indicators},
+        params={"period": period, "indicators": indicator_param},
     )
 
 
@@ -227,10 +300,12 @@ async def get_investment_activity(ticker: str) -> dict:
 @mcp.tool()
 async def get_report_content(report_id: str) -> dict:
     """
-    Get full markdown content of a specific AI research report.
+    Get full content of a specific AI research report.
 
     Use after get_research_archive to fetch the full text of a specific report
     by its ID. Reports can be long — fetch only the one(s) you actually need.
+
+    Response includes `content_format`, currently always `markdown`.
 
     report_id: the UUID from get_research_archive reports[].id
     """
@@ -244,6 +319,9 @@ async def get_note_content(note_id: str) -> dict:
 
     Use after get_stock_context or get_research_archive when a note preview
     looks relevant and you need the full text.
+
+    Response includes `content_format`, currently always `plain_text`.
+    Stored rich text is normalized for AI-friendly reading.
 
     note_id: the UUID from journal_context.notes[].id or research_archive notes[].id
     """
@@ -262,6 +340,8 @@ async def save_stock_journal_note(ticker: str, content: str) -> dict:
 
     ticker: stock symbol for the current single-stock conversation
     content: final user-approved plain-text note to save
+
+    Response echoes the saved `content` plus `content_format="plain_text"`.
     """
     return await _api_post(
         "/api/mcp/stock-journal-note",
@@ -280,6 +360,8 @@ async def save_portfolio_journal_note(portfolio_id: str, content: str) -> dict:
 
     portfolio_id: target portfolio ID for the current single-portfolio conversation
     content: final user-approved plain-text note to save
+
+    Response echoes the saved `content` plus `content_format="plain_text"`.
     """
     return await _api_post(
         "/api/mcp/portfolio-journal-note",

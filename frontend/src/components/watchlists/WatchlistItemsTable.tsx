@@ -214,7 +214,7 @@ export function WatchlistItemsTable({
                   atBuy
                     ? 'bg-positive/5'
                     : atSell
-                      ? 'bg-amber-500/10'
+                      ? 'bg-warning/10'
                       : ''
                 }`}
                 onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
@@ -226,7 +226,7 @@ export function WatchlistItemsTable({
                       <span className="mt-1.5 flex h-2.5 w-2.5 shrink-0 rounded-full">
                         <span
                           className={`relative inline-flex rounded-full h-2 w-2 ${
-                            atBuy ? 'bg-positive' : 'bg-amber-500'
+                            atBuy ? 'bg-positive' : 'bg-warning'
                           }`}
                         />
                       </span>
@@ -238,7 +238,7 @@ export function WatchlistItemsTable({
                             atBuy
                               ? 'text-positive'
                               : atSell
-                                ? 'text-amber-500'
+                                ? 'text-warning'
                                 : ''
                           }`}
                         >
@@ -293,7 +293,7 @@ export function WatchlistItemsTable({
                       </div>
                     )}
                     {quote?.postMarketPrice && (
-                      <div className="text-[10px] text-sky-500">
+                      <div className="text-[10px] text-info">
                         {formatPrice(
                           quote.postMarketPrice,
                           item.stocks.currency,
@@ -323,7 +323,7 @@ export function WatchlistItemsTable({
                       )}
                     {quote?.postMarketChangePercent !== undefined &&
                       quote?.postMarketChangePercent !== null && (
-                        <div className="text-[10px] text-sky-500">
+                        <div className="text-[10px] text-info">
                           {formatPercent(quote.postMarketChangePercent)}
                         </div>
                       )}
@@ -343,7 +343,7 @@ export function WatchlistItemsTable({
                 <TableCell
                   className={`text-right font-mono-price ${
                     atSell
-                      ? 'text-amber-500 font-semibold'
+                      ? 'text-warning font-semibold'
                       : 'text-muted-foreground'
                   }`}
                 >
@@ -355,7 +355,7 @@ export function WatchlistItemsTable({
                   {quote?.earningsDate ? (
                     <div>
                       {showBadge && (
-                        <div className="text-xs font-semibold text-blue-500">
+                        <div className="text-xs font-semibold text-info">
                           {earningsBadge}
                         </div>
                       )}

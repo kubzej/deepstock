@@ -6,7 +6,7 @@ can describe the actual payloads external agents depend on.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -109,7 +109,7 @@ class WatchlistContextResponse(BaseModel):
 
 class SmartAnalysisLabelResponse(BaseModel):
     text: Optional[str] = None
-    color_class: Optional[str] = None
+    tone: Optional[Literal["positive", "neutral", "warning", "negative"]] = None
 
 
 class SmartAnalysisResponse(BaseModel):
@@ -211,12 +211,104 @@ class TechnicalHistorySummaryResponse(BaseModel):
     volume_signal: Optional[str] = None
 
 
+class PerformanceDataPointResponse(BaseModel):
+    date: str
+    value: float
+    invested: float
+    benchmark: Optional[float] = None
+
+
+class TechnicalPricePointResponse(BaseModel):
+    date: str
+    price: Optional[float] = None
+    sma50: Optional[float] = None
+    sma200: Optional[float] = None
+
+
+class TechnicalMACDPointResponse(BaseModel):
+    date: str
+    macd: Optional[float] = None
+    signal: Optional[float] = None
+    histogram: Optional[float] = None
+
+
+class TechnicalBollingerPointResponse(BaseModel):
+    date: str
+    price: Optional[float] = None
+    upper: Optional[float] = None
+    middle: Optional[float] = None
+    lower: Optional[float] = None
+
+
+class TechnicalStochasticPointResponse(BaseModel):
+    date: str
+    k: Optional[float] = None
+    d: Optional[float] = None
+
+
+class TechnicalRSIPointResponse(BaseModel):
+    date: str
+    rsi: Optional[float] = None
+
+
+class TechnicalVolumePointResponse(BaseModel):
+    date: str
+    volume: int = 0
+    avgVolume: Optional[float] = None
+    isAboveAvg: bool = False
+
+
+class TechnicalATRPointResponse(BaseModel):
+    date: str
+    atr: Optional[float] = None
+    atrPercent: Optional[float] = None
+
+
+class TechnicalOBVPointResponse(BaseModel):
+    date: str
+    obv: Optional[float] = None
+    obvSma: Optional[float] = None
+
+
+class TechnicalADXPointResponse(BaseModel):
+    date: str
+    adx: Optional[float] = None
+    plusDI: Optional[float] = None
+    minusDI: Optional[float] = None
+
+
+class TechnicalFibonacciLevelResponse(BaseModel):
+    ratio: Optional[float] = None
+    price: Optional[float] = None
+    label: Optional[str] = None
+
+
+class TechnicalFibonacciPointResponse(BaseModel):
+    date: str
+    price: Optional[float] = None
+    levels: list[TechnicalFibonacciLevelResponse] = Field(default_factory=list)
+
+
+class TechnicalHistoryDataResponse(BaseModel):
+    period: str
+    price: list[TechnicalPricePointResponse] = Field(default_factory=list)
+    macd: list[TechnicalMACDPointResponse] = Field(default_factory=list)
+    bollinger: list[TechnicalBollingerPointResponse] = Field(default_factory=list)
+    stochastic: list[TechnicalStochasticPointResponse] = Field(default_factory=list)
+    rsi: list[TechnicalRSIPointResponse] = Field(default_factory=list)
+    volume: list[TechnicalVolumePointResponse] = Field(default_factory=list)
+    atr: list[TechnicalATRPointResponse] = Field(default_factory=list)
+    obv: list[TechnicalOBVPointResponse] = Field(default_factory=list)
+    adx: list[TechnicalADXPointResponse] = Field(default_factory=list)
+    fibonacci: list[TechnicalFibonacciPointResponse] = Field(default_factory=list)
+
+
 class TechnicalHistoryResponse(BaseModel):
     ticker: str
     generated_at: str
     period: str
     summary: TechnicalHistorySummaryResponse
-    history: dict[str, Any] = Field(default_factory=dict)
+    history: TechnicalHistoryDataResponse
 
 
 class ResearchArchiveResponse(BaseModel):
@@ -232,6 +324,7 @@ class ReportContentResponse(BaseModel):
     report_type: Optional[str] = None
     model: Optional[str] = None
     content: str = ""
+    content_format: Literal["markdown"] = "markdown"
 
 
 class NoteContentResponse(BaseModel):
@@ -240,6 +333,7 @@ class NoteContentResponse(BaseModel):
     updated_at: Optional[str] = None
     type: str = "note"
     content: str = ""
+    content_format: Literal["plain_text"] = "plain_text"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -269,7 +363,8 @@ class SaveStockJournalNoteResponse(BaseModel):
     ticker: str
     channel_id: str
     created_at: Optional[str] = None
-    content_plaintext: str
+    content: str
+    content_format: Literal["plain_text"] = "plain_text"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -300,7 +395,8 @@ class SavePortfolioJournalNoteResponse(BaseModel):
     portfolio_name: str
     channel_id: str
     created_at: Optional[str] = None
-    content_plaintext: str
+    content: str
+    content_format: Literal["plain_text"] = "plain_text"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -369,7 +465,7 @@ class NamedPerformanceResponse(BaseModel):
     total_return: float
     total_return_pct: float
     benchmark_return_pct: Optional[float] = None
-    data: list[dict[str, Any]] = Field(default_factory=list)
+    data: list[PerformanceDataPointResponse] = Field(default_factory=list)
 
 
 class PortfolioPerformanceResponse(BaseModel):

@@ -441,7 +441,7 @@ export function HoldingsTable({
                     {/* After-hours price (only if no pre-market) */}
                     {holding.quote?.postMarketPrice != null &&
                       holding.quote?.preMarketPrice == null && (
-                        <div className="text-[10px] text-sky-500">
+                        <div className="text-[10px] text-info">
                           {formatPrice(
                             holding.quote.postMarketPrice,
                             holding.currency,
@@ -474,7 +474,7 @@ export function HoldingsTable({
                       {/* After-hours change (only if no pre-market) */}
                       {holding.quote?.postMarketChangePercent != null &&
                         holding.quote?.preMarketChangePercent == null && (
-                          <span className="text-[10px] font-mono-price text-sky-500">
+                          <span className="text-[10px] font-mono-price text-info">
                             {formatPercent(
                               holding.quote.postMarketChangePercent,
                               2,

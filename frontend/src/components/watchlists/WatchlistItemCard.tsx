@@ -143,7 +143,7 @@ export function WatchlistItemCard({
               )}
               {/* Earnings Badge - show only for -7 to +14 days */}
               {showBadge && earningsBadge && (
-                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold leading-none bg-blue-500/15 text-blue-500">
+                <span className="inline-flex items-center gap-0.5 rounded bg-info/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-info">
                   <Calendar className="h-2.5 w-2.5" />
                   {earningsBadge}
                 </span>
@@ -172,7 +172,7 @@ export function WatchlistItemCard({
                   </span>
                 )}
                 {quote?.postMarketPrice && (
-                  <span className="font-mono-price text-[10px] text-sky-500">
+                  <span className="font-mono-price text-[10px] text-info">
                     → {formatPrice(quote.postMarketPrice, item.stocks.currency)}
                   </span>
                 )}
@@ -191,7 +191,7 @@ export function WatchlistItemCard({
                   )}
                 {quote?.postMarketChangePercent !== undefined &&
                   quote?.postMarketChangePercent !== null && (
-                    <span className="font-mono-price text-[10px] text-sky-500">
+                    <span className="font-mono-price text-[10px] text-info">
                       ({formatPercent(quote.postMarketChangePercent)})
                     </span>
                   )}

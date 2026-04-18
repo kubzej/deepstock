@@ -57,6 +57,10 @@ Returns:
 - options performance time series
 - total return and total return percent
 
+Valid periods:
+
+- `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL`
+
 ### `get_market_context()`
 
 Use when the user asks about the broader market regime or wants context around
@@ -98,12 +102,13 @@ Returns preview/index data only:
 
 ### `get_report_content(report_id)`
 
-Use when a specific AI report needs the full markdown body.
+Use when a specific AI report needs the full body.
 
 Returns:
 
 - report metadata
 - full `content`
+- explicit `content_format` (`markdown`)
 
 ### `get_note_content(note_id)`
 
@@ -113,6 +118,12 @@ Returns:
 
 - note metadata
 - full `content`
+- explicit `content_format` (`plain_text`)
+
+Important:
+
+- stored rich text is normalized to plain text for AI consumption
+- this endpoint is for chat context, not UI rendering
 
 ### `save_stock_journal_note(ticker, content)`
 
@@ -129,7 +140,8 @@ Returns:
 - created entry ID
 - resolved stock ticker
 - resolved journal channel ID
-- saved plaintext content
+- saved plain-text `content`
+- explicit `content_format` (`plain_text`)
 - metadata for the created note
 
 Important:
@@ -155,7 +167,8 @@ Returns:
 - resolved portfolio ID
 - resolved portfolio name
 - resolved journal channel ID
-- saved plaintext content
+- saved plain-text `content`
+- explicit `content_format` (`plain_text`)
 - metadata for the created note
 
 Important:
@@ -185,6 +198,14 @@ Returns:
 
 - technical summary
 - indicator history for the requested period/indicator set
+
+Valid periods:
+
+- `1w`, `1mo`, `3mo`, `6mo`, `1y`, `2y`
+
+Valid indicators:
+
+- `price`, `rsi`, `macd`, `bollinger`, `volume`, `stochastic`, `atr`, `obv`, `adx`, `fibonacci`
 
 ## Response Shape
 
@@ -358,7 +379,8 @@ Returns:
   "created_at": "2026-04-10T09:00:00Z",
   "report_type": "full_analysis",
   "model": "claude-sonnet",
-  "content": "# Full markdown..."
+  "content": "# Full markdown...",
+  "content_format": "markdown"
 }
 ```
 
@@ -370,7 +392,8 @@ Returns:
   "created_at": "2026-04-09T08:00:00Z",
   "updated_at": null,
   "type": "note",
-  "content": "<p>Full note body...</p>",
+  "content": "Full note body...",
+  "content_format": "plain_text",
   "metadata": {}
 }
 ```
@@ -383,7 +406,8 @@ Returns:
   "ticker": "NVDA",
   "channel_id": "uuid",
   "created_at": "2026-04-17T10:00:00Z",
-  "content_plaintext": "Pulled back into support. Keep watching margins.",
+  "content": "Pulled back into support. Keep watching margins.",
+  "content_format": "plain_text",
   "metadata": {
     "ticker": "NVDA",
     "source": "mcp_stock_note",
@@ -401,7 +425,8 @@ Returns:
   "portfolio_name": "Main",
   "channel_id": "uuid",
   "created_at": "2026-04-17T10:00:00Z",
-  "content_plaintext": "Still concentrated in semis. Next adds should improve diversification.",
+  "content": "Still concentrated in semis. Next adds should improve diversification.",
+  "content_format": "plain_text",
   "metadata": {
     "portfolio_id": "uuid",
     "portfolio_name": "Main",
@@ -427,11 +452,25 @@ Returns:
 
 - `journal_context.notes[]` and archive `notes[]` are previews, not full note content
 - `journal_context.reports[]` and archive `reports[]` are previews, not full report content
+- `smart_analysis.valuation_label.tone` is semantic output for AI use, not a frontend class name
 - `position_summary.total_cost` is the open-position cost basis in the instrument currency
 - `get_investment_activity` is the full transaction detail endpoint
-- `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML
-- `save_portfolio_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML
+- `get_report_content` always returns `content_format: markdown`
+- `get_note_content` always returns `content_format: plain_text`
+- `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
+- `save_portfolio_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
 - `get_portfolio_context` defaults to aggregated multi-portfolio scope; holdings and transactions retain portfolio identity
 - `get_portfolio_performance` is the analytical layer above transactions, not a raw transaction dump
 - `get_market_context` intentionally stays compact: sentiment + FX + macro quotes only
 - `market_context` remains richer than the other summary branches because there is no separate MCP market-detail endpoint yet
+
+## Error Semantics
+
+Common tool failures are normalized into descriptive MCP errors:
+
+- not found: missing ticker, note, report, or portfolio in the authenticated user's scope
+- invalid input: unsupported period or indicator selection
+- authentication failed: MCP server or backend auth misconfiguration
+- rate limit hit: retry later
+- upstream provider unavailable: market data or backend dependency is temporarily down
+- API unreachable or timed out: network or backend availability issue
