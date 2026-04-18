@@ -41,6 +41,8 @@ import {
 import { TransactionModal } from '@/components/transactions';
 import { StockFormDialog } from './StockFormDialog';
 import { InsiderTrades } from './InsiderTrades';
+import { useOptionTransactions, useOptionHoldings } from '@/hooks/useOptions';
+import type { OptionTransaction, OptionHolding } from '@/lib/api';
 import {
   SymbolOverview,
   isTradingViewSupported,
@@ -70,6 +72,13 @@ export function StockDetail() {
   const { data: transactions = [], isLoading: transactionsLoading } =
     useTickerTransactions(portfolio?.id ?? null, ticker, isAllPortfolios);
 
+  // Option transactions and holdings for this ticker
+  const portfolioIdForOptions = isAllPortfolios ? undefined : (portfolio?.id ?? undefined);
+  const { data: optionTransactions = [], isLoading: optionTxLoading } =
+    useOptionTransactions(portfolioIdForOptions, ticker);
+  const { data: allOptionHoldings = [], isLoading: optionHoldingsLoading } =
+    useOptionHoldings(portfolioIdForOptions);
+
   // Quote from React Query (if not in portfolio context)
   const tickersToFetch = portfolioQuotes[ticker] ? [] : [ticker];
   const { data: fetchedQuotes = {}, isLoading: quoteLoading } =
@@ -93,6 +102,8 @@ export function StockDetail() {
   const [transactionFilter, setTransactionFilter] = useState<'active' | 'all'>(
     'active',
   );
+  const [optionFilter, setOptionFilter] = useState<'active' | 'all'>('active');
+  const [visibleOptionCount, setVisibleOptionCount] = useState(6);
 
   // Get optional holding (position) from portfolio
   const holding = getHoldingByTicker(ticker);
@@ -151,6 +162,83 @@ export function StockDetail() {
       ).length,
     [transactions],
   );
+
+  const openOptionHoldings = useMemo(
+    () => allOptionHoldings.filter((h) => h.symbol === ticker),
+    [allOptionHoldings, ticker],
+  );
+  const openOptionSymbols = useMemo(
+    () => new Set(openOptionHoldings.map((h) => h.option_symbol)),
+    [openOptionHoldings],
+  );
+  const { optionLotNumbers, optionClosingSource, optionSymbolLots, stockToOptionTx } = useMemo(() => {
+    const sorted = [...optionTransactions].sort((a, b) => a.date.localeCompare(b.date));
+
+    // Global sequential numbering across ALL opening transactions, oldest = #1
+    const lotNumbers = new Map<string, number>();
+    let n = 1;
+    for (const tx of sorted) {
+      if (tx.action === 'BTO' || tx.action === 'STO') {
+        lotNumbers.set(tx.id, n++);
+      }
+    }
+
+    // FIFO closing source per option_symbol
+    const closingSource = new Map<string, { tx: OptionTransaction; lotNum: number }>();
+    const bySymbol = new Map<string, OptionTransaction[]>();
+    for (const tx of sorted) {
+      const group = bySymbol.get(tx.option_symbol) ?? [];
+      group.push(tx);
+      bySymbol.set(tx.option_symbol, group);
+    }
+    for (const group of bySymbol.values()) {
+      const queue: { tx: OptionTransaction; remaining: number }[] = [];
+      for (const tx of group) {
+        if (tx.action === 'BTO' || tx.action === 'STO') {
+          queue.push({ tx, remaining: tx.contracts });
+        } else {
+          let toClose = tx.contracts;
+          while (toClose > 0 && queue.length > 0) {
+            const oldest = queue[0];
+            const taken = Math.min(oldest.remaining, toClose);
+            if (!closingSource.has(tx.id))
+              closingSource.set(tx.id, { tx: oldest.tx, lotNum: lotNumbers.get(oldest.tx.id)! });
+            oldest.remaining -= taken;
+            toClose -= taken;
+            if (oldest.remaining === 0) queue.shift();
+          }
+        }
+      }
+    }
+
+    // Map option_symbol -> lot numbers (for holdings cards)
+    const symbolLots = new Map<string, number[]>();
+    for (const tx of sorted) {
+      if (tx.action === 'BTO' || tx.action === 'STO') {
+        const lots = symbolLots.get(tx.option_symbol) ?? [];
+        lots.push(lotNumbers.get(tx.id)!);
+        symbolLots.set(tx.option_symbol, lots);
+      }
+    }
+
+    // Reverse map: stock tx id → option tx (for ASSIGNMENT/EXERCISE)
+    const stockToOptionTx = new Map<string, { optionTx: OptionTransaction; sourceLotNum: number | undefined }>();
+    for (const tx of sorted) {
+      if (tx.linked_stock_tx_id) {
+        const src = closingSource.get(tx.id);
+        stockToOptionTx.set(tx.linked_stock_tx_id, {
+          optionTx: tx,
+          sourceLotNum: src?.lotNum,
+        });
+      }
+    }
+
+    return { optionLotNumbers: lotNumbers, optionClosingSource: closingSource, optionSymbolLots: symbolLots, stockToOptionTx };
+  }, [optionTransactions]);
+
+  const hasOpenOptions = openOptionHoldings.length > 0;
+  const effectiveOptionFilter =
+    optionFilter === 'active' && !hasOpenOptions ? 'all' : optionFilter;
 
   // Helper to get lot status for BUY transactions
   const getLotStatus = (tx: Transaction) => {
@@ -352,7 +440,7 @@ export function StockDetail() {
         }
       >
         {position && positionCzk ? (
-          <div className="grid max-w-5xl gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-2 max-w-5xl gap-x-6 gap-y-5 xl:grid-cols-5">
             <div className="space-y-1">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Počet akcií
@@ -385,7 +473,7 @@ export function StockDetail() {
                 {formatCurrency(positionCzk.totalValue)}
               </p>
             </div>
-            <div className="space-y-1">
+            <div className="col-span-2 xl:col-span-1 space-y-1">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Nerealizovaný P/L
               </p>
@@ -444,7 +532,7 @@ export function StockDetail() {
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Transakce ({transactions.length})
+            Akciové transakce ({transactions.length})
           </h2>
         </div>
 
@@ -481,7 +569,6 @@ export function StockDetail() {
                 const isBuy = tx.type === 'BUY';
                 const lotStatus = isBuy ? getLotStatus(tx) : null;
 
-                let pnl: number | null = null;
                 let pnlPercent: number | null = null;
                 let pnlCzk: number | null = null;
 
@@ -490,11 +577,11 @@ export function StockDetail() {
                   tx.realizedPnl !== null &&
                   tx.realizedPnl !== undefined
                 ) {
-                  pnl = tx.realizedPnl;
                   pnlCzk = tx.realizedPnlCzk;
-                  const costBasisSold = tx.costBasisSold!;
                   pnlPercent =
-                    costBasisSold > 0 ? (pnl / costBasisSold) * 100 : 0;
+                    tx.costBasisSoldCzk && tx.costBasisSoldCzk > 0
+                      ? (tx.realizedPnlCzk! / tx.costBasisSoldCzk) * 100
+                      : 0;
                 }
 
                 if (
@@ -506,14 +593,6 @@ export function StockDetail() {
                   quote?.price
                 ) {
                   const currentPriceScaled = quote.price * priceScale;
-                  const remainingCostBasis = tx.remainingCostBasis;
-                  pnl =
-                    currentPriceScaled * lotStatus.remaining -
-                    remainingCostBasis;
-                  pnlPercent =
-                    remainingCostBasis > 0
-                      ? (pnl / remainingCostBasis) * 100
-                      : 0;
                   const costBasisCzk = tx.remainingCostBasisCzk;
                   const currentValueCzk = toCZK(
                     currentPriceScaled * lotStatus.remaining,
@@ -521,6 +600,7 @@ export function StockDetail() {
                     rates,
                   );
                   pnlCzk = currentValueCzk - costBasisCzk;
+                  pnlPercent = costBasisCzk > 0 ? (pnlCzk / costBasisCzk) * 100 : 0;
                 }
 
                 const lotNum = isBuy
@@ -578,12 +658,7 @@ export function StockDetail() {
                   isActiveLot && quote?.price
                     ? formatPrice(quote.price * priceScale, tx.currency)
                     : null;
-                const secondaryMeta = [
-                  lotInfo,
-                  tx.feeCzk != null && tx.feeCzk > 0
-                    ? `Poplatky ${formatCurrency(tx.feeCzk)}`
-                    : null,
-                ].filter(Boolean) as string[];
+                const secondaryMeta = [lotInfo].filter(Boolean) as string[];
 
                 return (
                   <div
@@ -614,9 +689,6 @@ export function StockDetail() {
                               #{lotNum}
                             </span>
                           )}
-                          {isActiveLot && (
-                            <span className="inline-flex h-2 w-2 rounded-full bg-positive" />
-                          )}
                           <span className="text-[11px] text-muted-foreground">
                             {formatDateCzech(tx.date)}
                           </span>
@@ -638,13 +710,22 @@ export function StockDetail() {
                           </span>
                         </div>
 
-                        {secondaryMeta.length > 0 && (
+                        {(secondaryMeta.length > 0 || stockToOptionTx.has(tx.id)) && (
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             {secondaryMeta.map((item) => (
                               <span key={item} className="font-mono-price">
                                 {item}
                               </span>
                             ))}
+                            {(() => {
+                              const ref = stockToOptionTx.get(tx.id);
+                              if (!ref) return null;
+                              return (
+                                <span className="font-mono-price">
+                                  z opce {ref.sourceLotNum != null ? `#${ref.sourceLotNum}` : ''}
+                                </span>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -715,13 +796,233 @@ export function StockDetail() {
         )}
       </section>
 
+      {/* Options */}
+      {(optionTxLoading || optionHoldingsLoading || optionTransactions.length > 0 || openOptionHoldings.length > 0) && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Opční transakce ({effectiveOptionFilter === 'active' ? openOptionHoldings.length : optionTransactions.length})
+            </h2>
+          </div>
+
+          <ToggleGroup
+            type="single"
+            value={effectiveOptionFilter}
+            onValueChange={(value) => {
+              if (value === 'active' || value === 'all') {
+                setOptionFilter(value);
+                setVisibleOptionCount(6);
+              }
+            }}
+            variant="segmented"
+            size="sm"
+            className="w-fit"
+          >
+            <ToggleGroupItem value="active" disabled={!hasOpenOptions}>
+              Aktivní ({openOptionHoldings.length})
+            </ToggleGroupItem>
+            <ToggleGroupItem value="all">Vše ({optionTransactions.length})</ToggleGroupItem>
+          </ToggleGroup>
+
+          {optionTxLoading || optionHoldingsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : effectiveOptionFilter === 'active' ? (
+            openOptionHoldings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Žádné otevřené pozice</p>
+            ) : (
+              <div className="space-y-2">
+                {openOptionHoldings.map((h: OptionHolding) => {
+                  const isLong = h.position === 'long';
+                  const costBasisCzk = toCZK(Math.abs(h.total_cost), h.currency, rates);
+                  return (
+                    <div
+                      key={`${h.option_symbol}-${h.portfolio_id}`}
+                      className="rounded-xl border border-border/70 bg-muted/18 px-4 py-3 hover:bg-muted/24 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge
+                              variant="outline"
+                              className="h-[20px] px-1.5 py-0 text-[10px] font-medium"
+                            >
+                              {h.option_type.toUpperCase()}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="h-[20px] px-1.5 py-0 text-[10px] font-medium"
+                            >
+                              {isLong ? 'LONG' : 'SHORT'}
+                            </Badge>
+                            {(optionSymbolLots.get(h.option_symbol) ?? []).map((num) => (
+                              <span key={num} className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono-price text-muted-foreground">
+                                #{num}
+                              </span>
+                            ))}
+                            <span className="text-[11px] text-muted-foreground">
+                              {formatDateCzech(h.expiration_date)}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span className="text-sm font-medium text-foreground">
+                              {formatPrice(h.strike_price, h.currency)} strike
+                            </span>
+                            <span className="text-sm font-medium text-muted-foreground">{h.contracts} kontr.</span>
+                            {h.avg_premium !== null && (
+                              <span className="text-sm font-medium text-muted-foreground">
+                                avg {formatPrice(h.avg_premium, h.currency)}/kont.
+                              </span>
+                            )}
+                          </div>
+
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <div className="font-mono-price text-sm font-semibold text-foreground">
+                            {formatCurrency(costBasisCzk)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            optionTransactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Žádné opce</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {optionTransactions.slice(0, visibleOptionCount).map((tx: OptionTransaction) => {
+                    const isClosingAction = ['STC', 'BTC', 'EXPIRATION', 'ASSIGNMENT', 'EXERCISE'].includes(tx.action);
+                    const isClosing = isClosingAction || !openOptionSymbols.has(tx.option_symbol);
+                    const primaryAmountCzk = isClosing && tx.realized_pl_czk !== null
+                      ? tx.realized_pl_czk
+                      : tx.gross_amount_czk;
+                    const isPositive = primaryAmountCzk >= 0;
+
+                    return (
+                      <div
+                        key={tx.id}
+                        className={`rounded-xl border px-4 py-3 transition-colors ${
+                          isClosing
+                            ? 'border-border/35 bg-muted/6 opacity-60'
+                            : 'border-border/70 bg-muted/18 hover:bg-muted/24'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-6">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge
+                                variant="outline"
+                                className="h-[20px] px-1.5 py-0 text-[10px] font-medium"
+                              >
+                                {tx.action}
+                              </Badge>
+                              {optionLotNumbers.has(tx.id) && (
+                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-mono-price text-muted-foreground">
+                                  #{optionLotNumbers.get(tx.id)}
+                                </span>
+                              )}
+                              <Badge
+                                variant="outline"
+                                className="h-[20px] px-1.5 py-0 text-[10px] font-medium"
+                              >
+                                {tx.option_type.toUpperCase()}
+                              </Badge>
+                              <span className="text-[11px] text-muted-foreground">
+                                {formatDateCzech(tx.date)}
+                              </span>
+                              {isAllPortfolios && tx.portfolio_name && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  {tx.portfolio_name}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                              <span className="text-sm font-medium text-foreground">
+                                {formatPrice(tx.strike_price, tx.currency)} strike
+                              </span>
+                              <span className="text-sm font-medium text-muted-foreground">{tx.contracts} kontr.</span>
+                              {tx.premium !== null && (
+                                <span className="text-sm font-medium text-muted-foreground">
+                                  avg {formatPrice(tx.premium, tx.currency)}/kont.
+                                </span>
+                              )}
+                            </div>
+
+                            {(() => {
+                              const source = optionClosingSource.get(tx.id);
+                              const linkedStock = tx.linked_stock_tx_id
+                                ? transactions.find((t) => t.id === tx.linked_stock_tx_id)
+                                : null;
+                              return (
+                                <>
+                                  {source && (
+                                    <div className="text-[11px] font-mono-price text-muted-foreground">
+                                      z {source.tx.action} #{source.lotNum}
+                                    </div>
+                                  )}
+                                  {linkedStock && (
+                                    <div className="text-[11px] font-mono-price text-muted-foreground">
+                                      → {linkedStock.type === 'BUY' ? 'nákup' : 'prodej'} #{lotNumbers.get(linkedStock.id) ?? '?'}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <div className={`font-mono-price text-sm font-semibold ${
+                              isClosing && tx.realized_pl_czk !== null
+                                ? isPositive ? 'text-positive' : 'text-negative'
+                                : 'text-foreground'
+                            }`}>
+                              {isClosing && tx.realized_pl_czk !== null && isPositive ? '+' : ''}
+                              {formatCurrency(primaryAmountCzk)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {visibleOptionCount < optionTransactions.length && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 w-full text-xs text-muted-foreground"
+                    onClick={() =>
+                      setVisibleOptionCount((prev) =>
+                        Math.min(prev + 10, optionTransactions.length),
+                      )
+                    }
+                  >
+                    Zobrazit dalších{' '}
+                    {Math.min(10, optionTransactions.length - visibleOptionCount)}
+                  </Button>
+                )}
+              </>
+            )
+          )}
+        </section>
+      )}
+
       <section className="space-y-3">
         <div>
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Insider obchody
           </h2>
         </div>
-        <div className="rounded-2xl border border-border/70 bg-card/70 p-3 md:p-4">
+        <div className="rounded-2xl border border-border/70 p-3 md:p-4">
           <InsiderTrades ticker={ticker} />
         </div>
       </section>
