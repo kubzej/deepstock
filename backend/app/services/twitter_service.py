@@ -24,14 +24,28 @@ _CT.generate_transaction_id = _empty_transaction_id
 import twikit
 import twikit.user as _twikit_user
 
-# Patch twikit's User.__init__ which crashes with KeyError when a user's bio
-# has no URLs (description.entities.urls key is absent for some accounts).
+# Twitter's API stopped returning several optional fields that twikit accesses
+# with direct bracket notation (no .get()). Pre-populate sensible defaults so
+# User.__init__ doesn't crash for accounts missing these fields.
+_LEGACY_DEFAULTS: dict = {
+    'pinned_tweet_ids_str': [],
+    'withheld_in_countries': [],
+    'profile_banner_url': '',
+    'url': '',
+    'possibly_sensitive': False,
+    'can_dm': False,
+    'can_media_tag': False,
+    'want_retweets': False,
+}
+
 _orig_user_init = _twikit_user.User.__init__
 
 def _patched_user_init(self, client, data):
     try:
-        desc = data.get('legacy', {}).get('entities', {}).get('description', {})
-        desc.setdefault('urls', [])
+        legacy = data.get('result', data).get('legacy', {})
+        for key, default in _LEGACY_DEFAULTS.items():
+            legacy.setdefault(key, default)
+        legacy.get('entities', {}).get('description', {}).setdefault('urls', [])
     except Exception:
         pass
     _orig_user_init(self, client, data)
