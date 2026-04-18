@@ -1,17 +1,19 @@
 from app.schemas.mcp import (
     GlobalMarketContextResponse,
-    InvestmentActivityResponse,
-    NoteContentResponse,
+    JournalNoteContentResponse,
+    JournalReportContentResponse,
+    PortfolioActivityResponse,
     PortfolioContextResponse,
+    PortfolioJournalArchiveResponse,
     PortfolioListResponse,
     PortfolioPerformanceResponse,
-    ReportContentResponse,
-    ResearchArchiveResponse,
     SavePortfolioJournalNoteRequest,
     SavePortfolioJournalNoteResponse,
     SaveStockJournalNoteRequest,
     SaveStockJournalNoteResponse,
+    StockJournalArchiveResponse,
     StockContextResponse,
+    TickerActivityResponse,
     TechnicalHistoryResponse,
 )
 
@@ -115,7 +117,7 @@ def test_stock_context_contract_accepts_summary_shape():
 
 
 def test_detail_contracts_accept_full_content_payloads():
-    archive = ResearchArchiveResponse.model_validate(
+    archive = StockJournalArchiveResponse.model_validate(
         {
             "ticker": "NVDA",
             "generated_at": "2026-04-17T10:00:00Z",
@@ -141,7 +143,7 @@ def test_detail_contracts_accept_full_content_payloads():
             ],
         }
     )
-    report = ReportContentResponse.model_validate(
+    report = JournalReportContentResponse.model_validate(
         {
             "id": "report-1",
             "created_at": "2026-04-15T10:00:00Z",
@@ -151,7 +153,7 @@ def test_detail_contracts_accept_full_content_payloads():
             "content_format": "markdown",
         }
     )
-    note = NoteContentResponse.model_validate(
+    note = JournalNoteContentResponse.model_validate(
         {
             "id": "note-1",
             "created_at": "2026-04-14T10:00:00Z",
@@ -203,10 +205,17 @@ def test_detail_contracts_accept_full_content_payloads():
             },
         }
     )
-    activity = InvestmentActivityResponse.model_validate(
+    activity = TickerActivityResponse.model_validate(
         {
             "ticker": "NVDA",
             "generated_at": "2026-04-17T10:00:00Z",
+            "period": "YTD",
+            "from_date": "2026-01-01",
+            "to_date": "2026-04-17",
+            "limit": 50,
+            "cursor": None,
+            "next_cursor": "2026-04-12T10:00:00Z",
+            "has_more": True,
             "position_summary": {
                 "has_position": True,
                 "shares": 10,
@@ -215,14 +224,51 @@ def test_detail_contracts_accept_full_content_payloads():
                 "unrealized_pnl": 150,
                 "currency": "USD",
             },
-            "stock_transactions": [],
+            "transactions": [
+                {
+                    "id": "tx-stock-1",
+                    "asset_type": "stock",
+                    "portfolio_id": "p-main",
+                    "portfolio_name": "Main",
+                    "executed_at": "2026-04-12T10:00:00Z",
+                    "ticker": "NVDA",
+                    "type": "buy",
+                    "shares": 5,
+                    "price_per_share": 100,
+                    "currency": "USD",
+                    "fees": 1,
+                    "notes": None,
+                    "source_transaction_id": None,
+                    "remaining_shares": 5,
+                    "realized_pnl": None,
+                    "realized_pnl_czk": None,
+                },
+                {
+                    "id": "tx-option-1",
+                    "asset_type": "option",
+                    "portfolio_id": "p-main",
+                    "portfolio_name": "Main",
+                    "executed_at": "2026-04-13T10:00:00Z",
+                    "ticker": "NVDA",
+                    "action": "sell_to_open",
+                    "option_symbol": "NVDA250620C00120000",
+                    "option_type": "call",
+                    "strike": 120,
+                    "expiration": "2025-06-20",
+                    "contracts": 1,
+                    "premium": 2.4,
+                    "currency": "USD",
+                    "fees": 1,
+                    "notes": None,
+                    "position_after": "open",
+                },
+            ],
             "option_summary": {
                 "has_option_activity": False,
                 "open_positions": 0,
                 "contracts": 0,
                 "open_holdings": [],
             },
-            "option_transactions": [],
         }
     )
 
@@ -233,6 +279,37 @@ def test_detail_contracts_accept_full_content_payloads():
     assert note.content_format == "plain_text"
     assert technical.period == "6mo"
     assert activity.position_summary.currency == "USD"
+    assert activity.transactions[1].asset_type == "option"
+
+    portfolio_archive = PortfolioJournalArchiveResponse.model_validate(
+        {
+            "portfolio_id": "portfolio-main",
+            "portfolio_name": "Main",
+            "generated_at": "2026-04-17T10:00:00Z",
+            "reports": [
+                {
+                    "id": "report-portfolio-1",
+                    "created_at": "2026-04-15T10:00:00Z",
+                    "report_type": "portfolio_review",
+                    "model": "claude-sonnet",
+                    "preview": "Preview",
+                    "content_length": 2100,
+                }
+            ],
+            "notes": [
+                {
+                    "id": "note-portfolio-1",
+                    "created_at": "2026-04-14T10:00:00Z",
+                    "updated_at": None,
+                    "type": "note",
+                    "preview": "Preview",
+                    "metadata": {},
+                }
+            ],
+        }
+    )
+
+    assert portfolio_archive.portfolio_name == "Main"
 
 
 def test_save_stock_journal_note_contract_accepts_writeback_shape():
@@ -364,8 +441,71 @@ def test_portfolio_and_market_contracts_accept_expected_shapes():
             "sector_exposure": [
                 {"sector": "Technology", "value_czk": 25300, "weight_pct": 100}
             ],
-            "recent_transactions": [],
+            "recent_transactions": [
+                {
+                    "id": "ctx-stock-1",
+                    "asset_type": "stock",
+                    "portfolio_id": "p-main",
+                    "portfolio_name": "Main",
+                    "executed_at": "2026-04-16T10:00:00Z",
+                    "ticker": "NVDA",
+                    "type": "BUY",
+                    "shares": 2,
+                    "price_per_share": 105,
+                    "currency": "USD",
+                    "fees": 1,
+                },
+                {
+                    "id": "ctx-option-1",
+                    "asset_type": "option",
+                    "portfolio_id": "p-main",
+                    "portfolio_name": "Main",
+                    "executed_at": "2026-04-15T10:00:00Z",
+                    "ticker": "NVDA",
+                    "action": "sell_to_open",
+                    "option_symbol": "NVDA250620C00120000",
+                    "option_type": "call",
+                    "strike": 120,
+                    "expiration": "2025-06-20",
+                    "contracts": 1,
+                    "premium": 2.4,
+                    "currency": "USD",
+                    "fees": 1,
+                    "position_after": "open",
+                },
+            ],
             "open_lots_summary": {"count": 2, "tickers": ["NVDA", "MSFT"]},
+        }
+    )
+    portfolio_activity = PortfolioActivityResponse.model_validate(
+        {
+            "scope": "portfolio-main",
+            "generated_at": "2026-04-17T10:00:00Z",
+            "portfolio_id": "portfolio-main",
+            "portfolio_name": "Main",
+            "portfolio_count": 1,
+            "period": "custom",
+            "from_date": "2026-01-01",
+            "to_date": "2026-04-17",
+            "limit": 25,
+            "cursor": None,
+            "next_cursor": None,
+            "has_more": False,
+            "transactions": [
+                {
+                    "id": "portfolio-tx-1",
+                    "asset_type": "stock",
+                    "portfolio_id": "p-main",
+                    "portfolio_name": "Main",
+                    "executed_at": "2026-04-16T10:00:00Z",
+                    "ticker": "NVDA",
+                    "type": "BUY",
+                    "shares": 2,
+                    "price_per_share": 105,
+                    "currency": "USD",
+                    "fees": 1,
+                }
+            ],
         }
     )
     performance = PortfolioPerformanceResponse.model_validate(
@@ -417,5 +557,8 @@ def test_portfolio_and_market_contracts_accept_expected_shapes():
 
     assert portfolios.portfolio_count == 2
     assert context.scope == "all"
+    assert context.recent_transactions[1].asset_type == "option"
+    assert portfolio_activity.portfolio_name == "Main"
+    assert portfolio_activity.period == "custom"
     assert performance.period == "1Y"
     assert market.macro_quotes[0].ticker == "GLD"

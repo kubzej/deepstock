@@ -14,7 +14,7 @@ import asyncio
 import html
 import json
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Iterable, Literal, Optional
 
 import httpx
@@ -32,6 +32,7 @@ from app.services.stocks import stock_service
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
 VALID_PORTFOLIO_PERFORMANCE_PERIODS: set[str] = {"1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"}
+VALID_ACTIVITY_PERIODS: set[str] = VALID_PORTFOLIO_PERFORMANCE_PERIODS
 VALID_TECHNICAL_INDICATORS: set[str] = {
     "price",
     "rsi",
@@ -77,6 +78,10 @@ MACRO_MARKET_INDICATORS = [
         "inverted": False,
     },
 ]
+
+
+class ActivityFilterError(ValueError):
+    pass
 
 
 def _iso_now() -> str:
@@ -165,15 +170,24 @@ def _serialize_ai_report(entry: dict, include_full_content: bool) -> dict:
     }
 
 
-def _serialize_stock_transaction(transaction: dict) -> dict:
+def _serialize_stock_activity_transaction(transaction: dict) -> dict:
     return {
         "id": transaction.get("id"),
+        "asset_type": "stock",
         "portfolio_id": transaction.get("portfolio_id"),
         "portfolio_name": transaction.get("portfolio_name", ""),
         "executed_at": transaction.get("executed_at"),
+        "ticker": (transaction.get("stocks") or {}).get("ticker") or transaction.get("ticker"),
         "type": transaction.get("type"),
+        "action": None,
         "shares": _coerce_float(transaction.get("shares")),
         "price_per_share": _coerce_float(transaction.get("price_per_share")),
+        "option_symbol": None,
+        "option_type": None,
+        "strike": None,
+        "expiration": None,
+        "contracts": None,
+        "premium": None,
         "currency": transaction.get("currency"),
         "fees": _coerce_float(transaction.get("fees")) or 0.0,
         "notes": transaction.get("notes"),
@@ -181,17 +195,22 @@ def _serialize_stock_transaction(transaction: dict) -> dict:
         "remaining_shares": _coerce_float(transaction.get("remaining_shares")),
         "realized_pnl": _coerce_float(transaction.get("realized_pnl")),
         "realized_pnl_czk": _coerce_float(transaction.get("realized_pnl_czk")),
+        "position_after": None,
     }
 
 
-def _serialize_option_transaction(transaction: dict) -> dict:
+def _serialize_option_activity_transaction(transaction: dict) -> dict:
     return {
         "id": transaction.get("id"),
+        "asset_type": "option",
         "portfolio_id": transaction.get("portfolio_id"),
         "portfolio_name": transaction.get("portfolio_name", ""),
         "executed_at": transaction.get("date"),
+        "ticker": transaction.get("symbol"),
+        "type": None,
         "action": transaction.get("action"),
-        "symbol": transaction.get("symbol"),
+        "shares": None,
+        "price_per_share": None,
         "option_symbol": transaction.get("option_symbol"),
         "option_type": transaction.get("option_type"),
         "strike": _coerce_float(transaction.get("strike_price")),
@@ -201,7 +220,115 @@ def _serialize_option_transaction(transaction: dict) -> dict:
         "currency": transaction.get("currency"),
         "fees": _coerce_float(transaction.get("fees")) or 0.0,
         "notes": transaction.get("notes"),
+        "source_transaction_id": None,
+        "remaining_shares": None,
+        "realized_pnl": None,
+        "realized_pnl_czk": None,
         "position_after": transaction.get("position"),
+    }
+
+
+def _sort_activity_transactions_desc(transactions: list[dict]) -> list[dict]:
+    return sorted(
+        transactions,
+        key=lambda item: item.get("executed_at") or "",
+        reverse=True,
+    )
+
+
+def _parse_activity_date(value: str, field_name: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ActivityFilterError(
+            f"Invalid {field_name} '{value}'. Expected YYYY-MM-DD format."
+        ) from exc
+
+
+def _parse_activity_cursor(value: str) -> datetime:
+    normalized = value.strip()
+    if not normalized:
+        raise ActivityFilterError("Cursor cannot be empty.")
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ActivityFilterError(
+            f"Invalid cursor '{value}'. Expected ISO datetime format."
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _activity_period_start(period: str, today: date) -> Optional[date]:
+    if period == "ALL":
+        return None
+    if period == "1W":
+        return today - timedelta(days=7)
+    if period == "1M":
+        return today - timedelta(days=30)
+    if period == "3M":
+        return today - timedelta(days=90)
+    if period == "6M":
+        return today - timedelta(days=180)
+    if period == "MTD":
+        return today.replace(day=1)
+    if period == "YTD":
+        return today.replace(month=1, day=1)
+    if period == "1Y":
+        return today - timedelta(days=365)
+    raise ActivityFilterError(
+        f"Unsupported activity period '{period}'. Expected one of: {', '.join(sorted(VALID_ACTIVITY_PERIODS))}"
+    )
+
+
+def _resolve_activity_window(
+    period: str = "ALL",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    cursor: Optional[str] = None,
+) -> dict[str, Optional[str]]:
+    normalized_period = period.upper()
+    if normalized_period not in VALID_ACTIVITY_PERIODS:
+        raise ActivityFilterError(
+            f"Unsupported activity period '{period}'. Expected one of: {', '.join(sorted(VALID_ACTIVITY_PERIODS))}"
+        )
+
+    today = datetime.now(timezone.utc).date()
+    has_custom_range = bool(from_date or to_date)
+
+    start_date = _parse_activity_date(from_date, "from_date") if from_date else None
+    end_date = _parse_activity_date(to_date, "to_date") if to_date else today
+
+    if has_custom_range:
+        if start_date and start_date > end_date:
+            raise ActivityFilterError("from_date cannot be after to_date.")
+        resolved_period = "custom"
+    else:
+        start_date = _activity_period_start(normalized_period, today)
+        resolved_period = normalized_period
+
+    lower_bound = (
+        datetime.combine(start_date, time.min, tzinfo=timezone.utc).isoformat()
+        if start_date
+        else None
+    )
+    upper_bound_dt = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
+
+    cursor_value = None
+    if cursor:
+        cursor_dt = _parse_activity_cursor(cursor)
+        cursor_value = cursor_dt.isoformat()
+        if cursor_dt < upper_bound_dt:
+            upper_bound_dt = cursor_dt
+
+    return {
+        "period": resolved_period,
+        "from_date": start_date.isoformat() if start_date else None,
+        "to_date": end_date.isoformat(),
+        "cursor": cursor_value,
+        "lower_bound": lower_bound,
+        "upper_bound": upper_bound_dt.isoformat(),
     }
 
 
@@ -554,7 +681,7 @@ class ResearchContextService:
             annotated = await portfolio_service._annotate_transactions(response.data or [])
             for tx in annotated:
                 tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
-            stock_transactions = [_serialize_stock_transaction(tx) for tx in annotated]
+            stock_transactions = [_serialize_stock_activity_transaction(tx) for tx in annotated]
 
             holdings = await portfolio_service.get_all_holdings(user_id)
             matching_holdings = [
@@ -754,7 +881,7 @@ class ResearchContextService:
             "market_context": market_context,
         }
 
-    async def get_research_archive(self, ticker: str, user_id: str, limit: int = 10) -> dict:
+    async def get_stock_journal_archive(self, ticker: str, user_id: str, limit: int = 10) -> dict:
         normalized_ticker = ticker.upper()
         channel = await journal_service.get_channel_by_ticker(normalized_ticker, user_id=user_id)
         if not channel:
@@ -783,7 +910,52 @@ class ResearchContextService:
             "notes": notes,
         }
 
-    async def get_report_content(self, report_id: str, user_id: str) -> dict:
+    async def get_portfolio_journal_archive(self, portfolio_id: str, user_id: str, limit: int = 10) -> dict:
+        portfolio = supabase.table("portfolios") \
+            .select("id, name") \
+            .eq("id", portfolio_id) \
+            .eq("user_id", user_id) \
+            .single() \
+            .execute()
+        portfolio_row = portfolio.data
+        if not portfolio_row:
+            raise ValueError(f"Portfolio {portfolio_id} not found")
+
+        channel = await journal_service.get_channel_by_portfolio_id(portfolio_id, user_id=user_id)
+        if not channel:
+            return {
+                "portfolio_id": portfolio_row["id"],
+                "portfolio_name": portfolio_row["name"],
+                "generated_at": _iso_now(),
+                "reports": [],
+                "notes": [],
+            }
+
+        entries = await journal_service.get_entries(
+            channel_id=channel["id"],
+            limit=max(limit * 3, 30),
+            user_id=user_id,
+        )
+        reports = [
+            _serialize_ai_report(entry, include_full_content=False)
+            for entry in entries
+            if entry.get("type") == "ai_report"
+        ][:limit]
+        notes = [
+            _serialize_note_preview(entry)
+            for entry in entries
+            if entry.get("type") == "note"
+        ][:limit]
+
+        return {
+            "portfolio_id": portfolio_row["id"],
+            "portfolio_name": portfolio_row["name"],
+            "generated_at": _iso_now(),
+            "reports": reports,
+            "notes": notes,
+        }
+
+    async def get_journal_report_content(self, report_id: str, user_id: str) -> dict:
         entry = supabase.table("journal_entries") \
             .select("id, created_at, content, metadata, type, journal_channels!inner(user_id)") \
             .eq("id", report_id) \
@@ -805,7 +977,7 @@ class ResearchContextService:
             "content_format": "markdown",
         }
 
-    async def get_note_content(self, note_id: str, user_id: str) -> dict:
+    async def get_journal_note_content(self, note_id: str, user_id: str) -> dict:
         entry = supabase.table("journal_entries") \
             .select("id, created_at, updated_at, content, metadata, type, journal_channels!inner(user_id)") \
             .eq("id", note_id) \
@@ -894,50 +1066,83 @@ class ResearchContextService:
             "metadata": entry.get("metadata") or {},
         }
 
-    async def get_investment_activity(self, ticker: str, user_id: str) -> dict:
+    async def get_ticker_activity(
+        self,
+        ticker: str,
+        user_id: str,
+        period: str = "ALL",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> dict:
         normalized_ticker = ticker.upper()
-        stock_info = await market_service.get_stock_info(normalized_ticker)
-        stock_price = _coerce_float(stock_info.get("price")) if stock_info else None
+        stock = await self._get_stock_row(normalized_ticker)
+        if not stock:
+            raise ValueError(f"Ticker {normalized_ticker} not found")
         activity_context = await self._build_activity_context(
             normalized_ticker,
             user_id=user_id,
-            stock_price=stock_price,
+            stock_price=None,
         )
-        full_stock_transactions: list[dict] = []
-        full_option_transactions: list[dict] = []
-
-        stock = await self._get_stock_row(normalized_ticker)
-        portfolios = await portfolio_service.get_user_portfolios(user_id)
-        portfolio_ids = [portfolio["id"] for portfolio in portfolios]
-        portfolio_names = {portfolio["id"]: portfolio["name"] for portfolio in portfolios}
-
-        if stock and portfolio_ids:
-            response = supabase.table("transactions") \
-                .select("*, source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \
-                .in_("portfolio_id", portfolio_ids) \
-                .eq("stock_id", stock["id"]) \
-                .order("executed_at", desc=True) \
-                .limit(100) \
-                .execute()
-            annotated = await portfolio_service._annotate_transactions(response.data or [])
-            for tx in annotated:
-                tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
-            full_stock_transactions = [_serialize_stock_transaction(tx) for tx in annotated]
-
-        option_transactions = await options_service.get_transactions(
+        feed = await self._get_mixed_activity_feed(
             user_id=user_id,
-            symbol=normalized_ticker,
-            limit=100,
+            ticker=normalized_ticker,
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            cursor=cursor,
         )
-        full_option_transactions = [_serialize_option_transaction(tx) for tx in option_transactions]
 
         return {
             "ticker": normalized_ticker,
             "generated_at": _iso_now(),
+            "period": feed["period"],
+            "from_date": feed["from_date"],
+            "to_date": feed["to_date"],
+            "limit": feed["limit"],
+            "cursor": feed["cursor"],
+            "next_cursor": feed["next_cursor"],
+            "has_more": feed["has_more"],
             "position_summary": activity_context["position_summary"],
-            "stock_transactions": full_stock_transactions,
+            "transactions": feed["transactions"],
             "option_summary": activity_context["option_summary"],
-            "option_transactions": full_option_transactions,
+        }
+
+    async def get_portfolio_activity(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        period: str = "ALL",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> dict:
+        feed = await self._get_mixed_activity_feed(
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            cursor=cursor,
+        )
+        return {
+            "scope": feed["scope"],
+            "generated_at": _iso_now(),
+            "portfolio_id": feed["portfolio_id"],
+            "portfolio_name": feed["portfolio_name"],
+            "portfolio_count": feed["portfolio_count"],
+            "period": feed["period"],
+            "from_date": feed["from_date"],
+            "to_date": feed["to_date"],
+            "limit": feed["limit"],
+            "cursor": feed["cursor"],
+            "next_cursor": feed["next_cursor"],
+            "has_more": feed["has_more"],
+            "transactions": feed["transactions"],
         }
 
     async def get_technical_history(
@@ -997,24 +1202,193 @@ class ResearchContextService:
             "portfolios": portfolio_summaries,
         }
 
-    async def get_portfolio_context(self, user_id: str, portfolio_id: Optional[str] = None) -> dict:
+    async def _get_recent_portfolio_activity(
+        self,
+        user_id: str,
+        scoped_portfolio: Optional[dict],
+        recent_limit: int,
+    ) -> list[dict]:
+        if scoped_portfolio:
+            stock_transactions_raw = await portfolio_service.get_transactions(
+                scoped_portfolio["id"],
+                limit=recent_limit,
+            )
+            for tx in stock_transactions_raw:
+                tx["portfolio_name"] = scoped_portfolio["name"]
+            option_transactions_raw = await options_service.get_transactions(
+                user_id=user_id,
+                portfolio_id=scoped_portfolio["id"],
+                limit=recent_limit,
+            )
+        else:
+            stock_page = await portfolio_service.get_all_transactions(user_id, limit=recent_limit)
+            stock_transactions_raw = stock_page["data"]
+            option_transactions_raw = await options_service.get_transactions(
+                user_id=user_id,
+                limit=recent_limit,
+            )
+
+        mixed_transactions = [
+            _serialize_stock_activity_transaction(tx)
+            for tx in stock_transactions_raw
+        ] + [
+            _serialize_option_activity_transaction(tx)
+            for tx in option_transactions_raw
+        ]
+        return _sort_activity_transactions_desc(mixed_transactions)[:recent_limit]
+
+    async def _fetch_stock_activity_rows(
+        self,
+        portfolio_ids: list[str],
+        portfolio_names: dict[str, str],
+        stock_id: Optional[str],
+        limit: int,
+        lower_bound: Optional[str],
+        upper_bound: Optional[str],
+    ) -> list[dict]:
+        if not portfolio_ids or stock_id is None:
+            return []
+
+        query = supabase.table("transactions") \
+            .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \
+            .in_("portfolio_id", portfolio_ids) \
+            .order("executed_at", desc=True) \
+            .limit(limit + 1)
+
+        if stock_id:
+            query = query.eq("stock_id", stock_id)
+        if lower_bound:
+            query = query.gte("executed_at", lower_bound)
+        if upper_bound:
+            query = query.lt("executed_at", upper_bound)
+
+        response = query.execute()
+        annotated = await portfolio_service._annotate_transactions(response.data or [])
+        for tx in annotated:
+            tx["portfolio_name"] = portfolio_names.get(tx["portfolio_id"], "")
+        return annotated
+
+    async def _fetch_option_activity_rows(
+        self,
+        portfolio_ids: list[str],
+        symbol: Optional[str],
+        limit: int,
+        lower_bound: Optional[str],
+        upper_bound: Optional[str],
+    ) -> list[dict]:
+        if not portfolio_ids:
+            return []
+
+        query = supabase.table("option_transactions") \
+            .select("*, portfolios(name)") \
+            .in_("portfolio_id", portfolio_ids) \
+            .order("date", desc=True) \
+            .limit(limit + 1)
+
+        if symbol:
+            query = query.eq("symbol", symbol)
+        if lower_bound:
+            query = query.gte("date", lower_bound)
+        if upper_bound:
+            query = query.lt("date", upper_bound)
+
+        response = query.execute()
+        rows = []
+        for tx in response.data or []:
+            tx["portfolio_name"] = tx.get("portfolios", {}).get("name", "") if tx.get("portfolios") else ""
+            del tx["portfolios"]
+            rows.append(tx)
+        return await options_service._annotate_transactions(rows)
+
+    async def _get_mixed_activity_feed(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        ticker: Optional[str] = None,
+        period: str = "ALL",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> dict:
+        scope, portfolios, scoped_portfolio = await self._resolve_portfolio_scope(user_id, portfolio_id)
+        portfolio_ids = [portfolio["id"] for portfolio in portfolios]
+        portfolio_names = {portfolio["id"]: portfolio["name"] for portfolio in portfolios}
+        normalized_ticker = ticker.upper() if ticker else None
+        window = _resolve_activity_window(
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            cursor=cursor,
+        )
+
+        stock = await self._get_stock_row(normalized_ticker) if normalized_ticker else None
+        stock_id = stock["id"] if stock else None
+        stock_rows, option_rows = await asyncio.gather(
+            self._fetch_stock_activity_rows(
+                portfolio_ids=portfolio_ids,
+                portfolio_names=portfolio_names,
+                stock_id=stock_id,
+                limit=limit,
+                lower_bound=window["lower_bound"],
+                upper_bound=window["upper_bound"],
+            ),
+            self._fetch_option_activity_rows(
+                portfolio_ids=portfolio_ids,
+                symbol=normalized_ticker,
+                limit=limit,
+                lower_bound=window["lower_bound"],
+                upper_bound=window["upper_bound"],
+            ),
+        )
+
+        mixed_transactions = _sort_activity_transactions_desc(
+            [_serialize_stock_activity_transaction(tx) for tx in stock_rows]
+            + [_serialize_option_activity_transaction(tx) for tx in option_rows]
+        )
+        has_more = len(mixed_transactions) > limit
+        transactions = mixed_transactions[:limit]
+        next_cursor = transactions[-1].get("executed_at") if has_more and transactions else None
+
+        return {
+            "scope": scope,
+            "portfolio_id": scoped_portfolio["id"] if scoped_portfolio else None,
+            "portfolio_name": scoped_portfolio["name"] if scoped_portfolio else None,
+            "portfolio_count": len(portfolios),
+            "period": window["period"],
+            "from_date": window["from_date"],
+            "to_date": window["to_date"],
+            "limit": limit,
+            "cursor": window["cursor"],
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "transactions": transactions,
+        }
+
+    async def get_portfolio_context(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        recent_limit: int = 20,
+    ) -> dict:
         scope, portfolios, scoped_portfolio = await self._resolve_portfolio_scope(user_id, portfolio_id)
 
         if scoped_portfolio:
             holdings_raw = await portfolio_service.get_holdings(scoped_portfolio["id"])
             for holding in holdings_raw:
                 holding["portfolio_name"] = scoped_portfolio["name"]
-            transactions_raw = await portfolio_service.get_transactions(scoped_portfolio["id"], limit=10)
-            for tx in transactions_raw:
-                tx["portfolio_name"] = scoped_portfolio["name"]
             open_lots = await portfolio_service.get_all_open_lots(scoped_portfolio["id"])
             aggregate_snapshot = await portfolio_service.get_portfolio_snapshot(scoped_portfolio["id"], user_id)
         else:
             holdings_raw = await portfolio_service.get_all_holdings(user_id)
-            transactions_page = await portfolio_service.get_all_transactions(user_id, limit=10)
-            transactions_raw = transactions_page["data"]
             open_lots = await portfolio_service.get_all_open_lots_for_user(user_id)
             aggregate_snapshot = await portfolio_service.get_portfolio_snapshot(None, user_id)
+
+        recent_transactions = await self._get_recent_portfolio_activity(
+            user_id=user_id,
+            scoped_portfolio=scoped_portfolio,
+            recent_limit=recent_limit,
+        )
 
         tickers = sorted({
             (holding.get("stocks") or {}).get("ticker")
@@ -1050,7 +1424,7 @@ class ResearchContextService:
             "aggregate_snapshot": aggregate_snapshot.model_dump(),
             "holdings": holdings,
             "sector_exposure": _build_sector_exposure(holdings),
-            "recent_transactions": [_serialize_stock_transaction(tx) for tx in transactions_raw],
+            "recent_transactions": recent_transactions,
             "open_lots_summary": {
                 "count": len(open_lots),
                 "tickers": open_lot_tickers,

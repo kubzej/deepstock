@@ -9,7 +9,7 @@ The MCP surface is intentionally two-layered:
 - `get_stock_context` gives the agent a compact cross-domain map of the ticker
 - `get_portfolio_context` gives the agent a compact cross-domain map of the portfolio state
 - `get_market_context` gives the agent a compact market backdrop
-- drilldown tools return full-fidelity detail for the one branch the agent
+- `*_activity` drilldown tools return full-fidelity transaction detail for the one branch the agent
   actually needs next
 
 This keeps the first call usable in chat without throwing away access to full
@@ -38,14 +38,46 @@ Returns:
 - aggregate snapshot
 - holdings with portfolio identity
 - sector exposure
-- recent transactions
+- recent mixed transactions
 - open-lot summary
 
 Important:
 
 - leaving `portfolio_id` empty aggregates across all portfolios
+- `recent_limit` defaults to 20 and lets the agent ask for a smaller/larger recent window without switching to the full activity drilldown
 - holdings still keep `portfolio_id` and `portfolio_name` so the agent does not
   lose portfolio identity inside the aggregate view
+
+### `get_portfolio_activity(portfolio_id?, period, from_date?, to_date?, limit, cursor?)`
+
+Use for full transaction drilldown across stock and option activity after
+`get_portfolio_context` is no longer enough.
+
+Returns:
+
+- scope (`all` or one portfolio ID)
+- `portfolio_id` and `portfolio_name` when scoped to one portfolio
+- mixed `transactions[]`
+- paging metadata (`limit`, `cursor`, `next_cursor`, `has_more`)
+- applied window metadata (`period`, `from_date`, `to_date`)
+
+Important:
+
+- leaving `portfolio_id` empty aggregates across all portfolios
+- `from_date` / `to_date` use `YYYY-MM-DD` and override `period`
+- `cursor` uses the previous response `next_cursor` to page older rows
+
+### `get_portfolio_journal_archive(portfolio_id, limit)`
+
+Use when the conversation is about one concrete portfolio and the agent needs
+older portfolio-specific notes or AI reports.
+
+Returns preview/index data only:
+
+- resolved `portfolio_id`
+- resolved `portfolio_name`
+- `reports[]`: report metadata plus preview text
+- `notes[]`: note metadata plus preview text
 
 ### `get_portfolio_performance(period, portfolio_id?)`
 
@@ -91,16 +123,16 @@ Important:
 - It does not include full report markdown
 - It does not include full stock/option transaction lists
 
-### `get_research_archive(ticker, limit)`
+### `get_stock_journal_archive(ticker, limit)`
 
-Use when the user asks about older thinking, older notes, or older AI reports.
+Use when the user asks about older ticker-specific thinking, notes, or AI reports.
 
 Returns preview/index data only:
 
 - `reports[]`: report metadata plus preview text
 - `notes[]`: note metadata plus preview text
 
-### `get_report_content(report_id)`
+### `get_journal_report_content(report_id)`
 
 Use when a specific AI report needs the full body.
 
@@ -110,7 +142,7 @@ Returns:
 - full `content`
 - explicit `content_format` (`markdown`)
 
-### `get_note_content(note_id)`
+### `get_journal_note_content(note_id)`
 
 Use when a specific note preview looks relevant and the full note matters.
 
@@ -146,7 +178,7 @@ Returns:
 
 Important:
 
- - This is one of the intentionally narrow MCP write-back tools
+- This is one of the intentionally narrow MCP write-back tools
 - Backend resolves the stock journal channel; the agent does not choose a channel ID
 - Content is stored as a normal `note` entry, not as raw transcript
 - This should be used only after explicit user approval
@@ -178,16 +210,35 @@ Important:
 - Content is stored as a normal `note` entry, not as raw transcript
 - This should be used only after explicit user approval
 
-### `get_investment_activity(ticker)`
+### `get_ticker_activity(ticker, period, from_date?, to_date?, limit, cursor?)`
 
 Use for full trade history and option detail.
 
 Returns:
 
 - `position_summary`
-- full `stock_transactions[]`
+- full mixed `transactions[]`
 - `option_summary`
-- full `option_transactions[]`
+- paging metadata (`limit`, `cursor`, `next_cursor`, `has_more`)
+- applied window metadata (`period`, `from_date`, `to_date`)
+
+Each transaction item uses one shared shape with common fields:
+
+- `asset_type`: `stock` or `option`
+- `portfolio_id`
+- `portfolio_name`
+- `executed_at`
+- `ticker`
+
+Type-specific fields stay optional on the same item:
+
+- stock rows may include `type`, `shares`, `price_per_share`, `remaining_shares`, `realized_pnl`, `realized_pnl_czk`, `source_transaction_id`
+- option rows may include `action`, `option_symbol`, `option_type`, `strike`, `expiration`, `contracts`, `premium`, `position_after`
+
+Important:
+
+- `get_ticker_activity` is transaction-first and should remain available even if live market data are temporarily unavailable
+- in that degraded case, `position_summary.market_value` and `position_summary.unrealized_pnl` may be `null`
 
 ### `get_technical_history(ticker, period, indicators)`
 
@@ -244,11 +295,74 @@ Valid indicators:
   "aggregate_snapshot": {},
   "holdings": [],
   "sector_exposure": [],
-  "recent_transactions": [],
+  "recent_transactions": [
+    {
+      "asset_type": "stock",
+      "portfolio_id": "uuid",
+      "portfolio_name": "Main",
+      "executed_at": "2026-04-16T10:00:00Z",
+      "ticker": "NVDA",
+      "type": "BUY",
+      "shares": 2,
+      "price_per_share": 105.0,
+      "currency": "USD",
+      "fees": 1.0
+    }
+  ],
   "open_lots_summary": {
     "count": 0,
     "tickers": []
   }
+}
+```
+
+## `get_portfolio_activity`
+
+```json
+{
+  "scope": "all",
+  "generated_at": "2026-04-17T10:00:00Z",
+  "portfolio_id": null,
+  "portfolio_name": null,
+  "portfolio_count": 2,
+  "period": "custom",
+  "from_date": "2026-01-01",
+  "to_date": "2026-04-17",
+  "limit": 25,
+  "cursor": null,
+  "next_cursor": "2026-03-28T14:30:00+00:00",
+  "has_more": true,
+  "transactions": []
+}
+```
+
+## `get_portfolio_journal_archive`
+
+```json
+{
+  "portfolio_id": "uuid",
+  "portfolio_name": "Main",
+  "generated_at": "2026-04-17T10:00:00Z",
+  "reports": [
+    {
+      "id": "uuid",
+      "created_at": "2026-04-10T09:00:00Z",
+      "report_type": "portfolio_review",
+      "model": "claude-sonnet",
+      "preview": "Short preview...",
+      "content_length": 2400
+    }
+  ],
+  "notes": [
+    {
+      "id": "uuid",
+      "created_at": "2026-04-09T08:00:00Z",
+      "updated_at": null,
+      "type": "note",
+      "preview": "Short preview...",
+      "metadata": {}
+    }
+  ]
 }
 ```
 
@@ -342,7 +456,7 @@ Valid indicators:
 }
 ```
 
-## `get_research_archive`
+## `get_stock_journal_archive`
 
 ```json
 {
@@ -371,7 +485,7 @@ Valid indicators:
 }
 ```
 
-## `get_report_content`
+## `get_journal_report_content`
 
 ```json
 {
@@ -384,7 +498,7 @@ Valid indicators:
 }
 ```
 
-## `get_note_content`
+## `get_journal_note_content`
 
 ```json
 {
@@ -435,16 +549,22 @@ Valid indicators:
 }
 ```
 
-## `get_investment_activity`
+## `get_ticker_activity`
 
 ```json
 {
   "ticker": "NVDA",
   "generated_at": "2026-04-17T10:00:00Z",
+  "period": "YTD",
+  "from_date": "2026-01-01",
+  "to_date": "2026-04-17",
+  "limit": 50,
+  "cursor": null,
+  "next_cursor": "2026-04-12T10:00:00+00:00",
+  "has_more": true,
   "position_summary": {},
-  "stock_transactions": [],
-  "option_summary": {},
-  "option_transactions": []
+  "transactions": [],
+  "option_summary": {}
 }
 ```
 
@@ -454,9 +574,17 @@ Valid indicators:
 - `journal_context.reports[]` and archive `reports[]` are previews, not full report content
 - `smart_analysis.valuation_label.tone` is semantic output for AI use, not a frontend class name
 - `position_summary.total_cost` is the open-position cost basis in the instrument currency
-- `get_investment_activity` is the full transaction detail endpoint
-- `get_report_content` always returns `content_format: markdown`
-- `get_note_content` always returns `content_format: plain_text`
+- `*_context` tools are summary-first; `*_activity` tools are the transaction drilldowns
+- `get_portfolio_activity` and `get_ticker_activity` both support `period`, `from_date`, `to_date`, `limit`, and `cursor`
+- `get_portfolio_activity` includes `portfolio_id` and `portfolio_name` only for single-portfolio scope, so the response is self-describing in agent/chat flows
+- when `from_date` or `to_date` is provided, the activity tools return `period: custom`
+- `get_ticker_activity` is the full transaction detail endpoint for one ticker
+- `get_portfolio_activity` is the full transaction detail endpoint for one portfolio or all portfolios
+- `get_stock_journal_archive` and `get_portfolio_journal_archive` are the scoped journal preview/index tools
+- `get_ticker_activity.transactions[]` and `get_portfolio_context.recent_transactions[]` share the same mixed item shape
+- `get_ticker_activity` does not depend on live market data for the transaction feed; only live valuation fields inside `position_summary` may be `null`
+- `get_journal_report_content` always returns `content_format: markdown`
+- `get_journal_note_content` always returns `content_format: plain_text`
 - `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
 - `save_portfolio_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
 - `get_portfolio_context` defaults to aggregated multi-portfolio scope; holdings and transactions retain portfolio identity

@@ -12,22 +12,25 @@ from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.schemas.mcp import (
     GlobalMarketContextResponse,
-    InvestmentActivityResponse,
-    NoteContentResponse,
+    JournalNoteContentResponse,
+    JournalReportContentResponse,
+    PortfolioActivityResponse,
     PortfolioContextResponse,
+    PortfolioJournalArchiveResponse,
     PortfolioListResponse,
     PortfolioPerformanceResponse,
-    ReportContentResponse,
-    ResearchArchiveResponse,
     SavePortfolioJournalNoteRequest,
     SavePortfolioJournalNoteResponse,
     SaveStockJournalNoteRequest,
     SaveStockJournalNoteResponse,
+    StockJournalArchiveResponse,
     StockContextResponse,
+    TickerActivityResponse,
     TechnicalHistoryResponse,
 )
 from app.services.market.stock_info import StockInfoUnavailableError
 from app.services.research_context import (
+    ActivityFilterError,
     VALID_TECHNICAL_INDICATORS,
     research_context_service,
 )
@@ -35,6 +38,7 @@ from app.services.research_context import (
 router = APIRouter()
 
 PortfolioPerformancePeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
+ActivityPeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 
 
@@ -53,11 +57,16 @@ async def list_portfolios(
 async def get_portfolio_context(
     request: Request,
     portfolio_id: Optional[str] = Query(None),
+    recent_limit: int = Query(20, ge=1, le=50),
     user_id: str = Depends(get_current_user_id),
 ):
     del request
     try:
-        return await research_context_service.get_portfolio_context(user_id, portfolio_id=portfolio_id)
+        return await research_context_service.get_portfolio_context(
+            user_id,
+            portfolio_id=portfolio_id,
+            recent_limit=recent_limit,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -150,45 +159,66 @@ async def get_technical_history(
             detail=f"Stock data provider is temporarily unavailable for {ticker.upper()}",
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        detail = str(exc)
+        status_code = 404 if detail.startswith("Ticker ") and detail.endswith(" not found") else 400
+        raise HTTPException(status_code=status_code, detail=detail)
 
 
-@router.get("/research-archive/{ticker}", response_model=ResearchArchiveResponse)
+@router.get("/stock-journal-archive/{ticker}", response_model=StockJournalArchiveResponse)
 @limiter.limit("30/minute")
-async def get_research_archive(
+async def get_stock_journal_archive(
     request: Request,
     ticker: str,
     limit: int = Query(10, ge=1, le=50),
     user_id: str = Depends(get_current_user_id),
 ):
     del request
-    return await research_context_service.get_research_archive(ticker, user_id, limit=limit)
+    return await research_context_service.get_stock_journal_archive(ticker, user_id, limit=limit)
 
 
-@router.get("/report/{report_id}", response_model=ReportContentResponse)
+@router.get("/portfolio-journal-archive/{portfolio_id}", response_model=PortfolioJournalArchiveResponse)
 @limiter.limit("30/minute")
-async def get_report_content(
+async def get_portfolio_journal_archive(
+    request: Request,
+    portfolio_id: str,
+    limit: int = Query(10, ge=1, le=50),
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        return await research_context_service.get_portfolio_journal_archive(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/journal-report/{report_id}", response_model=JournalReportContentResponse)
+@limiter.limit("30/minute")
+async def get_journal_report_content(
     request: Request,
     report_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
     del request
     try:
-        return await research_context_service.get_report_content(report_id, user_id)
+        return await research_context_service.get_journal_report_content(report_id, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.get("/note/{note_id}", response_model=NoteContentResponse)
+@router.get("/journal-note/{note_id}", response_model=JournalNoteContentResponse)
 @limiter.limit("30/minute")
-async def get_note_content(
+async def get_journal_note_content(
     request: Request,
     note_id: str,
     user_id: str = Depends(get_current_user_id),
 ):
     del request
     try:
-        return await research_context_service.get_note_content(note_id, user_id)
+        return await research_context_service.get_journal_note_content(note_id, user_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -229,20 +259,59 @@ async def save_portfolio_journal_note(
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.get("/investment-activity/{ticker}", response_model=InvestmentActivityResponse)
+@router.get("/ticker-activity/{ticker}", response_model=TickerActivityResponse)
 @limiter.limit("30/minute")
-async def get_investment_activity(
+async def get_ticker_activity(
     request: Request,
     ticker: str,
+    period: ActivityPeriod = Query("ALL"),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    cursor: Optional[str] = Query(None),
     user_id: str = Depends(get_current_user_id),
 ):
     del request
     try:
-        return await research_context_service.get_investment_activity(ticker, user_id)
-    except StockInfoUnavailableError:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Stock data provider is temporarily unavailable for {ticker.upper()}",
+        return await research_context_service.get_ticker_activity(
+            ticker=ticker,
+            user_id=user_id,
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            cursor=cursor,
         )
+    except ActivityFilterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/portfolio-activity", response_model=PortfolioActivityResponse)
+@limiter.limit("30/minute")
+async def get_portfolio_activity(
+    request: Request,
+    portfolio_id: Optional[str] = Query(None),
+    period: ActivityPeriod = Query("ALL"),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    cursor: Optional[str] = Query(None),
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        return await research_context_service.get_portfolio_activity(
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ActivityFilterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

@@ -156,30 +156,17 @@ class StockContextResponse(BaseModel):
     market_context: MarketContextResponse
 
 
-class StockTransactionResponse(BaseModel):
+class ActivityTransactionResponse(BaseModel):
     id: Optional[str] = None
+    asset_type: Literal["stock", "option"]
     portfolio_id: Optional[str] = None
     portfolio_name: str = ""
     executed_at: Optional[str] = None
+    ticker: Optional[str] = None
     type: Optional[str] = None
+    action: Optional[str] = None
     shares: Optional[float] = None
     price_per_share: Optional[float] = None
-    currency: Optional[str] = None
-    fees: float = 0.0
-    notes: Optional[str] = None
-    source_transaction_id: Optional[str] = None
-    remaining_shares: Optional[float] = None
-    realized_pnl: Optional[float] = None
-    realized_pnl_czk: Optional[float] = None
-
-
-class OptionTransactionResponse(BaseModel):
-    id: Optional[str] = None
-    portfolio_id: Optional[str] = None
-    portfolio_name: str = ""
-    executed_at: Optional[str] = None
-    action: Optional[str] = None
-    symbol: Optional[str] = None
     option_symbol: Optional[str] = None
     option_type: Optional[str] = None
     strike: Optional[float] = None
@@ -189,16 +176,38 @@ class OptionTransactionResponse(BaseModel):
     currency: Optional[str] = None
     fees: float = 0.0
     notes: Optional[str] = None
+    source_transaction_id: Optional[str] = None
+    remaining_shares: Optional[float] = None
+    realized_pnl: Optional[float] = None
+    realized_pnl_czk: Optional[float] = None
     position_after: Optional[str] = None
 
 
-class InvestmentActivityResponse(BaseModel):
+class ActivityPageResponse(BaseModel):
+    period: str
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    limit: int = 0
+    cursor: Optional[str] = None
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+
+
+class TickerActivityResponse(ActivityPageResponse):
     ticker: str
     generated_at: str
     position_summary: PositionSummaryResponse
-    stock_transactions: list[StockTransactionResponse] = Field(default_factory=list)
+    transactions: list[ActivityTransactionResponse] = Field(default_factory=list)
     option_summary: OptionSummaryResponse
-    option_transactions: list[OptionTransactionResponse] = Field(default_factory=list)
+
+
+class PortfolioActivityResponse(ActivityPageResponse):
+    scope: str
+    generated_at: str
+    portfolio_id: Optional[str] = None
+    portfolio_name: Optional[str] = None
+    portfolio_count: int = 0
+    transactions: list[ActivityTransactionResponse] = Field(default_factory=list)
 
 
 class TechnicalHistorySummaryResponse(BaseModel):
@@ -311,14 +320,22 @@ class TechnicalHistoryResponse(BaseModel):
     history: TechnicalHistoryDataResponse
 
 
-class ResearchArchiveResponse(BaseModel):
+class StockJournalArchiveResponse(BaseModel):
     ticker: str
     generated_at: str
     reports: list[AIReportPreviewResponse] = Field(default_factory=list)
     notes: list[JournalNotePreviewResponse] = Field(default_factory=list)
 
 
-class ReportContentResponse(BaseModel):
+class PortfolioJournalArchiveResponse(BaseModel):
+    portfolio_id: str
+    portfolio_name: str
+    generated_at: str
+    reports: list[AIReportPreviewResponse] = Field(default_factory=list)
+    notes: list[JournalNotePreviewResponse] = Field(default_factory=list)
+
+
+class JournalReportContentResponse(BaseModel):
     id: str
     created_at: Optional[str] = None
     report_type: Optional[str] = None
@@ -327,7 +344,7 @@ class ReportContentResponse(BaseModel):
     content_format: Literal["markdown"] = "markdown"
 
 
-class NoteContentResponse(BaseModel):
+class JournalNoteContentResponse(BaseModel):
     id: str
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -457,7 +474,7 @@ class PortfolioContextResponse(BaseModel):
     aggregate_snapshot: PortfolioSnapshotResponse
     holdings: list[PortfolioHoldingResponse] = Field(default_factory=list)
     sector_exposure: list[SectorExposureResponse] = Field(default_factory=list)
-    recent_transactions: list[StockTransactionResponse] = Field(default_factory=list)
+    recent_transactions: list[ActivityTransactionResponse] = Field(default_factory=list)
     open_lots_summary: OpenLotsSummaryResponse = Field(default_factory=OpenLotsSummaryResponse)
 
 

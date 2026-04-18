@@ -185,14 +185,17 @@ async def list_portfolios() -> dict:
 
 
 @mcp.tool()
-async def get_portfolio_context(portfolio_id: str = "") -> dict:
+async def get_portfolio_context(portfolio_id: str = "", recent_limit: int = 20) -> dict:
     """
     Get the current portfolio state: holdings, snapshot, sector exposure,
     recent transactions, and open-lot summary.
 
     Leave portfolio_id empty to aggregate across all portfolios.
+    recent_limit controls how many recent mixed activity rows are included.
     """
-    params = {"portfolio_id": portfolio_id} if portfolio_id else None
+    params = {"recent_limit": recent_limit}
+    if portfolio_id:
+        params["portfolio_id"] = portfolio_id
     return await _api_get("/api/mcp/portfolio-context", params=params)
 
 
@@ -266,66 +269,135 @@ async def get_technical_history(
 
 
 @mcp.tool()
-async def get_research_archive(ticker: str, limit: int = 10) -> dict:
+async def get_stock_journal_archive(ticker: str, limit: int = 10) -> dict:
     """
     Get report and note previews for a ticker.
 
     Use for questions like "what did I think about this stock 6 months ago"
-    or when comparing current state to historical research. This returns
-    preview/index data; fetch the full body with get_report_content or
-    get_note_content only when needed.
+    or when comparing current state to older ticker-specific notes and AI reports.
+    This returns preview/index data; fetch the full body with
+    get_journal_report_content or get_journal_note_content only when needed.
 
     limit: number of reports/notes to return (1-50)
     """
     return await _api_get(
-        f"/api/mcp/research-archive/{ticker.upper()}",
+        f"/api/mcp/stock-journal-archive/{ticker.upper()}",
         params={"limit": limit},
     )
 
 
 @mcp.tool()
-async def get_investment_activity(ticker: str) -> dict:
+async def get_portfolio_journal_archive(portfolio_id: str, limit: int = 10) -> dict:
     """
-    Get detailed investment activity for a ticker.
+    Get report and note previews for one portfolio journal.
 
-    Returns full stock transaction history, option transactions,
-    current position summary, and open option holdings.
+    Use when the conversation is about one concrete portfolio and you need
+    older portfolio-specific notes or AI reports before deciding whether to
+    fetch a full note body with get_journal_note_content.
+
+    limit: number of reports/notes to return (1-50)
+    """
+    return await _api_get(
+        f"/api/mcp/portfolio-journal-archive/{portfolio_id}",
+        params={"limit": limit},
+    )
+
+
+@mcp.tool()
+async def get_ticker_activity(
+    ticker: str,
+    period: PortfolioPerformancePeriod = "ALL",
+    from_date: str = "",
+    to_date: str = "",
+    limit: int = 50,
+    cursor: str = "",
+) -> dict:
+    """
+    Get detailed activity for a ticker.
+
+    Returns mixed stock and option transaction history plus the
+    current position and option summary for the ticker.
 
     Use for deep-dive questions about trade history, cost basis,
     or option strategy breakdown.
+
+    period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
+    from_date/to_date: optional custom range in YYYY-MM-DD format; overrides period
+    limit: page size for returned transactions
+    cursor: ISO datetime from previous response's next_cursor
     """
-    return await _api_get(f"/api/mcp/investment-activity/{ticker.upper()}")
+    params = {"period": period, "limit": limit}
+    if from_date:
+        params["from_date"] = from_date
+    if to_date:
+        params["to_date"] = to_date
+    if cursor:
+        params["cursor"] = cursor
+    return await _api_get(f"/api/mcp/ticker-activity/{ticker.upper()}", params=params)
 
 
 @mcp.tool()
-async def get_report_content(report_id: str) -> dict:
+async def get_portfolio_activity(
+    portfolio_id: str = "",
+    period: PortfolioPerformancePeriod = "ALL",
+    from_date: str = "",
+    to_date: str = "",
+    limit: int = 50,
+    cursor: str = "",
+) -> dict:
+    """
+    Get mixed portfolio activity for one portfolio or all portfolios.
+
+    Use this for transaction drilldown across stock and option activity.
+    Leave portfolio_id empty to aggregate across all portfolios.
+
+    period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
+    from_date/to_date: optional custom range in YYYY-MM-DD format; overrides period
+    limit: page size for returned transactions
+    cursor: ISO datetime from previous response's next_cursor
+    """
+    params = {"period": period, "limit": limit}
+    if portfolio_id:
+        params["portfolio_id"] = portfolio_id
+    if from_date:
+        params["from_date"] = from_date
+    if to_date:
+        params["to_date"] = to_date
+    if cursor:
+        params["cursor"] = cursor
+    return await _api_get("/api/mcp/portfolio-activity", params=params)
+
+
+@mcp.tool()
+async def get_journal_report_content(report_id: str) -> dict:
     """
     Get full content of a specific AI research report.
 
-    Use after get_research_archive to fetch the full text of a specific report
-    by its ID. Reports can be long — fetch only the one(s) you actually need.
+    Use after get_stock_journal_archive or get_portfolio_journal_archive to fetch
+    the full text of a specific report by its ID. Reports can be long — fetch
+    only the one(s) you actually need.
 
     Response includes `content_format`, currently always `markdown`.
 
-    report_id: the UUID from get_research_archive reports[].id
+    report_id: the UUID from a journal archive response reports[].id
     """
-    return await _api_get(f"/api/mcp/report/{report_id}")
+    return await _api_get(f"/api/mcp/journal-report/{report_id}")
 
 
 @mcp.tool()
-async def get_note_content(note_id: str) -> dict:
+async def get_journal_note_content(note_id: str) -> dict:
     """
     Get full content of a specific journal note.
 
-    Use after get_stock_context or get_research_archive when a note preview
-    looks relevant and you need the full text.
+    Use after get_stock_journal_archive, get_portfolio_journal_archive, or
+    get_stock_context when a note preview looks relevant and you need the full text.
 
     Response includes `content_format`, currently always `plain_text`.
     Stored rich text is normalized for AI-friendly reading.
 
-    note_id: the UUID from journal_context.notes[].id or research_archive notes[].id
+    note_id: the UUID from journal preview responses notes[].id
     """
-    return await _api_get(f"/api/mcp/note/{note_id}")
+    return await _api_get(f"/api/mcp/journal-note/{note_id}")
 
 
 @mcp.tool()

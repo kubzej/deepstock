@@ -6,20 +6,22 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 
 ## Tools
 
-| Tool | Description |
-|---|---|
-| `list_portfolios` | List available portfolios and their snapshot summaries |
-| `get_portfolio_context` | Current holdings/snapshot context for all portfolios or one selected portfolio |
-| `get_portfolio_performance` | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL` |
-| `get_market_context` | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview |
-| `get_stock_context` | Default first call — lean ticker summary across journal, activity, watchlist, and market |
-| `get_technical_history` | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list |
-| `get_research_archive` | Report and note previews for a ticker |
-| `get_report_content` | Full report content by ID, with explicit `content_format="markdown"` |
-| `get_note_content` | Full note content by ID, normalized to AI-friendly plain text with `content_format="plain_text"` |
-| `save_stock_journal_note` | Save a user-approved plain-text note into the stock journal for one ticker; response echoes canonical plain-text content |
-| `save_portfolio_journal_note` | Save a user-approved plain-text note into the journal for one portfolio; response echoes canonical plain-text content |
-| `get_investment_activity` | Transaction history, cost basis, open option positions |
+| Tool                            | Description                                                                                                                                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_portfolios`               | List available portfolios and their snapshot summaries                                                                                               |
+| `get_portfolio_context`         | Current holdings/snapshot context for all portfolios or one selected portfolio, plus configurable recent mixed activity                              |
+| `get_portfolio_activity`        | Full mixed stock/options transaction drilldown for all portfolios or one selected portfolio                                                          |
+| `get_portfolio_journal_archive` | Portfolio-specific note/report previews for one selected portfolio                                                                                   |
+| `get_portfolio_performance`     | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL`         |
+| `get_market_context`            | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview                                                                   |
+| `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market                                                             |
+| `get_technical_history`         | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list                                                     |
+| `get_stock_journal_archive`     | Report and note previews for a ticker journal                                                                                                        |
+| `get_journal_report_content`    | Full journal AI report content by ID, with explicit `content_format="markdown"`                                                                      |
+| `get_journal_note_content`      | Full journal note content by ID, normalized to AI-friendly plain text with `content_format="plain_text"`                                             |
+| `save_stock_journal_note`       | Save a user-approved plain-text note into the stock journal for one ticker; response echoes canonical plain-text content                             |
+| `save_portfolio_journal_note`   | Save a user-approved plain-text note into the journal for one portfolio; response echoes canonical plain-text content                                |
+| `get_ticker_activity`           | Full mixed stock/options transaction drilldown for one ticker, with period/custom-range filters and cursor paging; live valuation fields may be null |
 
 See [CONTRACT.md](CONTRACT.md) for response shapes, field semantics, and tool-selection guidance.
 
@@ -73,12 +75,12 @@ For Claude.ai (web or mobile): add the URL directly in Claude.ai Project setting
 
 Set in Railway dashboard (remote) or `backend/.env` (local Docker — shared with backend):
 
-| Variable | Description |
-|---|---|
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key |
-| `SUPABASE_JWT_SECRET` | Supabase JWT secret |
-| `DEEPSTOCK_API_URL` | Backend URL — `http://backend:8000` (Docker) or Railway backend URL (remote) |
+| Variable                    | Description                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `SUPABASE_URL`              | Supabase project URL                                                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                                                    |
+| `SUPABASE_JWT_SECRET`       | Supabase JWT secret                                                          |
+| `DEEPSTOCK_API_URL`         | Backend URL — `http://backend:8000` (Docker) or Railway backend URL (remote) |
 
 ---
 
