@@ -76,17 +76,12 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
 
   return (
     <div>
-      {/* Section header */}
-      <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-        Insider obchody
-      </h2>
-
       {/* Summary bar */}
-      <div className="flex gap-6 mb-4 text-sm">
+      <div className="mb-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
         {buyCount > 0 && (
           <div>
             <span className="text-muted-foreground">Celkem nákupy: </span>
-            <span className="font-mono-price font-medium">
+            <span className="font-mono-price text-foreground/85">
               {formatValue(totalBuys)}
             </span>
           </div>
@@ -94,7 +89,7 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
         {sellCount > 0 && (
           <div>
             <span className="text-muted-foreground">Celkem prodeje: </span>
-            <span className="font-mono-price font-medium">
+            <span className="font-mono-price text-foreground/85">
               {formatValue(totalSells)}
             </span>
           </div>
@@ -109,7 +104,7 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
           return (
             <div
               key={`${trade.trade_date}-${trade.insider_name}-${i}`}
-              className="bg-muted/30 rounded-xl"
+              className="rounded-xl border border-border/60 bg-muted/18"
             >
               <div className="px-3 py-2.5">
                 {/* Header Row */}
@@ -119,7 +114,11 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
                     <div className="flex items-center gap-1.5">
                       <Badge
                         variant="outline"
-                        className="text-[10px] px-1.5 py-0 h-[18px] font-medium"
+                        className={`h-[18px] px-1.5 py-0 text-[10px] font-medium ${
+                          isBuy
+                            ? 'border-positive/20 bg-positive/6 text-positive'
+                            : 'border-negative/20 bg-negative/6 text-negative'
+                        }`}
                       >
                         {isBuy ? 'NÁKUP' : 'PRODEJ'}
                       </Badge>
@@ -130,8 +129,8 @@ export function InsiderTrades({ ticker }: InsiderTradesProps) {
                   </div>
 
                   {/* Right: Value */}
-                  <div className="flex items-baseline gap-1.5 flex-shrink-0">
-                    <span className="font-mono-price text-sm font-medium">
+                  <div className="flex shrink-0 items-baseline gap-1.5">
+                    <span className="font-mono-price text-sm text-foreground/90">
                       {formatValue(trade.total_value)}
                     </span>
                   </div>
