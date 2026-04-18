@@ -22,6 +22,21 @@ _CT.init = _noop_ct_init
 _CT.generate_transaction_id = _empty_transaction_id
 
 import twikit
+import twikit.user as _twikit_user
+
+# Patch twikit's User.__init__ which crashes with KeyError when a user's bio
+# has no URLs (description.entities.urls key is absent for some accounts).
+_orig_user_init = _twikit_user.User.__init__
+
+def _patched_user_init(self, client, data):
+    try:
+        desc = data.get('legacy', {}).get('entities', {}).get('description', {})
+        desc.setdefault('urls', [])
+    except Exception:
+        pass
+    _orig_user_init(self, client, data)
+
+_twikit_user.User.__init__ = _patched_user_init
 
 logger = logging.getLogger(__name__)
 
