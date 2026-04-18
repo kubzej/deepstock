@@ -3,7 +3,7 @@ MCP endpoints for DeepStock-backed chat workflows.
 
 Summary-first MCP endpoints and narrow write-back actions for external chat agents.
 """
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
@@ -27,9 +27,15 @@ from app.schemas.mcp import (
     TechnicalHistoryResponse,
 )
 from app.services.market.stock_info import StockInfoUnavailableError
-from app.services.research_context import research_context_service
+from app.services.research_context import (
+    VALID_TECHNICAL_INDICATORS,
+    research_context_service,
+)
 
 router = APIRouter()
+
+PortfolioPerformancePeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
+TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 
 
 @router.get("/portfolios", response_model=PortfolioListResponse)
@@ -61,7 +67,7 @@ async def get_portfolio_context(
 async def get_portfolio_performance(
     request: Request,
     portfolio_id: Optional[str] = Query(None),
-    period: str = Query("1Y"),
+    period: PortfolioPerformancePeriod = Query("1Y"),
     user_id: str = Depends(get_current_user_id),
 ):
     del request
@@ -72,7 +78,7 @@ async def get_portfolio_performance(
             period=period,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/market-context", response_model=GlobalMarketContextResponse)
@@ -109,7 +115,7 @@ async def get_stock_context(
 async def get_technical_history(
     request: Request,
     ticker: str,
-    period: str = Query("6mo"),
+    period: TechnicalPeriod = Query("6mo"),
     indicators: Optional[str] = Query(
         None,
         description="Comma-separated indicator names: price,rsi,macd,bollinger,volume,stochastic,atr,obv,adx,fibonacci",
@@ -118,6 +124,19 @@ async def get_technical_history(
 ):
     del request
     indicator_list = indicators.split(",") if indicators else None
+    if indicator_list:
+        normalized_indicators = [item.strip() for item in indicator_list if item.strip()]
+        invalid_indicators = sorted(set(normalized_indicators) - VALID_TECHNICAL_INDICATORS)
+        if invalid_indicators:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Unsupported technical indicators: "
+                    + ", ".join(invalid_indicators)
+                    + ". Expected a subset of: "
+                    + ", ".join(sorted(VALID_TECHNICAL_INDICATORS))
+                ),
+            )
     try:
         return await research_context_service.get_technical_history(
             ticker=ticker,
@@ -131,7 +150,7 @@ async def get_technical_history(
             detail=f"Stock data provider is temporarily unavailable for {ticker.upper()}",
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/research-archive/{ticker}", response_model=ResearchArchiveResponse)

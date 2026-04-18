@@ -272,10 +272,10 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
                 After-market
               </span>
-              <span className="text-lg font-mono-price font-semibold text-sky-500">
+              <span className="text-lg font-mono-price font-semibold text-info">
                 {formatCurrency(extendedHoursData.postMarketChangeCzk)}
               </span>
-              <span className="text-sm font-mono-price ml-1.5 text-sky-500/70">
+              <span className="text-sm font-mono-price ml-1.5 text-info/70">
                 {formatPercent(
                   extendedHoursData.postMarketChangePercent,
                   1,

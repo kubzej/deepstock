@@ -31,6 +31,19 @@ from app.services.stocks import stock_service
 
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
+VALID_PORTFOLIO_PERFORMANCE_PERIODS: set[str] = {"1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"}
+VALID_TECHNICAL_INDICATORS: set[str] = {
+    "price",
+    "rsi",
+    "macd",
+    "bollinger",
+    "volume",
+    "stochastic",
+    "atr",
+    "obv",
+    "adx",
+    "fibonacci",
+}
 
 MACRO_MARKET_INDICATORS = [
     {
@@ -108,8 +121,20 @@ def _plain_text_note_to_html(content: str) -> str:
     )
 
 
+def _html_to_plain_text(content: str) -> str:
+    normalized = (content or "").replace("\r\n", "\n")
+    normalized = re.sub(r"<br\s*/?>", "\n", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"</p\s*>", "\n\n", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"<[^>]+>", " ", normalized)
+    normalized = html.unescape(normalized)
+    normalized = re.sub(r"[ \t]+\n", "\n", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
+    return normalized.strip()
+
+
 def _serialize_note_preview(entry: dict) -> dict:
-    content = re.sub(r"<[^>]+>", " ", entry.get("content") or "")
+    content = _html_to_plain_text(entry.get("content") or "")
     content = re.sub(r"\s+", " ", content).strip()
     return {
         "id": entry.get("id"),
@@ -210,20 +235,20 @@ def _serialize_watchlist_item(item: dict) -> dict:
 
 def _valuation_label(signal: Optional[str]) -> dict[str, Optional[str]]:
     mapping = {
-        "undervalued": {"text": "Podhodnocená", "color_class": "text-positive"},
+        "undervalued": {"text": "Podhodnocená", "tone": "positive"},
         "slightly_undervalued": {
             "text": "Mírně podhodnocená",
-            "color_class": "text-positive",
+            "tone": "positive",
         },
-        "fair": {"text": "Férová cena", "color_class": "text-muted-foreground"},
+        "fair": {"text": "Férová cena", "tone": "neutral"},
         "slightly_overvalued": {
             "text": "Mírně nadhodnocená",
-            "color_class": "text-warning",
+            "tone": "warning",
         },
-        "overvalued": {"text": "Nadhodnocená", "color_class": "text-negative"},
-        "hold": {"text": "Neutrální", "color_class": "text-muted-foreground"},
+        "overvalued": {"text": "Nadhodnocená", "tone": "negative"},
+        "hold": {"text": "Neutrální", "tone": "neutral"},
     }
-    return mapping.get(signal or "", {"text": "Bez dat", "color_class": "text-muted-foreground"})
+    return mapping.get(signal or "", {"text": "Bez dat", "tone": "neutral"})
 
 
 def _has_high_growth_potential(stock_info: dict) -> bool:
@@ -777,6 +802,7 @@ class ResearchContextService:
             "report_type": metadata.get("report_type"),
             "model": metadata.get("model"),
             "content": row.get("content") or "",
+            "content_format": "markdown",
         }
 
     async def get_note_content(self, note_id: str, user_id: str) -> dict:
@@ -796,7 +822,8 @@ class ResearchContextService:
             "created_at": row.get("created_at"),
             "updated_at": row.get("updated_at"),
             "type": row.get("type") or "note",
-            "content": row.get("content") or "",
+            "content": _html_to_plain_text(row.get("content") or ""),
+            "content_format": "plain_text",
             "metadata": row.get("metadata") or {},
         }
 
@@ -823,7 +850,8 @@ class ResearchContextService:
             "ticker": normalized_ticker,
             "channel_id": channel["id"],
             "created_at": entry.get("created_at"),
-            "content_plaintext": content,
+            "content": content,
+            "content_format": "plain_text",
             "metadata": entry.get("metadata") or {},
         }
 
@@ -861,7 +889,8 @@ class ResearchContextService:
             "portfolio_name": portfolio_row["name"],
             "channel_id": channel["id"],
             "created_at": entry.get("created_at"),
-            "content_plaintext": content,
+            "content": content,
+            "content_format": "plain_text",
             "metadata": entry.get("metadata") or {},
         }
 
@@ -924,11 +953,20 @@ class ResearchContextService:
             raise ValueError(
                 f"Unsupported technical period '{period}'. Expected one of: {', '.join(sorted(VALID_TECHNICAL_PERIODS))}"
             )
+        selected = {item.strip() for item in indicators or [] if item.strip()} or None
+        if selected:
+            invalid_indicators = sorted(selected - VALID_TECHNICAL_INDICATORS)
+            if invalid_indicators:
+                raise ValueError(
+                    "Unsupported technical indicators: "
+                    + ", ".join(invalid_indicators)
+                    + ". Expected a subset of: "
+                    + ", ".join(sorted(VALID_TECHNICAL_INDICATORS))
+                )
         technical_data = await market_service.get_technical_indicators(normalized_ticker, period=period)
         if not technical_data:
             raise ValueError(f"Technical data for {normalized_ticker} are not available")
 
-        selected = {item.strip() for item in indicators or [] if item.strip()} or None
         return {
             "ticker": normalized_ticker,
             "generated_at": _iso_now(),
@@ -1025,6 +1063,11 @@ class ResearchContextService:
         portfolio_id: Optional[str] = None,
         period: str = "1Y",
     ) -> dict:
+        if period not in VALID_PORTFOLIO_PERFORMANCE_PERIODS:
+            raise ValueError(
+                f"Unsupported portfolio performance period '{period}'. Expected one of: "
+                + ", ".join(sorted(VALID_PORTFOLIO_PERFORMANCE_PERIODS))
+            )
         scope, _, _ = await self._resolve_portfolio_scope(user_id, portfolio_id)
         stock_result, options_result = await asyncio.gather(
             get_stock_performance(user_id, portfolio_id=portfolio_id, period=period),

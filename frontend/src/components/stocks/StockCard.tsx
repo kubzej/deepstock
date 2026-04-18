@@ -130,7 +130,7 @@ export function StockCard({
             {/* After-hours price */}
             {quote?.postMarketPrice != null &&
               quote?.preMarketPrice == null && (
-                <span className="text-[10px] font-mono-price text-sky-500">
+                <span className="text-[10px] font-mono-price text-info">
                   → {formatPrice(quote.postMarketPrice, currency)}
                 </span>
               )}
@@ -150,7 +150,7 @@ export function StockCard({
             {/* After-hours change */}
             {quote?.postMarketChangePercent != null &&
               quote?.preMarketChangePercent == null && (
-                <span className="text-[10px] font-mono-price text-sky-500">
+                <span className="text-[10px] font-mono-price text-info">
                   {formatPercent(quote.postMarketChangePercent, 1, true)}
                 </span>
               )}

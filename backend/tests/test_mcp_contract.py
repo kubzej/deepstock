@@ -86,7 +86,7 @@ def test_stock_context_contract_accepts_summary_shape():
             "smart_analysis": {
                 "verdict": "watch",
                 "valuation_signal": "fair",
-                "valuation_label": {"text": "Férová cena", "color_class": "text-muted-foreground"},
+                "valuation_label": {"text": "Férová cena", "tone": "neutral"},
                 "technical_note": "Ve středu pásma.",
                 "positives": [],
                 "warnings": [],
@@ -148,6 +148,7 @@ def test_detail_contracts_accept_full_content_payloads():
             "report_type": "full_analysis",
             "model": "claude-sonnet",
             "content": "# Full markdown",
+            "content_format": "markdown",
         }
     )
     note = NoteContentResponse.model_validate(
@@ -156,7 +157,8 @@ def test_detail_contracts_accept_full_content_payloads():
             "created_at": "2026-04-14T10:00:00Z",
             "updated_at": None,
             "type": "note",
-            "content": "<p>Full note</p>",
+            "content": "Full note",
+            "content_format": "plain_text",
             "metadata": {"price_at_creation": 100.0},
         }
     )
@@ -174,7 +176,31 @@ def test_detail_contracts_accept_full_content_payloads():
                 "bollinger_signal": "neutral",
                 "volume_signal": "normal",
             },
-            "history": {"period": "6mo", "price": []},
+            "history": {
+                "period": "6mo",
+                "price": [
+                    {
+                        "date": "2026-04-01T00:00:00",
+                        "price": 115.0,
+                        "sma50": 110.0,
+                        "sma200": 98.5,
+                    }
+                ],
+                "rsi": [
+                    {
+                        "date": "2026-04-01T00:00:00",
+                        "rsi": 62.1,
+                    }
+                ],
+                "macd": [
+                    {
+                        "date": "2026-04-01T00:00:00",
+                        "macd": 1.2,
+                        "signal": 0.8,
+                        "histogram": 0.4,
+                    }
+                ],
+            },
         }
     )
     activity = InvestmentActivityResponse.model_validate(
@@ -202,7 +228,9 @@ def test_detail_contracts_accept_full_content_payloads():
 
     assert archive.reports[0].id == "report-1"
     assert report.content.startswith("# Full")
+    assert report.content_format == "markdown"
     assert note.type == "note"
+    assert note.content_format == "plain_text"
     assert technical.period == "6mo"
     assert activity.position_summary.currency == "USD"
 
@@ -220,7 +248,8 @@ def test_save_stock_journal_note_contract_accepts_writeback_shape():
             "ticker": "NVDA",
             "channel_id": "channel-1",
             "created_at": "2026-04-17T10:00:00Z",
-            "content_plaintext": "Conviction is improving after the recent pullback.\n\nKeep watching margins.",
+            "content": "Conviction is improving after the recent pullback.\n\nKeep watching margins.",
+            "content_format": "plain_text",
             "metadata": {
                 "ticker": "NVDA",
                 "source": "mcp_stock_note",
@@ -231,6 +260,7 @@ def test_save_stock_journal_note_contract_accepts_writeback_shape():
 
     assert request.ticker == "NVDA"
     assert request.content.startswith("Conviction")
+    assert response.content_format == "plain_text"
     assert response.metadata["source"] == "mcp_stock_note"
 
 
@@ -248,7 +278,8 @@ def test_save_portfolio_journal_note_contract_accepts_writeback_shape():
             "portfolio_name": "Main",
             "channel_id": "channel-2",
             "created_at": "2026-04-17T10:00:00Z",
-            "content_plaintext": "Portfolio is still too concentrated in semis.\n\nNext adds should improve diversification.",
+            "content": "Portfolio is still too concentrated in semis.\n\nNext adds should improve diversification.",
+            "content_format": "plain_text",
             "metadata": {
                 "portfolio_id": "portfolio-main",
                 "portfolio_name": "Main",
@@ -259,6 +290,7 @@ def test_save_portfolio_journal_note_contract_accepts_writeback_shape():
 
     assert request.portfolio_id == "portfolio-main"
     assert request.content.startswith("Portfolio")
+    assert response.content_format == "plain_text"
     assert response.metadata["source"] == "mcp_portfolio_note"
 
 

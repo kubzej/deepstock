@@ -137,9 +137,9 @@ function LotRow({
             <span
               className={
                 lot.extendedHoursType === 'pre'
-                  ? 'text-orange-500'
+                  ? 'text-warning'
                   : lot.extendedHoursType === 'post'
-                    ? 'text-violet-500'
+                    ? 'text-info'
                     : ''
               }
             >
