@@ -295,6 +295,10 @@ async def get_stock_context(ticker: str) -> dict:
     drilldown tools below instead of expecting full transactions or full
     journal content inline.
 
+    Journal preview routing:
+    - journal_context.reports[].id -> get_journal_report_content(report_id)
+    - journal_context.notes[].id -> get_journal_note_content(note_id)
+
     Use this as the first call when the user asks about any stock.
     """
     return await _api_get(_ticker_path("/api/mcp/stock-context", ticker))
@@ -345,7 +349,11 @@ async def get_portfolio_journal_archive(portfolio_id: str, limit: int = 10) -> d
 
     Use when the conversation is about one concrete portfolio and you need
     older portfolio-specific notes or AI reports before deciding whether to
-    fetch a full note body with get_journal_note_content.
+    fetch a full body.
+
+    Routing:
+    - reports[].id -> get_journal_report_content(report_id)
+    - notes[].id -> get_journal_note_content(note_id)
 
     limit: number of reports/notes to return (1-50)
     """
@@ -428,13 +436,13 @@ async def get_journal_report_content(report_id: str) -> dict:
     """
     Get full content of a specific AI research report.
 
-    Use after get_stock_journal_archive or get_portfolio_journal_archive to fetch
-    the full text of a specific report by its ID. Reports can be long — fetch
-    only the one(s) you actually need.
+    Use after get_stock_context, get_stock_journal_archive, or
+    get_portfolio_journal_archive to fetch the full text of a specific report
+    by its ID. Reports can be long — fetch only the one(s) you actually need.
 
     Response includes `content_format`, currently always `markdown`.
 
-    report_id: the UUID from a journal archive response reports[].id
+    report_id: the UUID from journal preview responses reports[].id
     """
     return await _api_get(f"/api/mcp/journal-report/{report_id}")
 

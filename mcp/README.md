@@ -16,11 +16,11 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 | `get_market_context`            | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview                                                                   |
 | `list_watchlists`               | List available watchlists with names, descriptions, ordering, and item counts                                                                        |
 | `get_watchlist_items`           | Read one concrete watchlist with its stocks, buy/sell targets, notes, sector, and added date                                                        |
-| `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market                                                             |
+| `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market; use `journal_context.reports[]` with `get_journal_report_content` and `journal_context.notes[]` with `get_journal_note_content` |
 | `get_technical_history`         | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list                                                     |
-| `get_stock_journal_archive`     | Report and note previews for a ticker journal                                                                                                        |
-| `get_journal_report_content`    | Full journal AI report content by ID, with explicit `content_format="markdown"`                                                                      |
-| `get_journal_note_content`      | Full journal note content by ID, normalized to AI-friendly plain text with `content_format="plain_text"`                                             |
+| `get_stock_journal_archive`     | Report and note previews for a ticker journal; route `reports[].id` to `get_journal_report_content` and `notes[].id` to `get_journal_note_content` |
+| `get_journal_report_content`    | Full journal AI report content by ID from preview payloads such as `journal_context.reports[]` or archive `reports[]`, with explicit `content_format="markdown"` |
+| `get_journal_note_content`      | Full journal note content by ID from preview payloads such as `journal_context.notes[]` or archive `notes[]`, normalized to AI-friendly plain text with `content_format="plain_text"` |
 | `save_stock_journal_note`       | Save a user-approved plain-text note into the stock journal for one ticker; response echoes canonical plain-text content                             |
 | `save_portfolio_journal_note`   | Save a user-approved plain-text note into the journal for one portfolio; response echoes canonical plain-text content                                |
 | `get_ticker_activity`           | Full mixed stock/options transaction drilldown for one ticker, with period/custom-range filters and cursor paging; live valuation fields may be null |

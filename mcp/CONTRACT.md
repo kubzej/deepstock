@@ -161,6 +161,8 @@ Important:
 - It does not include full note bodies
 - It does not include full report markdown
 - It does not include full stock/option transaction lists
+- `journal_context.reports[].id` must be followed with `get_journal_report_content(report_id)`
+- `journal_context.notes[].id` must be followed with `get_journal_note_content(note_id)`
 
 ### `get_stock_journal_archive(ticker, limit)`
 
@@ -173,7 +175,13 @@ Returns preview/index data only:
 
 ### `get_journal_report_content(report_id)`
 
-Use when a specific AI report needs the full body.
+Use when a specific AI report preview needs the full body.
+
+Valid sources for `report_id`:
+
+- `get_stock_context(...).journal_context.reports[].id`
+- `get_stock_journal_archive(...).reports[].id`
+- `get_portfolio_journal_archive(...).reports[].id`
 
 Returns:
 
@@ -184,6 +192,12 @@ Returns:
 ### `get_journal_note_content(note_id)`
 
 Use when a specific note preview looks relevant and the full note matters.
+
+Valid sources for `note_id`:
+
+- `get_stock_context(...).journal_context.notes[].id`
+- `get_stock_journal_archive(...).notes[].id`
+- `get_portfolio_journal_archive(...).notes[].id`
 
 Returns:
 
