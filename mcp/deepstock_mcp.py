@@ -13,7 +13,7 @@ Configuration (environment variables):
 """
 import os
 import time
-from typing import Literal
+from typing import Any, Literal
 
 import httpx
 import jwt
@@ -43,6 +43,37 @@ TechnicalIndicator = Literal[
     "adx",
     "fibonacci",
 ]
+
+
+def _compact_params(**params: Any) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in params.items()
+        if value is not None and value != ""
+    }
+
+
+def _ticker_path(base_path: str, ticker: str) -> str:
+    return f"{base_path}/{ticker.upper()}"
+
+
+def _activity_params(
+    period: PortfolioPerformancePeriod,
+    limit: int,
+    *,
+    portfolio_id: str = "",
+    from_date: str = "",
+    to_date: str = "",
+    cursor: str = "",
+) -> dict[str, Any]:
+    return _compact_params(
+        period=period,
+        limit=limit,
+        portfolio_id=portfolio_id,
+        from_date=from_date,
+        to_date=to_date,
+        cursor=cursor,
+    )
 
 
 @mcp.custom_route("/health", methods=["GET"])
@@ -193,10 +224,10 @@ async def get_portfolio_context(portfolio_id: str = "", recent_limit: int = 20) 
     Leave portfolio_id empty to aggregate across all portfolios.
     recent_limit controls how many recent mixed activity rows are included.
     """
-    params = {"recent_limit": recent_limit}
-    if portfolio_id:
-        params["portfolio_id"] = portfolio_id
-    return await _api_get("/api/mcp/portfolio-context", params=params)
+    return await _api_get(
+        "/api/mcp/portfolio-context",
+        params=_compact_params(recent_limit=recent_limit, portfolio_id=portfolio_id),
+    )
 
 
 @mcp.tool()
@@ -212,10 +243,10 @@ async def get_portfolio_performance(
 
     period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
     """
-    params = {"period": period}
-    if portfolio_id:
-        params["portfolio_id"] = portfolio_id
-    return await _api_get("/api/mcp/portfolio-performance", params=params)
+    return await _api_get(
+        "/api/mcp/portfolio-performance",
+        params=_compact_params(period=period, portfolio_id=portfolio_id),
+    )
 
 
 @mcp.tool()
@@ -266,7 +297,7 @@ async def get_stock_context(ticker: str) -> dict:
 
     Use this as the first call when the user asks about any stock.
     """
-    return await _api_get(f"/api/mcp/stock-context/{ticker.upper()}")
+    return await _api_get(_ticker_path("/api/mcp/stock-context", ticker))
 
 
 @mcp.tool()
@@ -287,8 +318,8 @@ async def get_technical_history(
     """
     indicator_param = ",".join(indicators) if indicators else None
     return await _api_get(
-        f"/api/mcp/technical-history/{ticker.upper()}",
-        params={"period": period, "indicators": indicator_param},
+        _ticker_path("/api/mcp/technical-history", ticker),
+        params=_compact_params(period=period, indicators=indicator_param),
     )
 
 
@@ -304,10 +335,7 @@ async def get_stock_journal_archive(ticker: str, limit: int = 10) -> dict:
 
     limit: number of reports/notes to return (1-50)
     """
-    return await _api_get(
-        f"/api/mcp/stock-journal-archive/{ticker.upper()}",
-        params={"limit": limit},
-    )
+    return await _api_get(_ticker_path("/api/mcp/stock-journal-archive", ticker), params={"limit": limit})
 
 
 @mcp.tool()
@@ -350,14 +378,16 @@ async def get_ticker_activity(
     limit: page size for returned transactions
     cursor: ISO datetime from previous response's next_cursor
     """
-    params = {"period": period, "limit": limit}
-    if from_date:
-        params["from_date"] = from_date
-    if to_date:
-        params["to_date"] = to_date
-    if cursor:
-        params["cursor"] = cursor
-    return await _api_get(f"/api/mcp/ticker-activity/{ticker.upper()}", params=params)
+    return await _api_get(
+        _ticker_path("/api/mcp/ticker-activity", ticker),
+        params=_activity_params(
+            period,
+            limit,
+            from_date=from_date,
+            to_date=to_date,
+            cursor=cursor,
+        ),
+    )
 
 
 @mcp.tool()
@@ -380,16 +410,17 @@ async def get_portfolio_activity(
     limit: page size for returned transactions
     cursor: ISO datetime from previous response's next_cursor
     """
-    params = {"period": period, "limit": limit}
-    if portfolio_id:
-        params["portfolio_id"] = portfolio_id
-    if from_date:
-        params["from_date"] = from_date
-    if to_date:
-        params["to_date"] = to_date
-    if cursor:
-        params["cursor"] = cursor
-    return await _api_get("/api/mcp/portfolio-activity", params=params)
+    return await _api_get(
+        "/api/mcp/portfolio-activity",
+        params=_activity_params(
+            period,
+            limit,
+            portfolio_id=portfolio_id,
+            from_date=from_date,
+            to_date=to_date,
+            cursor=cursor,
+        ),
+    )
 
 
 @mcp.tool()

@@ -55,7 +55,9 @@ If MCP changes, update these together:
 
 - `backend/app/api/endpoints/mcp.py`
 - `backend/app/services/research_context.py`
+- any affected split `backend/app/services/research_context_*.py` domain modules
 - `backend/app/schemas/mcp.py`
+- any affected split `backend/app/schemas/mcp_*.py` schema modules
 - `mcp/deepstock_mcp.py`
 - `mcp/CONTRACT.md`
 - `mcp/README.md`

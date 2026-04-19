@@ -2,6 +2,12 @@
 
 Canonical contract and tool-selection guide for the DeepStock MCP surface.
 
+Maintenance note:
+
+- treat tool names in `mcp/deepstock_mcp.py` as canonical
+- keep this document's `## Tool Selection` entries aligned with the README tools table
+- if the tool surface changes, update the mirrored Felix invest prompts too
+
 ## Design
 
 The MCP surface is intentionally two-layered:
