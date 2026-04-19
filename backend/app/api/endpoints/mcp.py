@@ -27,6 +27,8 @@ from app.schemas.mcp import (
     StockContextResponse,
     TickerActivityResponse,
     TechnicalHistoryResponse,
+    WatchlistItemsResponse,
+    WatchlistListResponse,
 )
 from app.services.market.stock_info import StockInfoUnavailableError
 from app.services.research_context import (
@@ -98,6 +100,30 @@ async def get_market_context(
 ):
     del request
     return await research_context_service.get_market_context(user_id)
+
+
+@router.get("/watchlists", response_model=WatchlistListResponse)
+@limiter.limit("30/minute")
+async def list_watchlists(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    return await research_context_service.list_watchlists(user_id)
+
+
+@router.get("/watchlists/{watchlist_id}/items", response_model=WatchlistItemsResponse)
+@limiter.limit("30/minute")
+async def get_watchlist_items(
+    request: Request,
+    watchlist_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        return await research_context_service.get_watchlist_items(watchlist_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/stock-context/{ticker}", response_model=StockContextResponse)

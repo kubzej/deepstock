@@ -28,6 +28,7 @@ from app.services.options import options_service
 from app.services.performance import get_options_performance, get_stock_performance
 from app.services.portfolio import portfolio_service
 from app.services.stocks import stock_service
+from app.services.watchlist import watchlist_service
 
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
@@ -352,6 +353,30 @@ def _serialize_watchlist_item(item: dict) -> dict:
         "id": item.get("id"),
         "watchlist_id": item.get("watchlist_id"),
         "watchlist_name": item.get("watchlist_name", ""),
+        "target_buy_price": _coerce_float(item.get("target_buy_price")),
+        "target_sell_price": _coerce_float(item.get("target_sell_price")),
+        "notes": item.get("notes"),
+        "sector": item.get("sector"),
+        "added_at": item.get("added_at"),
+    }
+
+
+def _serialize_watchlist_summary(watchlist: dict) -> dict:
+    return {
+        "id": watchlist.get("id"),
+        "name": watchlist.get("name") or "",
+        "description": watchlist.get("description"),
+        "position": int(watchlist.get("position") or 0),
+        "item_count": int(watchlist.get("item_count") or 0),
+    }
+
+
+def _serialize_watchlist_detail_item(item: dict) -> dict:
+    stock = item.get("stocks") or {}
+    return {
+        "id": item.get("id"),
+        "ticker": stock.get("ticker") or "",
+        "stock_name": stock.get("name"),
         "target_buy_price": _coerce_float(item.get("target_buy_price")),
         "target_sell_price": _coerce_float(item.get("target_sell_price")),
         "notes": item.get("notes"),
@@ -1200,6 +1225,30 @@ class ResearchContextService:
             "generated_at": _iso_now(),
             "portfolio_count": len(portfolio_summaries),
             "portfolios": portfolio_summaries,
+        }
+
+    async def list_watchlists(self, user_id: str) -> dict:
+        watchlists = await watchlist_service.get_user_watchlists(user_id)
+        watchlist_summaries = [_serialize_watchlist_summary(watchlist) for watchlist in watchlists]
+        return {
+            "generated_at": _iso_now(),
+            "watchlist_count": len(watchlist_summaries),
+            "watchlists": watchlist_summaries,
+        }
+
+    async def get_watchlist_items(self, watchlist_id: str, user_id: str) -> dict:
+        watchlist = await watchlist_service.get_watchlist(watchlist_id, user_id)
+        if not watchlist:
+            raise ValueError("Watchlist not found")
+
+        items_raw = await watchlist_service.get_watchlist_items(watchlist_id)
+        items = [_serialize_watchlist_detail_item(item) for item in items_raw]
+        return {
+            "watchlist_id": watchlist["id"],
+            "watchlist_name": watchlist.get("name") or "",
+            "description": watchlist.get("description"),
+            "generated_at": _iso_now(),
+            "items": items,
         }
 
     async def _get_recent_portfolio_activity(

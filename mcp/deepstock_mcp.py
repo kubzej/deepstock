@@ -230,6 +230,30 @@ async def get_market_context() -> dict:
 
 
 @mcp.tool()
+async def list_watchlists() -> dict:
+    """
+    List available watchlists for the authenticated DeepStock user.
+
+    Use this first when the user refers to a watchlist by name or wants to
+    review watchlists as collections before drilling into one concrete list.
+    """
+    return await _api_get("/api/mcp/watchlists")
+
+
+@mcp.tool()
+async def get_watchlist_items(watchlist_id: str) -> dict:
+    """
+    Get the stocks and watch targets for one concrete watchlist.
+
+    Returns watchlist metadata plus all items with ticker, stock name,
+    buy/sell targets, notes, sector, and added date.
+
+    Use this after list_watchlists once you know which watchlist matters.
+    """
+    return await _api_get(f"/api/mcp/watchlists/{watchlist_id}/items")
+
+
+@mcp.tool()
 async def get_stock_context(ticker: str) -> dict:
     """
     Get the default chat entry point for a ticker.

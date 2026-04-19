@@ -14,6 +14,8 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 | `get_portfolio_journal_archive` | Portfolio-specific note/report previews for one selected portfolio                                                                                   |
 | `get_portfolio_performance`     | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL`         |
 | `get_market_context`            | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview                                                                   |
+| `list_watchlists`               | List available watchlists with names, descriptions, ordering, and item counts                                                                        |
+| `get_watchlist_items`           | Read one concrete watchlist with its stocks, buy/sell targets, notes, sector, and added date                                                        |
 | `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market                                                             |
 | `get_technical_history`         | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list                                                     |
 | `get_stock_journal_archive`     | Report and note previews for a ticker journal                                                                                                        |

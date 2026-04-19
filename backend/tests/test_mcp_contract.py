@@ -15,6 +15,8 @@ from app.schemas.mcp import (
     StockContextResponse,
     TickerActivityResponse,
     TechnicalHistoryResponse,
+    WatchlistItemsResponse,
+    WatchlistListResponse,
 )
 
 
@@ -114,6 +116,57 @@ def test_stock_context_contract_accepts_summary_shape():
     assert model.ticker == "NVDA"
     assert model.journal_context.note_count == 2
     assert model.activity_context.position_summary.has_position is True
+
+
+def test_watchlist_contracts_accept_summary_and_item_payloads():
+    watchlists = WatchlistListResponse.model_validate(
+        {
+            "generated_at": "2026-04-19T10:00:00Z",
+            "watchlist_count": 2,
+            "watchlists": [
+                {
+                    "id": "wl-1",
+                    "name": "To Analyze",
+                    "description": "Fresh ideas",
+                    "position": 0,
+                    "item_count": 12,
+                },
+                {
+                    "id": "wl-2",
+                    "name": "Core",
+                    "description": None,
+                    "position": 1,
+                    "item_count": 5,
+                },
+            ],
+        }
+    )
+    items = WatchlistItemsResponse.model_validate(
+        {
+            "watchlist_id": "wl-1",
+            "watchlist_name": "To Analyze",
+            "description": "Fresh ideas",
+            "generated_at": "2026-04-19T10:00:00Z",
+            "items": [
+                {
+                    "id": "item-1",
+                    "ticker": "NVDA",
+                    "stock_name": "NVIDIA Corporation",
+                    "target_buy_price": 101.5,
+                    "target_sell_price": 139.0,
+                    "notes": "Wait for pullback into support.",
+                    "sector": "Semiconductors",
+                    "added_at": "2026-04-10T09:00:00Z",
+                }
+            ],
+        }
+    )
+
+    assert watchlists.watchlist_count == 2
+    assert watchlists.watchlists[0].name == "To Analyze"
+    assert items.watchlist_name == "To Analyze"
+    assert items.items[0].ticker == "NVDA"
+    assert items.items[0].target_buy_price == 101.5
 
 
 def test_detail_contracts_accept_full_content_payloads():

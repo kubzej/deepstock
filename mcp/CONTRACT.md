@@ -9,6 +9,7 @@ The MCP surface is intentionally two-layered:
 - `get_stock_context` gives the agent a compact cross-domain map of the ticker
 - `get_portfolio_context` gives the agent a compact cross-domain map of the portfolio state
 - `get_market_context` gives the agent a compact market backdrop
+- `list_watchlists` / `get_watchlist_items` give the agent a watchlist-first path
 - `*_activity` drilldown tools return full-fidelity transaction detail for the one branch the agent
   actually needs next
 
@@ -104,6 +105,36 @@ Returns:
 - FX rates to CZK
 - macro quotes for the same macro tickers tracked in the DeepStock frontend
 
+### `list_watchlists()`
+
+Use first when the user refers to a watchlist by name or wants to talk about
+watchlists as collections.
+
+Returns:
+
+- available watchlist IDs
+- names and descriptions
+- position/order
+- item counts
+
+### `get_watchlist_items(watchlist_id)`
+
+Use after `list_watchlists` once one concrete watchlist matters.
+
+Returns:
+
+- resolved `watchlist_id`
+- resolved `watchlist_name`
+- watchlist `description`
+- `items[]` with:
+  - `ticker`
+  - `stock_name`
+  - `target_buy_price`
+  - `target_sell_price`
+  - `notes`
+  - `sector`
+  - `added_at`
+
 ### `get_stock_context(ticker)`
 
 Use first for almost every ticker conversation.
@@ -119,6 +150,8 @@ Returns:
 Important:
 
 - This is a summary payload, not a full journal dump
+- For watchlist-first conversations, prefer `list_watchlists` and `get_watchlist_items`
+  instead of trying to infer collections from this ticker-first payload
 - It does not include full note bodies
 - It does not include full report markdown
 - It does not include full stock/option transaction lists
