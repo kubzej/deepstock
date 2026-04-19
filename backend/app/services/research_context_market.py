@@ -3,7 +3,9 @@ Market and ticker-focused helpers for the MCP research context surface.
 """
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Iterable, Literal, Optional
 
@@ -13,6 +15,8 @@ from app.core.cache import CacheTTL
 from app.core.redis import get_redis
 from app.services.exchange import exchange_service
 from app.services.market import market_service
+
+logger = logging.getLogger(__name__)
 
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
@@ -211,25 +215,29 @@ class MarketContextService:
         if cached:
             return json.loads(cached)
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
-                headers={"User-Agent": "Mozilla/5.0 (compatible; DeepStock/1.0)"},
-            )
-            response.raise_for_status()
-            raw = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+                    headers={"User-Agent": "Mozilla/5.0 (compatible; DeepStock/1.0)"},
+                )
+                response.raise_for_status()
+                raw = response.json()
 
-        fg = raw["fear_and_greed"]
-        result = {
-            "score": round(fg["score"], 1),
-            "rating": fg["rating"],
-            "previousClose": round(fg["previous_close"], 1),
-            "previousWeek": round(fg["previous_1_week"], 1),
-            "previousMonth": round(fg["previous_1_month"], 1),
-            "previousYear": round(fg["previous_1_year"], 1),
-        }
-        await redis.setex(cache_key, CacheTTL.FEAR_GREED, json.dumps(result))
-        return result
+            fg = raw["fear_and_greed"]
+            result = {
+                "score": round(fg["score"], 1),
+                "rating": fg["rating"],
+                "previousClose": round(fg["previous_close"], 1),
+                "previousWeek": round(fg["previous_1_week"], 1),
+                "previousMonth": round(fg["previous_1_month"], 1),
+                "previousYear": round(fg["previous_1_year"], 1),
+            }
+            await redis.setex(cache_key, CacheTTL.FEAR_GREED, json.dumps(result))
+            return result
+        except Exception as exc:
+            logger.warning("Fear & Greed snapshot unavailable for MCP market context: %s", exc)
+            return {}
 
     def build_ticker_info(self, stock_info: dict) -> dict:
         return {
@@ -411,7 +419,18 @@ class MarketContextService:
             self.get_fear_greed_snapshot(),
             exchange_service.get_rates(),
             market_service.get_quotes([item["ticker"] for item in MACRO_MARKET_INDICATORS]),
+            return_exceptions=True,
         )
+        if isinstance(fear_greed, Exception):
+            logger.warning("Fear & Greed fetch failed for MCP market context: %s", fear_greed)
+            fear_greed = {}
+        if isinstance(exchange_rates, Exception):
+            logger.warning("Exchange rate fetch failed for MCP market context: %s", exchange_rates)
+            exchange_rates = {}
+        if isinstance(macro_quotes, Exception):
+            logger.warning("Macro quote fetch failed for MCP market context: %s", macro_quotes)
+            macro_quotes = {}
+
         selected_rates = {
             currency: float(exchange_rates.get(currency, 1.0))
             for currency in ["USD", "EUR", "GBP", "CZK"]
