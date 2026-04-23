@@ -1,5 +1,5 @@
 """
-Earnings calendar cache service.
+Earnings calendar service.
 
 Stores and refreshes next earnings dates outside the live page-render path so
 the frontend does not trigger per-ticker Yahoo .info fan-out.
@@ -26,7 +26,7 @@ class EarningsCalendarService:
         response = (
             supabase.table("stocks")
             .select(
-                "ticker, earnings_calendar_cache(earnings_date, source, last_checked_at, updated_at)"
+                "ticker, earnings_calendar(earnings_date, source, last_checked_at, updated_at)"
             )
             .in_("ticker", unique_tickers)
             .execute()
@@ -34,7 +34,7 @@ class EarningsCalendarService:
 
         result: Dict[str, dict] = {}
         for row in response.data or []:
-            cache = row.get("earnings_calendar_cache")
+            cache = row.get("earnings_calendar")
             if isinstance(cache, list):
                 cache = cache[0] if cache else None
             result[row["ticker"]] = {
@@ -81,7 +81,7 @@ class EarningsCalendarService:
         cutoff = datetime.now(timezone.utc) - timedelta(days=1)
         response = (
             supabase.table("stocks")
-            .select("ticker, earnings_calendar_cache(last_checked_at)")
+            .select("ticker, earnings_calendar(last_checked_at)")
             .in_("ticker", all_watchlist_tickers)
             .execute()
         )
@@ -89,7 +89,7 @@ class EarningsCalendarService:
         due: List[str] = []
         for row in response.data or []:
             ticker = row["ticker"]
-            cache = row.get("earnings_calendar_cache")
+            cache = row.get("earnings_calendar")
             if isinstance(cache, list):
                 cache = cache[0] if cache else None
 
@@ -146,13 +146,13 @@ class EarningsCalendarService:
 
             try:
                 (
-                    supabase.table("earnings_calendar_cache")
+                    supabase.table("earnings_calendar")
                     .upsert(payload, on_conflict="stock_id")
                     .execute()
                 )
                 refreshed += 1
             except Exception as exc:
-                logger.error("Failed to upsert earnings cache for %s: %s", ticker, exc)
+                logger.error("Failed to upsert earnings calendar for %s: %s", ticker, exc)
 
         return {
             "tickers_requested": len(unique_tickers),
@@ -169,8 +169,8 @@ class EarningsCalendarService:
         target = target_date.isoformat()
         response = (
             supabase.table("stocks")
-            .select("ticker, name, earnings_calendar_cache!inner(earnings_date)")
-            .eq("earnings_calendar_cache.earnings_date", target)
+            .select("ticker, name, earnings_calendar!inner(earnings_date)")
+            .eq("earnings_calendar.earnings_date", target)
             .execute()
         )
 

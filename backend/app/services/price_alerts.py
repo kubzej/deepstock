@@ -114,8 +114,8 @@ class PriceAlertService:
         if not tickers:
             return 0
         
-        # Fetch current prices
-        quotes = await get_quotes(redis, tickers)
+        # Price alerts only need basic quote data, no extended .info enrichment
+        quotes = await get_quotes(redis, tickers, include_extended=False)
         
         alerts_sent = 0
         
@@ -554,10 +554,10 @@ class PriceAlertService:
             logger.warning("No tickers found in alerts")
             return {"alerts_checked": 0, "alerts_triggered": 0}
         
-        # Fetch current prices for all relevant tickers
+        # Custom alerts only need price / previous close, no extended .info enrichment
         tickers = list(alerts_by_ticker.keys())
         logger.info(f"Fetching quotes for tickers: {tickers}")
-        quotes = await get_quotes(redis, tickers)
+        quotes = await get_quotes(redis, tickers, include_extended=False)
         
         alerts_triggered = 0
         
