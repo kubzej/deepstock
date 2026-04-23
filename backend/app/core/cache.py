@@ -19,7 +19,7 @@ class CacheTTL:
     QUOTE_EXTENDED = 14400          # 4 hours — pre/post market, earnings date
     OPTION_QUOTE = 300               # 5 min  — aligned with frontend staleTime
     PRICE_HISTORY_INTRADAY = 60     # 1 min  — 1d / 5d charts
-    PRICE_HISTORY_SHORT = 3600      # 1 hour — 1mo / 3mo charts
+    PRICE_HISTORY_SHORT = 14400     # 4 hours — 1mo / 3mo charts
     PRICE_HISTORY_LONG = 86400      # 24 hours — 6mo+ charts
 
     # ── Research ──────────────────────────────────────────────────

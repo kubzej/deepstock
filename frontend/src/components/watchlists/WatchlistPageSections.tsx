@@ -194,6 +194,7 @@ export function WatchlistsMobileSortRow({
         { key: 'ticker' as SortKey, label: 'A-Z' },
         { key: 'price' as SortKey, label: 'Cena' },
         { key: 'change' as SortKey, label: 'Změna' },
+        { key: 'earnings' as SortKey, label: 'Earnings' },
         { key: 'buyTarget' as SortKey, label: 'Nákup' },
         { key: 'sellTarget' as SortKey, label: 'Prodej' },
       ].map((option) => (

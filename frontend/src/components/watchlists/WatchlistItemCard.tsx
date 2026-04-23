@@ -1,13 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Pencil,
   Trash2,
   Tag,
   MoreHorizontal,
-  Calendar,
   MoveRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sparkline } from '@/components/shared/Sparkline';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Quote, WatchlistItem } from '@/lib/api';
+import type { EarningsCalendarEntry, Quote, WatchlistItem } from '@/lib/api';
 import {
   getDaysUntilEarnings,
   shouldShowEarningsBadge,
@@ -26,13 +26,14 @@ import {
 } from '@/lib/format';
 import {
   getWatchlistActiveTarget,
-  getWatchlistSignalSummary,
   getWatchlistTargetSummaries,
 } from './watchlistSignals';
 
 interface WatchlistItemCardProps {
   item: WatchlistItem;
   quote: Quote | null;
+  earnings?: EarningsCalendarEntry | null;
+  sparklineData?: number[] | null;
   onEdit: () => void;
   onDelete: () => void;
   onTags: () => void;
@@ -46,6 +47,8 @@ interface WatchlistItemCardProps {
 export function WatchlistItemCard({
   item,
   quote,
+  earnings,
+  sparklineData,
   onEdit,
   onDelete,
   onTags,
@@ -56,19 +59,13 @@ export function WatchlistItemCard({
   watchlistName,
 }: WatchlistItemCardProps) {
   const [expanded, setExpanded] = useState(false);
-
-  // Calculate earnings data from quote.earningsDate
-  const daysUntil = useMemo(
-    () => getDaysUntilEarnings(quote?.earningsDate),
-    [quote?.earningsDate],
-  );
+  const daysUntil = getDaysUntilEarnings(earnings?.earningsDate);
   const earningsBadge = formatEarningsBadge(daysUntil);
   const showBadge = shouldShowEarningsBadge(daysUntil);
 
   const activeTarget = getWatchlistActiveTarget(item, quote);
   const atBuyTarget = activeTarget === 'buy';
   const atSellTarget = activeTarget === 'sell';
-  const signal = getWatchlistSignalSummary(item, quote);
   const targetSummaries = getWatchlistTargetSummaries(item, quote);
 
   const dayChangeTone = quote
@@ -141,10 +138,8 @@ export function WatchlistItemCard({
                   )}
                 </div>
               )}
-              {/* Earnings Badge - show only for -7 to +14 days */}
               {showBadge && earningsBadge && (
                 <span className="inline-flex items-center gap-0.5 rounded bg-info/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-info">
-                  <Calendar className="h-2.5 w-2.5" />
                   {earningsBadge}
                 </span>
               )}
@@ -160,22 +155,12 @@ export function WatchlistItemCard({
           </div>
 
           {/* Right: Price + Change */}
-          <div className="flex items-start gap-1.5 flex-shrink-0">
+          <div className="flex items-start gap-2 flex-shrink-0">
             <div className="text-right">
               <div className="flex items-center justify-end gap-1">
                 <span className="font-mono-price text-base font-semibold">
                   {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
                 </span>
-                {quote?.preMarketPrice && (
-                  <span className="font-mono-price text-[10px] text-warning">
-                    → {formatPrice(quote.preMarketPrice, item.stocks.currency)}
-                  </span>
-                )}
-                {quote?.postMarketPrice && (
-                  <span className="font-mono-price text-[10px] text-info">
-                    → {formatPrice(quote.postMarketPrice, item.stocks.currency)}
-                  </span>
-                )}
               </div>
               <div className="flex items-center justify-end gap-1">
                 <span
@@ -183,18 +168,6 @@ export function WatchlistItemCard({
                 >
                   {quote ? formatPercent(quote.changePercent) : '—'}
                 </span>
-                {quote?.preMarketChangePercent !== undefined &&
-                  quote?.preMarketChangePercent !== null && (
-                    <span className="font-mono-price text-[10px] text-warning">
-                      ({formatPercent(quote.preMarketChangePercent)})
-                    </span>
-                  )}
-                {quote?.postMarketChangePercent !== undefined &&
-                  quote?.postMarketChangePercent !== null && (
-                    <span className="font-mono-price text-[10px] text-info">
-                      ({formatPercent(quote.postMarketChangePercent)})
-                    </span>
-                  )}
               </div>
             </div>
 
@@ -277,14 +250,29 @@ export function WatchlistItemCard({
               >
                 {target.value}
               </div>
+              {target.value !== '—' && (
+                <div
+                  className={`mt-0.5 text-[10px] leading-tight ${
+                    target.active
+                      ? target.key === 'buy'
+                        ? 'text-positive/70'
+                        : 'text-warning/80'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {target.detail}
+                </div>
+              )}
             </div>
           ))}
-          {signal.label !== 'Bez cíle' ? (
-            <div className="min-w-0 self-center text-[10px] leading-tight text-muted-foreground">
-              {signal.detail}
+          {sparklineData && sparklineData.length >= 2 ? (
+            <div className="flex min-h-[54px] items-center justify-center px-1 py-1">
+              <div className="h-10 w-full max-w-[108px] overflow-hidden opacity-90">
+                <Sparkline data={sparklineData} className="h-full w-full" />
+              </div>
             </div>
           ) : (
-            <div />
+            <div className="min-h-[54px]" />
           )}
         </div>
 
@@ -297,11 +285,10 @@ export function WatchlistItemCard({
           }`}
         >
           <div className="overflow-hidden">
-            {/* Earnings */}
-            {quote?.earningsDate && (
+            {earnings?.earningsDate && (
               <div className="text-xs mb-2">
                 <span className="text-muted-foreground/70 block">Earnings</span>
-                <span>{formatDateCzech(quote.earningsDate)}</span>
+                <span>{formatDateCzech(earnings.earningsDate)}</span>
               </div>
             )}
 

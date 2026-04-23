@@ -13,7 +13,7 @@ import pandas as pd
 from app.core.redis import get_redis
 
 # Import modular functions
-from .quotes import get_quotes, get_price_history
+from .quotes import get_quotes, get_price_history, get_batch_price_history
 from .options_quotes import get_option_quotes
 from .stock_info import get_stock_info, StockInfoUnavailableError
 from .technical import get_technical_indicators
@@ -29,13 +29,17 @@ class MarketDataService:
     def __init__(self):
         self.redis = get_redis()
     
-    async def get_quotes(self, tickers: List[str]) -> Dict[str, dict]:
+    async def get_quotes(self, tickers: List[str], include_extended: bool = True) -> Dict[str, dict]:
         """Get batch stock quotes with caching."""
-        return await get_quotes(self.redis, tickers)
+        return await get_quotes(self.redis, tickers, include_extended)
     
     async def get_price_history(self, ticker: str, period: str = "1mo") -> List[dict]:
         """Get historical price data for charting."""
         return await get_price_history(self.redis, ticker, period)
+
+    async def get_batch_price_history(self, tickers: List[str], period: str = "1mo") -> Dict[str, List[dict]]:
+        """Get historical price data for multiple tickers in one batch request."""
+        return await get_batch_price_history(self.redis, tickers, period)
     
     async def get_option_quotes(self, occ_symbols: List[str]) -> Dict[str, dict]:
         """Get option quotes for OCC symbols."""

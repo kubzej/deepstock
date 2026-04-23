@@ -153,7 +153,7 @@ async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0):
         logger.warning(f"Background fetch failed for {ticker}: {e}")
 
 
-async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
+async def get_quotes(redis, tickers: List[str], include_extended: bool = True) -> Dict[str, dict]:
     """
     Smart fetcher with two-tier caching:
     1. Basic quotes (price, change, volume) via yf.download() - fast, 1 request
@@ -247,6 +247,9 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
         except Exception as e:
             logger.error(f"Error in yf.download batch: {e}")
     
+    if not include_extended:
+        return results
+
     # ========================================
     # TIER 2: Extended data via .info (longer TTL)
     # Check cache first, schedule background fetch for missing
@@ -274,6 +277,34 @@ async def get_quotes(redis, tickers: List[str]) -> Dict[str, dict]:
     return results
 
 
+def _history_interval_and_ttl(period: str) -> tuple[str, int]:
+    if period in ["1d", "5d"]:
+        return ("15m" if period == "1d" else "30m", CacheTTL.PRICE_HISTORY_INTRADAY)
+    if period in ["1mo", "3mo"]:
+        return ("1d", CacheTTL.PRICE_HISTORY_SHORT)
+    return ("1wk", CacheTTL.PRICE_HISTORY_LONG)
+
+
+def _serialize_history_frame(hist: pd.DataFrame) -> List[dict]:
+    if hist is None or hist.empty:
+        return []
+
+    result = []
+    for idx, row in hist.iterrows():
+        close_price = safe_float(row["Close"])
+        if close_price is None:
+            continue
+        result.append({
+            "date": idx.isoformat(),
+            "open": safe_float(row["Open"]) or close_price,
+            "high": safe_float(row["High"]) or close_price,
+            "low": safe_float(row["Low"]) or close_price,
+            "close": close_price,
+            "volume": safe_int(row["Volume"]) or 0
+        })
+    return result
+
+
 async def get_price_history(redis, ticker: str, period: str = "1mo") -> List[dict]:
     """
     Get historical price data for charting.
@@ -286,48 +317,86 @@ async def get_price_history(redis, ticker: str, period: str = "1mo") -> List[dic
 
     try:
         t = yf.Ticker(ticker)
-        
-        # Determine interval based on period
-        interval = "1d"
-        if period in ["1d", "5d"]:
-            interval = "15m" if period == "1d" else "30m"
-        elif period in ["1mo", "3mo"]:
-            interval = "1d"
-        else:
-            interval = "1wk"
-        
+        interval, ttl = _history_interval_and_ttl(period)
         hist = t.history(period=period, interval=interval)
-        
+
         if hist.empty:
             return []
-        
-        # Convert to list of dicts for JSON
-        result = []
-        for idx, row in hist.iterrows():
-            close_price = safe_float(row["Close"])
-            # Skip rows with invalid close price
-            if close_price is None:
-                continue
-            result.append({
-                "date": idx.isoformat(),
-                "open": safe_float(row["Open"]) or close_price,
-                "high": safe_float(row["High"]) or close_price,
-                "low": safe_float(row["Low"]) or close_price,
-                "close": close_price,
-                "volume": safe_int(row["Volume"]) or 0
-            })
-        
-        # Cache based on period (shorter periods = shorter TTL)
-        if period in ["1d", "5d"]:
-            ttl = CacheTTL.PRICE_HISTORY_INTRADAY
-        elif period in ["1mo", "3mo"]:
-            ttl = CacheTTL.PRICE_HISTORY_SHORT
-        else:
-            ttl = CacheTTL.PRICE_HISTORY_LONG
-        
+
+        result = _serialize_history_frame(hist)
         await redis.set(cache_key, json.dumps(result), ex=ttl)
         return result
-        
+
     except Exception as e:
         logger.error(f"Error fetching history for {ticker}: {e}")
         return []
+
+
+async def get_batch_price_history(
+    redis,
+    tickers: List[str],
+    period: str = "1mo",
+) -> Dict[str, List[dict]]:
+    """
+    Get historical price data for multiple tickers in one Yahoo batch request.
+    Uses per-ticker Redis cache, but fetches all cache misses together.
+    """
+    unique_tickers = list(dict.fromkeys(t.upper() for t in tickers if t))
+    if not unique_tickers:
+        return {}
+
+    results: Dict[str, List[dict]] = {}
+    missing: List[str] = []
+
+    for ticker in unique_tickers:
+        cache_key = f"history:{ticker}:{period}"
+        cached = await redis.get(cache_key)
+        if cached:
+            results[ticker] = json.loads(cached)
+        else:
+            missing.append(ticker)
+
+    if not missing:
+        return results
+
+    try:
+        interval, ttl = _history_interval_and_ttl(period)
+        df = yf.download(
+            " ".join(missing),
+            period=period,
+            interval=interval,
+            auto_adjust=False,
+            progress=False,
+            threads=True,
+        )
+
+        if df.empty:
+            logger.warning(
+                "yf.download() returned empty history DataFrame for %d tickers %s",
+                len(missing), missing,
+            )
+        else:
+            for ticker in missing:
+                try:
+                    ticker_data = _normalize_ticker_data(df, ticker)
+                    if ticker_data is None or ticker_data.empty:
+                        results[ticker] = []
+                        continue
+
+                    ticker_data = ticker_data.dropna(subset=["Close"])
+                    serialized = _serialize_history_frame(ticker_data)
+                    results[ticker] = serialized
+                    await redis.set(
+                        f"history:{ticker}:{period}",
+                        json.dumps(serialized),
+                        ex=ttl,
+                    )
+                except Exception as e:
+                    logger.warning(f"Error processing history for {ticker}: {e}")
+                    results[ticker] = []
+    except Exception as e:
+        logger.error(f"Error in yf.download history batch for {missing}: {e}")
+        for ticker in missing:
+            results.setdefault(ticker, [])
+
+    return results

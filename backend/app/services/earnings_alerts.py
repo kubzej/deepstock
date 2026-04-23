@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, date
 from typing import Dict
 from app.core.supabase import supabase
-from app.services.market.quotes import get_quotes
+from app.services.earnings_calendar import earnings_calendar_service
 from app.services.push import send_push_notification
 from app.core.cache import CacheTTL
 
@@ -92,14 +92,14 @@ class EarningsAlertService:
         if not tickers:
             return 0
         
-        # Fetch quotes (includes earningsDate)
-        quotes = await get_quotes(redis, tickers)
-        
+        earnings_today_by_ticker = await earnings_calendar_service.get_tickers_with_earnings_on(
+            date.fromisoformat(today_str)
+        )
+
         # Find tickers with earnings TODAY
         earnings_today = []
         for ticker in tickers:
-            quote = quotes.get(ticker)
-            if quote and quote.get("earningsDate") == today_str:
+            if ticker in earnings_today_by_ticker:
                 # Get stock name from items
                 stock_name = next(
                     (item["stocks"]["name"] for item in items_response.data 

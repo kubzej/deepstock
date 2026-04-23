@@ -21,11 +21,14 @@ import {
 } from '@/components/shared';
 import { Eye, Plus, Target } from 'lucide-react';
 import {
+  fetchBatchEarnings,
+  fetchBatchPriceHistory,
+  type EarningsCalendarEntry,
   type WatchlistItem,
   type WatchlistItemWithSource,
 } from '@/lib/api';
 import { useQuotes } from '@/hooks/useQuotes';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useWatchlists,
   useWatchlistItems,
@@ -124,20 +127,49 @@ export function WatchlistsPage() {
     data: quotes = {},
     isFetching: quotesFetching,
     dataUpdatedAt: quotesUpdatedAt,
-  } = useQuotes(tickers);
+  } = useQuotes(tickers, { includeExtended: false });
+  const { data: earningsByTicker = {}, isFetching: earningsFetching, dataUpdatedAt: earningsUpdatedAt } = useQuery({
+    queryKey: ['batchEarnings', tickers.slice().sort().join(',')],
+    queryFn: async () => fetchBatchEarnings(tickers),
+    enabled: tickers.length > 0,
+    staleTime: 60 * 60 * 1000,
+    retry: 1,
+  });
+  const { data: watchlistHistory = {} } = useQuery({
+    queryKey: ['batchPriceHistory', tickers.slice().sort().join(','), '1mo', 'watchlist-sparkline'],
+    queryFn: async () => fetchBatchPriceHistory(tickers, '1mo'),
+    enabled: tickers.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  const sparklineByTicker = useMemo(() => {
+    return Object.fromEntries(
+      tickers.map((ticker) => {
+        const data = watchlistHistory[ticker]
+          ?.map((point) => point.close)
+          .filter((value) => Number.isFinite(value))
+          .slice(-12) ?? null;
+        return [ticker, data && data.length >= 7 ? data : null];
+      }),
+    ) as Record<string, number[] | null>;
+  }, [tickers, watchlistHistory]);
 
   // Combined fetching state for refresh indicator
   const isFetching =
-    watchlistsFetching || itemsFetching || allItemsFetching || quotesFetching;
+    watchlistsFetching ||
+    itemsFetching ||
+    allItemsFetching ||
+    quotesFetching ||
+    earningsFetching;
 
   // Oldest data update time (for freshness indicator)
   const dataUpdatedAt = useMemo(() => {
-    const timestamps = [watchlistsUpdatedAt, quotesUpdatedAt].filter(
+    const timestamps = [watchlistsUpdatedAt, quotesUpdatedAt, earningsUpdatedAt].filter(
       (t): t is number => t !== undefined && t > 0,
     );
     if (timestamps.length === 0) return null;
     return Math.min(...timestamps);
-  }, [watchlistsUpdatedAt, quotesUpdatedAt]);
+  }, [watchlistsUpdatedAt, quotesUpdatedAt, earningsUpdatedAt]);
 
   // All holdings (for AI suggestions — to detect avg_cost)
   const { data: allHoldings = [] } = useHoldings(null);
@@ -206,7 +238,7 @@ export function WatchlistsPage() {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      // Text fields and earnings default to asc (A-Z, soonest first)
+      // Text fields default to asc (A-Z)
       setSortDir(
         key === 'ticker' || key === 'sector' || key === 'earnings'
           ? 'asc'
@@ -271,24 +303,23 @@ export function WatchlistsPage() {
           aVal = a.target_sell_price ?? -Infinity;
           bVal = b.target_sell_price ?? -Infinity;
           break;
-        case 'sector':
-          aVal = a.sector ?? a.stocks.sector ?? '';
-          bVal = b.sector ?? b.stocks.sector ?? '';
-          break;
         case 'earnings': {
-          const aDate = quotes[a.stocks.ticker]?.earningsDate;
-          const bDate = quotes[b.stocks.ticker]?.earningsDate;
-          // Items without earnings date always go to the bottom
+          const aDate = earningsByTicker[a.stocks.ticker]?.earningsDate;
+          const bDate = earningsByTicker[b.stocks.ticker]?.earningsDate;
           const aHas = aDate ? 1 : 0;
           const bHas = bDate ? 1 : 0;
           if (aHas !== bHas) {
-            return bHas - aHas; // Items with dates first
+            return bHas - aHas;
           }
-          if (!aDate || !bDate) return 0; // Both have no date
+          if (!aDate || !bDate) return 0;
           const aTime = new Date(aDate).getTime();
           const bTime = new Date(bDate).getTime();
           return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
         }
+        case 'sector':
+          aVal = a.sector ?? a.stocks.sector ?? '';
+          bVal = b.sector ?? b.stocks.sector ?? '';
+          break;
       }
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -304,6 +335,7 @@ export function WatchlistsPage() {
   }, [
     items,
     quotes,
+    earningsByTicker,
     sortKey,
     sortDir,
     isFilterView,
@@ -621,6 +653,8 @@ export function WatchlistsPage() {
                           key={item.id}
                           item={item}
                           quote={quotes[item.stocks.ticker] || null}
+                          earnings={earningsByTicker[item.stocks.ticker] ?? null}
+                          sparklineData={sparklineByTicker[item.stocks.ticker]}
                           onEdit={() => openEditItem(item)}
                           onDelete={() => setDeleteItemData(item)}
                           onTags={() => openTagsDialog(item)}
@@ -644,6 +678,8 @@ export function WatchlistsPage() {
                   <WatchlistItemsTable
                     items={filteredAndSortedItems}
                     quotes={quotes}
+                    earningsByTicker={earningsByTicker as Record<string, EarningsCalendarEntry | null>}
+                    sparklineByTicker={sparklineByTicker}
                     sortKey={sortKey}
                     sortDir={sortDir}
                     onSort={handleSort}

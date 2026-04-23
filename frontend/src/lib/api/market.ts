@@ -45,14 +45,20 @@ export interface OptionQuote {
 
 // ============ Quote Endpoints ============
 
-export async function fetchQuotes(tickers: string[]): Promise<Record<string, Quote>> {
+export async function fetchQuotes(
+  tickers: string[],
+  options?: { includeExtended?: boolean }
+): Promise<Record<string, Quote>> {
   const response = await fetch(`${API_URL}/api/market/batch-quotes`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(await getAuthHeader()),
     },
-    body: JSON.stringify({ tickers }),
+    body: JSON.stringify({
+      tickers,
+      include_extended: options?.includeExtended ?? true,
+    }),
   });
   
   if (!response.ok) {
@@ -106,6 +112,14 @@ export interface PriceHistoryPoint {
 
 export type ChartPeriod = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5y' | 'max';
 
+export interface EarningsCalendarEntry {
+  ticker: string;
+  earningsDate: string | null;
+  source: string | null;
+  lastCheckedAt: string | null;
+  updatedAt: string | null;
+}
+
 export async function fetchPriceHistory(
   ticker: string,
   period: ChartPeriod = '1mo'
@@ -119,6 +133,49 @@ export async function fetchPriceHistory(
     throw new Error('Failed to fetch price history');
   }
   
+  return response.json();
+}
+
+export async function fetchBatchPriceHistory(
+  tickers: string[],
+  period: ChartPeriod = '1mo'
+): Promise<Record<string, PriceHistoryPoint[]>> {
+  if (tickers.length === 0) return {};
+
+  const response = await fetch(`${API_URL}/api/market/batch-history`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await getAuthHeader()),
+    },
+    body: JSON.stringify({ tickers, period }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch batch price history');
+  }
+
+  return response.json();
+}
+
+export async function fetchBatchEarnings(
+  tickers: string[]
+): Promise<Record<string, EarningsCalendarEntry>> {
+  if (tickers.length === 0) return {};
+
+  const response = await fetch(`${API_URL}/api/market/batch-earnings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(await getAuthHeader()),
+    },
+    body: JSON.stringify({ tickers }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch batch earnings');
+  }
+
   return response.json();
 }
 

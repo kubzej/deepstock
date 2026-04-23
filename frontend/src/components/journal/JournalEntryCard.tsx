@@ -71,6 +71,7 @@ export function JournalEntryCard({
 }: JournalEntryCardProps) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(entry.content);
+  const [noteExpanded, setNoteExpanded] = useState(false);
   const [reportExpanded, setReportExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const { portfolios } = usePortfolio();
@@ -96,7 +97,7 @@ export function JournalEntryCard({
   // ── note ──────────────────────────────────────────
   if (entry.type === 'note') {
     return (
-      <EntrySurface>
+      <EntrySurface interactive={!editing}>
         <div className="flex items-start justify-between gap-2 mb-2">
           <EntryMeta>
             <span className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</span>
@@ -114,7 +115,11 @@ export function JournalEntryCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={() => { setEditing(true); setEditContent(entry.content); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+                setEditContent(entry.content);
+              }}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -122,7 +127,10 @@ export function JournalEntryCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmDelete(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmDelete(true);
+              }}
               disabled={isDeleting}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -148,7 +156,21 @@ export function JournalEntryCard({
             </div>
           </div>
         ) : (
-          <RichTextContent html={entry.content} />
+          <button
+            type="button"
+            className="block w-full text-left"
+            onClick={() => setNoteExpanded((v) => !v)}
+          >
+            <div className={`relative overflow-hidden ${noteExpanded ? '' : 'max-h-40'}`}>
+              <RichTextContent
+                html={entry.content}
+                className="pointer-events-none"
+              />
+              {!noteExpanded && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background via-background/90 to-transparent" />
+              )}
+            </div>
+          </button>
         )}
 
         {/* Delete confirm */}

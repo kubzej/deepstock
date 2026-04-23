@@ -7,6 +7,7 @@ from typing import Optional
 from app.core.config import get_settings
 from app.core.redis import get_redis
 from app.services.price_alerts import price_alert_service
+from app.services.earnings_calendar import earnings_calendar_service
 from app.services.earnings_alerts import earnings_alert_service
 
 logger = logging.getLogger(__name__)
@@ -84,12 +85,31 @@ async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
     redis = get_redis()
 
     try:
+        refresh_result = await earnings_calendar_service.refresh_due_watchlist_tickers()
         result = await earnings_alert_service.check_all_users(redis)
         return {
             "success": True,
+            "tickers_due": refresh_result["tickers_due"],
+            "tickers_refreshed": refresh_result["tickers_refreshed"],
             "users_checked": result["users_checked"],
             "alerts_sent": result["alerts_sent"]
         }
     except Exception as e:
         logger.error(f"check-earnings-alerts failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Chyba při kontrole earnings alertů.")
+
+
+@router.post("/refresh-earnings-calendar")
+async def refresh_earnings_calendar(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Refresh cached earnings dates for watchlist tickers.
+    Called daily by cron.
+    """
+    await verify_cron_secret(x_cron_secret)
+
+    try:
+        result = await earnings_calendar_service.refresh_due_watchlist_tickers()
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"refresh-earnings-calendar failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při refreshi earnings kalendáře.")

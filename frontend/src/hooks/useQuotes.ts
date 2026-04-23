@@ -1,6 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchQuotes, type Quote } from '@/lib/api';
-import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+import { STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+
+function quoteCacheKey(ticker: string, includeExtended: boolean) {
+  return ['quote', includeExtended ? 'extended' : 'basic', ticker] as const;
+}
+
+function quotesQueryPrefix(includeExtended: boolean) {
+  return ['quotes', includeExtended ? 'extended' : 'basic'] as const;
+}
 
 /**
  * Normalized quotes cache - each ticker has its own cache entry.
@@ -17,12 +25,16 @@ import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
  * 
  * Earnings date is always included (from info, no extra API call).
  */
-export function useQuotes(tickers: string[]) {
+export function useQuotes(
+  tickers: string[],
+  options?: { includeExtended?: boolean }
+) {
   const queryClient = useQueryClient();
   const uniqueTickers = [...new Set(tickers)].sort();
+  const includeExtended = options?.includeExtended ?? true;
   
   return useQuery({
-    queryKey: queryKeys.quotes(uniqueTickers),
+    queryKey: [...quotesQueryPrefix(includeExtended), uniqueTickers.join(',')],
     queryFn: async () => {
       if (uniqueTickers.length === 0) return {};
       
@@ -31,8 +43,9 @@ export function useQuotes(tickers: string[]) {
       const result: Record<string, Quote> = {};
       
       for (const ticker of uniqueTickers) {
-        const cached = queryClient.getQueryData<Quote>(['quote', ticker]);
-        const state = queryClient.getQueryState(['quote', ticker]);
+        const cacheKey = quoteCacheKey(ticker, includeExtended);
+        const cached = queryClient.getQueryData<Quote>(cacheKey);
+        const state = queryClient.getQueryState(cacheKey);
         
         if (cached && state && !isStale(state.dataUpdatedAt, STALE_TIMES.quotes)) {
           result[ticker] = cached;
@@ -43,11 +56,11 @@ export function useQuotes(tickers: string[]) {
       
       // Fetch missing tickers in batch
       if (missing.length > 0) {
-        const newQuotes = await fetchQuotes(missing);
+        const newQuotes = await fetchQuotes(missing, { includeExtended });
         
         // Store each quote in its own cache entry (normalized)
         for (const [ticker, quote] of Object.entries(newQuotes)) {
-          queryClient.setQueryData(['quote', ticker], quote, {
+          queryClient.setQueryData(quoteCacheKey(ticker, includeExtended), quote, {
             updatedAt: Date.now(),
           });
           result[ticker] = quote;
@@ -78,7 +91,7 @@ export function useQuote(ticker: string) {
   return useQuery({
     queryKey: ['quote', ticker],
     queryFn: async () => {
-      const quotes = await fetchQuotes([ticker]);
+      const quotes = await fetchQuotes([ticker], { includeExtended: true });
       return quotes[ticker] || null;
     },
     staleTime: STALE_TIMES.quotes,
@@ -87,7 +100,7 @@ export function useQuote(ticker: string) {
     // Try to get from existing batch queries first
     initialData: () => {
       const allQueries = queryClient.getQueriesData<Record<string, Quote>>({
-        queryKey: ['quotes'],
+        queryKey: quotesQueryPrefix(true),
       });
       for (const [, data] of allQueries) {
         if (data?.[ticker]) return data[ticker];
@@ -104,12 +117,12 @@ export function useCachedQuote(ticker: string): Quote | undefined {
   const queryClient = useQueryClient();
   
   // First check normalized cache
-  const normalized = queryClient.getQueryData<Quote>(['quote', ticker]);
+  const normalized = queryClient.getQueryData<Quote>(quoteCacheKey(ticker, true));
   if (normalized) return normalized;
   
   // Fallback: check batch queries
   const allQueries = queryClient.getQueriesData<Record<string, Quote>>({
-    queryKey: ['quotes'],
+    queryKey: quotesQueryPrefix(true),
   });
   
   for (const [, data] of allQueries) {
@@ -129,17 +142,20 @@ export function usePrefetchQuotes() {
     if (tickers.length === 0) return;
     
     const uniqueTickers = [...new Set(tickers)].sort();
-    const quotes = await fetchQuotes(uniqueTickers);
+    const quotes = await fetchQuotes(uniqueTickers, { includeExtended: true });
     
     // Store in normalized cache
     for (const [ticker, quote] of Object.entries(quotes)) {
-      queryClient.setQueryData(['quote', ticker], quote, {
+      queryClient.setQueryData(quoteCacheKey(ticker, true), quote, {
         updatedAt: Date.now(),
       });
     }
     
     // Also set the batch query
-    queryClient.setQueryData(queryKeys.quotes(uniqueTickers), quotes);
+    queryClient.setQueryData(
+      [...quotesQueryPrefix(true), uniqueTickers.join(',')],
+      quotes,
+    );
   };
 }
 

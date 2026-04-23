@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from app.services.market import market_service
 from app.services.market.stock_info import StockInfoUnavailableError
 from app.services.exchange import exchange_service
+from app.services.earnings_calendar import earnings_calendar_service
 from app.core.auth import get_current_user_id
 from app.core.redis import get_redis
 from app.core.cache import CacheTTL
@@ -14,6 +15,14 @@ router = APIRouter()
 
 class TickerRequest(BaseModel):
     tickers: List[str]
+    include_extended: bool = True
+
+class BatchHistoryRequest(BaseModel):
+    tickers: List[str]
+    period: str = "1mo"
+
+class BatchEarningsRequest(BaseModel):
+    tickers: List[str]
 
 class OptionSymbolsRequest(BaseModel):
     symbols: List[str]
@@ -23,9 +32,9 @@ async def get_quotes(payload: TickerRequest, user_id: str = Depends(get_current_
     """
     Fetch price and change % for a list of tickers.
     Uses Redis caching + yfinance batch download.
-    Earnings date is included (from info, no extra API call).
+    Optional extended data (pre/post market, earnings, avgVolume) can be disabled.
     """
-    return await market_service.get_quotes(payload.tickers)
+    return await market_service.get_quotes(payload.tickers, include_extended=payload.include_extended)
 
 
 @router.post("/option-quotes")
@@ -54,6 +63,23 @@ async def get_price_history(ticker: str, period: str = "1mo", user_id: str = Dep
     Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
     """
     return await market_service.get_price_history(ticker.upper(), period)
+
+
+@router.post("/batch-history")
+async def get_batch_price_history(payload: BatchHistoryRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Get historical price data for multiple tickers in one batch.
+    Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
+    """
+    return await market_service.get_batch_price_history(payload.tickers, payload.period)
+
+
+@router.post("/batch-earnings")
+async def get_batch_earnings(payload: BatchEarningsRequest, user_id: str = Depends(get_current_user_id)):
+    """
+    Get cached earnings dates for multiple tickers.
+    """
+    return await earnings_calendar_service.get_batch(payload.tickers)
 
 
 @router.get("/stock-info/{ticker}")

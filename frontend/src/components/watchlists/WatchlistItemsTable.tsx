@@ -18,11 +18,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -34,10 +29,12 @@ import {
 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import {
+  type EarningsCalendarEntry,
   type WatchlistItem,
   type WatchlistItemWithSource,
   type Quote,
 } from '@/lib/api';
+import { Sparkline } from '@/components/shared/Sparkline';
 import {
   getDaysUntilEarnings,
   shouldShowEarningsBadge,
@@ -48,6 +45,7 @@ import {
 } from '@/lib/format';
 import {
   getWatchlistActiveTarget,
+  getWatchlistTargetSummaries,
 } from './watchlistSignals';
 
 export type SortKey =
@@ -63,6 +61,8 @@ export type SortDir = 'asc' | 'desc';
 interface WatchlistItemsTableProps {
   items: WatchlistItem[];
   quotes: Record<string, Quote>;
+  earningsByTicker: Record<string, EarningsCalendarEntry | null>;
+  sparklineByTicker: Record<string, number[] | null>;
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
@@ -97,6 +97,8 @@ function SortIcon({
 export function WatchlistItemsTable({
   items,
   quotes,
+  earningsByTicker,
+  sparklineByTicker,
   sortKey,
   sortDir,
   onSort,
@@ -146,6 +148,9 @@ export function WatchlistItemsTable({
                 currentKey={sortKey}
                 currentDir={sortDir}
               />
+            </TableHead>
+            <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-center">
+              10D
             </TableHead>
             <TableHead
               className="text-xs uppercase tracking-wide text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors select-none"
@@ -200,10 +205,15 @@ export function WatchlistItemsTable({
         <TableBody>
           {items.map((item) => {
             const quote = quotes[item.stocks.ticker];
+            const earnings = earningsByTicker[item.stocks.ticker];
+            const sparkline = sparklineByTicker[item.stocks.ticker];
             const activeTarget = getWatchlistActiveTarget(item, quote);
+            const targetSummaries = getWatchlistTargetSummaries(item, quote);
+            const buySummary = targetSummaries.find((summary) => summary.key === 'buy');
+            const sellSummary = targetSummaries.find((summary) => summary.key === 'sell');
             const atBuy = activeTarget === 'buy';
             const atSell = activeTarget === 'sell';
-            const daysUntil = getDaysUntilEarnings(quote?.earningsDate);
+            const daysUntil = getDaysUntilEarnings(earnings?.earningsDate);
             const earningsBadge = formatEarningsBadge(daysUntil);
             const showBadge = shouldShowEarningsBadge(daysUntil);
 
@@ -280,54 +290,29 @@ export function WatchlistItemsTable({
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono-price">
-                  <div>
-                    {quote
-                      ? formatPrice(quote.price, item.stocks.currency)
-                      : '—'}
-                    {quote?.preMarketPrice && (
-                      <div className="text-[10px] text-warning">
-                        {formatPrice(
-                          quote.preMarketPrice,
-                          item.stocks.currency,
-                        )}
-                      </div>
-                    )}
-                    {quote?.postMarketPrice && (
-                      <div className="text-[10px] text-info">
-                        {formatPrice(
-                          quote.postMarketPrice,
-                          item.stocks.currency,
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  {quote ? formatPrice(quote.price, item.stocks.currency) : '—'}
                 </TableCell>
                 <TableCell className="text-right font-mono-price">
-                  <div>
-                    <span
-                      className={
-                        quote && quote.changePercent > 0
-                          ? 'text-positive'
-                          : quote && quote.changePercent < 0
-                            ? 'text-negative'
-                            : ''
-                      }
-                    >
-                      {quote ? formatPercent(quote.changePercent) : '—'}
-                    </span>
-                    {quote?.preMarketChangePercent !== undefined &&
-                      quote?.preMarketChangePercent !== null && (
-                        <div className="text-[10px] text-warning">
-                          {formatPercent(quote.preMarketChangePercent)}
-                        </div>
-                      )}
-                    {quote?.postMarketChangePercent !== undefined &&
-                      quote?.postMarketChangePercent !== null && (
-                        <div className="text-[10px] text-info">
-                          {formatPercent(quote.postMarketChangePercent)}
-                        </div>
-                      )}
-                  </div>
+                  <span
+                    className={
+                      quote && quote.changePercent > 0
+                        ? 'text-positive'
+                        : quote && quote.changePercent < 0
+                          ? 'text-negative'
+                          : ''
+                    }
+                  >
+                    {quote ? formatPercent(quote.changePercent) : '—'}
+                  </span>
+                </TableCell>
+                <TableCell className="py-3">
+                  {sparkline ? (
+                    <div className="mx-auto h-7 w-[88px] min-w-[88px]">
+                      <Sparkline data={sparkline} className="h-full w-full" />
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground">—</div>
+                  )}
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono-price ${
@@ -336,9 +321,18 @@ export function WatchlistItemsTable({
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {item.target_buy_price
-                    ? formatPrice(item.target_buy_price, item.stocks.currency)
-                    : '—'}
+                  <div>
+                    {buySummary?.value ?? '—'}
+                    {item.target_buy_price && buySummary?.detail && (
+                      <div
+                        className={`text-[10px] ${
+                          atBuy ? 'text-positive/70' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {buySummary.detail}
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell
                   className={`text-right font-mono-price ${
@@ -347,12 +341,21 @@ export function WatchlistItemsTable({
                       : 'text-muted-foreground'
                   }`}
                 >
-                  {item.target_sell_price
-                    ? formatPrice(item.target_sell_price, item.stocks.currency)
-                    : '—'}
+                  <div>
+                    {sellSummary?.value ?? '—'}
+                    {item.target_sell_price && sellSummary?.detail && (
+                      <div
+                        className={`text-[10px] ${
+                          atSell ? 'text-warning/80' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {sellSummary.detail}
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-center hidden lg:table-cell">
-                  {quote?.earningsDate ? (
+                  {earnings?.earningsDate ? (
                     <div>
                       {showBadge && (
                         <div className="text-xs font-semibold text-info">
@@ -360,7 +363,7 @@ export function WatchlistItemsTable({
                         </div>
                       )}
                       <div className="text-[10px] text-muted-foreground">
-                        {formatDateCzech(quote.earningsDate)}
+                        {formatDateCzech(earnings.earningsDate)}
                       </div>
                     </div>
                   ) : (
@@ -372,19 +375,9 @@ export function WatchlistItemsTable({
                 </TableCell>
                 <TableCell className="text-sm hidden lg:table-cell max-w-[150px]">
                   {item.notes ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="text-muted-foreground truncate block cursor-help">
-                          {item.notes}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        className="max-w-[300px] whitespace-pre-wrap"
-                      >
-                        {item.notes}
-                      </TooltipContent>
-                    </Tooltip>
+                    <span className="text-muted-foreground truncate block">
+                      {item.notes}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground/50">—</span>
                   )}

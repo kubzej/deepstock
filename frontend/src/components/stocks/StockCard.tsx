@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Quote } from '@/lib/api';
+import { Sparkline } from '@/components/shared/Sparkline';
 import {
   formatCurrency,
   formatPercent,
@@ -21,7 +22,6 @@ interface PortfolioHolding {
 interface StockCardProps {
   ticker: string;
   name?: string;
-  sector?: string;
   currency?: string;
   quote: Quote | null;
   shares?: number;
@@ -32,13 +32,13 @@ interface StockCardProps {
   targetPrice?: number;
   portfolioCount?: number;
   portfolioHoldings?: PortfolioHolding[];
+  sparklineData?: number[] | null;
   onClick?: () => void;
 }
 
 export function StockCard({
   ticker,
   name,
-  sector,
   currency = 'USD',
   quote,
   shares,
@@ -49,6 +49,7 @@ export function StockCard({
   targetPrice,
   portfolioCount,
   portfolioHoldings,
+  sparklineData,
   onClick,
 }: StockCardProps) {
   const [expanded, setExpanded] = useState(false);
@@ -75,6 +76,22 @@ export function StockCard({
     targetPrice && quote?.price
       ? ((targetPrice - quote.price) / quote.price) * 100
       : null;
+  const extendedPrice =
+    quote?.preMarketPrice != null
+      ? quote.preMarketPrice
+      : quote?.postMarketPrice != null
+        ? quote.postMarketPrice
+        : null;
+  const extendedPriceTone =
+    quote?.preMarketPrice != null ? 'text-warning' : 'text-info';
+  const extendedChangePercent =
+    quote?.preMarketChangePercent != null
+      ? quote.preMarketChangePercent
+      : quote?.postMarketChangePercent != null
+        ? quote.postMarketChangePercent
+        : null;
+  const extendedChangeTone =
+    quote?.preMarketChangePercent != null ? 'text-warning' : 'text-info';
 
   return (
     <div
@@ -83,10 +100,8 @@ export function StockCard({
     >
       {/* Main content */}
       <div className="px-3 py-2.5">
-        {/* Header Row */}
-        <div className="flex items-center justify-between">
-          {/* Left: Ticker + Name */}
-          <div className="min-w-0 flex-1">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 items-start">
+          <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="font-bold text-sm">{ticker}</span>
               {isExpandable && (
@@ -100,8 +115,7 @@ export function StockCard({
             </div>
           </div>
 
-          {/* Right: P/L */}
-          <div className="flex items-baseline gap-1.5 flex-shrink-0">
+          <div className="min-w-[140px] flex items-baseline justify-end gap-1.5 text-right">
             <span
               className={`font-mono-price text-sm font-medium ${isPositive ? 'text-positive' : 'text-negative'}`}
             >
@@ -113,47 +127,42 @@ export function StockCard({
               {formatPercent(plPercent, 1, true)}
             </span>
           </div>
-        </div>
 
-        {/* Subrow: Price + Daily */}
-        <div className="flex items-center justify-between mt-0.5">
-          <div className="flex items-center gap-1.5">
+          <div className="min-w-0 min-h-[28px] flex flex-col justify-center leading-tight">
             <span className="text-[11px] text-muted-foreground font-mono-price">
               {formatPrice(quote?.price, currency)}
             </span>
-            {/* Pre-market price */}
-            {quote?.preMarketPrice != null && (
-              <span className="text-[10px] font-mono-price text-warning">
-                → {formatPrice(quote.preMarketPrice, currency)}
+            {extendedPrice != null && (
+              <span
+                className={`text-[10px] font-mono-price ${extendedPriceTone}`}
+              >
+                {formatPrice(extendedPrice, currency)}
               </span>
             )}
-            {/* After-hours price */}
-            {quote?.postMarketPrice != null &&
-              quote?.preMarketPrice == null && (
-                <span className="text-[10px] font-mono-price text-info">
-                  → {formatPrice(quote.postMarketPrice, currency)}
-                </span>
-              )}
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-mono-price ${isDayPositive ? 'text-positive/70' : 'text-negative/70'}`}
-            >
-              {formatPercent(quote?.changePercent, 1, true)}
-            </span>
-            {/* Pre-market change */}
-            {quote?.preMarketChangePercent != null && (
-              <span className="text-[10px] font-mono-price text-warning">
-                {formatPercent(quote.preMarketChangePercent, 1, true)}
+
+          <div className="min-w-[140px] grid grid-cols-[72px_auto] items-center justify-end gap-x-3 min-h-[28px]">
+            <div className="w-[72px] flex justify-center pr-1">
+              {sparklineData && sparklineData.length >= 2 ? (
+                <div className="h-7 w-[72px] overflow-hidden rounded-sm opacity-90">
+                  <Sparkline data={sparklineData} className="h-full w-full" />
+                </div>
+              ) : null}
+            </div>
+            <div className="min-w-[48px] flex flex-col items-end justify-center leading-tight text-right">
+              <span
+                className={`text-[10px] font-mono-price ${isDayPositive ? 'text-positive/70' : 'text-negative/70'}`}
+              >
+                {formatPercent(quote?.changePercent, 1, true)}
               </span>
-            )}
-            {/* After-hours change */}
-            {quote?.postMarketChangePercent != null &&
-              quote?.preMarketChangePercent == null && (
-                <span className="text-[10px] font-mono-price text-info">
-                  {formatPercent(quote.postMarketChangePercent, 1, true)}
+              {extendedChangePercent != null && (
+                <span
+                  className={`text-[10px] font-mono-price ${extendedChangeTone}`}
+                >
+                  {formatPercent(extendedChangePercent, 1, true)}
                 </span>
               )}
+            </div>
           </div>
         </div>
 
@@ -166,12 +175,6 @@ export function StockCard({
           }`}
         >
           <div className="overflow-hidden">
-            {sector && (
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wide mb-2">
-                {sector}
-              </p>
-            )}
-
             {/* Stats - 3 column compact */}
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div>

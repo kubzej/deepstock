@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import {
   Table,
@@ -11,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { StockCard } from '@/components/stocks';
 import { PillButton } from '@/components/shared/PillButton';
+import { Sparkline } from '@/components/shared/Sparkline';
 import {
   ArrowUpDown,
   ArrowUp,
@@ -18,7 +20,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from 'lucide-react';
-import type { Quote, ExchangeRates } from '@/lib/api';
+import { fetchBatchPriceHistory, type Quote, type ExchangeRates } from '@/lib/api';
 import {
   formatCurrency,
   formatPercent,
@@ -110,6 +112,30 @@ export function HoldingsTable({
   const [expandedTickers, setExpandedTickers] = useState<Set<string>>(
     new Set(),
   );
+  const uniqueTickers = useMemo(
+    () => Array.from(new Set(holdings.map((holding) => holding.ticker))),
+    [holdings],
+  );
+
+  const { data: sparklineHistory = {} } = useQuery({
+    queryKey: ['batchPriceHistory', uniqueTickers.join(','), '1mo', 'dashboard-sparkline'],
+    queryFn: async () => fetchBatchPriceHistory(uniqueTickers, '1mo'),
+    enabled: uniqueTickers.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const sparklineByTicker = useMemo(() => {
+    return Object.fromEntries(
+      uniqueTickers.map((ticker) => {
+        const data = sparklineHistory[ticker]
+          ?.map((point) => point.close)
+          .filter((value) => Number.isFinite(value))
+          .slice(-12) ?? null;
+        return [ticker, data && data.length >= 7 ? data : null];
+      }),
+    ) as Record<string, number[] | null>;
+  }, [sparklineHistory, uniqueTickers]);
 
   // Calculate enriched data for each holding
   const enrichedHoldings = useMemo(() => {
@@ -352,16 +378,19 @@ export function HoldingsTable({
                 'dailyChange',
                 'text-right w-[80px]',
               )}
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground text-center w-[100px]">
+                10D
+              </TableHead>
               {renderSortableHeader('Objem', 'volume', 'text-right w-[70px]')}
-              {renderSortableHeader(
-                'Investováno',
-                'invested',
-                'text-right w-[110px]',
-              )}
               {renderSortableHeader(
                 'Prům. cena',
                 'avgCost',
                 'text-right w-[90px]',
+              )}
+              {renderSortableHeader(
+                'Investováno',
+                'invested',
+                'text-right w-[110px]',
               )}
               {renderSortableHeader('Hodnota', 'value', 'text-right w-[110px]')}
               {renderSortableHeader(
@@ -370,9 +399,6 @@ export function HoldingsTable({
                 'text-right w-[100px]',
               )}
               {renderSortableHeader('Váha', 'weight', 'text-right w-[70px]')}
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">
-                Sektor
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -381,6 +407,7 @@ export function HoldingsTable({
               const isExpanded = expandedTickers.has(holding.ticker);
               const isPositive = holding.plCzk >= 0;
               const isDayPositive = (holding.quote?.changePercent ?? 0) >= 0;
+              const sparkline = sparklineByTicker[holding.ticker];
 
               const rows = [
                 <TableRow
@@ -484,6 +511,15 @@ export function HoldingsTable({
                         )}
                     </div>
                   </TableCell>
+                  <TableCell className="py-3">
+                    {sparkline ? (
+                      <div className="mx-auto h-7 w-[88px] min-w-[88px]">
+                        <Sparkline data={sparkline} className="h-full w-full" />
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground">—</div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono-price text-muted-foreground">
                     {formatVolumeRatio(
                       holding.quote?.volume,
@@ -491,10 +527,10 @@ export function HoldingsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    {formatCurrency(holding.investedCzk)}
+                    {formatPrice(holding.avgCost, holding.currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
-                    {formatPrice(holding.avgCost, holding.currency)}
+                    {formatCurrency(holding.investedCzk)}
                   </TableCell>
                   <TableCell className="text-right font-mono-price">
                     {formatCurrency(holding.currentValueCzk)}
@@ -513,9 +549,6 @@ export function HoldingsTable({
                   </TableCell>
                   <TableCell className="text-right font-mono-price text-muted-foreground">
                     {formatPercent(holding.weight, 1)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm truncate max-w-[180px]">
-                    {holding.sector || '—'}
                   </TableCell>
                 </TableRow>,
               ];
@@ -547,11 +580,14 @@ export function HoldingsTable({
                       <TableCell className="text-right text-muted-foreground">
                         —
                       </TableCell>
-                      <TableCell className="text-right font-mono-price">
-                        {formatCurrency(subHolding.investedCzk)}
+                      <TableCell className="text-right text-muted-foreground">
+                        —
                       </TableCell>
                       <TableCell className="text-right font-mono-price">
                         {formatPrice(subHolding.avgCost, subHolding.currency)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono-price">
+                        {formatCurrency(subHolding.investedCzk)}
                       </TableCell>
                       <TableCell className="text-right font-mono-price">
                         {formatCurrency(subHolding.currentValueCzk)}
@@ -573,7 +609,6 @@ export function HoldingsTable({
                       <TableCell className="text-right font-mono-price text-muted-foreground">
                         {formatPercent(subHolding.weight, 1)}
                       </TableCell>
-                      <TableCell></TableCell>
                     </TableRow>,
                   );
                 }
@@ -626,7 +661,6 @@ export function HoldingsTable({
                 key={holding.ticker}
                 ticker={holding.ticker}
                 name={holding.name}
-                sector={holding.sector}
                 currency={holding.currency}
                 quote={holding.quote ?? null}
                 shares={holding.shares}
@@ -640,6 +674,7 @@ export function HoldingsTable({
                 portfolioHoldings={
                   isExpandable ? holding.portfolioHoldings : undefined
                 }
+                sparklineData={sparklineByTicker[holding.ticker]}
                 onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })}
               />
             );
