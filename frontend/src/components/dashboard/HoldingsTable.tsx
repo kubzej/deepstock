@@ -30,6 +30,7 @@ import {
   toCZK,
   fromCZK,
 } from '@/lib/format';
+import { getMarketStatus } from '@/lib/marketHours';
 
 export interface Holding {
   ticker: string;
@@ -98,6 +99,8 @@ interface HoldingsTableProps {
   quotes: Record<string, Quote>;
   rates: ExchangeRates;
   showPortfolioColumn?: boolean;
+  showOpenMarketsOnly?: boolean;
+  onToggleOpenMarketsOnly?: () => void;
 }
 
 export function HoldingsTable({
@@ -105,6 +108,8 @@ export function HoldingsTable({
   quotes,
   rates,
   showPortfolioColumn = false,
+  showOpenMarketsOnly = false,
+  onToggleOpenMarketsOnly,
 }: HoldingsTableProps) {
   const navigate = useNavigate();
   const [sortKey, setSortKey] = useState<SortKey>('ticker');
@@ -320,8 +325,8 @@ export function HoldingsTable({
       return sortDirection === 'asc'
         ? (aVal as number) - (bVal as number)
         : (bVal as number) - (aVal as number);
-    });
-  }, [aggregatedHoldings, sortKey, sortDirection]);
+    }).filter((h) => !showOpenMarketsOnly || getMarketStatus(h.ticker) === 'OPEN');
+  }, [aggregatedHoldings, sortKey, sortDirection, showOpenMarketsOnly]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -624,6 +629,13 @@ export function HoldingsTable({
       <div className="md:hidden">
         {/* Mobile Sort Pills - edge to edge scroll */}
         <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 -mx-4 px-4 scrollbar-hide">
+          <PillButton
+            active={showOpenMarketsOnly}
+            onClick={onToggleOpenMarketsOnly}
+            size="sm"
+          >
+            Otevřené
+          </PillButton>
           {[
             { key: 'pl' as SortKey, label: 'P/L' },
             { key: 'plPercent' as SortKey, label: '%' },

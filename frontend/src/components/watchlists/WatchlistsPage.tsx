@@ -56,6 +56,7 @@ import {
   type WatchlistItemFormData,
 } from './WatchlistItemFormDialog';
 import { isAtBuyTarget, isAtSellTarget } from './watchlistSignals';
+import { getMarketStatus } from '@/lib/marketHours';
 
 // Special ID for filter view
 const FILTER_VIEW_ID = '__filter__';
@@ -84,6 +85,7 @@ export function WatchlistsPage() {
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [showAtBuyTarget, setShowAtBuyTarget] = useState(false);
   const [showAtSellTarget, setShowAtSellTarget] = useState(false);
+  const [showOpenMarketsOnly, setShowOpenMarketsOnly] = useState(false);
 
   // Auto-select first watchlist
   useEffect(() => {
@@ -230,6 +232,7 @@ export function WatchlistsPage() {
     setFilterTags([]);
     setShowAtBuyTarget(false);
     setShowAtSellTarget(false);
+    setShowOpenMarketsOnly(false);
   };
 
   // Sorting
@@ -274,6 +277,13 @@ export function WatchlistsPage() {
           if (showAtSellTarget) return atSell;
           return true;
         });
+      }
+
+      // Filter by market open status
+      if (showOpenMarketsOnly) {
+        filtered = filtered.filter(
+          (item) => getMarketStatus(item.stocks.ticker) === 'OPEN',
+        );
       }
     }
 
@@ -342,11 +352,12 @@ export function WatchlistsPage() {
     filterTags,
     showAtBuyTarget,
     showAtSellTarget,
+    showOpenMarketsOnly,
   ]);
 
   // Check if any filters are active
   const hasActiveFilters =
-    filterTags.length > 0 || showAtBuyTarget || showAtSellTarget;
+    filterTags.length > 0 || showAtBuyTarget || showAtSellTarget || showOpenMarketsOnly;
 
   const filterSummary = useMemo(() => {
     const parts: string[] = [];
@@ -585,11 +596,13 @@ export function WatchlistsPage() {
                 filterTags={filterTags}
                 showAtBuyTarget={showAtBuyTarget}
                 showAtSellTarget={showAtSellTarget}
+                showOpenMarketsOnly={showOpenMarketsOnly}
                 filteredItemsCount={filteredAndSortedItems.length}
                 totalItemsCount={allItems.length}
                 hasActiveFilters={hasActiveFilters}
                 onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
                 onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
+                onToggleOpenMarketsOnly={() => setShowOpenMarketsOnly((prev) => !prev)}
                 onToggleTag={(tagId) =>
                   setFilterTags((prev) =>
                     prev.includes(tagId)

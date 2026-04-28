@@ -67,11 +67,13 @@ interface FilteredMonitoringPanelProps {
   filterTags: string[];
   showAtBuyTarget: boolean;
   showAtSellTarget: boolean;
+  showOpenMarketsOnly: boolean;
   filteredItemsCount: number;
   totalItemsCount: number;
   hasActiveFilters: boolean;
   onToggleBuyTarget: () => void;
   onToggleSellTarget: () => void;
+  onToggleOpenMarketsOnly: () => void;
   onToggleTag: (tagId: string) => void;
   onClearFilters: () => void;
 }
@@ -81,11 +83,13 @@ export function FilteredMonitoringPanel({
   filterTags,
   showAtBuyTarget,
   showAtSellTarget,
+  showOpenMarketsOnly,
   filteredItemsCount,
   totalItemsCount,
   hasActiveFilters,
   onToggleBuyTarget,
   onToggleSellTarget,
+  onToggleOpenMarketsOnly,
   onToggleTag,
   onClearFilters,
 }: FilteredMonitoringPanelProps) {
@@ -133,6 +137,15 @@ export function FilteredMonitoringPanel({
               inactiveClassName="border-transparent bg-amber-500/6 text-amber-700 hover:bg-amber-500/10"
             >
               Prodejní cíl
+            </PillButton>
+            <PillButton
+              onClick={onToggleOpenMarketsOnly}
+              active={showOpenMarketsOnly}
+              size="md"
+              activeClassName="border-transparent bg-sky-500/12 text-sky-500 hover:bg-sky-500/16"
+              inactiveClassName="border-transparent bg-muted/60 text-muted-foreground hover:bg-muted"
+            >
+              Jen otevřené
             </PillButton>
           </PillGroup>
         </div>

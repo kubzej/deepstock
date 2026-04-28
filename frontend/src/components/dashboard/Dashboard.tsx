@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HoldingsTable, type Holding as HoldingView } from './HoldingsTable';
 import { OpenLotsRanking, type OpenLot } from './OpenLotsRanking';
@@ -12,6 +12,7 @@ import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicat
 import { EmptyState, ErrorState, PageHero, PageShell } from '@/components/shared';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
+import { PillButton } from '@/components/shared/PillButton';
 
 interface DashboardProps {
   onAddTransaction?: () => void;
@@ -32,6 +33,9 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
     dataUpdatedAt,
     isAllPortfolios,
   } = usePortfolio();
+
+  const [activeTab, setActiveTab] = useState('holdings');
+  const [showOpenMarketsOnly, setShowOpenMarketsOnly] = useState(false);
 
   // Transform holdings to HoldingsTable format
   const holdingsForTable: HoldingView[] = useMemo(() => {
@@ -340,12 +344,25 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
       )}
 
       {/* Content with Tabs */}
-      <Tabs defaultValue="holdings" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="holdings">Držené pozice</TabsTrigger>
-          <TabsTrigger value="lots">Otevřené loty</TabsTrigger>
-          <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center gap-3 mb-4">
+          <TabsList>
+            <TabsTrigger value="holdings">Držené pozice</TabsTrigger>
+            <TabsTrigger value="lots">Otevřené loty</TabsTrigger>
+            <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
+          </TabsList>
+          {activeTab === 'holdings' && (
+            <div className="hidden md:block">
+              <PillButton
+                active={showOpenMarketsOnly}
+                onClick={() => setShowOpenMarketsOnly((prev) => !prev)}
+                size="sm"
+              >
+                Otevřené trhy
+              </PillButton>
+            </div>
+          )}
+        </div>
 
         <TabsContent value="holdings">
           <HoldingsTable
@@ -353,6 +370,8 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
             quotes={quotes}
             rates={rates}
             showPortfolioColumn={isAllPortfolios}
+            showOpenMarketsOnly={showOpenMarketsOnly}
+            onToggleOpenMarketsOnly={() => setShowOpenMarketsOnly((prev) => !prev)}
           />
         </TabsContent>
 
