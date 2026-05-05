@@ -94,8 +94,10 @@ function SidebarContent({
         : customChannels.filter((c) => c.section_id === section.id);
 
     if (isStockSystemSection && search.trim()) {
+      const q = search.toLowerCase();
       sectionChannels = sectionChannels.filter((c) =>
-        c.name.toLowerCase().includes(search.toLowerCase())
+        c.name.toLowerCase().includes(q) ||
+        (c.stock_name?.toLowerCase().includes(q) ?? false)
       );
     }
 
@@ -157,7 +159,7 @@ function SidebarContent({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Hledat ticker..."
+            placeholder="Hledat ticker nebo název..."
             className="h-9 pl-8 pr-8 text-sm bg-muted/40 border-muted focus-visible:ring-1"
           />
           {search && (

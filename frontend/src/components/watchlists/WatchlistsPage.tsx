@@ -25,14 +25,12 @@ import {
   fetchBatchPriceHistory,
   type EarningsCalendarEntry,
   type WatchlistItem,
-  type WatchlistItemWithSource,
 } from '@/lib/api';
 import { useQuotes } from '@/hooks/useQuotes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useWatchlists,
   useWatchlistItems,
-  useAllWatchlistItems,
   useAddWatchlistItem,
   useUpdateWatchlistItem,
   useDeleteWatchlistItem,
@@ -58,9 +56,6 @@ import {
 import { isAtBuyTarget, isAtSellTarget } from './watchlistSignals';
 import { getMarketStatus } from '@/lib/marketHours';
 
-// Special ID for filter view
-const FILTER_VIEW_ID = '__filter__';
-
 export function WatchlistsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -76,12 +71,7 @@ export function WatchlistsPage() {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(
     null,
   );
-  const [lastConcreteWatchlistId, setLastConcreteWatchlistId] = useState<string | null>(
-    null,
-  );
 
-  // Filter view state
-  const isFilterView = selectedWatchlistId === FILTER_VIEW_ID;
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [showAtBuyTarget, setShowAtBuyTarget] = useState(false);
   const [showAtSellTarget, setShowAtSellTarget] = useState(false);
@@ -94,31 +84,13 @@ export function WatchlistsPage() {
     }
   }, [watchlists, selectedWatchlistId]);
 
-  useEffect(() => {
-    if (selectedWatchlistId && selectedWatchlistId !== FILTER_VIEW_ID) {
-      setLastConcreteWatchlistId(selectedWatchlistId);
-    }
-  }, [selectedWatchlistId]);
-
-  // Single watchlist items
   const {
     data: singleWatchlistItems = [],
     isLoading: itemsLoading,
     isFetching: itemsFetching,
-  } = useWatchlistItems(isFilterView ? null : selectedWatchlistId);
+  } = useWatchlistItems(selectedWatchlistId);
 
-  // All watchlist items (for filter view)
-  const {
-    data: allItems = [],
-    isLoading: allItemsLoading,
-    isFetching: allItemsFetching,
-  } = useAllWatchlistItems();
-
-  // Determine which items to display
-  const items = useMemo(() => {
-    if (!isFilterView) return singleWatchlistItems;
-    return allItems as WatchlistItem[];
-  }, [isFilterView, singleWatchlistItems, allItems]);
+  const items: WatchlistItem[] = singleWatchlistItems;
 
   // Get tickers from items for quotes
   const tickers = useMemo(
@@ -160,7 +132,6 @@ export function WatchlistsPage() {
   const isFetching =
     watchlistsFetching ||
     itemsFetching ||
-    allItemsFetching ||
     quotesFetching ||
     earningsFetching;
 
@@ -208,24 +179,9 @@ export function WatchlistsPage() {
   const selectedWatchlist = watchlists.find(
     (w) => w.id === selectedWatchlistId,
   );
-  const targetWatchlistIdForNewItem =
-    isFilterView
-      ? (lastConcreteWatchlistId ?? watchlists[0]?.id ?? null)
-      : selectedWatchlistId;
 
   const handleSelectWatchlist = (watchlistId: string) => {
     setSelectedWatchlistId(watchlistId);
-  };
-
-  const handleToggleFilteredMode = () => {
-    if (isFilterView) {
-      setSelectedWatchlistId(
-        lastConcreteWatchlistId ?? watchlists[0]?.id ?? null,
-      );
-      return;
-    }
-
-    setSelectedWatchlistId(FILTER_VIEW_ID);
   };
 
   const clearFilters = () => {
@@ -252,39 +208,36 @@ export function WatchlistsPage() {
 
   // Filtering + Sorting
   const filteredAndSortedItems = useMemo(() => {
-    // First filter (only in filter view)
     let filtered = [...items];
 
-    if (isFilterView) {
-      // Filter by tags
-      if (filterTags.length > 0) {
-        filtered = filtered.filter((item) =>
-          item.tags?.some((tag) => filterTags.includes(tag.id)),
-        );
-      }
+    // Filter by tags
+    if (filterTags.length > 0) {
+      filtered = filtered.filter((item) =>
+        item.tags?.some((tag) => filterTags.includes(tag.id)),
+      );
+    }
 
-      // Filter by target status
-      if (showAtBuyTarget || showAtSellTarget) {
-        filtered = filtered.filter((item) => {
-          const quote = quotes[item.stocks.ticker];
-          const atBuy = isAtBuyTarget(item, quote);
-          const atSell = isAtSellTarget(item, quote);
+    // Filter by target status
+    if (showAtBuyTarget || showAtSellTarget) {
+      filtered = filtered.filter((item) => {
+        const quote = quotes[item.stocks.ticker];
+        const atBuy = isAtBuyTarget(item, quote);
+        const atSell = isAtSellTarget(item, quote);
 
-          if (showAtBuyTarget && showAtSellTarget) {
-            return atBuy || atSell;
-          }
-          if (showAtBuyTarget) return atBuy;
-          if (showAtSellTarget) return atSell;
-          return true;
-        });
-      }
+        if (showAtBuyTarget && showAtSellTarget) {
+          return atBuy || atSell;
+        }
+        if (showAtBuyTarget) return atBuy;
+        if (showAtSellTarget) return atSell;
+        return true;
+      });
+    }
 
-      // Filter by market open status
-      if (showOpenMarketsOnly) {
-        filtered = filtered.filter(
-          (item) => getMarketStatus(item.stocks.ticker) === 'OPEN',
-        );
-      }
+    // Filter by market open status
+    if (showOpenMarketsOnly) {
+      filtered = filtered.filter(
+        (item) => getMarketStatus(item.stocks.ticker) === 'OPEN',
+      );
     }
 
     // Then sort
@@ -348,7 +301,6 @@ export function WatchlistsPage() {
     earningsByTicker,
     sortKey,
     sortDir,
-    isFilterView,
     filterTags,
     showAtBuyTarget,
     showAtSellTarget,
@@ -359,33 +311,9 @@ export function WatchlistsPage() {
   const hasActiveFilters =
     filterTags.length > 0 || showAtBuyTarget || showAtSellTarget || showOpenMarketsOnly;
 
-  const filterSummary = useMemo(() => {
-    const parts: string[] = [];
-
-    if (showAtBuyTarget) parts.push('nákupní signál');
-    if (showAtSellTarget) parts.push('prodejní signál');
-
-    if (filterTags.length > 0) {
-      const activeTags = allTags
-        .filter((tag) => filterTags.includes(tag.id))
-        .map((tag) => tag.name);
-
-      if (activeTags.length > 0) {
-        parts.push(`tagy: ${activeTags.join(', ')}`);
-      }
-    }
-
-    return parts.length > 0 ? `Aktivní filtry: ${parts.join(' • ')}` : null;
-  }, [allTags, filterTags, showAtBuyTarget, showAtSellTarget]);
-
   // Item CRUD
   const openAddItem = () => {
-    if (!targetWatchlistIdForNewItem) return;
-
-    if (selectedWatchlistId !== targetWatchlistIdForNewItem) {
-      setSelectedWatchlistId(targetWatchlistIdForNewItem);
-    }
-
+    if (!selectedWatchlistId) return;
     setEditingItem(null);
     setAddItemDialogOpen(true);
   };
@@ -396,14 +324,14 @@ export function WatchlistsPage() {
   };
 
   const handleSaveItem = async (formData: WatchlistItemFormData) => {
-    if (!targetWatchlistIdForNewItem) return;
+    if (!selectedWatchlistId) return;
 
     setItemSaving(true);
     try {
       if (editingItem) {
         await updateItemMutation.mutateAsync({
           itemId: editingItem.id,
-          watchlistId: targetWatchlistIdForNewItem,
+          watchlistId: selectedWatchlistId,
           targetBuyPrice: formData.buyTarget
             ? parseFloat(formData.buyTarget)
             : null,
@@ -416,7 +344,7 @@ export function WatchlistsPage() {
       } else {
         if (!formData.ticker.trim()) return;
         await addItemMutation.mutateAsync({
-          watchlistId: targetWatchlistIdForNewItem,
+          watchlistId: selectedWatchlistId,
           ticker: formData.ticker.trim().toUpperCase(),
           targetBuyPrice: formData.buyTarget
             ? parseFloat(formData.buyTarget)
@@ -538,15 +466,10 @@ export function WatchlistsPage() {
       <PageIntro
         title="Watchlisty"
         actions={
-          !isFilterView && selectedWatchlist ? (
+          selectedWatchlist ? (
             <Button onClick={openAddItem}>
               <Plus className="mr-2 h-4 w-4" />
               Přidat akcii
-            </Button>
-          ) : targetWatchlistIdForNewItem ? (
-            <Button onClick={openAddItem} variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Přidat do watchlistu
             </Button>
           ) : null
         }
@@ -554,7 +477,6 @@ export function WatchlistsPage() {
           // Invalidate all caches - React Query will refetch them
           queryClient.invalidateQueries({ queryKey: ['watchlists'] });
           queryClient.invalidateQueries({ queryKey: ['watchlistItems'] });
-          queryClient.invalidateQueries({ queryKey: ['allWatchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
           // Remove individual quote caches to force fresh batch fetch
           queryClient.removeQueries({ queryKey: ['quote'] });
@@ -580,67 +502,51 @@ export function WatchlistsPage() {
             <WatchlistModeRail
               watchlists={watchlists}
               selectedWatchlistId={selectedWatchlistId}
-              isFilterView={isFilterView}
-              totalItemsCount={allItems.length}
-              filteredItemsCount={filteredAndSortedItems.length}
-              hasActiveFilters={hasActiveFilters}
-              filterSummary={filterSummary}
               onSelectWatchlist={handleSelectWatchlist}
-              onSelectFilteredMode={handleToggleFilteredMode}
             />
 
-            {/* Filter panel (only in filter view) */}
-            {isFilterView && (
-              <FilteredMonitoringPanel
-                allTags={allTags}
-                filterTags={filterTags}
-                showAtBuyTarget={showAtBuyTarget}
-                showAtSellTarget={showAtSellTarget}
-                showOpenMarketsOnly={showOpenMarketsOnly}
-                filteredItemsCount={filteredAndSortedItems.length}
-                totalItemsCount={allItems.length}
-                hasActiveFilters={hasActiveFilters}
-                onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
-                onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
-                onToggleOpenMarketsOnly={() => setShowOpenMarketsOnly((prev) => !prev)}
-                onToggleTag={(tagId) =>
-                  setFilterTags((prev) =>
-                    prev.includes(tagId)
-                      ? prev.filter((id) => id !== tagId)
-                      : [...prev, tagId],
-                  )
-                }
-                onClearFilters={clearFilters}
-              />
-            )}
+            {/* Filter panel — always visible */}
+            <FilteredMonitoringPanel
+              allTags={allTags}
+              filterTags={filterTags}
+              showAtBuyTarget={showAtBuyTarget}
+              showAtSellTarget={showAtSellTarget}
+              showOpenMarketsOnly={showOpenMarketsOnly}
+              filteredItemsCount={filteredAndSortedItems.length}
+              totalItemsCount={singleWatchlistItems.length}
+              hasActiveFilters={hasActiveFilters}
+              onToggleBuyTarget={() => setShowAtBuyTarget((prev) => !prev)}
+              onToggleSellTarget={() => setShowAtSellTarget((prev) => !prev)}
+              onToggleOpenMarketsOnly={() => setShowOpenMarketsOnly((prev) => !prev)}
+              onToggleTag={(tagId) =>
+                setFilterTags((prev) =>
+                  prev.includes(tagId)
+                    ? prev.filter((id) => id !== tagId)
+                    : [...prev, tagId],
+                )
+              }
+              onClearFilters={clearFilters}
+            />
           </PageTopRail>
 
           {/* Items table */}
-          {(selectedWatchlist || isFilterView) && (
+          {selectedWatchlist && (
             <>
-              {(isFilterView ? allItemsLoading : itemsLoading) ? (
+              {itemsLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
                     <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               ) : filteredAndSortedItems.length === 0 ? (
-                isFilterView ? (
-                  hasActiveFilters ? (
-                    <FilteredEmptyState
-                      description="Zkus upravit tagy nebo cílové filtry a zobraz další kandidáty."
-                      clearAction={{
-                        label: 'Vymazat filtry',
-                        onClick: clearFilters,
-                      }}
-                    />
-                  ) : (
-                    <EmptyState
-                      icon={Target}
-                      title="Žádné položky ve watchlistech"
-                      description="Jakmile přidáš akcie do některého watchlistu, uvidíš je i ve filtrovaném přehledu."
-                    />
-                  )
+                hasActiveFilters ? (
+                  <FilteredEmptyState
+                    description="Zkus upravit tagy nebo cílové filtry a zobraz další kandidáty."
+                    clearAction={{
+                      label: 'Vymazat filtry',
+                      onClick: clearFilters,
+                    }}
+                  />
                 ) : (
                   <EmptyState
                     icon={Target}
@@ -672,16 +578,9 @@ export function WatchlistsPage() {
                           onDelete={() => setDeleteItemData(item)}
                           onTags={() => openTagsDialog(item)}
                           onMove={() => setMoveItemData(item)}
-                          showMoveOption={
-                            watchlists.length > 1 && !isFilterView
-                          }
+                          showMoveOption={watchlists.length > 1}
                           onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
-                          showWatchlistName={isFilterView}
-                          watchlistName={
-                            isFilterView
-                              ? (item as WatchlistItemWithSource).watchlist_name
-                              : undefined
-                          }
+                          showWatchlistName={false}
                         />
                       ))}
                     </div>
@@ -700,8 +599,8 @@ export function WatchlistsPage() {
                     onDelete={setDeleteItemData}
                     onMove={setMoveItemData}
                     onTagsEdit={openTagsDialog}
-                    showMoveOption={watchlists.length > 1 && !isFilterView}
-                    showWatchlistName={isFilterView}
+                    showMoveOption={watchlists.length > 1}
+                    showWatchlistName={false}
                   />
                 </>
               )}

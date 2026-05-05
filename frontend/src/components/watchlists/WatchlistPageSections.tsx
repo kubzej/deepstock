@@ -1,4 +1,5 @@
-import { Filter, X } from 'lucide-react';
+import { useState } from 'react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import type { Watchlist, WatchlistTag } from '@/lib/api';
@@ -7,58 +8,28 @@ import type { SortDir, SortKey } from './WatchlistItemsTable';
 interface WatchlistModeRailProps {
   watchlists: Watchlist[];
   selectedWatchlistId: string | null;
-  isFilterView: boolean;
-  totalItemsCount: number;
-  filteredItemsCount: number;
-  hasActiveFilters: boolean;
-  filterSummary: string | null;
   onSelectWatchlist: (watchlistId: string) => void;
-  onSelectFilteredMode: () => void;
 }
 
 export function WatchlistModeRail({
   watchlists,
   selectedWatchlistId,
-  isFilterView,
-  totalItemsCount,
-  filteredItemsCount,
-  hasActiveFilters,
-  filterSummary,
   onSelectWatchlist,
-  onSelectFilteredMode,
 }: WatchlistModeRailProps) {
   return (
-    <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
-      <PillGroup behavior="scroll" bleed className="xl:max-w-4xl">
-        {watchlists.map((watchlist) => (
-          <PillButton
-            key={watchlist.id}
-            active={!isFilterView && selectedWatchlistId === watchlist.id}
-            onClick={() => onSelectWatchlist(watchlist.id)}
-            size="md"
-            count={watchlist.item_count || 0}
-          >
-            {watchlist.name}
-          </PillButton>
-        ))}
-      </PillGroup>
-
-      <div className="flex items-center gap-2 self-start xl:self-auto">
+    <PillGroup behavior="scroll" bleed>
+      {watchlists.map((watchlist) => (
         <PillButton
-          active={isFilterView}
-          onClick={onSelectFilteredMode}
+          key={watchlist.id}
+          active={selectedWatchlistId === watchlist.id}
+          onClick={() => onSelectWatchlist(watchlist.id)}
           size="md"
-          count={isFilterView ? filteredItemsCount : totalItemsCount}
-          indicatorClassName={hasActiveFilters ? 'bg-amber-500' : undefined}
+          count={watchlist.item_count || 0}
         >
-          <Filter className="h-3.5 w-3.5" />
-          Filtrované
+          {watchlist.name}
         </PillButton>
-        {!isFilterView && hasActiveFilters && filterSummary ? (
-          <div className="text-xs text-muted-foreground">{filterSummary}</div>
-        ) : null}
-      </div>
-    </div>
+      ))}
+    </PillGroup>
   );
 }
 
@@ -93,100 +64,112 @@ export function FilteredMonitoringPanel({
   onToggleTag,
   onClearFilters,
 }: FilteredMonitoringPanelProps) {
+  const [mobileTagsOpen, setMobileTagsOpen] = useState(false);
+  const selectedTagCount = filterTags.length;
+
+  const tagPills = allTags.map((tag) => {
+    const isSelected = filterTags.includes(tag.id);
+    return (
+      <PillButton
+        key={tag.id}
+        onClick={() => onToggleTag(tag.id)}
+        active={isSelected}
+        size="sm"
+        activeClassName="border-transparent text-white shadow-sm"
+        inactiveClassName="border-transparent opacity-60 hover:opacity-90"
+        style={{
+          backgroundColor: isSelected ? tag.color : `${tag.color}16`,
+          color: isSelected ? '#fff' : tag.color,
+        }}
+      >
+        {tag.name}
+      </PillButton>
+    );
+  });
+
   return (
-    <section className="space-y-3 overflow-hidden rounded-2xl border border-border/70 bg-background/85 p-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-          Filtry
-        </div>
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <PillButton
+          onClick={onToggleBuyTarget}
+          active={showAtBuyTarget}
+          size="sm"
+          activeClassName="border-transparent bg-positive/12 text-positive hover:bg-positive/16"
+          inactiveClassName="border-transparent bg-positive/6 text-positive/80 hover:bg-positive/10"
+        >
+          Nákupní cíl
+        </PillButton>
+        <PillButton
+          onClick={onToggleSellTarget}
+          active={showAtSellTarget}
+          size="sm"
+          activeClassName="border-transparent bg-amber-500/12 text-amber-600 hover:bg-amber-500/16"
+          inactiveClassName="border-transparent bg-amber-500/6 text-amber-700 hover:bg-amber-500/10"
+        >
+          Prodejní cíl
+        </PillButton>
+        <PillButton
+          onClick={onToggleOpenMarketsOnly}
+          active={showOpenMarketsOnly}
+          size="sm"
+          activeClassName="border-transparent bg-sky-500/12 text-sky-500 hover:bg-sky-500/16"
+          inactiveClassName="border-transparent bg-muted/60 text-muted-foreground hover:bg-muted"
+        >
+          Jen otevřené
+        </PillButton>
+
+        {/* Desktop: separator + tags inline */}
+        {allTags.length > 0 && (
+          <>
+            <div aria-hidden="true" className="hidden h-4 w-px bg-border/70 md:block" />
+            <div className="hidden flex-wrap gap-2 md:flex">
+              {tagPills}
+            </div>
+          </>
+        )}
+
+        {/* Mobile: compact tags toggle */}
+        {allTags.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMobileTagsOpen((v) => !v)}
+            className="md:hidden inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          >
+            Tagy
+            {selectedTagCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
+                {selectedTagCount}
+              </span>
+            )}
+          </button>
+        )}
+
         {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="h-9 shrink-0 text-sm"
+            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
           >
             <X className="mr-1 h-3 w-3" />
-            Vymazat filtry
+            Vymazat
           </Button>
         )}
-      </div>
 
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            Signál
-          </div>
-          <PillGroup>
-            <PillButton
-              onClick={onToggleBuyTarget}
-              active={showAtBuyTarget}
-              size="md"
-              indicatorClassName="bg-positive"
-              activeClassName="border-transparent bg-positive/12 text-positive hover:bg-positive/16"
-              inactiveClassName="border-transparent bg-positive/6 text-positive/80 hover:bg-positive/10"
-            >
-              Nákupní cíl
-            </PillButton>
-            <PillButton
-              onClick={onToggleSellTarget}
-              active={showAtSellTarget}
-              size="md"
-              indicatorClassName="bg-amber-500"
-              activeClassName="border-transparent bg-amber-500/12 text-amber-600 hover:bg-amber-500/16"
-              inactiveClassName="border-transparent bg-amber-500/6 text-amber-700 hover:bg-amber-500/10"
-            >
-              Prodejní cíl
-            </PillButton>
-            <PillButton
-              onClick={onToggleOpenMarketsOnly}
-              active={showOpenMarketsOnly}
-              size="md"
-              activeClassName="border-transparent bg-sky-500/12 text-sky-500 hover:bg-sky-500/16"
-              inactiveClassName="border-transparent bg-muted/60 text-muted-foreground hover:bg-muted"
-            >
-              Jen otevřené
-            </PillButton>
-          </PillGroup>
-        </div>
-
-        {allTags.length > 0 && (
-          <div className="min-w-0 space-y-1.5 overflow-hidden">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              Tagy
-            </div>
-            <PillGroup behavior="scroll" className="w-full max-w-full">
-              {allTags.map((tag) => {
-                const isSelected = filterTags.includes(tag.id);
-
-                return (
-                  <PillButton
-                    key={tag.id}
-                    onClick={() => onToggleTag(tag.id)}
-                    active={isSelected}
-                    size="md"
-                    indicatorPosition="leading"
-                    indicatorClassName="bg-current"
-                    activeClassName="border-transparent text-white shadow-sm"
-                    inactiveClassName="border-transparent opacity-75 hover:opacity-100"
-                    style={{
-                      backgroundColor: isSelected ? tag.color : `${tag.color}16`,
-                      color: isSelected ? '#fff' : tag.color,
-                    }}
-                  >
-                    {tag.name}
-                  </PillButton>
-                );
-              })}
-            </PillGroup>
-          </div>
+        {hasActiveFilters && (
+          <span className="text-xs text-muted-foreground">
+            {filteredItemsCount} / {totalItemsCount}
+          </span>
         )}
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        {filteredItemsCount} / {totalItemsCount}
-      </div>
-    </section>
+      {/* Mobile: expanded tags row */}
+      {mobileTagsOpen && allTags.length > 0 && (
+        <div className="flex flex-wrap gap-2 md:hidden">
+          {tagPills}
+        </div>
+      )}
+    </div>
   );
 }
 
