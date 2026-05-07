@@ -33,9 +33,15 @@ async def check_price_alerts(x_cron_secret: Optional[str] = Header(None)):
     await verify_cron_secret(x_cron_secret)
     
     redis = get_redis()
+    logger.info("Cron check-price-alerts started")
 
     try:
         result = await price_alert_service.check_all_users(redis)
+        logger.info(
+            "Cron check-price-alerts finished: users_checked=%d alerts_sent=%d",
+            result["users_checked"],
+            result["alerts_sent"],
+        )
         return {
             "success": True,
             "users_checked": result["users_checked"],
@@ -55,9 +61,15 @@ async def check_custom_alerts(x_cron_secret: Optional[str] = Header(None)):
     await verify_cron_secret(x_cron_secret)
     
     redis = get_redis()
+    logger.info("Cron check-custom-alerts started")
 
     try:
         result = await price_alert_service.check_custom_alerts(redis)
+        logger.info(
+            "Cron check-custom-alerts finished: alerts_checked=%d alerts_triggered=%d",
+            result["alerts_checked"],
+            result["alerts_triggered"],
+        )
         return {
             "success": True,
             "alerts_checked": result["alerts_checked"],
@@ -83,14 +95,27 @@ async def check_earnings_alerts(x_cron_secret: Optional[str] = Header(None)):
     await verify_cron_secret(x_cron_secret)
     
     redis = get_redis()
+    logger.info("Cron check-earnings-alerts started")
 
     try:
         refresh_result = await earnings_calendar_service.refresh_due_watchlist_tickers()
         result = await earnings_alert_service.check_all_users(redis)
+        logger.info(
+            (
+                "Cron check-earnings-alerts finished: tickers_due=%d tickers_refreshed=%d orphaned_entries_deleted=%d "
+                "users_checked=%d alerts_sent=%d"
+            ),
+            refresh_result["tickers_due"],
+            refresh_result["tickers_refreshed"],
+            refresh_result["orphaned_entries_deleted"],
+            result["users_checked"],
+            result["alerts_sent"],
+        )
         return {
             "success": True,
             "tickers_due": refresh_result["tickers_due"],
             "tickers_refreshed": refresh_result["tickers_refreshed"],
+            "orphaned_entries_deleted": refresh_result["orphaned_entries_deleted"],
             "users_checked": result["users_checked"],
             "alerts_sent": result["alerts_sent"]
         }
@@ -106,10 +131,39 @@ async def refresh_earnings_calendar(x_cron_secret: Optional[str] = Header(None))
     Called daily by cron.
     """
     await verify_cron_secret(x_cron_secret)
+    logger.info("Cron refresh-earnings-calendar started")
 
     try:
         result = await earnings_calendar_service.refresh_due_watchlist_tickers()
+        logger.info(
+            "Cron refresh-earnings-calendar finished: tickers_due=%d tickers_refreshed=%d orphaned_entries_deleted=%d",
+            result["tickers_due"],
+            result["tickers_refreshed"],
+            result["orphaned_entries_deleted"],
+        )
         return {"success": True, **result}
     except Exception as e:
         logger.error(f"refresh-earnings-calendar failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Chyba při refreshi earnings kalendáře.")
+
+
+@router.post("/cleanup-earnings-calendar")
+async def cleanup_earnings_calendar(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Remove earnings cache rows for stocks that are no longer present
+    in any watchlist item.
+    """
+    await verify_cron_secret(x_cron_secret)
+    logger.info("Cron cleanup-earnings-calendar started")
+
+    try:
+        result = await earnings_calendar_service.cleanup_orphaned_entries()
+        logger.info(
+            "Cron cleanup-earnings-calendar finished: orphaned_entries_found=%d orphaned_entries_deleted=%d",
+            result["orphaned_entries_found"],
+            result["orphaned_entries_deleted"],
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"cleanup-earnings-calendar failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při cleanupu earnings kalendáře.")

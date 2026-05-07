@@ -44,6 +44,7 @@ export const STALE_TIMES = {
   technicalIndicators: 5 * 60 * 1000, // 5 minutes
   insiderTrades: 30 * 60 * 1000,    // 30 minutes (cached 12h on backend)
   fearGreed: 30 * 60 * 1000,        // 30 minutes (cached 30min on backend)
+  earningsCalendar: 60 * 60 * 1000, // 1 hour
 
   // Journal - user data, only invalidate on CRUD
   journalChannels: Infinity,
@@ -98,6 +99,10 @@ export const queryKeys = {
   stocks: () => ['stocks'] as const,
   stock: (ticker: string) => ['stock', ticker] as const,
   priceHistory: (ticker: string, period: string) => ['priceHistory', ticker, period] as const,
+  batchPriceHistory: (tickers: string[], period: string, scope: string = 'default') =>
+    ['batchPriceHistory', tickers.slice().sort().join(','), period, scope] as const,
+  batchEarnings: (tickers: string[]) =>
+    ['batchEarnings', tickers.slice().sort().join(',')] as const,
 
   // Watchlists
   watchlists: () => ['watchlists'] as const,

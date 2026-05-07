@@ -232,13 +232,28 @@ export function getSmartDecimals(prices: number[]): number {
 /**
  * Calculate days until earnings (negative = past)
  */
-export function getDaysUntilEarnings(dateStr: string | null | undefined): number | null {
+function parseCalendarDate(dateStr: string | null | undefined): Date | null {
   if (!dateStr) return null;
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(dateStr);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+export function getDaysUntilEarnings(dateStr: string | null | undefined): number | null {
+  const earningsDay = parseCalendarDate(dateStr);
+  if (!earningsDay) return null;
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const earningsDay = new Date(dateStr);
   earningsDay.setHours(0, 0, 0, 0);
-  return Math.ceil((earningsDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.round((earningsDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /**
@@ -281,9 +296,8 @@ export function isEarningsPast(daysUntil: number | null): boolean {
  * Format date in Czech short format (e.g., "11. 2.")
  */
 export function formatDateCzechShort(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
+  const date = parseCalendarDate(dateStr);
+  if (!date) return dateStr || '—';
   return `${date.getDate()}. ${date.getMonth() + 1}.`;
 }
 
@@ -291,12 +305,18 @@ export function formatDateCzechShort(dateStr: string | null | undefined): string
  * Format date in Czech format (e.g., "11. 2. 2026")
  */
 export function formatDateCzech(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return dateStr;
-  
+  const date = parseCalendarDate(dateStr);
+  if (!date) return dateStr || '—';
+
   const day = date.getDate();
   const month = date.getMonth() + 1;
   const year = date.getFullYear();
   return `${day}. ${month}. ${year}`;
+}
+
+export function getDateSortValue(dateStr: string | null | undefined): number | null {
+  const date = parseCalendarDate(dateStr);
+  if (!date) return null;
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }

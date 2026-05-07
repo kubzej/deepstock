@@ -55,6 +55,8 @@ import {
 } from './WatchlistItemFormDialog';
 import { isAtBuyTarget, isAtSellTarget } from './watchlistSignals';
 import { getMarketStatus } from '@/lib/marketHours';
+import { getDateSortValue } from '@/lib/format';
+import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 
 export function WatchlistsPage() {
   const navigate = useNavigate();
@@ -102,15 +104,21 @@ export function WatchlistsPage() {
     isFetching: quotesFetching,
     dataUpdatedAt: quotesUpdatedAt,
   } = useQuotes(tickers, { includeExtended: false });
+  const batchEarningsQueryKey = queryKeys.batchEarnings(tickers);
   const { data: earningsByTicker = {}, isFetching: earningsFetching, dataUpdatedAt: earningsUpdatedAt } = useQuery({
-    queryKey: ['batchEarnings', tickers.slice().sort().join(',')],
+    queryKey: batchEarningsQueryKey,
     queryFn: async () => fetchBatchEarnings(tickers),
     enabled: tickers.length > 0,
-    staleTime: 60 * 60 * 1000,
+    staleTime: STALE_TIMES.earningsCalendar,
     retry: 1,
   });
+  const batchPriceHistoryQueryKey = queryKeys.batchPriceHistory(
+    tickers,
+    '1mo',
+    'watchlist-sparkline',
+  );
   const { data: watchlistHistory = {} } = useQuery({
-    queryKey: ['batchPriceHistory', tickers.slice().sort().join(','), '1mo', 'watchlist-sparkline'],
+    queryKey: batchPriceHistoryQueryKey,
     queryFn: async () => fetchBatchPriceHistory(tickers, '1mo'),
     enabled: tickers.length > 0,
     staleTime: 5 * 60 * 1000,
@@ -275,8 +283,8 @@ export function WatchlistsPage() {
             return bHas - aHas;
           }
           if (!aDate || !bDate) return 0;
-          const aTime = new Date(aDate).getTime();
-          const bTime = new Date(bDate).getTime();
+          const aTime = getDateSortValue(aDate) ?? 0;
+          const bTime = getDateSortValue(bDate) ?? 0;
           return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
         }
         case 'sector':
@@ -478,6 +486,8 @@ export function WatchlistsPage() {
           queryClient.invalidateQueries({ queryKey: ['watchlists'] });
           queryClient.invalidateQueries({ queryKey: ['watchlistItems'] });
           queryClient.invalidateQueries({ queryKey: ['quotes'] });
+          queryClient.invalidateQueries({ queryKey: ['batchEarnings'] });
+          queryClient.invalidateQueries({ queryKey: ['batchPriceHistory'] });
           // Remove individual quote caches to force fresh batch fetch
           queryClient.removeQueries({ queryKey: ['quote'] });
         }}

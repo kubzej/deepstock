@@ -40,6 +40,11 @@ class PriceAlertService:
         if not users_response.data:
             logger.info("No users with notifications enabled")
             return {"users_checked": 0, "alerts_sent": 0}
+
+        logger.info(
+            "Starting price alert check for %d users with notifications enabled",
+            len(users_response.data),
+        )
         
         total_alerts = 0
         users_checked = 0
@@ -56,7 +61,12 @@ class PriceAlertService:
                 users_checked += 1
             except Exception as e:
                 logger.error(f"Error checking alerts for user {user['id']}: {e}")
-        
+
+        logger.info(
+            "Finished price alert check: users_checked=%d alerts_sent=%d",
+            users_checked,
+            total_alerts,
+        )
         return {"users_checked": users_checked, "alerts_sent": total_alerts}
     
     async def check_user_alerts(
@@ -71,6 +81,10 @@ class PriceAlertService:
         Returns number of alerts sent.
         """
         if not alert_buy_enabled and not alert_sell_enabled:
+            logger.info(
+                "Skipping price alerts for user %s because buy and sell alerts are disabled",
+                user_id,
+            )
             return 0
         
         # Get all watchlist items with targets for this user
@@ -81,6 +95,7 @@ class PriceAlertService:
             .execute()
         
         if not watchlists_response.data:
+            logger.info("User %s has no watchlists for price alerts", user_id)
             return 0
         
         watchlist_ids = [w["id"] for w in watchlists_response.data]
@@ -92,6 +107,7 @@ class PriceAlertService:
             .execute()
         
         if not items_response.data:
+            logger.info("User %s has no watchlist items for price alerts", user_id)
             return 0
         
         # Filter items that have at least one target set and have stock info
@@ -102,6 +118,7 @@ class PriceAlertService:
         ]
         
         if not items_with_targets:
+            logger.info("User %s has no watchlist items with targets for price alerts", user_id)
             return 0
         
         # Get unique tickers from stock data
@@ -112,12 +129,33 @@ class PriceAlertService:
         ))
         
         if not tickers:
+            logger.info("User %s has no resolved tickers for price alerts", user_id)
             return 0
+
+        logger.info(
+            "Checking price alerts for user %s: watchlists=%d items_with_targets=%d unique_tickers=%d buy_enabled=%s sell_enabled=%s",
+            user_id,
+            len(watchlist_ids),
+            len(items_with_targets),
+            len(tickers),
+            alert_buy_enabled,
+            alert_sell_enabled,
+        )
         
         # Price alerts only need basic quote data, no extended .info enrichment
         quotes = await get_quotes(redis, tickers, include_extended=False)
+        logger.info(
+            "Fetched quotes for %d/%d user %s price alert tickers",
+            len(quotes),
+            len(tickers),
+            user_id,
+        )
         
         alerts_sent = 0
+        missing_quotes = 0
+        missing_prices = 0
+        buy_candidates = 0
+        sell_candidates = 0
         
         for item in items_with_targets:
             stock = item.get("stocks", {})
@@ -125,16 +163,19 @@ class PriceAlertService:
             stock_name = stock.get("name", ticker)
             
             if not ticker or ticker not in quotes:
+                missing_quotes += 1
                 continue
             
             current_price = quotes[ticker].get("price")
             if not current_price:
+                missing_prices += 1
                 continue
             
             # Check BUY alert
             if alert_buy_enabled:
                 target_buy = item.get("target_buy_price")
                 if target_buy and current_price <= float(target_buy):
+                    buy_candidates += 1
                     # Check anti-spam: only notify if target changed
                     last_alert_price = item.get("last_buy_alert_price")
                     # Compare as strings to handle Decimal precision
@@ -143,11 +184,19 @@ class PriceAlertService:
                         if sent:
                             alerts_sent += 1
                             await self._update_last_buy_alert(item["id"], target_buy)
+                    else:
+                        logger.info(
+                            "Skipping duplicate buy alert for user %s ticker %s target=%s",
+                            user_id,
+                            ticker,
+                            target_buy,
+                        )
             
             # Check SELL alert
             if alert_sell_enabled:
                 target_sell = item.get("target_sell_price")
                 if target_sell and current_price >= float(target_sell):
+                    sell_candidates += 1
                     # Check anti-spam: only notify if target changed
                     last_alert_price = item.get("last_sell_alert_price")
                     # Compare as strings to handle Decimal precision
@@ -156,7 +205,26 @@ class PriceAlertService:
                         if sent:
                             alerts_sent += 1
                             await self._update_last_sell_alert(item["id"], target_sell)
+                    else:
+                        logger.info(
+                            "Skipping duplicate sell alert for user %s ticker %s target=%s",
+                            user_id,
+                            ticker,
+                            target_sell,
+                        )
         
+        logger.info(
+            (
+                "User %s price alert run finished: alerts_sent=%d buy_candidates=%d sell_candidates=%d "
+                "missing_quotes=%d missing_prices=%d"
+            ),
+            user_id,
+            alerts_sent,
+            buy_candidates,
+            sell_candidates,
+            missing_quotes,
+            missing_prices,
+        )
         return alerts_sent
     
     async def _send_buy_alert(self, user_id: str, item: dict, current_price: float) -> bool:
@@ -560,6 +628,7 @@ class PriceAlertService:
         quotes = await get_quotes(redis, tickers, include_extended=False)
         
         alerts_triggered = 0
+        missing_quotes = 0
         
         for ticker, alerts in alerts_by_ticker.items():
             quote = quotes.get(ticker, {})
@@ -570,6 +639,7 @@ class PriceAlertService:
             
             if not current_price:
                 logger.warning(f"No price for ticker {ticker}, skipping")
+                missing_quotes += len(alerts)
                 continue
             
             for alert in alerts:
@@ -612,6 +682,13 @@ class PriceAlertService:
                     logger.error(f"Error processing alert {alert.get('id')}: {e}")
                     continue
         
+        logger.info(
+            "Custom alert check finished: alerts_checked=%d alerts_triggered=%d missing_quotes=%d tickers=%d",
+            len(pending_alerts),
+            alerts_triggered,
+            missing_quotes,
+            len(tickers),
+        )
         return {
             "alerts_checked": len(pending_alerts),
             "alerts_triggered": alerts_triggered
