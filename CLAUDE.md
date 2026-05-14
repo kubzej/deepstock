@@ -62,10 +62,10 @@ If MCP changes, update these together:
 - `mcp/CONTRACT.md`
 - `mcp/README.md`
 
-Felix depends on this contract too. If tool names, tool purpose, response shape, or recommended call order change, keep the mirrored Felix prompts aligned:
+Alethea depends on this contract too. If tool names, tool purpose, response shape, or recommended call order change, keep the mirrored Alethea prompts aligned:
 
-- `../felix/.agents/skills/felix-invest/SKILL.md`
-- `../felix/.claude/commands/felix.invest.md`
+- `../alethea/alethea-core/agents/shared/specs/investing.md`
+- `../alethea/alethea-knowledge/personal/wiki/projects/deepstock/knowledge.md`
 
 ### yfinance Rate Limiting — BE CAREFUL
 
@@ -177,6 +177,25 @@ async def my_endpoint(user_id: str = Depends(get_current_user_id)):
 
 Backend uses Supabase `service_role_key` which bypasses Row Level Security.
 Every endpoint that returns user data **must** filter by `user_id` — either directly via `.eq("user_id", user_id)` or via a `verify_*_ownership()` check. Never return data without ownership verification.
+
+### Supabase Migrations — Povinné GRANTy pro nové tabulky
+
+Backend přistupuje k Supabase přes `service_role_key` skrze Data API (supabase-py → PostgREST). Od října 2026 Supabase vyžaduje explicitní GRANT pro každou novou tabulku — bez něj PostgREST vrátí chybu `42501`.
+
+Každá nová migrace, která vytváří tabulku v `public` schématu, **musí** obsahovat:
+
+```sql
+-- Backend (vždy povinné)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nova_tabulka TO service_role;
+
+-- RLS policy pro service_role (backend jde přes policy, ne přes přímý bypass)
+ALTER TABLE public.nova_tabulka ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access" ON public.nova_tabulka
+    FOR ALL USING (auth.role() = 'service_role');
+```
+
+Frontend nikdy nečte data přímo ze Supabase (vše jde přes FastAPI), takže `anon` a `authenticated` granty pro datové tabulky nejsou povinné — přidej je jen pokud má tabulka přímý přístup z klienta.
 
 ### Market Service
 

@@ -199,15 +199,17 @@ Valid sources for `note_id`:
 - `get_stock_journal_archive(...).notes[].id`
 - `get_portfolio_journal_archive(...).notes[].id`
 
-Returns:
+Returns a list of content blocks:
 
-- note metadata
-- full `content`
-- explicit `content_format` (`plain_text`)
+1. JSON text block with note metadata and plain-text `content`
+2. One `ImageContent` block per embedded image (e.g. earnings screenshots, charts)
+
+Images are fetched from Supabase Storage and returned as base64 — the agent can read them directly. If a note has no images, only the text block is returned.
 
 Important:
 
 - stored rich text is normalized to plain text for AI consumption
+- images are embedded inline — no separate fetch needed
 - this endpoint is for chat context, not UI rendering
 
 ### `save_stock_journal_note(ticker, content)`
@@ -553,6 +555,8 @@ Valid indicators:
 
 ## `get_journal_note_content`
 
+Returns a list of MCP content blocks. First block is always a JSON text block:
+
 ```json
 {
   "id": "uuid",
@@ -564,6 +568,9 @@ Valid indicators:
   "metadata": {}
 }
 ```
+
+Followed by zero or more `ImageContent` blocks (base64-encoded) for any images embedded in the note (earnings screenshots, charts, etc.).
+
 
 ## `save_stock_journal_note`
 
@@ -637,7 +644,7 @@ Valid indicators:
 - `get_ticker_activity.transactions[]` and `get_portfolio_context.recent_transactions[]` share the same mixed item shape
 - `get_ticker_activity` does not depend on live market data for the transaction feed; only live valuation fields inside `position_summary` may be `null`
 - `get_journal_report_content` always returns `content_format: markdown`
-- `get_journal_note_content` always returns `content_format: plain_text`
+- `get_journal_note_content` returns a list of content blocks: first a JSON text block (with `content_format: plain_text`), then zero or more `ImageContent` blocks for embedded images
 - `save_stock_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
 - `save_portfolio_journal_note` accepts plain text, and the backend converts it into stored rich-text HTML while echoing canonical plain text back to the agent
 - `get_portfolio_context` defaults to aggregated multi-portfolio scope; holdings and transactions retain portfolio identity

@@ -46,6 +46,10 @@ def _html_to_plain_text(content: str) -> str:
     return normalized.strip()
 
 
+def _extract_image_urls(content: str) -> list[str]:
+    return re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', content, flags=re.IGNORECASE)
+
+
 def _serialize_note_preview(entry: dict) -> dict:
     content = _html_to_plain_text(entry.get("content") or "")
     content = re.sub(r"\s+", " ", content).strip()
@@ -229,13 +233,15 @@ class JournalContextService:
             raise ValueError(f"Note {note_id} not found")
         if row.get("type") != "note":
             raise ValueError(f"Entry {note_id} is not a note")
+        raw_content = row.get("content") or ""
         return {
             "id": row.get("id"),
             "created_at": row.get("created_at"),
             "updated_at": row.get("updated_at"),
             "type": row.get("type") or "note",
-            "content": _html_to_plain_text(row.get("content") or ""),
+            "content": _html_to_plain_text(raw_content),
             "content_format": "plain_text",
+            "image_urls": _extract_image_urls(raw_content),
             "metadata": row.get("metadata") or {},
         }
 

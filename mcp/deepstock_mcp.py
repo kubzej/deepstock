@@ -11,13 +11,14 @@ Configuration (environment variables):
   SUPABASE_SERVICE_ROLE_KEY      Supabase service role key
   SUPABASE_JWT_SECRET            Supabase JWT secret
 """
+import json
 import os
 import time
 from typing import Any, Literal
 
 import httpx
 import jwt
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Image
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -202,6 +203,18 @@ async def _api_get(path: str, params: dict | None = None) -> dict:
 
 async def _api_post(path: str, payload: dict) -> dict:
     return await _api_request("POST", path, payload=payload)
+
+
+async def _fetch_image(url: str) -> Image | None:
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "image/jpeg")
+            fmt = content_type.split(";")[0].strip().split("/")[-1]
+            return Image(data=resp.content, format=fmt)
+    except Exception:
+        return None
 
 
 @mcp.tool()
@@ -448,19 +461,28 @@ async def get_journal_report_content(report_id: str) -> dict:
 
 
 @mcp.tool()
-async def get_journal_note_content(note_id: str) -> dict:
+async def get_journal_note_content(note_id: str) -> list:
     """
-    Get full content of a specific journal note.
+    Get full content of a specific journal note, including any embedded images.
 
     Use after get_stock_journal_archive, get_portfolio_journal_archive, or
     get_stock_context when a note preview looks relevant and you need the full text.
 
-    Response includes `content_format`, currently always `plain_text`.
-    Stored rich text is normalized for AI-friendly reading.
+    Returns a list of content blocks: first a JSON text block with note metadata
+    and plain-text content, followed by one ImageContent block per embedded image
+    (e.g. earnings screenshots, charts). Images are fetched from Supabase Storage
+    and returned as base64 so you can read them directly.
 
     note_id: the UUID from journal preview responses notes[].id
     """
-    return await _api_get(f"/api/mcp/journal-note/{note_id}")
+    data = await _api_get(f"/api/mcp/journal-note/{note_id}")
+    image_urls = data.pop("image_urls", [])
+    blocks: list = [json.dumps(data, ensure_ascii=False, indent=2)]
+    for url in image_urls:
+        img = await _fetch_image(url)
+        if img:
+            blocks.append(img)
+    return blocks
 
 
 @mcp.tool()
