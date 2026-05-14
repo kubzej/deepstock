@@ -476,7 +476,7 @@ async def get_journal_note_content(note_id: str) -> list:
     note_id: the UUID from journal preview responses notes[].id
     """
     data = await _api_get(f"/api/mcp/journal-note/{note_id}")
-    image_urls = data.pop("image_urls", [])
+    image_urls = data.get("image_urls", [])
     blocks: list = [json.dumps(data, ensure_ascii=False, indent=2)]
     for url in image_urls:
         img = await _fetch_image(url)

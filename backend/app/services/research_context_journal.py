@@ -51,14 +51,18 @@ def _extract_image_urls(content: str) -> list[str]:
 
 
 def _serialize_note_preview(entry: dict) -> dict:
-    content = _html_to_plain_text(entry.get("content") or "")
+    raw_content = entry.get("content") or ""
+    content = _html_to_plain_text(raw_content)
     content = re.sub(r"\s+", " ", content).strip()
+    image_urls = _extract_image_urls(raw_content)
     return {
         "id": entry.get("id"),
         "created_at": entry.get("created_at"),
         "updated_at": entry.get("updated_at"),
         "type": entry.get("type") or "note",
         "preview": _preview_text(content),
+        "has_images": len(image_urls) > 0,
+        "image_count": len(image_urls),
         "metadata": entry.get("metadata") or {},
     }
 
