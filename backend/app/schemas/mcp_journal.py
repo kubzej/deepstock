@@ -14,6 +14,8 @@ class JournalNotePreviewResponse(BaseModel):
     updated_at: Optional[str] = None
     type: str = "note"
     preview: str = ""
+    has_images: bool = False
+    image_count: int = 0
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -68,6 +70,7 @@ class JournalNoteContentResponse(BaseModel):
     type: str = "note"
     content: str = ""
     content_format: Literal["plain_text"] = "plain_text"
+    image_urls: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
