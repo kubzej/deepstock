@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { searchStocks } from '@/lib/api';
+import { generateStockMetadata, searchStocks } from '@/lib/api';
 import type { Stock } from '@/lib/api';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 import {
   useStocks,
   useCreateStock,
@@ -50,20 +51,25 @@ import {
   PageTopRail,
   PageShell,
 } from '@/components/shared';
-import { MoreHorizontal, Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  Sparkles,
+  Loader2,
+} from 'lucide-react';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
+import {
+  applyStockMetadataSuggestion,
+  type StockMetadataFormFields,
+} from '@/lib/stockMetadata';
 
 type CompletenessFilter = 'all' | 'complete' | 'incomplete';
 
-interface StockFormData {
+interface StockFormData extends StockMetadataFormFields {
   ticker: string;
-  name: string;
-  sector: string;
-  exchange: string;
-  currency: string;
-  country: string;
-  price_scale: number;
-  notes: string;
 }
 
 const EMPTY_FORM: StockFormData = {
@@ -122,6 +128,9 @@ export default function StocksManager() {
   // Form state
   const [formData, setFormData] = useState<StockFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiInfo, setAiInfo] = useState<string | null>(null);
 
   // Derived state - apply completeness filter
   const baseStocks = searchResults ?? allStocks;
@@ -169,6 +178,8 @@ export default function StocksManager() {
     setIsEditMode(false);
     setFormData(EMPTY_FORM);
     setFormError(null);
+    setAiError(null);
+    setAiInfo(null);
     setDialogOpen(true);
   };
 
@@ -187,6 +198,8 @@ export default function StocksManager() {
       notes: stock.notes || '',
     });
     setFormError(null);
+    setAiError(null);
+    setAiInfo(null);
     setDialogOpen(true);
   };
 
@@ -202,7 +215,10 @@ export default function StocksManager() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'country' ? value.toUpperCase().slice(0, 2) : value,
+    }));
   };
 
   // Handle number input change
@@ -220,6 +236,37 @@ export default function StocksManager() {
       ...prev,
       [name]: value === '_none_' ? '' : value,
     }));
+  };
+
+  const handleAiAutofill = async () => {
+    const resolvedTicker = formData.ticker.trim().toUpperCase();
+    if (!resolvedTicker) return;
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiInfo(null);
+
+    try {
+      const suggestion = await generateStockMetadata(resolvedTicker);
+      setFormData((prev) => {
+        const { nextData, appliedFields } = applyStockMetadataSuggestion(
+          prev,
+          suggestion,
+        );
+        setAiInfo(
+          appliedFields.length > 0
+            ? `Doplněno: ${appliedFields.join(', ')}${suggestion.used_ai ? ' přes AI.' : '.'}`
+            : 'Všechna podporovaná pole už jsou vyplněná.',
+        );
+        return nextData;
+      });
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : 'Nepodařilo se AI doplnění.',
+      );
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Submit form (create or update)
@@ -375,7 +422,16 @@ export default function StocksManager() {
                 <div
                   key={stock.id}
                   className="flex items-center gap-2 py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
-                  onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
+                  onClick={() =>
+                    navigate({
+                      to: '/stocks/$ticker',
+                      params: { ticker: stock.ticker },
+                      state: withStockDetailBack({
+                        to: '/stocks',
+                        label: 'Akcie',
+                      }),
+                    })
+                  }
                 >
                   {/* Stock info */}
                   <div className="flex-1 min-w-0">
@@ -552,7 +608,7 @@ export default function StocksManager() {
                   placeholder="US"
                   value={formData.country}
                   onChange={handleChange}
-                  maxLength={10}
+                  maxLength={2}
                 />
               </div>
             </div>
@@ -591,7 +647,26 @@ export default function StocksManager() {
               />
             </div>
 
+            {aiError && <p className="text-xs text-destructive">{aiError}</p>}
+            {aiInfo && !aiError && (
+              <p className="text-xs text-muted-foreground">{aiInfo}</p>
+            )}
+
             <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAiAutofill}
+                disabled={aiLoading || !formData.ticker.trim()}
+                className="gap-1.5"
+              >
+                {aiLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {aiLoading ? 'Doplňuji...' : 'AI doplnit'}
+              </Button>
               <Button
                 type="button"
                 variant="outline"

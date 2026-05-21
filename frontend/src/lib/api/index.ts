@@ -61,6 +61,7 @@ export {
   type Transaction,
   type SourceTransaction,
   type OpenLot,
+  type AvailableLot,
   type TransactionUpdateData,
   type RecalculateHoldingsResult,
   type PerformancePoint,
@@ -76,6 +77,7 @@ export {
   fetchAllHoldings,
   fetchOpenLots,
   fetchAllOpenLots,
+  fetchAvailableLots,
   fetchTransactions,
   fetchAllTransactions,
   fetchAllTransactionsPage,
@@ -188,3 +190,9 @@ export {
   type WatchlistTargetsResponse,
   generateWatchlistTargets,
 } from './ai_watchlist_targets';
+
+// AI Stock Metadata
+export {
+  type StockMetadataSuggestion,
+  generateStockMetadata,
+} from './ai_stock_metadata';

@@ -8,13 +8,13 @@ Personal investing workstation for portfolio management, stock and options track
 
 | Layer    | Stack                                                        |
 | -------- | ------------------------------------------------------------ |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query, TanStack Router |
 | Backend  | Python 3.12, FastAPI, Pydantic v2                            |
 | Data     | Supabase (PostgreSQL + Auth), Redis (cache)                  |
 | AI       | Claude Sonnet via LiteLLM, Tavily (web search)               |
 | Infra    | Docker Compose (backend + Redis), Vite dev server (frontend) |
 
-All business logic lives in the backend. The frontend is a presentation layer — no calculations, no direct external API calls.
+Core investing, accounting, and portfolio logic lives in the backend. The frontend is primarily a presentation and workflow layer that talks to FastAPI, with a few UI-local utilities and embeds where the UX depends on them.
 
 ## Running
 
@@ -25,6 +25,16 @@ docker compose up -d
 # Frontend
 cd frontend && npm run dev
 ```
+
+## Verify
+
+```bash
+make verify
+```
+
+Runs the standard repository verification flow:
+- `frontend`: `npm run lint` and `npm run build`
+- `backend`: `python3 -m pytest`
 
 ## Conventions & patterns
 

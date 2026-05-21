@@ -11,6 +11,7 @@ import {
 } from '@/lib/format';
 import type { ExchangeRates } from '@/lib/api';
 import { toCZK } from '@/lib/format';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 
 export interface OpenLot {
   id: string;
@@ -354,7 +355,16 @@ export function OpenLotsRanking({
             key={lot.id}
             lot={lot}
             showPortfolio={showPortfolioColumn}
-            onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: lot.ticker } })}
+            onClick={() =>
+              navigate({
+                to: '/stocks/$ticker',
+                params: { ticker: lot.ticker },
+                state: withStockDetailBack({
+                  to: '/',
+                  label: 'Dashboard',
+                }),
+              })
+            }
           />
         ))}
       </div>

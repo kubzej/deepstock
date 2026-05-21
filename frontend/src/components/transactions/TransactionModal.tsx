@@ -20,22 +20,19 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useStocks } from '@/hooks/useStocks';
-import { updateTransaction, API_URL, getAuthHeader, type Transaction } from '@/lib/api';
+import {
+  updateTransaction,
+  fetchAvailableLots,
+  type AvailableLot,
+  API_URL,
+  getAuthHeader,
+  type Transaction,
+} from '@/lib/api';
 import { formatPrice, formatDate, formatNumber } from '@/lib/format';
 import { CURRENCIES } from '@/lib/constants';
 
 type TransactionType = 'BUY' | 'SELL';
 type SellMode = 'entire' | 'lot' | 'partial';
-
-interface AvailableLot {
-  id: string;
-  date: string;
-  quantity: number;
-  remaining_shares: number;
-  price_per_share: number;
-  currency: string;
-  total_amount: number;
-}
 
 interface TransactionFormData {
   stockTicker: string;
@@ -154,14 +151,11 @@ export function TransactionModal({
 
     setLotsLoading(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/portfolio/${activePortfolio.id}/available-lots/${formData.stockTicker}`,
-        { headers: await getAuthHeader() },
+      const lots = await fetchAvailableLots(
+        activePortfolio.id,
+        formData.stockTicker,
       );
-      if (response.ok) {
-        const lots = await response.json();
-        setAvailableLots(lots);
-      }
+      setAvailableLots(lots);
     } catch (err) {
       console.error('Failed to load available lots:', err);
     } finally {

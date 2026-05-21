@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -33,6 +34,23 @@ class Settings(BaseSettings):
 
     # App
     debug: bool = False
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalize_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        if isinstance(value, (int, float)):
+            return bool(value)
+
+        normalized = str(value).strip().lower()
+        if normalized in {"1", "true", "yes", "on", "debug", "dev", "development", "local"}:
+            return True
+        if normalized in {"0", "false", "no", "off", "release", "prod", "production", "staging"}:
+            return False
+        return value
     
     class Config:
         env_file = ".env"

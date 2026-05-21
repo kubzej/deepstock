@@ -31,6 +31,7 @@ import {
   fromCZK,
 } from '@/lib/format';
 import { getMarketStatus } from '@/lib/marketHours';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 
 export interface Holding {
   ticker: string;
@@ -421,7 +422,14 @@ export function HoldingsTable({
                   onClick={() =>
                     isExpandable
                       ? toggleExpand(holding.ticker)
-                      : navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })
+                      : navigate({
+                          to: '/stocks/$ticker',
+                          params: { ticker: holding.ticker },
+                          state: withStockDetailBack({
+                            to: '/',
+                            label: 'Dashboard',
+                          }),
+                        })
                   }
                 >
                   <TableCell>
@@ -566,7 +574,16 @@ export function HoldingsTable({
                     <TableRow
                       key={`${subHolding.ticker}-${subHolding.portfolioName}`}
                       className="cursor-pointer hover:bg-muted/50 border-border bg-muted/20"
-                      onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: subHolding.ticker } })}
+                      onClick={() =>
+                        navigate({
+                          to: '/stocks/$ticker',
+                          params: { ticker: subHolding.ticker },
+                          state: withStockDetailBack({
+                            to: '/',
+                            label: 'Dashboard',
+                          }),
+                        })
+                      }
                     >
                       <TableCell>
                         <div className="pl-8 text-muted-foreground text-sm">
@@ -687,7 +704,16 @@ export function HoldingsTable({
                   isExpandable ? holding.portfolioHoldings : undefined
                 }
                 sparklineData={sparklineByTicker[holding.ticker]}
-                onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: holding.ticker } })}
+                onClick={() =>
+                  navigate({
+                    to: '/stocks/$ticker',
+                    params: { ticker: holding.ticker },
+                    state: withStockDetailBack({
+                      to: '/',
+                      label: 'Dashboard',
+                    }),
+                  })
+                }
               />
             );
           })}

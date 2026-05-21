@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import Iterable, Literal, Optional
 
 from app.services.research_context_activity import ActivityFilterError
+from app.services.research_context_activity import _iso_now
+from app.services.research_context_activity import _resolve_activity_window
 from app.services.research_context_activity import activity_portfolio_context_service
 from app.services.research_context_journal import journal_context_service
 from app.services.research_context_market import market_context_service
@@ -16,6 +18,43 @@ TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 
 
 class ResearchContextService:
+    async def _get_stock_row(self, ticker: str) -> Optional[dict]:
+        return await market_context_service._get_stock_row(ticker)
+
+    async def _build_activity_context(
+        self,
+        ticker: str,
+        user_id: str,
+        stock_price: Optional[float],
+    ) -> dict:
+        return await activity_portfolio_context_service.build_activity_context(
+            ticker,
+            user_id=user_id,
+            stock_price=stock_price,
+        )
+
+    async def _get_mixed_activity_feed(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        ticker: Optional[str] = None,
+        period: str = "ALL",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        limit: int = 50,
+        cursor: Optional[str] = None,
+    ) -> dict:
+        return await activity_portfolio_context_service.get_mixed_activity_feed(
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            ticker=ticker,
+            period=period,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            cursor=cursor,
+        )
+
     async def get_stock_context(self, ticker: str, user_id: str) -> dict:
         return await market_context_service.get_stock_context(
             ticker,
@@ -65,15 +104,40 @@ class ResearchContextService:
         limit: int = 50,
         cursor: Optional[str] = None,
     ) -> dict:
-        return await activity_portfolio_context_service.get_ticker_activity(
-            ticker=ticker,
+        normalized_ticker = ticker.upper()
+        stock = await self._get_stock_row(normalized_ticker)
+        if not stock:
+            raise ValueError(f"Ticker {normalized_ticker} not found")
+
+        activity_context = await self._build_activity_context(
+            normalized_ticker,
             user_id=user_id,
+            stock_price=None,
+        )
+        feed = await self._get_mixed_activity_feed(
+            user_id=user_id,
+            ticker=normalized_ticker,
             period=period,
             from_date=from_date,
             to_date=to_date,
             limit=limit,
             cursor=cursor,
         )
+
+        return {
+            "ticker": normalized_ticker,
+            "generated_at": _iso_now(),
+            "period": feed["period"],
+            "from_date": feed["from_date"],
+            "to_date": feed["to_date"],
+            "limit": feed["limit"],
+            "cursor": feed["cursor"],
+            "next_cursor": feed["next_cursor"],
+            "has_more": feed["has_more"],
+            "position_summary": activity_context["position_summary"],
+            "transactions": feed["transactions"],
+            "option_summary": activity_context["option_summary"],
+        }
 
     async def get_portfolio_activity(
         self,

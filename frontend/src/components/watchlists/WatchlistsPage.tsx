@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -589,7 +590,16 @@ export function WatchlistsPage() {
                           onTags={() => openTagsDialog(item)}
                           onMove={() => setMoveItemData(item)}
                           showMoveOption={watchlists.length > 1}
-                          onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
+                          onClick={() =>
+                            navigate({
+                              to: '/stocks/$ticker',
+                              params: { ticker: item.stocks.ticker },
+                              state: withStockDetailBack({
+                                to: '/watchlist',
+                                label: 'Watchlist',
+                              }),
+                            })
+                          }
                           showWatchlistName={false}
                         />
                       ))}

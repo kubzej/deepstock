@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeft,
   TrendingUp,
@@ -43,6 +43,7 @@ import { StockFormDialog } from './StockFormDialog';
 import { InsiderTrades } from './InsiderTrades';
 import { useOptionTransactions, useOptionHoldings } from '@/hooks/useOptions';
 import type { OptionTransaction, OptionHolding } from '@/lib/api';
+import type { StockDetailBackState } from '@/lib/stockDetailNavigation';
 import {
   SymbolOverview,
   isTradingViewSupported,
@@ -51,7 +52,15 @@ import {
 export function StockDetail() {
   const { ticker } = useParams({ from: '/stocks/$ticker' });
   const navigate = useNavigate();
-  const onBack = () => navigate({ to: '/stocks' });
+  const backNavigation = useLocation({
+    select: (location) =>
+      ((location.state as { stockDetailBack?: StockDetailBackState } | undefined)
+        ?.stockDetailBack ?? null),
+  });
+  const onBack = () =>
+    navigate({
+      to: backNavigation?.to ?? '/stocks',
+    });
   const {
     portfolio,
     getHoldingByTicker,
@@ -360,7 +369,10 @@ export function StockDetail() {
 
   return (
     <div className="pb-24 md:pb-6 space-y-6">
-      <PageBackButton onClick={onBack} />
+      <PageBackButton
+        onClick={onBack}
+        label={backNavigation?.label ?? 'Akcie'}
+      />
 
       <PageHero
         title={
