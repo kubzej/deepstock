@@ -188,3 +188,9 @@ export {
   type WatchlistTargetsResponse,
   generateWatchlistTargets,
 } from './ai_watchlist_targets';
+
+// AI Stock Metadata
+export {
+  type StockMetadataSuggestion,
+  generateStockMetadata,
+} from './ai_stock_metadata';

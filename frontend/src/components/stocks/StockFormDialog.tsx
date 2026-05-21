@@ -18,19 +18,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { updateStock } from '@/lib/api';
+import { Loader2, Sparkles } from 'lucide-react';
+import { generateStockMetadata, updateStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
+import {
+  applyStockMetadataSuggestion,
+  type StockMetadataFormFields,
+} from '@/lib/stockMetadata';
 
-interface StockFormData {
-  name: string;
-  sector: string;
-  exchange: string;
-  currency: string;
-  country: string;
-  price_scale: number;
-  notes: string;
-}
+type StockFormData = StockMetadataFormFields;
 
 interface StockFormDialogProps {
   stock: Stock | null;
@@ -56,6 +53,9 @@ export function StockFormDialog({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiInfo, setAiInfo] = useState<string | null>(null);
 
   // Populate form when stock changes
   useEffect(() => {
@@ -70,6 +70,8 @@ export function StockFormDialog({
         notes: stock.notes || '',
       });
       setError(null);
+      setAiError(null);
+      setAiInfo(null);
     }
   }, [stock]);
 
@@ -77,7 +79,10 @@ export function StockFormDialog({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'country' ? value.toUpperCase().slice(0, 2) : value,
+    }));
   };
 
   const handleSelectChange = (field: string, value: string) => {
@@ -113,6 +118,36 @@ export function StockFormDialog({
       setError(err instanceof Error ? err.message : 'Nepodařilo se uložit');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAiAutofill = async () => {
+    if (!stock?.ticker) return;
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiInfo(null);
+
+    try {
+      const suggestion = await generateStockMetadata(stock.ticker);
+      setFormData((prev) => {
+        const { nextData, appliedFields } = applyStockMetadataSuggestion(
+          prev,
+          suggestion,
+        );
+        setAiInfo(
+          appliedFields.length > 0
+            ? `Doplněno: ${appliedFields.join(', ')}${suggestion.used_ai ? ' přes AI.' : '.'}`
+            : 'Všechna podporovaná pole už jsou vyplněná.',
+        );
+        return nextData;
+      });
+    } catch (err) {
+      setAiError(
+        err instanceof Error ? err.message : 'Nepodařilo se AI doplnění.',
+      );
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -206,7 +241,7 @@ export function StockFormDialog({
                 placeholder="US"
                 value={formData.country}
                 onChange={handleChange}
-                maxLength={10}
+                maxLength={2}
               />
             </div>
           </div>
@@ -245,7 +280,26 @@ export function StockFormDialog({
             />
           </div>
 
+          {aiError && <p className="text-xs text-destructive">{aiError}</p>}
+          {aiInfo && !aiError && (
+            <p className="text-xs text-muted-foreground">{aiInfo}</p>
+          )}
+
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAiAutofill}
+              disabled={aiLoading || !stock?.ticker}
+              className="gap-1.5"
+            >
+              {aiLoading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {aiLoading ? 'Doplňuji...' : 'AI doplnit'}
+            </Button>
             <Button
               type="button"
               variant="outline"
