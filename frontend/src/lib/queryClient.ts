@@ -81,7 +81,7 @@ export const queryClient = new QueryClient({
 // Query key factory for consistent keys
 export const queryKeys = {
   // Quotes
-  quotes: (tickers: string[]) => ['quotes', tickers.sort().join(',')] as const,
+  quotes: (tickers: string[]) => ['quotes', tickers.slice().sort().join(',')] as const,
   quote: (ticker: string) => ['quote', ticker] as const,
 
   // Holdings
@@ -134,7 +134,7 @@ export const queryKeys = {
   optionStats: (portfolioId?: string) => portfolioId
     ? ['optionStats', portfolioId] as const
     : ['optionStats', 'all'] as const,
-  optionQuotes: (symbols: string[]) => ['optionQuotes', symbols.sort().join(',')] as const,
+  optionQuotes: (symbols: string[]) => ['optionQuotes', symbols.slice().sort().join(',')] as const,
 
   // Portfolio snapshot
   portfolioSnapshot: (portfolioId: string | null) =>

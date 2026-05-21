@@ -5,6 +5,62 @@
 import { useEffect, useRef, memo } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
 
+const TRADINGVIEW_LIBRARY_SRC = 'https://s3.tradingview.com/tv.js';
+let tradingViewLibraryPromise: Promise<void> | null = null;
+
+function loadTradingViewLibrary(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+
+  if (typeof window.TradingView !== 'undefined') {
+    return Promise.resolve();
+  }
+
+  if (tradingViewLibraryPromise) {
+    return tradingViewLibraryPromise;
+  }
+
+  tradingViewLibraryPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${TRADINGVIEW_LIBRARY_SRC}"]`,
+    );
+
+    if (existingScript) {
+      const handleLoad = () => resolve();
+      const handleError = () => {
+        tradingViewLibraryPromise = null;
+        reject(new Error('Failed to load TradingView library'));
+      };
+
+      existingScript.addEventListener('load', handleLoad, { once: true });
+      existingScript.addEventListener('error', handleError, { once: true });
+
+      if (typeof window.TradingView !== 'undefined') {
+        existingScript.removeEventListener('load', handleLoad);
+        existingScript.removeEventListener('error', handleError);
+        resolve();
+      }
+
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = TRADINGVIEW_LIBRARY_SRC;
+    script.async = true;
+
+    script.onload = () => resolve();
+    script.onerror = () => {
+      tradingViewLibraryPromise = null;
+      reject(new Error('Failed to load TradingView library'));
+    };
+
+    document.head.appendChild(script);
+  });
+
+  return tradingViewLibraryPromise;
+}
+
 // ============================================================
 // Generic Widget Container
 // ============================================================
@@ -287,6 +343,7 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    let isCancelled = false;
 
     // Clear previous widget
     container.innerHTML = '';
@@ -298,11 +355,18 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
     widgetDiv.style.width = '100%';
     container.appendChild(widgetDiv);
 
-    // Load TradingView library
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/tv.js';
-    script.async = true;
-    script.onload = () => {
+    const initializeWidget = async () => {
+      try {
+        await loadTradingViewLibrary();
+      } catch (error) {
+        console.error('Failed to load TradingView library:', error);
+        return;
+      }
+
+      if (isCancelled) {
+        return;
+      }
+
       if (typeof window.TradingView !== 'undefined') {
         new window.TradingView.widget({
           autosize: true,
@@ -331,11 +395,12 @@ export const TradingViewAdvancedChart = memo(function TradingViewAdvancedChart({
         });
       }
     };
-    document.head.appendChild(script);
+
+    void initializeWidget();
 
     return () => {
+      isCancelled = true;
       container.innerHTML = '';
-      // Note: Script remains in head (cached by browser)
     };
   }, [tvSymbol, interval, hideTopToolbar, hideLegend, theme, JSON.stringify(studies)]);
 

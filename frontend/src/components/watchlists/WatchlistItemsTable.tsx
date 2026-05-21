@@ -34,6 +34,7 @@ import {
   type WatchlistItemWithSource,
   type Quote,
 } from '@/lib/api';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 import { Sparkline } from '@/components/shared/Sparkline';
 import {
   getDaysUntilEarnings,
@@ -227,7 +228,16 @@ export function WatchlistItemsTable({
                       ? 'bg-warning/10'
                       : ''
                 }`}
-                onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: item.stocks.ticker } })}
+                onClick={() =>
+                  navigate({
+                    to: '/stocks/$ticker',
+                    params: { ticker: item.stocks.ticker },
+                    state: withStockDetailBack({
+                      to: '/watchlist',
+                      label: 'Watchlist',
+                    }),
+                  })
+                }
               >
                 <TableCell>
                   <div className="flex items-start gap-2 py-1">

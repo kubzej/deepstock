@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { generateStockMetadata, searchStocks } from '@/lib/api';
 import type { Stock } from '@/lib/api';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 import {
   useStocks,
   useCreateStock,
@@ -421,7 +422,16 @@ export default function StocksManager() {
                 <div
                   key={stock.id}
                   className="flex items-center gap-2 py-2 px-2 rounded hover:bg-muted/50 group cursor-pointer"
-                  onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: stock.ticker } })}
+                  onClick={() =>
+                    navigate({
+                      to: '/stocks/$ticker',
+                      params: { ticker: stock.ticker },
+                      state: withStockDetailBack({
+                        to: '/stocks',
+                        label: 'Akcie',
+                      }),
+                    })
+                  }
                 >
                   {/* Stock info */}
                   <div className="flex-1 min-w-0">

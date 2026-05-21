@@ -3,7 +3,9 @@ Options Trading Service for DeepStock.
 Handles CRUD operations for option transactions and holdings.
 """
 import logging
+from app.core.redis import get_redis
 from app.core.supabase import supabase
+from app.services.market.options_quotes import get_option_quotes
 from app.services.options_accounting import (
     annotate_option_transactions,
     calculate_option_accounting,
@@ -433,80 +435,39 @@ class OptionsService:
             .execute()
         
         return response.data
-    
-    def _fetch_option_prices_batch(self, option_symbols: List[str]) -> List[dict]:
-        """
-        Fetch multiple option prices using yf.Tickers batch object.
-        This shares the HTTP session across all tickers for better performance.
-        """
-        import yfinance as yf
-        
-        results = []
-        
-        if not option_symbols:
-            return results
-        
-        try:
-            # Create batch ticker object - shares HTTP session
-            batch = yf.Tickers(" ".join(option_symbols))
-            
-            for occ_symbol in option_symbols:
-                try:
-                    ticker_obj = batch.tickers.get(occ_symbol)
-                    if not ticker_obj:
-                        continue
-                    
-                    info = ticker_obj.info
-                    
-                    if not info or info.get("regularMarketPrice") is None:
-                        continue
-                    
-                    results.append({
-                        "option_symbol": occ_symbol,
-                        "price": info.get("regularMarketPrice"),
-                        "bid": info.get("bid"),
-                        "ask": info.get("ask"),
-                        "volume": info.get("volume"),
-                        "open_interest": info.get("openInterest"),
-                        "implied_volatility": info.get("impliedVolatility"),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                    })
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to fetch price for {occ_symbol}: {e}")
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"Error creating batch tickers: {e}")
-        
-        return results
 
     async def fetch_live_prices(self, option_symbols: List[str]) -> List[dict]:
         """
         Fetch live option prices from Yahoo Finance via yfinance.
         Updates the option_prices cache and returns the results.
         
-        Optimization: Uses yf.Tickers batch object for shared HTTP session.
+        Uses the shared Redis-backed option quote cache first and only fetches
+        missing/expired OCC symbols from Yahoo Finance.
         """
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-        
         if not option_symbols:
             return []
-        
-        # Batch fetch using shared session in thread pool
-        loop = asyncio.get_event_loop()
-        
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            fetched_results = await loop.run_in_executor(
-                executor, 
-                self._fetch_option_prices_batch, 
-                option_symbols
-            )
-        
-        # Upsert to cache
+
+        redis = get_redis()
+        quotes_by_symbol = await get_option_quotes(redis, option_symbols)
+
         results = []
-        for result in fetched_results:
+        for occ_symbol in option_symbols:
+            quote = quotes_by_symbol.get(occ_symbol)
+            if not quote or quote.get("price") is None:
+                continue
+
+            result = {
+                "option_symbol": occ_symbol,
+                "price": quote.get("price"),
+                "bid": quote.get("bid"),
+                "ask": quote.get("ask"),
+                "volume": quote.get("volume"),
+                "open_interest": quote.get("openInterest"),
+                "implied_volatility": quote.get("impliedVolatility"),
+                "updated_at": quote.get("lastUpdated")
+                or datetime.now(timezone.utc).isoformat(),
+            }
+
             try:
                 supabase.table("option_prices") \
                     .upsert(result, on_conflict="option_symbol") \

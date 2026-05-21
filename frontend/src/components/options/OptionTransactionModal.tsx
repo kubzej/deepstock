@@ -33,23 +33,13 @@ import {
 } from '@/hooks/useOptions';
 import { useStocks } from '@/hooks/useStocks';
 import { formatPrice, formatDate } from '@/lib/format';
-import { API_URL } from '@/lib/api';
+import { fetchAvailableLots, type AvailableLot } from '@/lib/api';
 import { CURRENCIES } from '@/lib/constants';
 import type { OptionType, OptionAction, OptionHolding } from '@/lib/api';
 
 // ============ Types ============
 
 export type ModalMode = 'open' | 'close';
-
-interface AvailableLot {
-  id: string;
-  date: string;
-  quantity: number;
-  remaining_shares: number;
-  price_per_share: number;
-  currency: string;
-  total_amount: number;
-}
 
 interface OptionTransactionModalProps {
   open: boolean;
@@ -257,16 +247,11 @@ export function OptionTransactionModal({
 
     setLotsLoading(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/portfolio/${portfolio.id}/available-lots/${holding.symbol}`,
-      );
-      if (response.ok) {
-        const lots = await response.json();
-        setAvailableLots(lots);
-        // Auto-select first lot if available
-        if (lots.length > 0) {
-          setSelectedLotId(lots[0].id);
-        }
+      const lots = await fetchAvailableLots(portfolio.id, holding.symbol);
+      setAvailableLots(lots);
+      // Auto-select first lot if available
+      if (lots.length > 0) {
+        setSelectedLotId(lots[0].id);
       }
     } catch (err) {
       console.error('Failed to load available lots:', err);

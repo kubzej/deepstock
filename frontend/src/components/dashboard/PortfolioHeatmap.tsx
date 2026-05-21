@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/shared';
 import type { Quote, ExchangeRates } from '@/lib/api';
 import type { Holding } from './HoldingsTable';
 import { formatPrice, toCZK } from '@/lib/format';
+import { withStockDetailBack } from '@/lib/stockDetailNavigation';
 
 interface PortfolioHeatmapProps {
   holdings: Holding[];
@@ -157,7 +158,16 @@ function HeatmapCell(props: Record<string, unknown>) {
 
   return (
     <g
-      onClick={() => navigate({ to: '/stocks/$ticker', params: { ticker: String(ticker) } })}
+      onClick={() =>
+        navigate({
+          to: '/stocks/$ticker',
+          params: { ticker: String(ticker) },
+          state: withStockDetailBack({
+            to: '/',
+            label: 'Dashboard',
+          }),
+        })
+      }
       style={{ cursor: 'pointer' }}
       className="heatmap-cell"
     >

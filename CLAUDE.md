@@ -12,7 +12,7 @@ Personal portfolio tracker and stock analysis tool. Single user (owner-operated)
 
 | Layer    | Stack                                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 4, shadcn/ui (Radix), TanStack Query 5, Recharts, Lucide icons |
+| Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 4, shadcn/ui (Radix), TanStack Query 5, TanStack Router, Recharts, Lucide icons |
 | Backend  | Python 3.12, FastAPI, Pydantic v2, yfinance, Pandas                                                       |
 | Data     | Supabase (PostgreSQL + Auth), Redis 7 (cache)                                                             |
 | AI       | Claude Sonnet via LiteLLM, Tavily (web search)                                                            |
@@ -32,7 +32,13 @@ cd frontend && npm run dev
 
 ### Smart Backend, Dumb UI
 
-All calculations (scores, indicators, aggregations) happen in Python. Frontend is presentation only. Frontend NEVER calls external APIs directly — always through FastAPI.
+Core investing logic (accounting, holdings, performance semantics, derived portfolio state) belongs in Python. Frontend should stay backend-first for business logic and fetch application data through FastAPI.
+
+Current repo reality:
+
+- frontend contains a few UI-local utilities such as the options calculator and workflow state
+- frontend embeds third-party widgets such as TradingView where the UX depends on them
+- these exceptions should not become a precedent for moving core portfolio or market business rules out of the backend
 
 ### MCP Is A Public Contract
 
@@ -118,16 +124,17 @@ If a shadcn component doesn't exist yet: `cd frontend && npx shadcn@latest add <
 Every page follows this structure:
 
 ```tsx
-<div className="space-y-6 pb-12">
-  <PageHeader title="..." onRefresh={...} actions={...} />
+<PageShell width="full">
+  <PageIntro title="..." onRefresh={...} dataUpdatedAt={...} />
   {isLoading && <Skeleton />}
-  {error && <Alert variant="destructive">...</Alert>}
+  {error && <ErrorState ... />}
   {data && <Content />}
-</div>
+</PageShell>
 ```
 
-- `PageHeader` from `@/components/shared/PageHeader` for all page titles
-- `space-y-6` for vertical spacing, `pb-12` for mobile nav padding
+- Use `PageShell` from `@/components/shared/PageShell` as the default page wrapper
+- Use `PageIntro` for standard page headers and `PageHero` for dashboard/detail hero sections
+- Use shared feedback states (`EmptyState`, `ErrorState`, `FilteredEmptyState`) instead of ad hoc empty/error blocks where possible
 - No `p-4 md:p-6` on page wrappers — `AppLayout` handles padding
 
 ### Design System
@@ -140,9 +147,9 @@ Every page follows this structure:
 
 ### Navigation
 
-- Mobile: Bottom nav + hamburger header (`MobileHeader`)
+- Mobile: Fixed top header with portfolio switcher, quick-add menu, and hamburger navigation (`MobileHeader`)
 - Desktop: Fixed left sidebar 256px wide (`Sidebar`)
-- Routing: State-based via `activeTab` in `App.tsx` (no react-router)
+- Routing: `frontend/src/router.tsx` via TanStack Router
 
 ### API Client Pattern
 
@@ -233,10 +240,10 @@ content, model = await call_llm(SYSTEM_PROMPT, user_prompt)
 
 ### Frontend
 
-- `frontend/src/App.tsx` — routing, main layout
+- `frontend/src/router.tsx` — route tree, auth-gated root layout, page entrypoints
 - `frontend/src/components/layout/` — AppLayout, Sidebar, MobileHeader
 - `frontend/src/components/ui/` — shadcn components
-- `frontend/src/components/shared/` — PageHeader, ConfirmDialog, EmptyState, etc.
+- `frontend/src/components/shared/` — PageShell family, feedback states, reusable product UI
 - `frontend/src/hooks/` — React Query hooks (useQuotes, useHoldings, etc.)
 - `frontend/src/lib/api/` — API client functions per domain
 - `frontend/src/lib/queryClient.ts` — QueryClient config, queryKeys factory, STALE_TIMES

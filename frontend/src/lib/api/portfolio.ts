@@ -136,6 +136,16 @@ export interface OpenLot {
   portfolioName?: string;
 }
 
+export interface AvailableLot {
+  id: string;
+  date: string;
+  quantity: number;
+  remaining_shares: number;
+  price_per_share: number;
+  currency: string;
+  total_amount: number;
+}
+
 export interface TransactionUpdateData {
   shares?: number;
   price_per_share?: number;
@@ -386,6 +396,34 @@ export async function fetchAllOpenLots(): Promise<OpenLot[]> {
     throw new Error('Failed to fetch all open lots');
   }
   
+  return response.json();
+}
+
+export async function fetchAvailableLots(
+  portfolioId: string,
+  stockTicker: string,
+): Promise<AvailableLot[]> {
+  const authHeader = await getAuthHeader();
+  const response = await fetch(
+    `${API_URL}/api/portfolio/${portfolioId}/available-lots/${stockTicker}`,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeader,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+    if (response.status === 404) {
+      throw new Error('Portfolio or lots not found');
+    }
+    throw new Error('Failed to fetch available lots');
+  }
+
   return response.json();
 }
 

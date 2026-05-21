@@ -376,26 +376,24 @@ export function OptionsCalculator() {
   const selectedScenario = useMemo(() => {
     return scenarios.find((scenario) => scenario.id === selectedScenarioId);
   }, [scenarios, selectedScenarioId]);
-
-  if (!selectedScenario) {
-    return null;
-  }
+  const activeScenario =
+    selectedScenario ?? scenarios[0] ?? createDefaultRuntimeState().scenarios[0];
 
   const selectedParsedInputs = useMemo(() => {
-    return parseScenarioInput(selectedScenario);
-  }, [selectedScenario]);
+    return parseScenarioInput(activeScenario);
+  }, [activeScenario]);
 
   const selectedErrors = useMemo(() => {
-    return getValidationErrors(selectedScenario, selectedParsedInputs);
-  }, [selectedScenario, selectedParsedInputs]);
+    return getValidationErrors(activeScenario, selectedParsedInputs);
+  }, [activeScenario, selectedParsedInputs]);
 
   const selectedHasErrors = Object.keys(selectedErrors).length > 0;
   const selectedIsComplete =
-    selectedScenario.stockPrice !== '' &&
-    selectedScenario.strike !== '' &&
-    selectedScenario.premium !== '' &&
-    selectedScenario.contracts !== '' &&
-    selectedScenario.expirationDate !== '';
+    activeScenario.stockPrice !== '' &&
+    activeScenario.strike !== '' &&
+    activeScenario.premium !== '' &&
+    activeScenario.contracts !== '' &&
+    activeScenario.expirationDate !== '';
 
   const selectedCalculation = useMemo(() => {
     const {
@@ -413,21 +411,21 @@ export function OptionsCalculator() {
       return null;
     }
 
-    if (selectedScenario.strategy === 'sell-put') {
-      return calculateSellPut(sp, st, pr, ct, selectedScenario.expirationDate);
+    if (activeScenario.strategy === 'sell-put') {
+      return calculateSellPut(sp, st, pr, ct, activeScenario.expirationDate);
     }
 
-    if (selectedScenario.strategy === 'sell-call') {
-      return calculateSellCall(sp, st, pr, ct, selectedScenario.expirationDate);
+    if (activeScenario.strategy === 'sell-call') {
+      return calculateSellCall(sp, st, pr, ct, activeScenario.expirationDate);
     }
 
-    if (selectedScenario.strategy === 'buy-call') {
-      return calculateBuyCall(sp, st, pr, ct, selectedScenario.expirationDate);
+    if (activeScenario.strategy === 'buy-call') {
+      return calculateBuyCall(sp, st, pr, ct, activeScenario.expirationDate);
     }
 
-    return calculateBuyPut(sp, st, pr, ct, selectedScenario.expirationDate);
+    return calculateBuyPut(sp, st, pr, ct, activeScenario.expirationDate);
   }, [
-    selectedScenario,
+    activeScenario,
     selectedParsedInputs,
     selectedIsComplete,
     selectedHasErrors,
@@ -592,7 +590,7 @@ export function OptionsCalculator() {
   const updateSelectedScenario = (patch: Partial<ScenarioInput>) => {
     setScenarios((prev) => {
       return prev.map((scenario) => {
-        if (scenario.id !== selectedScenario.id) {
+        if (scenario.id !== activeScenario.id) {
           return scenario;
         }
 
@@ -645,10 +643,10 @@ export function OptionsCalculator() {
 
   const duplicateScenario = () => {
     const duplicate: ScenarioInput = {
-      ...selectedScenario,
+      ...activeScenario,
       id: `scenario-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       isNameCustom: false,
-      name: buildAutoScenarioName(selectedScenario),
+      name: buildAutoScenarioName(activeScenario),
     };
 
     setScenarios((prev) => [...prev, duplicate]);
@@ -659,9 +657,9 @@ export function OptionsCalculator() {
     if (scenarios.length <= 1) return;
 
     const selectedIndex = scenarios.findIndex(
-      (s) => s.id === selectedScenario.id,
+      (s) => s.id === activeScenario.id,
     );
-    const nextScenarios = scenarios.filter((s) => s.id !== selectedScenario.id);
+    const nextScenarios = scenarios.filter((s) => s.id !== activeScenario.id);
     const fallbackScenario =
       nextScenarios[Math.max(0, selectedIndex - 1)] ?? nextScenarios[0];
 
@@ -679,10 +677,10 @@ export function OptionsCalculator() {
     });
   };
 
-  const isSellPut = selectedScenario.strategy === 'sell-put';
-  const isSellCall = selectedScenario.strategy === 'sell-call';
-  const isBuyCall = selectedScenario.strategy === 'buy-call';
-  const isBuyPut = selectedScenario.strategy === 'buy-put';
+  const isSellPut = activeScenario.strategy === 'sell-put';
+  const isSellCall = activeScenario.strategy === 'sell-call';
+  const isBuyCall = activeScenario.strategy === 'buy-call';
+  const isBuyPut = activeScenario.strategy === 'buy-put';
   const isSellStrategy = isSellPut || isSellCall;
 
   const putCalc = selectedCalculation as SellPutCalculation | null;
@@ -801,7 +799,7 @@ export function OptionsCalculator() {
             <Label htmlFor="scenario-name">Název scénáře</Label>
             <Input
               id="scenario-name"
-              value={selectedScenario.name}
+              value={activeScenario.name}
               onChange={(e) => updateSelectedScenario({ name: e.target.value })}
               placeholder="Automaticky se generuje"
             />
@@ -812,7 +810,7 @@ export function OptionsCalculator() {
               {STRATEGY_OPTIONS.map((option) => (
                 <PillButton
                   key={option.value}
-                  active={selectedScenario.strategy === option.value}
+                  active={activeScenario.strategy === option.value}
                   onClick={() =>
                     updateSelectedScenario({ strategy: option.value })
                   }
@@ -835,7 +833,7 @@ export function OptionsCalculator() {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={selectedScenario.stockPrice}
+                  value={activeScenario.stockPrice}
                   onChange={(e) =>
                     updateSelectedScenario({ stockPrice: e.target.value })
                   }
@@ -859,7 +857,7 @@ export function OptionsCalculator() {
                   type="number"
                   step="0.5"
                   min="0"
-                  value={selectedScenario.strike}
+                  value={activeScenario.strike}
                   onChange={(e) =>
                     updateSelectedScenario({ strike: e.target.value })
                   }
@@ -881,7 +879,7 @@ export function OptionsCalculator() {
                   type="number"
                   step="0.05"
                   min="0"
-                  value={selectedScenario.premium}
+                  value={activeScenario.premium}
                   onChange={(e) =>
                     updateSelectedScenario({ premium: e.target.value })
                   }
@@ -903,7 +901,7 @@ export function OptionsCalculator() {
                 type="number"
                 step="1"
                 min="1"
-                value={selectedScenario.contracts}
+                value={activeScenario.contracts}
                 onChange={(e) =>
                   updateSelectedScenario({ contracts: e.target.value })
                 }
@@ -925,7 +923,7 @@ export function OptionsCalculator() {
               <Input
                 id="expiration"
                 type="date"
-                value={selectedScenario.expirationDate}
+                value={activeScenario.expirationDate}
                 onChange={(e) =>
                   updateSelectedScenario({ expirationDate: e.target.value })
                 }
