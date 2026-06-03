@@ -199,7 +199,7 @@ export function RichTextEditor({
       {/* Editor area */}
       <EditorContent
         editor={editor}
-        className="theme-prose prose prose-sm dark:prose-invert max-w-none px-3 py-2 min-h-[100px] overflow-x-hidden focus:outline-none [&_.tiptap]:min-h-[80px] [&_.tiptap]:outline-none [&_.tiptap]:break-words [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none [&_.tiptap_p.is-editor-empty:first-child::before]:float-left [&_.tiptap_p.is-editor-empty:first-child::before]:h-0 [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.tiptap_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.tiptap_img]:max-w-full [&_.tiptap_img]:rounded-md"
+        className="theme-prose prose prose-sm dark:prose-invert max-w-none px-3 py-2 min-h-[100px] max-h-[45dvh] overflow-x-hidden overflow-y-auto overscroll-contain focus:outline-none [&_.tiptap]:min-h-[80px] [&_.tiptap]:outline-none [&_.tiptap]:break-words [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none [&_.tiptap_p.is-editor-empty:first-child::before]:float-left [&_.tiptap_p.is-editor-empty:first-child::before]:h-0 [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.tiptap_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.tiptap_img]:my-3 [&_.tiptap_img]:block [&_.tiptap_img]:h-auto [&_.tiptap_img]:max-h-[28dvh] [&_.tiptap_img]:max-w-full [&_.tiptap_img]:rounded-md [&_.tiptap_img]:object-contain sm:[&_.tiptap_img]:max-h-[24rem]"
       />
     </div>
   );

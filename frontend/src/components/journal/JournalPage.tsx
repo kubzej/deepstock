@@ -3,7 +3,12 @@ import { BookOpen, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-rea
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PageBackButton, PageIntro, PageShell } from '@/components/shared/PageShell';
+import {
+  PageBackButton,
+  PageIntro,
+  PageShell,
+  PageTopRail,
+} from '@/components/shared/PageShell';
 import { JournalFeed } from './JournalFeed';
 import { useJournalChannels, useJournalSections } from '@/hooks/useJournal';
 import type { JournalChannel, JournalSection } from '@/lib/api/journal';
@@ -51,16 +56,17 @@ function SidebarContent({
   sections,
   activeChannelId,
   onSelect,
+  search,
   density = 'default',
 }: {
   channels: JournalChannel[];
   sections: JournalSection[];
   activeChannelId: string | null;
   onSelect: (channel: JournalChannel) => void;
+  search: string;
   density?: 'default' | 'compact';
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
   const isCompact = density === 'compact';
 
   const stockChannels = channels
@@ -157,25 +163,6 @@ function SidebarContent({
 
   return (
     <div className={`space-y-1 ${isCompact ? 'px-1.5' : 'px-2'}`}>
-      {stockChannels.length > 4 && (
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Hledat ticker nebo název..."
-            className="h-9 pl-8 pr-8 text-sm bg-muted/40 border-muted focus-visible:ring-1"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      )}
       {sections.map(renderSectionBlock)}
     </div>
   );
@@ -188,9 +175,12 @@ function SidebarContent({
 export function JournalPage() {
   const [activeChannel, setActiveChannel] = useState<JournalChannel | null>(null);
   const [mobileShowForm, setMobileShowForm] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data: channels = [], isLoading: channelsLoading } = useJournalChannels();
   const { data: sections = [] } = useJournalSections();
+  const stockChannelCount = channels.filter((channel) => channel.type === 'stock').length;
+  const showStockSearch = stockChannelCount > 4;
 
   useEffect(() => {
     setMobileShowForm(false);
@@ -250,6 +240,25 @@ export function JournalPage() {
                 title="Deník"
                 subtitle="Poznámky a záznamy k akciím i vlastním tématům"
               />
+              {showStockSearch && (
+                <div className="relative mt-3">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Hledat ticker nebo název..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-10 rounded-lg border-border/70 bg-background pl-10 pr-9"
+                  />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {channelsLoading ? (
               <div className="space-y-1 px-4 pt-4">
@@ -262,6 +271,7 @@ export function JournalPage() {
                   sections={sections}
                   activeChannelId={null}
                   onSelect={setActiveChannel}
+                  search={search}
                 />
               </div>
             )}
@@ -278,6 +288,28 @@ export function JournalPage() {
             subtitle="Poznámky a záznamy k akciím i vlastním tématům"
           />
         </div>
+
+        {showStockSearch && (
+          <PageTopRail>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Hledat ticker nebo název..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-10 rounded-lg border-border/70 bg-background pl-10 pr-9"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </PageTopRail>
+        )}
 
         {/* Two-column body — takes remaining height */}
         <div className="mt-5 flex min-h-0 flex-1 gap-6">
@@ -299,6 +331,7 @@ export function JournalPage() {
                   sections={sections}
                   activeChannelId={activeChannel?.id ?? null}
                   onSelect={setActiveChannel}
+                  search={search}
                   density="compact"
                 />
               </div>

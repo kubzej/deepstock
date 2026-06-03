@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import {
   ArrowLeft,
@@ -111,8 +111,14 @@ export function StockDetail() {
   const [transactionFilter, setTransactionFilter] = useState<'active' | 'all'>(
     'active',
   );
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [optionFilter, setOptionFilter] = useState<'active' | 'all'>('active');
   const [visibleOptionCount, setVisibleOptionCount] = useState(6);
+  const stockDescription = stock?.notes?.trim() || null;
+
+  useEffect(() => {
+    setDescriptionExpanded(false);
+  }, [ticker, stockDescription]);
 
   // Get optional holding (position) from portfolio
   const holding = getHoldingByTicker(ticker);
@@ -521,6 +527,30 @@ export function StockDetail() {
           </div>
         )}
       </PageHero>
+
+      {stockDescription && (
+        <div className="space-y-1">
+          <p
+            className={[
+              'max-w-5xl text-sm leading-relaxed text-muted-foreground/90 [overflow-wrap:anywhere]',
+              descriptionExpanded ? '' : 'line-clamp-2',
+            ].join(' ')}
+          >
+            {stockDescription}
+          </p>
+          {stockDescription.length > 220 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 text-muted-foreground hover:text-foreground"
+              onClick={() => setDescriptionExpanded((expanded) => !expanded)}
+            >
+              {descriptionExpanded ? 'Méně' : 'Více'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Price Chart - only for supported exchanges */}
       {isTradingViewSupported(ticker, stock.exchange || undefined) && (
