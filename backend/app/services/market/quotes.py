@@ -13,7 +13,7 @@ import math
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.cache import CacheTTL
 
 logger = logging.getLogger(__name__)
@@ -122,10 +122,13 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
                 # Yahoo returns percent already (e.g., -1.25 = -1.25%), no multiplication needed
                 ext_data["postMarketChangePercent"] = post_market_change
         
-        # Earnings date
-        earnings_ts = info.get("earningsTimestamp")
+        # Earnings date — use earningsTimestampStart (the UPCOMING earnings).
+        # earningsTimestamp is the LAST reported earnings, so it would surface a
+        # past date outside of an earnings day. Convert in UTC to avoid the date
+        # slipping by a day on local-time hosts.
+        earnings_ts = info.get("earningsTimestampStart")
         if earnings_ts:
-            ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts).date().isoformat()
+            ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts, tz=timezone.utc).date().isoformat()
         
         return ext_data if ext_data else None
         
@@ -134,11 +137,11 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         return None
 
 
-async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0):
+async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0) -> Optional[dict]:
     """
-    Fetch extended data in background and cache it.
-    Fire-and-forget - errors are logged but don't propagate.
+    Fetch extended data and cache it. Errors are logged but don't propagate.
     delay: seconds to wait before fetching (used to stagger burst requests)
+    Returns the extended data dict (or None) so synchronous callers can merge it.
     """
     try:
         if delay > 0:
@@ -149,15 +152,27 @@ async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0):
         if ext_data:
             await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=CacheTTL.QUOTE_EXTENDED)
             logger.debug(f"Cached extended data for {ticker}")
+        return ext_data
     except Exception as e:
         logger.warning(f"Background fetch failed for {ticker}: {e}")
+        return None
 
 
-async def get_quotes(redis, tickers: List[str], include_extended: bool = True) -> Dict[str, dict]:
+async def get_quotes(
+    redis,
+    tickers: List[str],
+    include_extended: bool = True,
+    extended_sync: bool = False,
+) -> Dict[str, dict]:
     """
     Smart fetcher with two-tier caching:
     1. Basic quotes (price, change, volume) via yf.download() - fast, 1 request
     2. Extended data (pre/post market, avgVolume, earnings) via .info - slower, cached longer
+
+    extended_sync: when True, extended data for cold-cache tickers is fetched
+    inline (awaited) and merged into the result instead of fire-and-forget. Use
+    only off the render path (e.g. the daily earnings cron) — callers that need
+    extended fields synchronously would otherwise get a cold-cache miss.
     """
     results = {}
     
@@ -267,12 +282,20 @@ async def get_quotes(redis, tickers: List[str], include_extended: bool = True) -
         else:
             missing_extended.append(t)
     
-    # Fire-and-forget: schedule background fetch for missing extended data
     # Staggered with 0.5s delay per ticker to avoid burst on Yahoo Finance
     if missing_extended:
-        for i, t in enumerate(missing_extended):
-            asyncio.create_task(_fetch_and_cache_extended_data(redis, t, delay=i * 0.5))
-        logger.debug(f"Scheduled staggered background fetch for {len(missing_extended)} tickers")
+        if extended_sync:
+            # Synchronous path: actually fetch inline and merge, so the caller
+            # gets extended fields (earnings, pre/post) in this same call.
+            for i, t in enumerate(missing_extended):
+                ext_data = await _fetch_and_cache_extended_data(redis, t, delay=i * 0.5)
+                if ext_data:
+                    results[t].update(ext_data)
+        else:
+            # Fire-and-forget: background fetch only warms the cache for next time.
+            for i, t in enumerate(missing_extended):
+                asyncio.create_task(_fetch_and_cache_extended_data(redis, t, delay=i * 0.5))
+            logger.debug(f"Scheduled staggered background fetch for {len(missing_extended)} tickers")
     
     return results
 

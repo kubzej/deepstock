@@ -147,6 +147,32 @@ async def refresh_earnings_calendar(x_cron_secret: Optional[str] = Header(None))
         raise HTTPException(status_code=500, detail="Chyba při refreshi earnings kalendáře.")
 
 
+@router.post("/refresh-earnings-calendar-force")
+async def refresh_earnings_calendar_force(x_cron_secret: Optional[str] = Header(None)):
+    """
+    Force-refresh earnings dates for ALL watchlist tickers, bypassing the
+    due-check. One-off / manual use — e.g. to backfill rows left stale by a
+    previous bug. The scheduled daily job should use /refresh-earnings-calendar.
+    """
+    await verify_cron_secret(x_cron_secret)
+    logger.info("Cron refresh-earnings-calendar-force started")
+
+    try:
+        cleanup_result = await earnings_calendar_service.cleanup_orphaned_entries()
+        tickers = await earnings_calendar_service.get_watchlist_tickers()
+        result = await earnings_calendar_service.refresh_tickers(tickers)
+        result.update(cleanup_result)
+        logger.info(
+            "Cron refresh-earnings-calendar-force finished: tickers_requested=%d tickers_refreshed=%d",
+            result["tickers_requested"],
+            result["tickers_refreshed"],
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"refresh-earnings-calendar-force failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Chyba při force refreshi earnings kalendáře.")
+
+
 @router.post("/cleanup-earnings-calendar")
 async def cleanup_earnings_calendar(x_cron_secret: Optional[str] = Header(None)):
     """

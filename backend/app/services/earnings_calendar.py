@@ -224,7 +224,12 @@ class EarningsCalendarService:
             _sample(unique_tickers),
         )
         redis = get_redis()
-        quotes = await get_quotes(redis, unique_tickers, include_extended=True)
+        # extended_sync: this runs in the daily cron (off the render path), so we
+        # fetch extended data inline instead of relying on the fire-and-forget
+        # render cache, which is almost always cold when the cron runs.
+        quotes = await get_quotes(
+            redis, unique_tickers, include_extended=True, extended_sync=True
+        )
         logger.info(
             "Fetched quote payloads for %d/%d earnings refresh tickers",
             len(quotes),
@@ -233,9 +238,7 @@ class EarningsCalendarService:
 
         stocks_response = (
             supabase.table("stocks")
-            .select(
-                "id, ticker, earnings_calendar(earnings_date, source, source_payload)"
-            )
+            .select("id, ticker, earnings_calendar(earnings_date)")
             .in_("ticker", unique_tickers)
             .execute()
         )
@@ -263,30 +266,28 @@ class EarningsCalendarService:
             quote = quotes.get(ticker) or {}
             existing_cache = existing_cache_by_ticker.get(ticker) or {}
             provider_earnings_date = quote.get("earningsDate")
-            earnings_date = provider_earnings_date or existing_cache.get("earnings_date")
-            source = "yfinance_info" if provider_earnings_date else (
-                existing_cache.get("source") or "yfinance_info"
-            )
-            source_payload = (
-                {"ticker": ticker}
-                if provider_earnings_date
-                else (existing_cache.get("source_payload") or {"ticker": ticker})
-            )
-            if provider_earnings_date:
-                provider_dates_found.append(ticker)
-            elif existing_cache.get("earnings_date"):
-                preserved_existing_dates.append(ticker)
-            else:
-                still_missing_dates.append(ticker)
+
+            if not provider_earnings_date:
+                # Provider gave us no date. Leave the row untouched — keep any
+                # existing date for display but DO NOT bump last_checked_at, so
+                # the ticker stays "due" and is retried next run instead of
+                # silently masking the failed fetch as a successful refresh.
+                if existing_cache.get("earnings_date"):
+                    preserved_existing_dates.append(ticker)
+                else:
+                    still_missing_dates.append(ticker)
                 logger.warning(
-                    "Provider returned no earnings date for %s and no cached date exists",
+                    "Provider returned no earnings date for %s; leaving row untouched (stays due)",
                     ticker,
                 )
+                continue
+
+            provider_dates_found.append(ticker)
             payload = {
                 "stock_id": stock_id,
-                "earnings_date": earnings_date,
-                "source": source,
-                "source_payload": source_payload,
+                "earnings_date": provider_earnings_date,
+                "source": "yfinance_info",
+                "source_payload": {"ticker": ticker},
                 "last_checked_at": checked_at,
             }
 
@@ -297,11 +298,6 @@ class EarningsCalendarService:
                     .execute()
                 )
                 refreshed += 1
-                if not provider_earnings_date and existing_cache.get("earnings_date"):
-                    logger.warning(
-                        "Preserved existing earnings date for %s because provider returned no date",
-                        ticker,
-                    )
             except Exception as exc:
                 logger.error("Failed to upsert earnings calendar for %s: %s", ticker, exc)
 
