@@ -224,9 +224,12 @@ class EarningsCalendarService:
             _sample(unique_tickers),
         )
         redis = get_redis()
-        # extended_sync: this runs in the daily cron (off the render path), so we
-        # fetch extended data inline instead of relying on the fire-and-forget
-        # render cache, which is almost always cold when the cron runs.
+        # Earnings refresh must reflect the provider's CURRENT data, not whatever
+        # the render-path quote_ext cache happens to hold (which may be up to 1h
+        # stale, or — during a field-change deploy — populated with the old
+        # field). Drop the extended cache for these tickers so extended_sync does
+        # a genuinely fresh .info fetch. This runs once daily off the render path.
+        await redis.delete(*(f"quote_ext:{t}" for t in unique_tickers))
         quotes = await get_quotes(
             redis, unique_tickers, include_extended=True, extended_sync=True
         )
