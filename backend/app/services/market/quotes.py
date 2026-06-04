@@ -287,8 +287,12 @@ async def get_quotes(
         if extended_sync:
             # Synchronous path: actually fetch inline and merge, so the caller
             # gets extended fields (earnings, pre/post) in this same call.
-            for i, t in enumerate(missing_extended):
-                ext_data = await _fetch_and_cache_extended_data(redis, t, delay=i * 0.5)
+            # No stagger delay here — sequential awaits already serialize the
+            # requests (only one .info in flight at a time), so there is no burst
+            # to spread out. Passing the fire-and-forget i*0.5 delay would
+            # accumulate into minutes of sleep across the loop.
+            for t in missing_extended:
+                ext_data = await _fetch_and_cache_extended_data(redis, t)
                 if ext_data:
                     results[t].update(ext_data)
         else:
