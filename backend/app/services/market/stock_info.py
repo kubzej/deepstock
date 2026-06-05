@@ -2110,7 +2110,10 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
             "earningsGrowth": info.get("earningsGrowth"),
             
             # Dividends
-            "dividendYield": info.get("dividendYield"),
+            # yfinance vrací dividendYield UŽ jako procento (např. 2.76 = 2,76 %),
+            # ale celý kód s ním pracuje jako se zlomkem (×100 na zobrazení, zlomkové
+            # prahy v insights). Normalizujeme na zlomek tady — jediný zdroj pravdy.
+            "dividendYield": (info.get("dividendYield") / 100) if info.get("dividendYield") is not None else None,
             "dividendRate": info.get("dividendRate"),
             "payoutRatio": info.get("payoutRatio"),
             "beta": info.get("beta"),

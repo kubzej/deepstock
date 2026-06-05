@@ -240,7 +240,10 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
 
         yields_data["earnings_yield"].append(_pct((ltm_eps / ltm_price) if (ltm_eps and ltm_price and ltm_price > 0) else None))
         yields_data["fcf_yield"].append(_pct((ltm_fcf / ltm_market_cap) if (ltm_fcf and ltm_market_cap) else None))
-        yields_data["dividend_yield"].append(_pct(info.get("dividendYield")))
+        # yfinance vrací dividendYield jako procento (např. 2.76) — převést na zlomek,
+        # aby LTM sloupec seděl s FY sloupci (počítané ručně jako dividends/market_cap).
+        _div_yield = info.get("dividendYield")
+        yields_data["dividend_yield"].append(_pct(_div_yield / 100 if _div_yield is not None else None))
 
         profitability["gross_margin"].append(_pct(info.get("grossMargins")))
         profitability["operating_margin"].append(_pct(info.get("operatingMargins")))
