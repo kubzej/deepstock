@@ -105,6 +105,51 @@ async def test_get_due_tickers_treats_null_earnings_date_as_due(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_due_tickers_treats_23h_old_cache_as_stale(monkeypatch):
+    service = EarningsCalendarService()
+    stale_checked = (datetime.now(timezone.utc) - timedelta(hours=23, minutes=5)).isoformat()
+    fresh_checked = (datetime.now(timezone.utc) - timedelta(hours=22, minutes=55)).isoformat()
+
+    async def _watchlist_tickers():
+        return ["AAPL", "MSFT"]
+
+    monkeypatch.setattr(service, "get_watchlist_tickers", _watchlist_tickers)
+    monkeypatch.setattr(
+        "app.services.earnings_calendar.supabase",
+        type(
+            "SupabaseStub",
+            (),
+            {
+                "table": staticmethod(
+                    lambda _name: _SupabaseQueryStub(
+                        [
+                            {
+                                "ticker": "AAPL",
+                                "earnings_calendar": {
+                                    "earnings_date": "2026-07-23",
+                                    "last_checked_at": stale_checked,
+                                },
+                            },
+                            {
+                                "ticker": "MSFT",
+                                "earnings_calendar": {
+                                    "earnings_date": "2026-07-24",
+                                    "last_checked_at": fresh_checked,
+                                },
+                            },
+                        ]
+                    )
+                )
+            },
+        )(),
+    )
+
+    due = await service.get_due_tickers()
+
+    assert due == ["AAPL"]
+
+
+@pytest.mark.asyncio
 async def test_cleanup_orphaned_entries_deletes_only_non_watchlist_stock_ids(monkeypatch):
     service = EarningsCalendarService()
     state = {

@@ -16,6 +16,8 @@ from app.services.market.quotes import get_quotes
 
 logger = logging.getLogger(__name__)
 
+EARNINGS_DUE_STALE_AFTER = timedelta(hours=23)
+
 
 def _sample(values: List[str], limit: int = 10) -> List[str]:
     return values[:limit]
@@ -146,7 +148,7 @@ class EarningsCalendarService:
             logger.info("No watchlist tickers found for earnings due check")
             return []
 
-        cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+        cutoff = datetime.now(timezone.utc) - EARNINGS_DUE_STALE_AFTER
         response = (
             supabase.table("stocks")
             .select("ticker, earnings_calendar(earnings_date, last_checked_at)")
