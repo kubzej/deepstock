@@ -41,6 +41,10 @@ class CacheTTL:
     # ── AI Research reports ───────────────────────────────────────
     AI_RESEARCH_REPORT = 86400      # 24 hours — AI-generated research reports (fundamental)
     AI_TA_REPORT = 7200             # 2 hours  — AI technical analysis (TA changes faster)
+    AI_EARNINGS_REPORT = 86400      # 24 hours — AI earnings report (post-earnings deep dive)
+
+    # ── Earnings analyst data ─────────────────────────────────────
+    EARNINGS_DATA = 86400           # 24 hours — yfinance earnings history/estimates/revisions
 
     # ── External sentiment data ────────────────────────────────────
     FEAR_GREED = 1800               # 30 min  — CNN Fear & Greed Index

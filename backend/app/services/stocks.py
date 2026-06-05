@@ -45,7 +45,7 @@ class StockService:
         if len(ticker_response.data) >= limit:
             return ticker_response.data
         
-        # Otherwise also search by name
+        # Otherwise also search by name and notes
         remaining = limit - len(ticker_response.data)
         existing_ids = [s["id"] for s in ticker_response.data]
         
@@ -58,6 +58,24 @@ class StockService:
         # Merge results, avoiding duplicates
         results = ticker_response.data.copy()
         for stock in name_response.data:
+            if stock["id"] not in existing_ids:
+                results.append(stock)
+                if len(results) >= limit:
+                    break
+
+        if len(results) >= limit:
+            return results
+
+        remaining = limit - len(results)
+        existing_ids = [s["id"] for s in results]
+
+        notes_response = supabase.table("stocks") \
+            .select("*") \
+            .ilike("notes", f"%{query}%") \
+            .limit(remaining + len(existing_ids)) \
+            .execute()
+
+        for stock in notes_response.data:
             if stock["id"] not in existing_ids:
                 results.append(stock)
                 if len(results) >= limit:

@@ -53,24 +53,28 @@ async def call_llm(system_prompt: str, user_prompt: str, request_timeout: int = 
 
     logger.info(f"Calling LLM model: {AI_MODEL} (timeout={request_timeout}s)")
 
+    completion_kwargs = dict(
+        model=AI_MODEL,
+        api_key=api_key,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=AI_MAX_TOKENS,
+        request_timeout=request_timeout,
+    )
+    # Some newer models reject an explicit temperature ("temperature is deprecated
+    # for this model"). Only send it when explicitly opted in via env.
+    _temp = os.getenv("AI_TEMPERATURE")
+    if _temp is not None:
+        completion_kwargs["temperature"] = float(_temp)
+
     try:
-        response = await litellm.acompletion(
-            model=AI_MODEL,
-            api_key=api_key,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=AI_MAX_TOKENS,
-            temperature=0.3,
-            request_timeout=request_timeout,
-        )
+        response = await litellm.acompletion(**completion_kwargs)
     except litellm.AuthenticationError:
         raise ValueError("Neplatný API klíč pro AI model. Zkontroluj ANTHROPIC_API_KEY v nastavení.")
     except litellm.RateLimitError:
         raise ValueError("Překročen rate limit AI modelu. Zkus to za chvíli znovu.")
-    except litellm.InsufficientCreditsError:
-        raise ValueError("Došly kredity na AI API (Anthropic). Dobij kredit na console.anthropic.com.")
     except litellm.Timeout:
         raise ValueError("AI model nereagoval včas (timeout). Zkus to znovu.")
     except (TimeoutError, asyncio.TimeoutError):

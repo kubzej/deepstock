@@ -3,7 +3,7 @@
  */
 import { API_URL, getAuthHeader } from './client';
 
-export type ReportType = 'briefing' | 'full_analysis' | 'technical_analysis';
+export type ReportType = 'briefing' | 'full_analysis' | 'technical_analysis' | 'earnings';
 
 export interface AIResearchReport {
   markdown: string;
@@ -90,6 +90,7 @@ export async function downloadPDF(
     briefing: 'briefing',
     full_analysis: 'analyza',
     technical_analysis: 'technicka',
+    earnings: 'earnings',
   };
   const label = labelMap[reportType] ?? reportType;
   a.href = url;

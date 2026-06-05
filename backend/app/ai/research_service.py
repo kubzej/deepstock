@@ -12,6 +12,7 @@ Flow:
 import json
 import logging
 import asyncio
+import re
 from datetime import date, datetime
 from typing import Literal, Optional
 
@@ -19,13 +20,13 @@ from app.core.redis import get_redis
 from app.core.cache import CacheTTL
 from app.ai.providers.litellm_client import call_llm
 from app.ai.search import tavily_client
-from app.ai.prompts import briefing_prompt, full_analysis_prompt, technical_prompt
+from app.ai.prompts import briefing_prompt, full_analysis_prompt, technical_prompt, earnings_prompt
 from app.services.insider import get_insider_trades
 from app.services.market import market_service
 
 logger = logging.getLogger(__name__)
 
-ReportType = Literal["briefing", "full_analysis", "technical_analysis"]
+ReportType = Literal["briefing", "full_analysis", "technical_analysis", "earnings"]
 
 
 # ─── Context builders ──────────────────────────────────────────────────────────
@@ -151,6 +152,133 @@ def _format_insider_trades(trades: list[dict], months: int = 6) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _format_earnings_context(ed: dict) -> str:
+    """Render structured earnings data (history, estimates, revisions) into AI context."""
+    if not ed or not any(ed.get(k) for k in ed):
+        return "Earnings data nedostupná (možná non-US ticker nebo bez pokrytí analytiky)."
+
+    def num(v, d=2): return f"{v:,.{d}f}" if isinstance(v, (int, float)) else "N/A"
+    def pct(v): return f"{v*100:+.1f}%" if isinstance(v, (int, float)) else "N/A"
+    def big(v):
+        if not isinstance(v, (int, float)): return "N/A"
+        a = abs(v)
+        if a >= 1e9: return f"${v/1e9:.2f}B"
+        if a >= 1e6: return f"${v/1e6:.1f}M"
+        return f"${v:,.0f}"
+
+    labels = {"0q": "Tento kvartál", "+1q": "Příští kvartál", "0y": "Tento rok", "+1y": "Příští rok"}
+    lines: list[str] = []
+
+    hist = ed.get("earningsHistory") or []
+    if hist:
+        lines.append("### Historie výsledků (EPS actual vs odhad)")
+        for r in hist:
+            surp = r.get("surprisePercent")
+            verdict = ""
+            if isinstance(surp, (int, float)):
+                verdict = "BEAT" if surp > 0 else ("MISS" if surp < 0 else "IN-LINE")
+            lines.append(
+                f"- {r.get('quarter', '?')}: actual {num(r.get('epsActual'))} vs odhad "
+                f"{num(r.get('epsEstimate'))} → surprise {pct(surp)} {verdict}".rstrip()
+            )
+        lines.append("")
+
+    ee = ed.get("earningsEstimate") or {}
+    if ee:
+        lines.append("### Konsenzus EPS (odhady analytiků)")
+        for p, label in labels.items():
+            d = ee.get(p)
+            if not d: continue
+            lines.append(
+                f"- {label}: avg {num(d.get('avg'))} (low {num(d.get('low'))} / high {num(d.get('high'))}), "
+                f"YoY růst {pct(d.get('growth'))}, {num(d.get('numberOfAnalysts'), 0)} analytiků"
+            )
+        lines.append("")
+
+    re_est = ed.get("revenueEstimate") or {}
+    if re_est:
+        lines.append("### Konsenzus tržeb")
+        for p, label in labels.items():
+            d = re_est.get(p)
+            if not d: continue
+            lines.append(
+                f"- {label}: avg {big(d.get('avg'))} (low {big(d.get('low'))} / high {big(d.get('high'))}), "
+                f"YoY růst {pct(d.get('growth'))}"
+            )
+        lines.append("")
+
+    et = ed.get("epsTrend") or {}
+    if et:
+        lines.append("### Vývoj EPS odhadu (teď ← 30 dní ← 90 dní)")
+        for p, label in labels.items():
+            d = et.get(p)
+            if not d: continue
+            lines.append(
+                f"- {label}: {num(d.get('current'))} ← {num(d.get('30daysAgo'))} ← {num(d.get('90daysAgo'))}"
+            )
+        lines.append("")
+
+    er = ed.get("epsRevisions") or {}
+    if er:
+        lines.append("### Revize odhadů analytiků (posledních 30 dní)")
+        for p, label in labels.items():
+            d = er.get(p)
+            if not d: continue
+            lines.append(
+                f"- {label}: ↑ {num(d.get('upLast30days'), 0)} nahoru / ↓ {num(d.get('downLast30days'), 0)} dolů"
+            )
+        lines.append("")
+
+    ge = ed.get("growthEstimates") or {}
+    if ge:
+        lines.append("### Očekávaný růst: akcie vs index")
+        for p, label in labels.items():
+            d = ge.get(p)
+            if not d: continue
+            lines.append(f"- {label}: akcie {pct(d.get('stockTrend'))} vs index {pct(d.get('indexTrend'))}")
+        lines.append("")
+
+    return "\n".join(lines).strip() or "Earnings data nedostupná."
+
+
+def _strip_html(html: str) -> str:
+    """Flatten journal HTML content to plain text for prompt context."""
+    text = re.sub(r"<[^>]+>", " ", html or "")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+async def _fetch_journal_notes_context(
+    ticker: str, user_id: Optional[str], limit: int = 10, max_chars: int = 2500
+) -> str:
+    """Recent user journal notes for the ticker as soft context (bounded length)."""
+    if not user_id:
+        return ""
+    try:
+        from app.services.journal import journal_service
+        entries = await journal_service.get_entries(ticker=ticker, user_id=user_id, limit=limit)
+    except Exception as e:
+        logger.warning(f"Could not fetch journal notes for {ticker}: {e}")
+        return ""
+
+    parts: list[str] = []
+    used = 0
+    for e in entries or []:
+        if e.get("type") != "note":
+            continue
+        content = _strip_html(e.get("content", ""))
+        if not content:
+            continue
+        created = (e.get("created_at") or "")[:10]
+        snippet = f"[{created}] {content}"
+        if used + len(snippet) > max_chars:
+            snippet = snippet[: max(0, max_chars - used)].rstrip() + "…"
+        parts.append(snippet)
+        used += len(snippet)
+        if used >= max_chars:
+            break
+    return "\n\n".join(parts)
 
 
 def _format_ta_context(ta: dict) -> str:
@@ -287,6 +415,15 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
     """
     short_name = company_name.split()[0] if company_name else ticker
     year = date.today().year
+
+    # Earnings report: tight, recent, post-earnings focused
+    if report_type == "earnings":
+        return [
+            (f"{short_name} {ticker} earnings results latest quarter beat miss revenue EPS", 30),
+            (f"{short_name} {ticker} earnings call transcript management commentary guidance", 30),
+            (f"{ticker} {short_name} analyst reaction price target after earnings", 30),
+            (f"{short_name} quarterly results segment performance {year}", 45),
+        ]
 
     queries = [
         (f"{short_name} {ticker} earnings results quarterly revenue", 90),
@@ -439,6 +576,82 @@ async def generate_research_report(
                 model_used,
                 user_id=user_id,
             )
+        return result
+
+    # ── Earnings report: post-earnings deep dive (no insider) ───────────────────
+    if report_type == "earnings":
+        fundamentals_context = _format_fundamentals(stock_data)
+        earnings_data = await market_service.get_earnings_data(ticker)
+        earnings_context = _format_earnings_context(earnings_data)
+
+        sector = stock_data.get("sector", "")
+        industry = stock_data.get("industry", "")
+        queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry)
+        search_tasks = [tavily_client.search(query, max_results=4, days=days) for query, days in queries]
+        gathered = await asyncio.gather(*search_tasks, _fetch_journal_notes_context(ticker, user_id), return_exceptions=True)
+        search_results_list = list(gathered[:-1])
+        journal_context = gathered[-1]
+        if isinstance(journal_context, Exception):
+            journal_context = ""
+
+        search_text_parts = []
+        for i, (query, _) in enumerate(queries):
+            results = search_results_list[i]
+            if isinstance(results, Exception) or not results:
+                continue
+            search_text_parts.append(f"### Výsledky hledání: \"{query}\"\n\n{tavily_client.format_results(results)}")
+
+        if not search_text_parts:
+            raise ValueError(
+                "Web search nevrátil žádná data — zkus to znovu za chvíli. "
+                "Pokud problém přetrvává, zkontroluj limit Tavily API."
+            )
+        search_context = ("\n\n" + "=" * 60 + "\n\n").join(search_text_parts)
+
+        system = earnings_prompt.SYSTEM_PROMPT
+        user = earnings_prompt.build_user_prompt(
+            ticker=ticker,
+            company_name=company_name,
+            current_price=current_price,
+            date=prompt_date,
+            earnings_context=earnings_context,
+            fundamentals_context=fundamentals_context,
+            search_context=search_context,
+            journal_context=journal_context,
+        )
+        markdown_content, model_used = await call_llm(system, user, request_timeout=180)
+
+        source_items = []
+        seen_urls = set()
+        for results in search_results_list:
+            if isinstance(results, Exception) or not results:
+                continue
+            for r in results:
+                url = r.get("url", "")
+                title = r.get("title", url)
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    source_items.append(f"- [{title}]({url})")
+        if source_items:
+            markdown_content += "\n\n---\n\n## Zdroje\n\n" + "\n".join(source_items)
+
+        result = {
+            "markdown": markdown_content,
+            "ticker": ticker,
+            "company_name": company_name,
+            "report_type": report_type,
+            "current_price": current_price,
+            "generated_at": datetime.now().isoformat(),
+            "model_used": model_used,
+            "cached": False,
+        }
+        try:
+            await redis.set(cache_key, json.dumps(result), ex=CacheTTL.AI_EARNINGS_REPORT)
+            logger.info(f"Earnings report cached at {cache_key}")
+        except Exception as e:
+            logger.warning(f"Failed to cache earnings report for {ticker}: {e}")
+        if user_id:
+            await _save_report_to_journal(ticker, markdown_content, report_type, model_used, user_id=user_id)
         return result
 
     # ── Fundamental reports (briefing / full_analysis) ───────────────────────────

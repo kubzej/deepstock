@@ -28,7 +28,7 @@ router = APIRouter()
 
 class GenerateReportRequest(BaseModel):
     current_price: float
-    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing"
+    report_type: Literal["briefing", "full_analysis", "technical_analysis", "earnings"] = "briefing"
     force_refresh: bool = False
     period: str = "3mo"  # used only for technical_analysis
 
@@ -36,7 +36,7 @@ class GenerateReportRequest(BaseModel):
 @router.get("/research/{ticker}")
 async def get_cached_research_report(
     ticker: str,
-    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "full_analysis",
+    report_type: Literal["briefing", "full_analysis", "technical_analysis", "earnings"] = "full_analysis",
     period: str = "3mo",
     user_id: str = Depends(get_current_user_id),
 ):
@@ -105,7 +105,7 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
 @router.get("/research/{ticker}/pdf")
 async def download_pdf(
     ticker: str,
-    report_type: Literal["briefing", "full_analysis", "technical_analysis"] = "briefing",
+    report_type: Literal["briefing", "full_analysis", "technical_analysis", "earnings"] = "briefing",
     current_price: Optional[float] = None,
     period: str = "3mo",
     user_id: str = Depends(get_current_user_id),
@@ -159,7 +159,7 @@ async def download_pdf(
         logger.error(f"PDF generation failed for {ticker}: {e}")
         raise HTTPException(status_code=500, detail="Chyba při generování PDF.")
 
-    type_labels = {"briefing": "briefing", "full_analysis": "analyza", "technical_analysis": "technicka"}
+    type_labels = {"briefing": "briefing", "full_analysis": "analyza", "technical_analysis": "technicka", "earnings": "earnings"}
     type_label = type_labels.get(report_type, report_type)
     filename = f"{ticker}_{type_label}_{today}.pdf"
 
