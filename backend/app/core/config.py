@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # AI Research
     anthropic_api_key: str = ""
     tavily_api_key: str = ""
-    ai_model: str = "anthropic/claude-opus-4-6"
+    ai_model: str = "anthropic/claude-opus-4-8"
     ai_max_tokens: int = 8000
 
     # Twitter scraping
