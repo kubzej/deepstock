@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  Pencil,
-  Trash2,
-  Tag,
-  MoreHorizontal,
-  MoveRight,
-} from 'lucide-react';
+import { Pencil, Trash2, MoreHorizontal, MoveRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sparkline } from '@/components/shared/Sparkline';
 import {
@@ -36,7 +30,6 @@ interface WatchlistItemCardProps {
   sparklineData?: number[] | null;
   onEdit: () => void;
   onDelete: () => void;
-  onTags: () => void;
   onMove?: () => void;
   showMoveOption?: boolean;
   onClick?: () => void;
@@ -51,7 +44,6 @@ export function WatchlistItemCard({
   sparklineData,
   onEdit,
   onDelete,
-  onTags,
   onMove,
   showMoveOption = false,
   onClick,
@@ -102,8 +94,12 @@ export function WatchlistItemCard({
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span
-                className={`font-bold text-sm ${
+              <a
+                href={`https://finance.yahoo.com/quote/${item.stocks.ticker}/`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`font-bold text-sm underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground ${
                   atBuyTarget
                     ? 'text-positive'
                     : atSellTarget
@@ -112,13 +108,13 @@ export function WatchlistItemCard({
                 }`}
               >
                 {item.stocks.ticker}
-              </span>
+              </a>
               {item.tags && item.tags.length > 0 && (
-                <div className="flex shrink-0 items-center gap-1">
-                  {item.tags.slice(0, 1).map((tag) => (
+                <div className="flex flex-wrap items-center gap-1">
+                  {item.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="inline-flex h-5 max-w-[72px] items-center gap-1 rounded-full px-1.5 text-[9px] font-medium leading-none truncate"
+                      className="inline-flex h-5 max-w-[120px] items-center gap-1 rounded-full px-1.5 text-[9px] font-medium leading-none"
                       style={{
                         backgroundColor: `${tag.color}15`,
                         color: tag.color,
@@ -131,11 +127,6 @@ export function WatchlistItemCard({
                       <span className="truncate">{tag.name}</span>
                     </span>
                   ))}
-                  {item.tags.length > 1 && (
-                    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-muted px-1.5 text-[9px] text-muted-foreground">
-                      +{item.tags.length - 1}
-                    </span>
-                  )}
                 </div>
               )}
               {showBadge && earningsBadge && (
@@ -187,15 +178,6 @@ export function WatchlistItemCard({
                 >
                   <Pencil className="h-4 w-4 mr-2" />
                   Upravit
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTags();
-                  }}
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  Tagy
                 </DropdownMenuItem>
                 {showMoveOption && onMove && (
                   <DropdownMenuItem

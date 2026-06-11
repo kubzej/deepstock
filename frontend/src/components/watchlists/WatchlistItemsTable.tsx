@@ -25,7 +25,6 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Tag,
 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -70,7 +69,6 @@ interface WatchlistItemsTableProps {
   onEdit: (item: WatchlistItem) => void;
   onDelete: (item: WatchlistItem) => void;
   onMove: (item: WatchlistItem) => void;
-  onTagsEdit: (item: WatchlistItem) => void;
   showMoveOption?: boolean;
   showWatchlistName?: boolean;
 }
@@ -106,7 +104,6 @@ export function WatchlistItemsTable({
   onEdit,
   onDelete,
   onMove,
-  onTagsEdit,
   showMoveOption = true,
   showWatchlistName = false,
 }: WatchlistItemsTableProps) {
@@ -253,8 +250,12 @@ export function WatchlistItemsTable({
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`font-bold ${
+                        <a
+                          href={`https://finance.yahoo.com/quote/${item.stocks.ticker}/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className={`font-bold underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground ${
                             atBuy
                               ? 'text-positive'
                               : atSell
@@ -263,7 +264,7 @@ export function WatchlistItemsTable({
                           }`}
                         >
                           {item.stocks.ticker}
-                        </span>
+                        </a>
                         {item.tags && item.tags.length > 0 && (
                           <div className="flex items-center gap-1">
                             {item.tags.map((tag) => (
@@ -403,10 +404,6 @@ export function WatchlistItemsTable({
                       <DropdownMenuItem onClick={() => onEdit(item)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         Upravit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onTagsEdit(item)}>
-                        <Tag className="h-4 w-4 mr-2" />
-                        Tagy
                       </DropdownMenuItem>
                       {showMoveOption && (
                         <DropdownMenuItem onClick={() => onMove(item)}>

@@ -59,6 +59,13 @@ import { getMarketStatus } from '@/lib/marketHours';
 import { getDateSortValue } from '@/lib/format';
 import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 
+// Compare two tag id lists ignoring order
+function sameTagSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
+}
+
 export function WatchlistsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -175,10 +182,6 @@ export function WatchlistsPage() {
     null,
   );
   const [moveItemData, setMoveItemData] = useState<WatchlistItem | null>(null);
-  const [tagsDialogItem, setTagsDialogItem] = useState<WatchlistItem | null>(
-    null,
-  );
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [itemSaving, setItemSaving] = useState(false);
 
   // Sorting
@@ -350,9 +353,17 @@ export function WatchlistsPage() {
           notes: formData.notes.trim() || null,
           sector: formData.sector.trim() || null,
         });
+        // Persist tags only when they changed
+        const currentTagIds = editingItem.tags?.map((t) => t.id) ?? [];
+        if (!sameTagSet(currentTagIds, formData.tagIds)) {
+          await setItemTagsMutation.mutateAsync({
+            itemId: editingItem.id,
+            tagIds: formData.tagIds,
+          });
+        }
       } else {
         if (!formData.ticker.trim()) return;
-        await addItemMutation.mutateAsync({
+        const created = await addItemMutation.mutateAsync({
           watchlistId: selectedWatchlistId,
           ticker: formData.ticker.trim().toUpperCase(),
           targetBuyPrice: formData.buyTarget
@@ -364,7 +375,16 @@ export function WatchlistsPage() {
           notes: formData.notes.trim() || undefined,
           sector: formData.sector.trim() || undefined,
         });
+        if (formData.tagIds.length > 0 && created?.id) {
+          await setItemTagsMutation.mutateAsync({
+            itemId: created.id,
+            tagIds: formData.tagIds,
+          });
+        }
       }
+      queryClient.invalidateQueries({
+        queryKey: ['watchlistItems', selectedWatchlistId],
+      });
       setAddItemDialogOpen(false);
     } catch (err) {
       console.error('Failed to save item:', err);
@@ -404,39 +424,6 @@ export function WatchlistsPage() {
     } catch (err) {
       console.error('Failed to move item:', err);
       alert(err instanceof Error ? err.message : 'Nepodařilo se přesunout');
-    }
-  };
-
-  // Tags dialog
-  const openTagsDialog = (item: WatchlistItem) => {
-    setTagsDialogItem(item);
-    setSelectedTagIds(item.tags?.map((t) => t.id) || []);
-  };
-
-  const toggleTag = (tagId: string) => {
-    setSelectedTagIds((prev) =>
-      prev.includes(tagId)
-        ? prev.filter((id) => id !== tagId)
-        : [...prev, tagId],
-    );
-  };
-
-  const handleSaveTags = async () => {
-    if (!tagsDialogItem || !selectedWatchlistId) return;
-
-    try {
-      await setItemTagsMutation.mutateAsync({
-        itemId: tagsDialogItem.id,
-        tagIds: selectedTagIds,
-      });
-      // Invalidate watchlist items to refresh tags
-      queryClient.invalidateQueries({
-        queryKey: ['watchlistItems', selectedWatchlistId],
-      });
-      setTagsDialogItem(null);
-    } catch (err) {
-      console.error('Failed to save tags:', err);
-      alert(err instanceof Error ? err.message : 'Nepodařilo se uložit tagy');
     }
   };
 
@@ -587,7 +574,6 @@ export function WatchlistsPage() {
                           sparklineData={sparklineByTicker[item.stocks.ticker]}
                           onEdit={() => openEditItem(item)}
                           onDelete={() => setDeleteItemData(item)}
-                          onTags={() => openTagsDialog(item)}
                           onMove={() => setMoveItemData(item)}
                           showMoveOption={watchlists.length > 1}
                           onClick={() =>
@@ -618,7 +604,6 @@ export function WatchlistsPage() {
                     onEdit={openEditItem}
                     onDelete={setDeleteItemData}
                     onMove={setMoveItemData}
-                    onTagsEdit={openTagsDialog}
                     showMoveOption={watchlists.length > 1}
                     showWatchlistName={false}
                   />
@@ -641,6 +626,7 @@ export function WatchlistsPage() {
             ? (allHoldings.find((h) => h.ticker === editingItem.stocks.ticker) ?? null)
             : null
         }
+        allTags={allTags}
       />
 
       {/* Delete Item Dialog */}
@@ -681,63 +667,6 @@ export function WatchlistsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveItemData(null)}>
               Zrušit
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Tags Dialog */}
-      <Dialog
-        open={!!tagsDialogItem}
-        onOpenChange={(open) => !open && setTagsDialogItem(null)}
-      >
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Tagy pro {tagsDialogItem?.stocks.ticker}</DialogTitle>
-            <DialogDescription>Vyberte tagy pro tuto akcii.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {allTags.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-4">
-                Nemáte žádné tagy. Vytvořte je v Nastavení → Watchlist tagy.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {allTags.map((tag) => {
-                  const isSelected = selectedTagIds.includes(tag.id);
-                  return (
-                    <button
-                      key={tag.id}
-                      onClick={() => toggleTag(tag.id)}
-                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        isSelected
-                          ? 'ring-2 ring-offset-2 ring-offset-background'
-                          : 'opacity-60 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: isSelected
-                          ? tag.color
-                          : `${tag.color}20`,
-                        color: isSelected ? '#fff' : tag.color,
-                        borderColor: tag.color,
-                      }}
-                    >
-                      {tag.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTagsDialogItem(null)}>
-              Zrušit
-            </Button>
-            <Button
-              onClick={handleSaveTags}
-              disabled={setItemTagsMutation.isPending}
-            >
-              {setItemTagsMutation.isPending ? 'Ukládám...' : 'Uložit'}
             </Button>
           </DialogFooter>
         </DialogContent>

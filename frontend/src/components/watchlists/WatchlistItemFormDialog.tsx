@@ -22,7 +22,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { type WatchlistItem, type Holding } from '@/lib/api';
+import {
+  type WatchlistItem,
+  type WatchlistTag,
+  type Holding,
+} from '@/lib/api';
 import { generateWatchlistTargets } from '@/lib/api/ai_watchlist_targets';
 import { formatPrice } from '@/lib/format';
 
@@ -38,6 +42,7 @@ interface WatchlistItemFormDialogProps {
   onSelectedWatchlistChange?: (watchlistId: string) => void;
   initialTicker?: string;
   initialSector?: string | null;
+  allTags?: WatchlistTag[];
 }
 
 export interface WatchlistItemFormData {
@@ -46,6 +51,7 @@ export interface WatchlistItemFormData {
   sellTarget: string;
   notes: string;
   sector: string;
+  tagIds: string[];
 }
 
 export function WatchlistItemFormDialog({
@@ -60,6 +66,7 @@ export function WatchlistItemFormDialog({
   onSelectedWatchlistChange,
   initialTicker,
   initialSector,
+  allTags = [],
 }: WatchlistItemFormDialogProps) {
   // Form state
   const [ticker, setTicker] = useState('');
@@ -67,6 +74,7 @@ export function WatchlistItemFormDialog({
   const [sellTarget, setSellTarget] = useState('');
   const [notes, setNotes] = useState('');
   const [sector, setSector] = useState('');
+  const [tagIds, setTagIds] = useState<string[]>([]);
 
   // AI suggestion state
   const [aiLoading, setAiLoading] = useState(false);
@@ -81,12 +89,14 @@ export function WatchlistItemFormDialog({
         setSellTarget(editingItem.target_sell_price?.toString() || '');
         setNotes(editingItem.notes || '');
         setSector(editingItem.sector || editingItem.stocks.sector || '');
+        setTagIds(editingItem.tags?.map((tag) => tag.id) || []);
       } else {
         setTicker(initialTicker?.trim().toUpperCase() || '');
         setBuyTarget('');
         setSellTarget('');
         setNotes('');
         setSector(initialSector || '');
+        setTagIds([]);
       }
       setAiError(null);
     }
@@ -99,7 +109,16 @@ export function WatchlistItemFormDialog({
       sellTarget,
       notes,
       sector,
+      tagIds,
     });
+  };
+
+  const toggleTag = (tagId: string) => {
+    setTagIds((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId],
+    );
   };
 
   const handleAiSuggest = async () => {
@@ -261,6 +280,37 @@ export function WatchlistItemFormDialog({
               rows={3}
             />
           </div>
+          {allTags.length > 0 && (
+            <div className="space-y-2">
+              <Label>Tagy</Label>
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => {
+                  const isSelected = tagIds.includes(tag.id);
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => toggleTag(tag.id)}
+                      className={`inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'ring-2 ring-offset-2 ring-offset-background'
+                          : 'opacity-60 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: isSelected
+                          ? tag.color
+                          : `${tag.color}20`,
+                        color: isSelected ? '#fff' : tag.color,
+                        borderColor: tag.color,
+                      }}
+                    >
+                      {tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

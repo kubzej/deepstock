@@ -28,8 +28,6 @@ export interface OpenLot {
   remainingCostBasis: number;
   remainingCostBasisCzk: number;
   portfolioName?: string;
-  preMarketPrice?: number | null;
-  postMarketPrice?: number | null;
 }
 
 type SortKey =
@@ -63,7 +61,6 @@ function LotRow({
     costBasisCzk: number;
     currentValueCzk: number;
     portfolioName?: string;
-    extendedHoursType: 'pre' | 'post' | null;
   };
   showPortfolio: boolean;
   onClick?: () => void;
@@ -135,17 +132,7 @@ function LotRow({
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-[11px] text-muted-foreground font-mono-price">
             {lot.shares} ks × {formatPrice(lot.economicBuyPrice, lot.currency)}{' '}
-            <span
-              className={
-                lot.extendedHoursType === 'pre'
-                  ? 'text-warning'
-                  : lot.extendedHoursType === 'post'
-                    ? 'text-info'
-                    : ''
-              }
-            >
-              → {formatPrice(lot.currentPriceScaled, lot.currency)}
-            </span>
+            <span>→ {formatPrice(lot.currentPriceScaled, lot.currency)}</span>
           </span>
           <span className="text-[11px] text-muted-foreground font-mono-price">
             {formatCurrency(lot.costBasisCzk)} →{' '}
@@ -218,25 +205,16 @@ export function OpenLotsRanking({
   const [sortKey, setSortKey] = useState<SortKey>('plPercent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Calculate P/L for each lot, preferring pre/post market price when available
+  // Calculate P/L for each lot against the regular current price
   const lotsWithPL = useMemo(
     () =>
       lots.map((lot) => {
         const scale = lot.priceScale ?? 1;
 
-        // Pick effective price: pre-market > post-market > regular
-        const extendedHoursType: 'pre' | 'post' | null = lot.preMarketPrice
-          ? 'pre'
-          : lot.postMarketPrice
-            ? 'post'
-            : null;
-        const effectivePrice =
-          lot.preMarketPrice ?? lot.postMarketPrice ?? lot.currentPrice;
-
         // buyPrice is stored in actual currency (e.g., GBP for LSE stocks)
-        // effectivePrice from quotes is in quoted units (e.g., pence) - needs scale
+        // currentPrice from quotes is in quoted units (e.g., pence) - needs scale
         const costBasis = lot.remainingCostBasis;
-        const currentPriceScaled = effectivePrice * scale;
+        const currentPriceScaled = lot.currentPrice * scale;
         const currentValue = currentPriceScaled * lot.shares;
         const plAmount = currentValue - costBasis;
         const plPercent = costBasis > 0 ? (plAmount / costBasis) * 100 : 0;
@@ -252,7 +230,6 @@ export function OpenLotsRanking({
           costBasisCzk,
           currentValueCzk,
           currentPriceScaled,
-          extendedHoursType,
         };
       }),
     [lots, rates],
