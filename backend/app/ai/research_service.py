@@ -551,7 +551,7 @@ async def generate_research_report(
             period=period,
             ta_context=ta_context,
         )
-        markdown_content, model_used = await call_llm(system, user, request_timeout=180)
+        markdown_content, model_used = await call_llm(system, user, request_timeout=300)
 
         result = {
             "markdown": markdown_content,
@@ -619,7 +619,7 @@ async def generate_research_report(
             search_context=search_context,
             journal_context=journal_context,
         )
-        markdown_content, model_used = await call_llm(system, user, request_timeout=180)
+        markdown_content, model_used = await call_llm(system, user, request_timeout=300)
 
         source_items = []
         seen_urls = set()
@@ -729,8 +729,8 @@ async def generate_research_report(
             insider_context=insider_context,
         )
 
-    # Call LLM — full_analysis generates up to 8000 tokens (~230s), briefing ~4000 tokens (~120s)
-    llm_timeout = 360 if report_type == "full_analysis" else 180
+    # Call LLM — full_analysis generates the most content, briefing less
+    llm_timeout = 600 if report_type == "full_analysis" else 300
     markdown_content, model_used = await call_llm(system, user, request_timeout=llm_timeout)
 
     # Append sources section from Tavily results

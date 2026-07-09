@@ -4,7 +4,7 @@
  * Shows all stock and option transactions with filters.
  * For tax purposes - list of all transactions with filtering.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { cs } from 'date-fns/locale';
@@ -29,7 +29,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronDown, Search, FileText, DollarSign } from 'lucide-react';
+import { ChevronDown, Search, FileText, DollarSign, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolios } from '@/hooks/usePortfolios';
 import { Button } from '@/components/ui/button';
 import {
@@ -124,6 +125,35 @@ export function TransactionHistoryPage() {
     dateFrom,
     dateTo,
   ]);
+
+  // Notice shown when "load older transactions" fetched more raw data but
+  // none of it passed the active filters (most commonly the date range) —
+  // without this the list looks unchanged and the fetch appears to be a no-op.
+  const [loadMoreNotice, setLoadMoreNotice] = useState<string | null>(null);
+  const wasFetchingNextPage = useRef(false);
+  const prevStockTotal = useRef(stockTransactions.length);
+  const prevStockFiltered = useRef(filteredStockTransactions.length);
+
+  useEffect(() => {
+    if (wasFetchingNextPage.current && !isFetchingNextPage) {
+      const addedRaw = stockTransactions.length - prevStockTotal.current;
+      const addedFiltered =
+        filteredStockTransactions.length - prevStockFiltered.current;
+      setLoadMoreNotice(
+        addedRaw > 0 && addedFiltered === 0
+          ? `Načteno ${addedRaw} starších transakcí, ale nespadají do vybraného období filtru (${format(parseISO(dateFrom), 'd. M. yyyy', { locale: cs })} – ${format(parseISO(dateTo), 'd. M. yyyy', { locale: cs })}). Uprav filtr data, pokud je chceš zobrazit.`
+          : null,
+      );
+    }
+    wasFetchingNextPage.current = isFetchingNextPage;
+    prevStockTotal.current = stockTransactions.length;
+    prevStockFiltered.current = filteredStockTransactions.length;
+  }, [isFetchingNextPage, stockTransactions.length, filteredStockTransactions.length, dateFrom, dateTo]);
+
+  // Clear a stale notice as soon as the user changes any filter.
+  useEffect(() => {
+    setLoadMoreNotice(null);
+  }, [search, typeFilter, portfolioFilter, dateFrom, dateTo]);
 
   // Filter option transactions
   const filteredOptionTransactions = useMemo(() => {
@@ -438,26 +468,34 @@ export function TransactionHistoryPage() {
 
           {/* Load more + summary */}
           {!stocksLoading && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                {filteredStockTransactions.length > 0
-                  ? `Zobrazeno ${filteredStockTransactions.length} z ${stockTransactions.length} načtených transakcí`
-                  : null}
+            <>
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  {filteredStockTransactions.length > 0
+                    ? `Zobrazeno ${filteredStockTransactions.length} z ${stockTransactions.length} načtených transakcí`
+                    : null}
+                </div>
+                {hasNextPage && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    {isFetchingNextPage
+                      ? 'Načítám...'
+                      : 'Načíst starší transakce'}
+                  </Button>
+                )}
               </div>
-              {hasNextPage && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                >
-                  <ChevronDown className="h-4 w-4 mr-1" />
-                  {isFetchingNextPage
-                    ? 'Načítám...'
-                    : 'Načíst starší transakce'}
-                </Button>
+              {loadMoreNotice && (
+                <Alert className="mt-2">
+                  <Info />
+                  <AlertDescription>{loadMoreNotice}</AlertDescription>
+                </Alert>
               )}
-            </div>
+            </>
           )}
         </TabsContent>
 

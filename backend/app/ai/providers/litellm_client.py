@@ -3,7 +3,7 @@ LiteLLM wrapper — provider-agnostic LLM calls.
 
 Configure via environment variables:
   AI_MODEL=anthropic/claude-sonnet-4-6   (default)
-  AI_MAX_TOKENS=8000                     (default)
+  AI_MAX_TOKENS=20000                    (default)
 
 Supported providers (examples):
   anthropic/claude-sonnet-4-6
@@ -22,7 +22,7 @@ import litellm
 logger = logging.getLogger(__name__)
 
 AI_MODEL = os.getenv("AI_MODEL", "anthropic/claude-sonnet-4-6")
-AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "8000"))
+AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "20000"))
 
 # Silence litellm verbose logging
 litellm.set_verbose = False
