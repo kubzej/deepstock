@@ -18,9 +18,6 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_claim_email: str = ""
     
-    # Cron job authentication
-    cron_secret: str = ""
-
     # AI Research
     anthropic_api_key: str = ""
     tavily_api_key: str = ""

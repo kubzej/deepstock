@@ -43,3 +43,7 @@ See [CLAUDE.md](CLAUDE.md) — code conventions, frontend patterns, backend patt
 ## Domain map
 
 See [docs/source-of-truth.md](docs/source-of-truth.md) — authoritative locations for domain truths (holdings, snapshot, accounting, performance, transactions).
+
+## Operations
+
+See [docs/railway-cron.md](docs/railway-cron.md) for Railway scheduled job commands and schedules.
