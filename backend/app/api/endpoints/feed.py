@@ -158,17 +158,44 @@ async def generate_feed_summary(
             return FeedSummaryResponse(**data, cached=True)
 
     # Fetch tweets
-    from app.services.twitter_service import fetch_tweets_for_list
+    from app.services.twitter_service import (
+        MAX_TWEET_AGE_HOURS,
+        TwitterAuthError,
+        TwitterProxyError,
+        TwitterRateLimitError,
+        fetch_tweets_for_list,
+    )
     try:
         tweets_by_user = await fetch_tweets_for_list(usernames)
+    except TwitterProxyError as e:
+        logger.error(f"Proxy rejected the connection: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Proxy pro načítání tweetů odmítá spojení. Zkontroluj PROXY_URL — credentials nejspíš vypršely.",
+        )
+    except TwitterAuthError as e:
+        logger.error(f"X cookies rejected: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Přihlášení k X vypršelo. Obnov TWITTER_AUTH_TOKEN a TWITTER_CT0 z cookies na x.com.",
+        )
+    except TwitterRateLimitError as e:
+        logger.warning(f"X rate limit hit: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="X dočasně omezuje počet požadavků. Zkus to za pár minut.",
+        )
     except Exception as e:
         logger.error(f"Twitter fetch failed: {e}", exc_info=True)
         raise HTTPException(status_code=502, detail="Nepodařilo se načíst tweety. Zkus to znovu.")
 
-    # Guard: skip LLM if no tweets were fetched
+    # Guard: skip LLM if every account was silent
     total_tweets = sum(len(v) for v in tweets_by_user.values())
     if total_tweets == 0:
-        raise HTTPException(status_code=422, detail="Nepodařilo se načíst žádné tweety pro tuto skupinu účtů.")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Za posledních {MAX_TWEET_AGE_HOURS} h nikdo ze sledovaných účtů nic nepublikoval.",
+        )
 
     # Build prompt + call LLM
     from app.ai.prompts.x_feed_prompt import SYSTEM_PROMPT, build_user_prompt

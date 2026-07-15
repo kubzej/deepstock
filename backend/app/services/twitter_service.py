@@ -7,6 +7,8 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
+import httpx
+
 # Patch twikit's broken x-client-transaction-id init (twikit 2.3.x regex doesn't
 # match Twitter's current webpack chunk format — PRs #410/#412 not yet merged).
 # Cookie auth works without a valid transaction ID.
@@ -56,6 +58,22 @@ logger = logging.getLogger(__name__)
 
 MAX_TWEET_AGE_HOURS = 24
 MAX_TWEETS_PER_USER = 10
+
+
+class TwitterFetchError(Exception):
+    """Base for failures that affect every account, not just one."""
+
+
+class TwitterProxyError(TwitterFetchError):
+    """PROXY_URL is unreachable or rejecting credentials."""
+
+
+class TwitterAuthError(TwitterFetchError):
+    """TWITTER_AUTH_TOKEN / TWITTER_CT0 cookies are expired or invalid."""
+
+
+class TwitterRateLimitError(TwitterFetchError):
+    """X is throttling the account."""
 
 
 def _parse_tweet_date(raw: str) -> datetime | None:
@@ -108,7 +126,14 @@ async def _fetch_user_tweets(client: twikit.Client, username: str) -> tuple[str,
             })
         logger.info(f"@{username}: {len(tweets)} tweets fetched")
         return username.lower(), tweets
+    except httpx.ProxyError as e:
+        raise TwitterProxyError(str(e)) from e
+    except twikit.errors.Unauthorized as e:
+        raise TwitterAuthError(str(e)) from e
+    except twikit.errors.TooManyRequests as e:
+        raise TwitterRateLimitError(str(e)) from e
     except Exception as e:
+        # Account-level problem (suspended, renamed, typo) — skip this one, keep going.
         logger.error(f"Failed to fetch tweets for @{username}: {e}", exc_info=True)
         return username.lower(), []
 
@@ -125,7 +150,11 @@ async def fetch_tweets_for_list(usernames: list[str]) -> dict[str, list[dict]]:
     for i, username in enumerate(usernames):
         if i > 0:
             await asyncio.sleep(0.5)
-        key, tweets = await _fetch_user_tweets(client, username)
+        try:
+            key, tweets = await _fetch_user_tweets(client, username)
+        except TwitterFetchError as e:
+            logger.error(f"Aborting fetch at @{username} — {type(e).__name__}: {e}")
+            raise
         filtered = []
         for tweet in tweets:
             dt = _parse_tweet_date(tweet["created_at"])
