@@ -15,6 +15,10 @@ The MCP surface is intentionally two-layered:
 - `get_stock_context` gives the agent a compact cross-domain map of the ticker
 - `get_portfolio_context` gives the agent a compact cross-domain map of the portfolio state
 - `get_market_context` gives the agent a compact market backdrop
+- `list_daily_briefings` / `get_latest_daily_briefing` / `get_daily_briefing`
+  give the agent access to generated daily news scans
+- `get_daily_briefing_sources` gives the agent the source audit trail behind a
+  report for follow-up questions
 - `list_watchlists` / `get_watchlist_items` give the agent a watchlist-first path
 - `*_activity` drilldown tools return full-fidelity transaction detail for the one branch the agent
   actually needs next
@@ -110,6 +114,47 @@ Returns:
 - Fear & Greed sentiment
 - FX rates to CZK
 - macro quotes for the same macro tickers tracked in the DeepStock frontend
+
+### `list_daily_briefings(limit)`
+
+Use when the user asks about recent daily briefings or wants to choose a report
+before drilling into details.
+
+Returns:
+
+- recent report IDs
+- status, trigger type, generated/window timestamps
+- summary, source counts, and warnings
+
+### `get_latest_daily_briefing()`
+
+Use first when the user asks about today's briefing or wants to discuss the
+latest generated news scan.
+
+Returns:
+
+- full report markdown
+- report lifecycle metadata
+- scope snapshot used at generation time
+- warnings/provider gaps
+
+### `get_daily_briefing(report_id)`
+
+Use after `list_daily_briefings` when a specific historical report matters.
+
+Returns the same shape as `get_latest_daily_briefing()`.
+
+### `get_daily_briefing_sources(report_id, ticker?, importance?)`
+
+Use when the user asks why the briefing mentioned something, wants source links,
+or wants ticker-specific drilldown from a report.
+
+Returns:
+
+- source title, snippet, URL, source type/name
+- ticker/scope/priority
+- importance and relevance score
+- bounded raw provider metadata
 
 ### `list_watchlists()`
 

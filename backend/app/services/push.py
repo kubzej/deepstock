@@ -117,7 +117,7 @@ def get_notification_settings(user_id: str) -> dict:
     """Get user's notification preferences"""
     result = supabase.table("profiles").select(
         "notifications_enabled, alert_buy_enabled, alert_sell_enabled, "
-        "alert_earnings_enabled"
+        "alert_earnings_enabled, alert_daily_news_enabled"
     ).eq("id", user_id).single().execute()
     
     return result.data or {
@@ -125,6 +125,7 @@ def get_notification_settings(user_id: str) -> dict:
         "alert_buy_enabled": True,
         "alert_sell_enabled": True,
         "alert_earnings_enabled": True,
+        "alert_daily_news_enabled": True,
     }
 
 

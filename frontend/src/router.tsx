@@ -23,6 +23,7 @@ import {
   PortfolioSettings,
   WatchlistSettings,
   WatchlistTagSettings,
+  DailyBriefingSettings,
 } from '@/components/settings';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
 import { FeedListSettings } from '@/components/settings/FeedListSettings';
@@ -35,6 +36,7 @@ import { MarketPage } from '@/components/market';
 import { AlertsPage } from '@/components/alerts';
 import { FeedPage } from '@/components/feed/FeedPage';
 import { JournalPage } from '@/components/journal/JournalPage';
+import { DailyBriefingPage } from '@/components/daily-briefing';
 import { NotFoundPage } from '@/components/shared/NotFoundPage';
 
 // Root component — auth gate + providers + global modals
@@ -173,6 +175,18 @@ const journalRoute = createRoute({
   component: JournalPage,
 });
 
+const dailyBriefingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/daily-briefing',
+  component: DailyBriefingPage,
+});
+
+const dailyBriefingDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/daily-briefing/$reportId',
+  component: DailyBriefingPage,
+});
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
@@ -207,6 +221,12 @@ const settingsNotificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/notifications',
   component: NotificationSettings,
+});
+
+const settingsDailyBriefingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/daily-briefing',
+  component: DailyBriefingSettings,
 });
 
 const settingsFeedListsRoute = createRoute({
@@ -246,12 +266,15 @@ const routeTree = rootRoute.addChildren([
   feedRoute,
   researchRoute,
   journalRoute,
+  dailyBriefingRoute,
+  dailyBriefingDetailRoute,
   settingsRoute,
   settingsAppearanceRoute,
   settingsPortfoliosRoute,
   settingsWatchlistsRoute,
   settingsWatchlistTagsRoute,
   settingsNotificationsRoute,
+  settingsDailyBriefingRoute,
   settingsFeedListsRoute,
   settingsJournalSectionsRoute,
   settingsJournalChannelsRoute,

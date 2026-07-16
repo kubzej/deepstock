@@ -14,6 +14,7 @@ class NotificationSettings(BaseModel):
     alert_buy_enabled: bool
     alert_sell_enabled: bool
     alert_earnings_enabled: bool
+    alert_daily_news_enabled: bool
 
 
 class NotificationSettingsUpdate(BaseModel):
@@ -22,6 +23,7 @@ class NotificationSettingsUpdate(BaseModel):
     alert_buy_enabled: Optional[bool] = None
     alert_sell_enabled: Optional[bool] = None
     alert_earnings_enabled: Optional[bool] = None
+    alert_daily_news_enabled: Optional[bool] = None
 
 
 class TestNotification(BaseModel):

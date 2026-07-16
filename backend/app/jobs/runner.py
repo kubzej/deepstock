@@ -24,6 +24,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "refresh-earnings-calendar": scheduled.run_refresh_earnings_calendar,
     "refresh-earnings-calendar-force": scheduled.run_refresh_earnings_calendar_force,
     "cleanup-earnings-calendar": scheduled.run_cleanup_earnings_calendar,
+    "daily-news-briefing": scheduled.run_daily_news_briefing,
 }
 
 

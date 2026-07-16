@@ -109,3 +109,27 @@ async def run_cleanup_earnings_calendar() -> dict[str, Any]:
     )
     return {"success": True, **result}
 
+
+async def _run_daily_news_enabled_users() -> dict[str, Any]:
+    from app.services.daily_news import daily_news_service
+
+    return await daily_news_service.run_enabled_users()
+
+
+async def run_daily_news_briefing() -> dict[str, Any]:
+    """Generate daily news briefings for enabled users."""
+    logger.info("Job daily-news-briefing started")
+    result = await _run_daily_news_enabled_users()
+    logger.info(
+        (
+            "Job daily-news-briefing finished: users_checked=%d reports_generated=%d "
+            "succeeded=%d degraded=%d failed=%d notifications_sent=%d"
+        ),
+        result["users_checked"],
+        result["reports_generated"],
+        result["succeeded"],
+        result["degraded"],
+        result["failed"],
+        result["notifications_sent"],
+    )
+    return {"success": True, **result}

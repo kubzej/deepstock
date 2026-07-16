@@ -14,6 +14,10 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 | `get_portfolio_journal_archive` | Portfolio-specific note/report previews for one selected portfolio                                                                                   |
 | `get_portfolio_performance`     | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL`         |
 | `get_market_context`            | Fear & Greed, FX rates, and the macro tickers tracked in DeepStock market overview                                                                   |
+| `list_daily_briefings`          | Recent daily briefing reports with status, window, summary, and source counts                                                                        |
+| `get_latest_daily_briefing`     | Full latest daily briefing markdown and metadata                                                                                                     |
+| `get_daily_briefing`            | Full daily briefing markdown and metadata by report ID                                                                                               |
+| `get_daily_briefing_sources`    | Source articles, filings, and market context items behind one briefing, optionally filtered by ticker or importance                                  |
 | `list_watchlists`               | List available watchlists with names, descriptions, ordering, and item counts                                                                        |
 | `get_watchlist_items`           | Read one concrete watchlist with its stocks, buy/sell targets, notes, sector, and added date                                                        |
 | `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market; use `journal_context.reports[]` with `get_journal_report_content` and `journal_context.notes[]` with `get_journal_note_content` |
@@ -35,12 +39,13 @@ When you add, remove, rename, or significantly repurpose a tool, update these to
 
 - `backend/app/api/endpoints/mcp.py`
 - `backend/app/services/research_context.py` and any split `research_context_*` domain services
+- `backend/app/services/daily_news.py` for daily briefing report/source MCP data
 - `backend/app/schemas/mcp.py` and any split `mcp_*` schema modules
 - `mcp/deepstock_mcp.py`
 - `mcp/CONTRACT.md`
 - `mcp/README.md`
-- `../felix/.agents/skills/felix-invest/SKILL.md`
-- `../felix/.claude/commands/felix.invest.md`
+- `../alethea/alethea-core/agents/shared/specs/investing.md`
+- `../alethea/alethea-knowledge/personal/wiki/projects/deepstock/knowledge.md`
 
 Keep the tool inventory aligned in three places:
 

@@ -6,6 +6,7 @@ import {
   Briefcase,
   Layers,
   List,
+  Newspaper,
   Rss,
   Tag,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ export interface SettingsCatalogItem {
     | '/settings/watchlist-tags'
     | '/settings/appearance'
     | '/settings/notifications'
+    | '/settings/daily-briefing'
     | '/settings/feed-lists'
     | '/settings/journal-sections'
     | '/settings/journal-channels';
@@ -79,6 +81,12 @@ export const SETTINGS_CATALOG: SettingsCatalogSection[] = [
         description: 'Push notifikace a cenové alerty pro sledované akcie.',
         to: '/settings/notifications',
         icon: Bell,
+      },
+      {
+        title: 'Denní briefing',
+        description: 'Výběr portfolií, watchlistů a priorit pro denní report.',
+        to: '/settings/daily-briefing',
+        icon: Newspaper,
       },
       {
         title: 'X.com Feed listy',

@@ -1,5 +1,8 @@
 from app.schemas.mcp import (
     GlobalMarketContextResponse,
+    DailyBriefingContentResponse,
+    DailyBriefingListResponse,
+    DailyBriefingSourcesResponse,
     JournalNoteContentResponse,
     JournalReportContentResponse,
     PortfolioActivityResponse,
@@ -18,6 +21,59 @@ from app.schemas.mcp import (
     WatchlistItemsResponse,
     WatchlistListResponse,
 )
+
+
+def test_daily_briefing_contracts_accept_report_and_source_payloads():
+    listing = DailyBriefingListResponse.model_validate(
+        {
+            "generated_at": "2026-07-15T14:00:00Z",
+            "reports": [
+                {
+                    "id": "report-1",
+                    "status": "succeeded",
+                    "trigger_type": "scheduled",
+                    "window_start": "2026-07-14T14:00:00Z",
+                    "window_end": "2026-07-15T14:00:00Z",
+                    "title": "Denní briefing",
+                    "summary": "No material issues.",
+                    "source_counts": {"used_in_prompt": 2},
+                    "warnings": [],
+                }
+            ],
+        }
+    )
+    detail = DailyBriefingContentResponse.model_validate(
+        {
+            "id": "report-1",
+            "status": "succeeded",
+            "trigger_type": "scheduled",
+            "window_start": "2026-07-14T14:00:00Z",
+            "window_end": "2026-07-15T14:00:00Z",
+            "markdown": "# Denní briefing",
+            "scope_snapshot": {"tickers": ["NVDA"]},
+        }
+    )
+    sources = DailyBriefingSourcesResponse.model_validate(
+        {
+            "report_id": "report-1",
+            "sources": [
+                {
+                    "id": "source-1",
+                    "ticker": "NVDA",
+                    "scope_type": "holding",
+                    "source_type": "edgar",
+                    "title": "NVDA filed 8-K",
+                    "importance": "high",
+                    "used_in_prompt": True,
+                    "raw_payload": {"form_type": "8-K"},
+                }
+            ],
+        }
+    )
+
+    assert listing.reports[0].id == "report-1"
+    assert detail.content_format == "markdown"
+    assert sources.sources[0].ticker == "NVDA"
 
 
 def test_stock_context_contract_accepts_summary_shape():

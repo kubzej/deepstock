@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     ai_model: str = "anthropic/claude-opus-4-8"
     ai_max_tokens: int = 8000
 
+    # Daily news briefing providers
+    marketaux_api_key: str = ""
+    marketaux_symbols_per_request: int = 1
+    marketaux_articles_per_request: int = 3
+    marketaux_request_delay_seconds: float = 2.0
+    marketaux_max_retries: int = 4
+    marketaux_retry_backoff_seconds: float = 30.0
+    sec_user_agent: str = "DeepStock daily briefing contact@example.com"
+
     # Twitter scraping
     twitter_auth_token: str = ""
     twitter_ct0: str = ""

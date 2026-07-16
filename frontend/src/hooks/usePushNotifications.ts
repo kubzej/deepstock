@@ -157,6 +157,7 @@ export function usePushNotifications() {
       alert_buy_enabled: true,
       alert_sell_enabled: true,
       alert_earnings_enabled: true,
+      alert_daily_news_enabled: true,
     },
     settingsLoading,
     

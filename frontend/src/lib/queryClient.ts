@@ -49,6 +49,10 @@ export const STALE_TIMES = {
   // Journal - user data, only invalidate on CRUD
   journalChannels: Infinity,
   journalEntries: Infinity,
+
+  // Daily briefing - generated operational reports
+  dailyBriefingSettings: 5 * 60 * 1000,
+  dailyBriefingReports: 60 * 1000,
 } as const;
 
 /**
@@ -164,4 +168,11 @@ export const queryKeys = {
   journalSections: () => ['journalSections'] as const,
   journalEntries: (channelId: string) => ['journalEntries', channelId] as const,
   journalEntriesByTicker: (ticker: string) => ['journalEntriesByTicker', ticker] as const,
+
+  // Daily briefing
+  dailyBriefingSettings: () => ['dailyBriefing', 'settings'] as const,
+  dailyBriefingScopeOptions: () => ['dailyBriefing', 'scopeOptions'] as const,
+  dailyBriefingReports: () => ['dailyBriefing', 'reports'] as const,
+  dailyBriefingReport: (reportId: string) => ['dailyBriefing', 'report', reportId] as const,
+  dailyBriefingSources: (reportId: string) => ['dailyBriefing', 'sources', reportId] as const,
 } as const;

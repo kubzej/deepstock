@@ -14,6 +14,7 @@ import {
   Bell,
   Rss,
   BookOpen,
+  Newspaper,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +33,7 @@ const menuItems = [
   { path: '/alerts', icon: Bell, label: 'Alerty' },
   { path: '/feed', icon: Rss, label: 'Feeds' },
   { path: '/research', icon: Search, label: 'Průzkum akcie' },
+  { path: '/daily-briefing', icon: Newspaper, label: 'Denní briefing' },
   { path: '/journal', icon: BookOpen, label: 'Deník' },
   { path: '/settings', icon: Settings, label: 'Nastavení' },
 ];
@@ -71,7 +73,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto p-4">
         <ul className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;

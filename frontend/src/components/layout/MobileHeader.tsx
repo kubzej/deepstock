@@ -16,6 +16,7 @@ import {
   Bell,
   Rss,
   BookOpen,
+  Newspaper,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +42,7 @@ const menuItems = [
   { path: '/alerts', icon: Bell, label: 'Alerty' },
   { path: '/feed', icon: Rss, label: 'Feeds' },
   { path: '/research', icon: Search, label: 'Průzkum akcie' },
+  { path: '/daily-briefing', icon: Newspaper, label: 'Denní briefing' },
   { path: '/journal', icon: BookOpen, label: 'Deník' },
   { path: '/settings', icon: Settings, label: 'Nastavení' },
 ];
@@ -96,7 +98,7 @@ export function MobileHeader() {
                 <Menu className="w-7 h-7" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuContent align="end" className="max-h-[calc(100vh-5rem)] w-52 overflow-y-auto">
               {menuItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.path, item.exact);

@@ -2,6 +2,7 @@ import {
   Bell,
   BellOff,
   Calendar,
+  Newspaper,
   Loader2,
   Send,
   ShoppingCart,
@@ -231,6 +232,16 @@ export function NotificationSettings() {
               checked={settings.alert_earnings_enabled}
               onCheckedChange={(value) =>
                 toggleSetting('alert_earnings_enabled', value)
+              }
+              disabled={isUpdating || settingsLoading}
+            />
+            <NotificationPreferenceRow
+              icon={Newspaper}
+              iconClassName="h-4 w-4 text-primary"
+              title="Denní briefing"
+              checked={settings.alert_daily_news_enabled}
+              onCheckedChange={(value) =>
+                toggleSetting('alert_daily_news_enabled', value)
               }
               disabled={isUpdating || settingsLoading}
             />

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import os
 import logging
 import yfinance as yf
-from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, ai_stock_metadata, mcp, feed, journal
+from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, ai_stock_metadata, mcp, feed, journal, daily_news
 from app.core.redis import close_redis_pool
 from app.core.rate_limit import limiter
 
@@ -70,3 +70,4 @@ app.include_router(ai_stock_metadata.router, prefix="/api/ai", tags=["AI Stock M
 app.include_router(mcp.router, prefix="/api/mcp", tags=["MCP"])
 app.include_router(feed.router, prefix="/api/feed", tags=["Feed"])
 app.include_router(journal.router, prefix="/api/journal", tags=["Journal"])
+app.include_router(daily_news.router, prefix="/api/daily-briefing", tags=["Daily Briefing"])

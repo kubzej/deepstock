@@ -274,6 +274,56 @@ async def get_market_context() -> dict:
 
 
 @mcp.tool()
+async def list_daily_briefings(limit: int = 10) -> dict:
+    """
+    List recent DeepStock daily briefing reports.
+
+    Use when the user asks about today's/recent briefing, what changed in the
+    last day, or wants to choose a report before drilling into full content.
+    """
+    return await _api_get("/api/mcp/daily-briefings", params={"limit": limit})
+
+
+@mcp.tool()
+async def get_latest_daily_briefing() -> dict:
+    """
+    Get the latest daily briefing markdown and metadata.
+
+    Use as the first call when the user asks about today's briefing or wants to
+    discuss the latest news scan.
+    """
+    return await _api_get("/api/mcp/daily-briefing/latest")
+
+
+@mcp.tool()
+async def get_daily_briefing(report_id: str) -> dict:
+    """
+    Get full markdown and metadata for one daily briefing report.
+
+    Use after list_daily_briefings when the user picks a specific report.
+    """
+    return await _api_get(f"/api/mcp/daily-briefing/{report_id}")
+
+
+@mcp.tool()
+async def get_daily_briefing_sources(
+    report_id: str,
+    ticker: str = "",
+    importance: str = "",
+) -> dict:
+    """
+    Get source articles, filings, and market context items behind a briefing.
+
+    Use for follow-up questions about why the briefing said something, or to
+    inspect ticker-specific/important source items.
+    """
+    return await _api_get(
+        f"/api/mcp/daily-briefing/{report_id}/sources",
+        params=_compact_params(ticker=ticker.upper(), importance=importance),
+    )
+
+
+@mcp.tool()
 async def list_watchlists() -> dict:
     """
     List available watchlists for the authenticated DeepStock user.

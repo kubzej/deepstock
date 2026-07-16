@@ -3,6 +3,37 @@ import pytest
 from app.jobs import runner, scheduled
 
 
+def test_runner_includes_daily_news_briefing_job():
+    assert runner.JOB_HANDLERS["daily-news-briefing"] is scheduled.run_daily_news_briefing
+
+
+@pytest.mark.asyncio
+async def test_run_daily_news_briefing_calls_service(monkeypatch):
+    async def run_enabled_users():
+        return {
+            "users_checked": 1,
+            "reports_generated": 1,
+            "succeeded": 1,
+            "degraded": 0,
+            "failed": 0,
+            "notifications_sent": 1,
+        }
+
+    monkeypatch.setattr(scheduled, "_run_daily_news_enabled_users", run_enabled_users)
+
+    result = await scheduled.run_daily_news_briefing()
+
+    assert result == {
+        "success": True,
+        "users_checked": 1,
+        "reports_generated": 1,
+        "succeeded": 1,
+        "degraded": 0,
+        "failed": 0,
+        "notifications_sent": 1,
+    }
+
+
 @pytest.mark.asyncio
 async def test_run_price_target_alerts_calls_service_with_redis(monkeypatch):
     redis = object()

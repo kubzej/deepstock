@@ -8,6 +8,7 @@ export interface NotificationSettings {
   alert_buy_enabled: boolean;
   alert_sell_enabled: boolean;
   alert_earnings_enabled: boolean;
+  alert_daily_news_enabled: boolean;
 }
 
 export interface VapidKey {

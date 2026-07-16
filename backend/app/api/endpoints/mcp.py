@@ -12,6 +12,9 @@ from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.schemas.mcp import (
     GlobalMarketContextResponse,
+    DailyBriefingContentResponse,
+    DailyBriefingListResponse,
+    DailyBriefingSourcesResponse,
     JournalNoteContentResponse,
     JournalReportContentResponse,
     PortfolioActivityResponse,
@@ -36,6 +39,8 @@ from app.services.research_context import (
     VALID_TECHNICAL_INDICATORS,
     research_context_service,
 )
+from app.services.daily_news import daily_news_service
+from app.services.research_context_activity import _iso_now
 
 router = APIRouter()
 
@@ -100,6 +105,69 @@ async def get_market_context(
 ):
     del request
     return await research_context_service.get_market_context(user_id)
+
+
+@router.get("/daily-briefings", response_model=DailyBriefingListResponse)
+@limiter.limit("30/minute")
+async def list_daily_briefings(
+    request: Request,
+    limit: int = Query(10, ge=1, le=50),
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    reports = await daily_news_service.list_reports(user_id, limit=limit, offset=0)
+    return {"generated_at": _iso_now(), "reports": reports}
+
+
+@router.get("/daily-briefing/latest", response_model=DailyBriefingContentResponse)
+@limiter.limit("30/minute")
+async def get_latest_daily_briefing(
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    report = await daily_news_service.get_latest_report(user_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Daily briefing not found")
+    report["content_format"] = "markdown"
+    return report
+
+
+@router.get("/daily-briefing/{report_id}", response_model=DailyBriefingContentResponse)
+@limiter.limit("30/minute")
+async def get_daily_briefing(
+    request: Request,
+    report_id: str,
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    report = await daily_news_service.get_report(report_id, user_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Daily briefing not found")
+    report["content_format"] = "markdown"
+    return report
+
+
+@router.get("/daily-briefing/{report_id}/sources", response_model=DailyBriefingSourcesResponse)
+@limiter.limit("30/minute")
+async def get_daily_briefing_sources(
+    request: Request,
+    report_id: str,
+    ticker: Optional[str] = Query(None),
+    importance: Optional[str] = Query(None),
+    user_id: str = Depends(get_current_user_id),
+):
+    del request
+    try:
+        sources = await daily_news_service.get_sources(
+            report_id,
+            user_id,
+            ticker=ticker,
+            importance=importance,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Daily briefing not found")
+    return {"report_id": report_id, "sources": sources}
 
 
 @router.get("/watchlists", response_model=WatchlistListResponse)

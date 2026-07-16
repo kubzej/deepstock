@@ -31,12 +31,15 @@ class CacheTTL:
     EXCHANGE_RATES = 3600           # 1 hour — CZK rates from ECB
     INSIDER_TRADES = 43200          # 12 hours — SEC Form 4 filings
     SEC_CIK_MAP = 604800            # 7 days  — ticker → CIK mapping (static)
+    DAILY_NEWS_MARKETAUX = 21600    # 6 hours — Marketaux daily briefing responses
+    DAILY_NEWS_EDGAR_FILINGS = 21600 # 6 hours — recent SEC submissions per ticker
 
     # ── User analytics ────────────────────────────────────────────
     PERFORMANCE = 3600              # 1 hour — portfolio performance charts
 
     # ── Dedup / flag keys ─────────────────────────────────────────
     ALERT_SENT = 86400              # 24 hours — prevent duplicate alert sends
+    DAILY_NEWS_RUN_LOCK = 7200      # 2 hours — prevent duplicate briefing runs
 
     # ── AI Research reports ───────────────────────────────────────
     AI_RESEARCH_REPORT = 86400      # 24 hours — AI-generated research reports (fundamental)
