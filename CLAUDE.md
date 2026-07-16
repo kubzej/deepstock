@@ -15,7 +15,7 @@ Personal portfolio tracker and stock analysis tool. Single user (owner-operated)
 | Frontend | React 19, TypeScript, Vite 7, Tailwind CSS 4, shadcn/ui (Radix), TanStack Query 5, TanStack Router, Recharts, Lucide icons |
 | Backend  | Python 3.12, FastAPI, Pydantic v2, yfinance, Pandas                                                       |
 | Data     | Supabase (PostgreSQL + Auth), Redis 7 (cache)                                                             |
-| AI       | Claude Sonnet via LiteLLM, Tavily (web search)                                                            |
+| AI       | Configured LLM via LiteLLM, Tavily (web search)                                                           |
 | Infra    | Docker Compose (backend + redis), Vite dev server (frontend)                                              |
 
 ## Running the App

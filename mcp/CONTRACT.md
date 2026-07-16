@@ -448,7 +448,7 @@ Valid indicators:
       "id": "uuid",
       "created_at": "2026-04-10T09:00:00Z",
       "report_type": "portfolio_review",
-      "model": "claude-sonnet",
+      "model": "configured-ai-model",
       "preview": "Short preview...",
       "content_length": 2400
     }
@@ -567,7 +567,7 @@ Valid indicators:
       "id": "uuid",
       "created_at": "2026-04-10T09:00:00Z",
       "report_type": "full_analysis",
-      "model": "claude-sonnet",
+      "model": "configured-ai-model",
       "preview": "Short preview...",
       "content_length": 8421
     }
@@ -592,7 +592,7 @@ Valid indicators:
   "id": "uuid",
   "created_at": "2026-04-10T09:00:00Z",
   "report_type": "full_analysis",
-  "model": "claude-sonnet",
+  "model": "configured-ai-model",
   "content": "# Full markdown...",
   "content_format": "markdown"
 }

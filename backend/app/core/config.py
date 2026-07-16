@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     tavily_api_key: str = ""
     ai_model: str = "anthropic/claude-opus-4-8"
-    ai_max_tokens: int = 8000
+    ai_max_tokens: int = 20000
 
     # Daily news briefing providers
     marketaux_api_key: str = ""

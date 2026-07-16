@@ -4,11 +4,11 @@ from __future__ import annotations
 LiteLLM wrapper — provider-agnostic LLM calls.
 
 Configure via environment variables:
-  AI_MODEL=anthropic/claude-sonnet-4-6   (default)
+  AI_MODEL=anthropic/claude-opus-4-8     (default)
   AI_MAX_TOKENS=20000                    (default)
 
 Supported providers (examples):
-  anthropic/claude-sonnet-4-6
+  anthropic/claude-opus-4-8
   openai/gpt-4o
   gemini/gemini-1.5-pro
   perplexity/sonar-pro
@@ -21,24 +21,34 @@ import os
 import logging
 import litellm
 
-logger = logging.getLogger(__name__)
+from app.core.config import get_settings
 
-AI_MODEL = os.getenv("AI_MODEL", "anthropic/claude-sonnet-4-6")
-AI_MAX_TOKENS = int(os.getenv("AI_MAX_TOKENS", "20000"))
+logger = logging.getLogger(__name__)
 
 # Silence litellm verbose logging
 litellm.set_verbose = False
 
 
-def _get_api_key() -> str | None:
+def _get_ai_model() -> str:
+    """Return the canonical configured AI model."""
+    return get_settings().ai_model
+
+
+def _get_ai_max_tokens() -> int:
+    """Return the canonical configured LLM max token limit."""
+    return get_settings().ai_max_tokens
+
+
+def _get_api_key(ai_model: str) -> str | None:
     """Resolve API key based on the configured provider."""
-    if "anthropic" in AI_MODEL or AI_MODEL.startswith("claude"):
-        return os.getenv("ANTHROPIC_API_KEY")
-    if "openai" in AI_MODEL or AI_MODEL.startswith("gpt"):
+    settings = get_settings()
+    if "anthropic" in ai_model or ai_model.startswith("claude"):
+        return settings.anthropic_api_key
+    if "openai" in ai_model or ai_model.startswith("gpt"):
         return os.getenv("OPENAI_API_KEY")
-    if "gemini" in AI_MODEL:
+    if "gemini" in ai_model:
         return os.getenv("GEMINI_API_KEY")
-    if "perplexity" in AI_MODEL:
+    if "perplexity" in ai_model:
         return os.getenv("PERPLEXITY_API_KEY")
     return None
 
@@ -49,20 +59,21 @@ async def call_llm(system_prompt: str, user_prompt: str, request_timeout: int = 
     Returns (content, model_used).
     Raises ValueError on API/auth/credit errors.
     """
-    api_key = _get_api_key()
+    ai_model = _get_ai_model()
+    api_key = _get_api_key(ai_model)
     if not api_key:
-        raise ValueError(f"API key not found for model '{AI_MODEL}'. Zkontroluj env vars.")
+        raise ValueError(f"API key not found for model '{ai_model}'. Zkontroluj env vars.")
 
-    logger.info(f"Calling LLM model: {AI_MODEL} (timeout={request_timeout}s)")
+    logger.info(f"Calling LLM model: {ai_model} (timeout={request_timeout}s)")
 
     completion_kwargs = dict(
-        model=AI_MODEL,
+        model=ai_model,
         api_key=api_key,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        max_tokens=AI_MAX_TOKENS,
+        max_tokens=_get_ai_max_tokens(),
         request_timeout=request_timeout,
     )
     # Some newer models reject an explicit temperature ("temperature is deprecated
@@ -92,6 +103,6 @@ async def call_llm(system_prompt: str, user_prompt: str, request_timeout: int = 
         raise ValueError(f"Neočekávaná chyba AI modelu ({type(e).__name__}). Zkus to znovu.")
 
     content = response.choices[0].message.content
-    model_used = response.model or AI_MODEL
+    model_used = response.model or ai_model
     logger.info(f"LLM response received ({len(content)} chars) from {model_used}")
     return content, model_used

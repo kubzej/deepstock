@@ -107,7 +107,7 @@ def test_stock_context_contract_accepts_summary_shape():
                     "id": "report-1",
                     "created_at": "2026-04-15T10:00:00Z",
                     "report_type": "full_analysis",
-                    "model": "claude-sonnet",
+                    "model": "configured-ai-model",
                     "preview": "Data center growth remains strong.",
                     "content_length": 4200,
                 }
@@ -235,7 +235,7 @@ def test_detail_contracts_accept_full_content_payloads():
                     "id": "report-1",
                     "created_at": "2026-04-15T10:00:00Z",
                     "report_type": "full_analysis",
-                    "model": "claude-sonnet",
+                    "model": "configured-ai-model",
                     "preview": "Preview",
                     "content_length": 3200,
                 }
@@ -257,7 +257,7 @@ def test_detail_contracts_accept_full_content_payloads():
             "id": "report-1",
             "created_at": "2026-04-15T10:00:00Z",
             "report_type": "full_analysis",
-            "model": "claude-sonnet",
+            "model": "configured-ai-model",
             "content": "# Full markdown",
             "content_format": "markdown",
         }
@@ -400,7 +400,7 @@ def test_detail_contracts_accept_full_content_payloads():
                     "id": "report-portfolio-1",
                     "created_at": "2026-04-15T10:00:00Z",
                     "report_type": "portfolio_review",
-                    "model": "claude-sonnet",
+                    "model": "configured-ai-model",
                     "preview": "Preview",
                     "content_length": 2100,
                 }
