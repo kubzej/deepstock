@@ -16,6 +16,32 @@ class StockInfoUnavailableError(Exception):
     """Raised when upstream market data is temporarily unavailable."""
 
 
+def _ltm_revenue_growth_from_historical(historical: Optional[dict]) -> Optional[float]:
+    """Compute LTM revenue growth from the same revenue series shown in the UI/MCP table."""
+    if not historical:
+        return None
+
+    years = historical.get("years") or []
+    revenue = (historical.get("context") or {}).get("revenue") or []
+    if "LTM" not in years:
+        return None
+
+    ltm_idx = years.index("LTM")
+    prev_idx = ltm_idx - 1
+    if prev_idx < 0 or ltm_idx >= len(revenue) or prev_idx >= len(revenue):
+        return None
+
+    current = revenue[ltm_idx]
+    previous = revenue[prev_idx]
+    if current is None or previous in (None, 0):
+        return None
+
+    try:
+        return round((float(current) - float(previous)) / abs(float(previous)), 4)
+    except (TypeError, ValueError):
+        return None
+
+
 # ============================================================
 # SECTOR RULES CONFIGURATION
 # ============================================================
@@ -277,17 +303,31 @@ def _generate_historical_insights(historical: dict) -> List[dict]:
             })
 
     # ── 3. Consistent positive FCF ────────────────────────────
-    fcf_fy = non_null(fy_vals(context.get("free_cashflow", [])))
+    free_cashflow = context.get("free_cashflow", [])
+    fcf_fy = non_null(fy_vals(free_cashflow))
+    ltm_fcf = ltm_val(free_cashflow)
     if len(fcf_fy) >= 3:
         if all(v > 0 for v in fcf_fy):
-            insights.append({
-                "type": "positive",
-                "title": "Konzistentní FCF",
-                "description": (
-                    f"Free Cash Flow byl pozitivní ve všech {len(fcf_fy)} "
-                    f"sledovaných letech. Stabilní generování hotovosti."
-                ),
-            })
+            if ltm_fcf is not None and ltm_fcf < 0:
+                insights.append({
+                    "type": "info",
+                    "title": "Historicky pozitivní FCF, LTM záporný",
+                    "description": (
+                        f"Free Cash Flow byl pozitivní ve všech {len(fcf_fy)} "
+                        f"sledovaných FY letech, ale LTM je záporný "
+                        f"({ltm_fcf / 1_000_000:.1f}M). Aktuální cash flow "
+                        f"se zhoršilo."
+                    ),
+                })
+            else:
+                insights.append({
+                    "type": "positive",
+                    "title": "Konzistentní FCF",
+                    "description": (
+                        f"Free Cash Flow byl pozitivní ve všech {len(fcf_fy)} "
+                        f"sledovaných letech. Stabilní generování hotovosti."
+                    ),
+                })
 
     # ── 4. Unstable FCF (2+ negative years) ───────────────────
     if len(fcf_fy) >= 3:
@@ -534,6 +574,12 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
     
     # Low gross margin for sector (sector-specific)
     gross_margin = get_num("grossMargin")
+    op_margin = get_num("operatingMargin")
+    roa = get_num("roa")
+    operating_quality_ok = not (
+        (op_margin is not None and op_margin <= 0)
+        or (roa is not None and roa < 0)
+    )
     if gross_margin is not None and rules["gross_margin_warning"] > 0:
         if gross_margin < rules["gross_margin_warning"] / 100:
             sector_context = f" pro {rules['sector_label']} firmu" if rules.get("sector_label") else ""
@@ -566,7 +612,7 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
     # Excellent ROE (sector-adjusted)
     roe = get_num("roe")
     roe_threshold = rules.get("roe_good", 15) / 100
-    if roe is not None and roe > roe_threshold:
+    if roe is not None and roe > roe_threshold and operating_quality_ok:
         sector_context = f" pro {rules['sector_label']} sektor" if rules.get("sector_label") else ""
         insights.append({
             "type": "positive",
@@ -616,7 +662,13 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
     forward_pe = get_num("forwardPE")
     
     # Earnings growth expected
-    if trailing_pe is not None and forward_pe is not None and forward_pe < trailing_pe * 0.85:
+    if (
+        trailing_pe is not None
+        and forward_pe is not None
+        and trailing_pe > 0
+        and forward_pe > 0
+        and forward_pe < trailing_pe * 0.85
+    ):
         insights.append({
             "type": "positive",
             "title": "Očekávaný růst zisků",
@@ -656,7 +708,6 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
         })
     
     # Strong profitability combo (universal)
-    op_margin = get_num("operatingMargin")
     if op_margin is not None and op_margin > 0.25 and roe is not None and roe > 0.15:
         insights.append({
             "type": "positive",
@@ -721,7 +772,7 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
     # Profit Margin analysis
     profit_margin = get_num("profitMargin")
     if profit_margin is not None:
-        if profit_margin > 0.25:
+        if profit_margin > 0.25 and op_margin is not None and op_margin > 0.10:
             insights.append({
                 "type": "positive",
                 "title": "Vynikající čistá marže",
@@ -751,7 +802,6 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
             })
     
     # ROA analysis
-    roa = get_num("roa")
     if roa is not None:
         if roa > 0.15:
             insights.append({
@@ -2130,6 +2180,9 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         
         # Generate insights from fundamentals + historical trends
         historical = await get_historical_financials(redis, ticker)
+        ltm_revenue_growth = _ltm_revenue_growth_from_historical(historical)
+        if ltm_revenue_growth is not None:
+            result["revenueGrowth"] = ltm_revenue_growth
         result["insights"] = generate_insights(result, historical=historical)
         
         # Calculate fair value estimates

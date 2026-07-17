@@ -9,7 +9,7 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 | Tool                            | Description                                                                                                                                          |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_portfolios`               | List available portfolios and their snapshot summaries                                                                                               |
-| `get_portfolio_context`         | Current holdings/snapshot context for all portfolios or one selected portfolio, plus configurable recent mixed activity                              |
+| `get_portfolio_context`         | Current holdings/snapshot context for all portfolios or one selected portfolio, plus recent mixed activity; `recent_limit` defaults to 20 and is capped at 50 |
 | `get_portfolio_activity`        | Full mixed stock/options transaction drilldown for all portfolios or one selected portfolio                                                          |
 | `get_portfolio_journal_archive` | Portfolio-specific note/report previews for one selected portfolio                                                                                   |
 | `get_portfolio_performance`     | Historical stock/options performance for all portfolios or one selected portfolio; period: `1W`, `1M`, `3M`, `6M`, `MTD`, `YTD`, `1Y`, `ALL`         |

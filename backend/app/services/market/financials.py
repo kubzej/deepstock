@@ -254,7 +254,7 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         profitability["roa"].append(_pct(info.get("returnOnAssets")))
         profitability["roic"].append(_pct((ltm_net_income / ltm_invested_cap) if (ltm_net_income and ltm_invested_cap and ltm_invested_cap > 0) else None))
 
-        growth["revenue_growth"].append(_pct(info.get("revenueGrowth")))
+        growth["revenue_growth"].append(_pct(_growth(ltm_revenue, prev["revenue"])))
         growth["net_income_growth"].append(_pct(info.get("earningsGrowth")))
         growth["eps_growth"].append(_pct(_growth(ltm_eps, prev["eps"])))
         growth["ebitda_growth"].append(_pct(_growth(ltm_ebitda, prev["ebitda"])))

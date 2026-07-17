@@ -55,7 +55,7 @@ Returns:
 Important:
 
 - leaving `portfolio_id` empty aggregates across all portfolios
-- `recent_limit` defaults to 20 and lets the agent ask for a smaller/larger recent window without switching to the full activity drilldown
+- `recent_limit` defaults to 20 and accepts values from 1 to 50; use `get_portfolio_activity` for deeper paged history
 - holdings still keep `portfolio_id` and `portfolio_name` so the agent does not
   lose portfolio identity inside the aggregate view
 

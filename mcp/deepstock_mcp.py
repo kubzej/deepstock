@@ -236,6 +236,7 @@ async def get_portfolio_context(portfolio_id: str = "", recent_limit: int = 20) 
 
     Leave portfolio_id empty to aggregate across all portfolios.
     recent_limit controls how many recent mixed activity rows are included.
+    Valid range: 1-50. Default: 20.
     """
     return await _api_get(
         "/api/mcp/portfolio-context",

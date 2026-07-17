@@ -397,7 +397,7 @@ class ActivityPortfolioContextService:
         lower_bound: Optional[str],
         upper_bound: Optional[str],
     ) -> list[dict]:
-        if not portfolio_ids or stock_id is None:
+        if not portfolio_ids:
             return []
 
         query = supabase.table("transactions") \
