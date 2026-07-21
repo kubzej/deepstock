@@ -180,6 +180,7 @@ class MarketauxClient:
             article_ticker = ticker
             article_scope_type = scope_type
             article_priority = priority
+            matched_entity: dict[str, Any] | None = None
             if entities:
                 for entity in entities:
                     symbol = entity.get("symbol") or entity.get("ticker")
@@ -190,11 +191,20 @@ class MarketauxClient:
                         article_ticker = normalized_symbol
                         article_scope_type = ticker_meta[normalized_symbol]["scope_type"]
                         article_priority = ticker_meta[normalized_symbol]["priority"]
+                        matched_entity = entity
                         break
                     if not article_ticker:
                         article_ticker = normalized_symbol
+                        matched_entity = entity
             if ticker_meta and not article_ticker:
                 continue
+            # Pull match_score/sentiment_score off the matched entity *before*
+            # bounded_raw_payload truncates entities past its depth limit —
+            # these need to survive as first-class fields, not raw metadata.
+            match_score = _coerce_float(matched_entity.get("match_score")) if matched_entity else None
+            sentiment_score = (
+                _coerce_float(matched_entity.get("sentiment_score")) if matched_entity else None
+            )
             candidates.append(
                 SourceCandidate(
                     title=title,
@@ -206,6 +216,8 @@ class MarketauxClient:
                     scope_type=article_scope_type,  # type: ignore[arg-type]
                     scope_priority=article_priority,  # type: ignore[arg-type]
                     source_type="marketaux",
+                    match_score=match_score,
+                    sentiment_score=sentiment_score,
                     raw_payload=bounded_raw_payload({
                         "uuid": article.get("uuid"),
                         "source": article.get("source"),
@@ -216,6 +228,15 @@ class MarketauxClient:
                 )
             )
         return candidates
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _format_marketaux_datetime(value: datetime) -> str:

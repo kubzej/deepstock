@@ -96,6 +96,9 @@ class DailyNewsSourceItem(BaseModel):
     url: Optional[str] = None
     source_name: Optional[str] = None
     published_at: Optional[datetime] = None
+    match_score: Optional[float] = None
+    sentiment_score: Optional[float] = None
+    sentiment_label: Optional[str] = None
     relevance_score: Optional[float] = None
     importance: Importance
     used_in_prompt: bool = False

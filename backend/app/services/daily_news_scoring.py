@@ -19,6 +19,19 @@ MAX_PROMPT_ITEMS = 30
 MAX_PERSISTED_ITEMS = 80
 MAX_RAW_STRING = 2000
 
+# Marketaux entity match_score assumed 0-100 (higher = article is genuinely about
+# this ticker, not just mentioning it in passing, e.g. an ETF holdings list).
+# Proportional rather than a hard cutoff since we don't yet have real observed
+# values to calibrate a threshold against (previously discarded by truncation
+# before ever reaching scoring — see bounded_raw_payload). Revisit once a few
+# days of real match_score values have been seen in production.
+MATCH_SCORE_MAX_BONUS = 15.0
+MATCH_SCORE_DEFAULT_BONUS = 7.5
+
+# Marketaux entity sentiment_score assumed -1..1 (negative-neutral-positive).
+SENTIMENT_POSITIVE_THRESHOLD = 0.15
+SENTIMENT_NEGATIVE_THRESHOLD = -0.15
+
 
 @dataclass
 class SourceCandidate:
@@ -32,6 +45,9 @@ class SourceCandidate:
     source_name: Optional[str] = None
     published_at: Optional[datetime] = None
     raw_payload: dict[str, Any] = field(default_factory=dict)
+    match_score: Optional[float] = None
+    sentiment_score: Optional[float] = None
+    sentiment_label: Optional[Literal["positive", "negative", "neutral"]] = None
     relevance_score: float = 0.0
     importance: Importance = "low"
     used_in_prompt: bool = False
@@ -105,15 +121,30 @@ def score_candidates(candidates: list[SourceCandidate], window_end: datetime) ->
         score += SCOPE_WEIGHT.get(candidate.scope_type, 0.0)
         score += PRIORITY_WEIGHT.get(candidate.scope_priority or "low", 0.0)
 
+        if candidate.match_score is not None:
+            clamped_match = max(0.0, min(100.0, candidate.match_score))
+            score += (clamped_match / 100.0) * MATCH_SCORE_MAX_BONUS
+        else:
+            score += MATCH_SCORE_DEFAULT_BONUS
+
+        if candidate.sentiment_score is not None:
+            if candidate.sentiment_score >= SENTIMENT_POSITIVE_THRESHOLD:
+                candidate.sentiment_label = "positive"
+            elif candidate.sentiment_score <= SENTIMENT_NEGATIVE_THRESHOLD:
+                candidate.sentiment_label = "negative"
+            else:
+                candidate.sentiment_label = "neutral"
+
         if candidate.published_at:
             age_hours = max(0.0, (window_end - candidate.published_at).total_seconds() / 3600)
             score += max(0.0, 18.0 - (age_hours * 0.75))
 
         form_type = str(candidate.raw_payload.get("form_type") or "").upper()
+        has_filing_description = bool(candidate.raw_payload.get("description"))
         if form_type in {"8-K", "10-Q", "10-K", "6-K"}:
-            score += 20.0
+            score += 20.0 if has_filing_description else 4.0
         elif form_type in {"S-1", "SC 13D", "SC 13G", "13D", "13G", "4"}:
-            score += 12.0
+            score += 12.0 if has_filing_description else 3.0
 
         candidate.relevance_score = round(score, 2)
         if score >= 75:
@@ -124,6 +155,15 @@ def score_candidates(candidates: list[SourceCandidate], window_end: datetime) ->
             candidate.importance = "low"
         else:
             candidate.importance = "noise"
+
+        if candidate.source_type == "edgar" and form_type and not has_filing_description:
+            # A bare "TICKER filed FORM" with no primaryDocDescription carries no
+            # standalone signal — base weights (priority+scope+source) alone can
+            # already clear the "high" bar for a high-priority holding, so this
+            # has to be an explicit cap, not just a smaller bonus.
+            if candidate.importance in ("high", "medium"):
+                candidate.importance = "low"
+
         scored.append(candidate)
 
     scored.sort(key=lambda item: (item.relevance_score, item.published_at or datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
@@ -147,6 +187,9 @@ def candidate_to_db_row(candidate: SourceCandidate, user_id: str, report_id: str
         "url": candidate.url,
         "source_name": candidate.source_name,
         "published_at": candidate.published_at.isoformat() if candidate.published_at else None,
+        "match_score": candidate.match_score,
+        "sentiment_score": candidate.sentiment_score,
+        "sentiment_label": candidate.sentiment_label,
         "relevance_score": candidate.relevance_score,
         "importance": candidate.importance,
         "used_in_prompt": candidate.used_in_prompt,
@@ -167,6 +210,7 @@ def prompt_item_dict(candidate: SourceCandidate) -> dict[str, Any]:
         "source_name": candidate.source_name,
         "published_at": candidate.published_at.isoformat() if candidate.published_at else None,
         "importance": candidate.importance,
+        "sentiment": candidate.sentiment_label,
         "score": candidate.relevance_score,
         "metadata": candidate.raw_payload,
     }

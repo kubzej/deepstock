@@ -37,6 +37,7 @@ import {
   useGenerateDailyBriefing,
 } from '@/hooks/useDailyBriefing';
 import type {
+  DailyBriefingPriority,
   DailyNewsReport,
   DailyNewsReportStatus,
   DailyNewsSourceItem,
@@ -122,6 +123,23 @@ const SOURCE_IMPORTANCE_LABELS: Record<DailyNewsSourceItem['importance'], string
   low: 'nízká',
   noise: 'šum',
 };
+
+const SENTIMENT_LABELS: Record<'positive' | 'negative' | 'neutral', string> = {
+  positive: 'pozitivní',
+  negative: 'negativní',
+  neutral: 'neutrální',
+};
+
+const SENTIMENT_CLASSES: Record<'positive' | 'negative' | 'neutral', string> = {
+  positive: 'text-emerald-500',
+  negative: 'text-rose-500',
+  neutral: 'text-muted-foreground',
+};
+
+function SentimentBadge({ label }: { label?: 'positive' | 'negative' | 'neutral' | null }) {
+  if (!label) return null;
+  return <span className={SENTIMENT_CLASSES[label]}>{SENTIMENT_LABELS[label]}</span>;
+}
 
 function getPromptSourceCount(report: DailyNewsReport) {
   return Number(report.source_counts?.used_in_prompt ?? 0);
@@ -421,6 +439,7 @@ function SourceRow({ source }: { source: DailyNewsSourceItem }) {
           {source.ticker ? <span>{source.ticker}</span> : null}
           <span>{source.source_name || source.source_type}</span>
           <span>{SOURCE_IMPORTANCE_LABELS[source.importance]}</span>
+          <SentimentBadge label={source.sentiment_label} />
           {source.published_at ? <span>{formatDateTime(source.published_at)}</span> : null}
         </div>
       </div>
@@ -436,6 +455,116 @@ function SourceRow({ source }: { source: DailyNewsSourceItem }) {
         </a>
       ) : null}
     </div>
+  );
+}
+
+type TickerCoverageRow = {
+  ticker: string;
+  name?: string | null;
+  sector?: string | null;
+  priority: DailyBriefingPriority;
+  origin: 'holding' | 'watchlist';
+  sourcesFound: number;
+  usedInPrompt: number;
+};
+
+const COVERAGE_ORIGIN_LABELS: Record<TickerCoverageRow['origin'], string> = {
+  holding: 'Holding',
+  watchlist: 'Watchlist',
+};
+
+const COVERAGE_PRIORITY_LABELS: Record<DailyBriefingPriority, string> = {
+  high: 'Vysoká',
+  medium: 'Střední',
+  low: 'Nízká',
+};
+
+function buildCoverageRows(
+  scopeSnapshot: Record<string, unknown>,
+  sources: DailyNewsSourceItem[],
+): TickerCoverageRow[] {
+  const holdings = Array.isArray((scopeSnapshot as { holdings?: unknown })?.holdings)
+    ? ((scopeSnapshot as { holdings: Record<string, unknown>[] }).holdings)
+    : [];
+  const watchlistItems = Array.isArray((scopeSnapshot as { watchlist_items?: unknown })?.watchlist_items)
+    ? ((scopeSnapshot as { watchlist_items: Record<string, unknown>[] }).watchlist_items)
+    : [];
+
+  const countsByTicker = sources.reduce<Record<string, { found: number; used: number }>>((acc, source) => {
+    if (!source.ticker) return acc;
+    const entry = acc[source.ticker] || { found: 0, used: 0 };
+    entry.found += 1;
+    if (source.used_in_prompt) entry.used += 1;
+    acc[source.ticker] = entry;
+    return acc;
+  }, {});
+
+  const toRow = (item: Record<string, unknown>, origin: TickerCoverageRow['origin']): TickerCoverageRow => {
+    const ticker = String(item.ticker ?? '');
+    const counts = countsByTicker[ticker] || { found: 0, used: 0 };
+    return {
+      ticker,
+      name: (item.name as string | null) ?? null,
+      sector: (item.sector as string | null) ?? null,
+      priority: (item.priority as DailyBriefingPriority) ?? 'medium',
+      origin,
+      sourcesFound: counts.found,
+      usedInPrompt: counts.used,
+    };
+  };
+
+  return [
+    ...holdings.filter((item) => item.ticker).map((item) => toRow(item, 'holding')),
+    ...watchlistItems.filter((item) => item.ticker).map((item) => toRow(item, 'watchlist')),
+  ].sort((a, b) => a.sourcesFound - b.sourcesFound || a.ticker.localeCompare(b.ticker));
+}
+
+function CoverageRowItem({ row }: { row: TickerCoverageRow }) {
+  const noCoverage = row.sourcesFound === 0;
+  return (
+    <UtilityListItem className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          {row.ticker}
+          <Badge variant="outline" className="text-xs font-normal">
+            {COVERAGE_ORIGIN_LABELS[row.origin]}
+          </Badge>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {row.name || row.sector || '—'} · priorita {COVERAGE_PRIORITY_LABELS[row.priority]}
+        </div>
+      </div>
+      <div className={`text-xs ${noCoverage ? 'text-rose-500' : 'text-muted-foreground'}`}>
+        {noCoverage ? 'Bez zdrojů' : `${row.sourcesFound} zdrojů · ${row.usedInPrompt} v promptu`}
+      </div>
+    </UtilityListItem>
+  );
+}
+
+function TickerCoverage({
+  scopeSnapshot,
+  sources,
+}: {
+  scopeSnapshot: Record<string, unknown>;
+  sources: DailyNewsSourceItem[];
+}) {
+  const rows = useMemo(() => buildCoverageRows(scopeSnapshot, sources), [scopeSnapshot, sources]);
+  if (!rows.length) return null;
+  const missingCount = rows.filter((row) => row.sourcesFound === 0).length;
+
+  return (
+    <UtilitySection title="Pokrytí tickerů">
+      <p className="mb-2 text-xs text-muted-foreground">
+        {missingCount > 0
+          ? `${missingCount} z ${rows.length} tickerů bez zachyceného zdroje za toto okno.`
+          : `Všech ${rows.length} sledovaných tickerů mělo alespoň jeden zdroj.`}
+      </p>
+      <UtilityList>
+        {rows.map((row) => (
+          <CoverageRowItem key={`${row.origin}:${row.ticker}`} row={row} />
+        ))}
+      </UtilityList>
+    </UtilitySection>
   );
 }
 
@@ -521,6 +650,10 @@ function ReportDetail({ reportId }: { reportId: string }) {
           isLoading={sourcesLoading}
         />
       </UtilitySection>
+
+      {!sourcesLoading && !sourcesError ? (
+        <TickerCoverage scopeSnapshot={report.scope_snapshot} sources={sourcesData?.sources ?? []} />
+      ) : null}
     </PageShell>
   );
 }

@@ -11,14 +11,15 @@ proč to může být relevantní pro nakonfigurované portfolio/watchlisty.
 Pravidla:
 - Používej pouze dodané zdroje a kontext.
 - Nehalucinuj fakta, čísla ani kauzalitu.
+- U každé položky vycházej z dodaného `current_price` a `daily_change_percent` (pokud jsou k dispozici) při hodnocení, jestli je zpráva/pohyb pro danou akcii pozitivní, negativní nebo neutrální. Nepočítej ani nezmiňuj, jestli je uživatel v zisku nebo ve ztrátě — tahle data se ti nedodávají a nesmíš si je domýšlet.
 - Piš jako denní digest na 2-3 minuty čtení, ne jako rešeršní dokument.
 - Celý report drž typicky do 650 slov; jen ve výjimečně rušný den smíš jít k 900 slovům.
 - Vyber jen informace, které mohou změnit pozornost, riziko, sizing, timing nebo další otázky k pozici.
-- Neopakuj stejnou informaci ve více sekcích. Verdikt má shrnout, detail má doplnit.
+- Neopakuj stejnou informaci ve více sekcích. Pokud už je fakt o tickeru popsaný v Holdings/Watchlist, nesmí se ve Verdiktu objevit stejná věta ani její parafráze — Verdikt buď přidá jiný úhel (proč je to dnes nejdůležitější ze všeho), nebo ten tiket ve Verdiktu vynech.
 - Neuváděj dlouhé seznamy tickerů "bez zpráv"; stačí jedna krátká věta, pokud je to důležité.
 - Přeskakuj administrativní PR, slabé analytické titulky, staré položky mimo 24h okno a nepřímé zmínky, pokud nejsou materiální.
 - Pokud nejsou zásadní zdroje, napiš to normálně a stručně.
-- Uveď zdrojové odkazy tam, kde jsou k dispozici.
+- Ke KAŽDÉ položce, která má v datech `url`, vlož markdown odkaz na zdroj. Vynech odkaz jen u položek bez `url` v datech — nikdy ne podle vlastního uvážení.
 - Nevkládej samostatnou sekci `Zdroje`; aplikace zdroje zobrazí pod reportem sama.
 - Zmiň nejistotu, mezery providerů a degraded stav jen jednou, stručně.
 - Výstup formátuj jako Markdown.

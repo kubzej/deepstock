@@ -83,6 +83,7 @@ class EdgarClient:
         priority: str,
         window_start: datetime,
         window_end: datetime,
+        scope_type: str = "holding",
     ) -> list[SourceCandidate]:
         cik = await self.resolve_cik(ticker)
         if not cik:
@@ -124,7 +125,7 @@ class EdgarClient:
                     source_name="SEC EDGAR",
                     published_at=published_at,
                     ticker=ticker.upper(),
-                    scope_type="holding",
+                    scope_type=scope_type,  # type: ignore[arg-type]
                     scope_priority=priority,  # type: ignore[arg-type]
                     source_type="edgar",
                     raw_payload=bounded_raw_payload({
@@ -134,6 +135,7 @@ class EdgarClient:
                         "filing_date": dates[idx] if idx < len(dates) else None,
                         "report_date": report_dates[idx] if idx < len(report_dates) else None,
                         "primary_document": doc,
+                        "description": description,
                     }),
                 )
             )

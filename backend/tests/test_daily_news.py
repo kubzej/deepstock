@@ -22,7 +22,7 @@ def test_daily_news_scoring_dedupes_and_marks_prompt_items():
             scope_priority="high",
             ticker="NVDA",
             published_at=window_end - timedelta(hours=1),
-            raw_payload={"accession_number": "abc", "form_type": "8-K"},
+            raw_payload={"accession_number": "abc", "form_type": "8-K", "description": "Material acquisition agreement"},
         ),
         SourceCandidate(
             title="Company files 8-K duplicate",
@@ -31,7 +31,7 @@ def test_daily_news_scoring_dedupes_and_marks_prompt_items():
             scope_priority="high",
             ticker="NVDA",
             published_at=window_end - timedelta(hours=1),
-            raw_payload={"accession_number": "abc", "form_type": "8-K"},
+            raw_payload={"accession_number": "abc", "form_type": "8-K", "description": "Material acquisition agreement"},
         ),
         SourceCandidate(
             title="Generic sector note",
@@ -49,6 +49,54 @@ def test_daily_news_scoring_dedupes_and_marks_prompt_items():
     assert scored[0].importance == "high"
     assert scored[0].used_in_prompt is True
     assert scored[0].dedupe_key
+
+
+def test_edgar_filing_without_description_is_capped_below_high():
+    window_end = datetime(2026, 7, 15, 14, 0, tzinfo=timezone.utc)
+    bare_filing = SourceCandidate(
+        title="ABT filed 8-K",
+        source_type="edgar",
+        scope_type="holding",
+        scope_priority="high",
+        ticker="ABT",
+        published_at=window_end - timedelta(hours=1),
+        raw_payload={"accession_number": "xyz", "form_type": "8-K"},
+    )
+
+    scored = score_candidates([bare_filing], window_end)
+
+    assert scored[0].importance == "low"
+
+
+def test_marketaux_match_score_and_sentiment_label_feed_scoring():
+    window_end = datetime(2026, 7, 15, 14, 0, tzinfo=timezone.utc)
+    weak_match = SourceCandidate(
+        title="Generic SCHD dividend roundup",
+        source_type="marketaux",
+        scope_type="holding",
+        scope_priority="high",
+        ticker="ABT",
+        match_score=5.0,
+        sentiment_score=0.6,
+        published_at=window_end - timedelta(hours=1),
+    )
+    strong_match = SourceCandidate(
+        title="ABT reports Q2 earnings",
+        source_type="marketaux",
+        scope_type="holding",
+        scope_priority="high",
+        ticker="ABT",
+        match_score=95.0,
+        sentiment_score=-0.6,
+        published_at=window_end - timedelta(hours=1),
+    )
+
+    scored = score_candidates([weak_match, strong_match], window_end)
+    by_title = {item.title: item for item in scored}
+
+    assert by_title["ABT reports Q2 earnings"].relevance_score > by_title["Generic SCHD dividend roundup"].relevance_score
+    assert by_title["ABT reports Q2 earnings"].sentiment_label == "negative"
+    assert by_title["Generic SCHD dividend roundup"].sentiment_label == "positive"
 
 
 def test_bounded_raw_payload_redacts_and_truncates():

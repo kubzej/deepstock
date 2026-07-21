@@ -4,6 +4,7 @@ from collections import Counter
 from typing import Any
 
 from app.core.supabase import supabase
+from app.services.market import market_service
 from app.services.portfolio import portfolio_service
 from app.services.watchlist import watchlist_service
 
@@ -139,10 +140,6 @@ class DailyNewsSettingsService:
                         "sector": stock.get("sector"),
                         "portfolio_id": portfolio["id"],
                         "portfolio_name": portfolio.get("name"),
-                        "shares": _coerce_float(holding.get("shares")),
-                        "avg_cost_per_share": _coerce_float(holding.get("avg_cost_per_share")),
-                        "total_cost": _coerce_float(holding.get("total_cost")),
-                        "total_invested_czk": _coerce_float(holding.get("total_invested_czk")),
                         "priority": priority,
                     })
             elif item["source_type"] == "watchlist":
@@ -182,6 +179,12 @@ class DailyNewsSettingsService:
         )
 
         tickers = sorted({item["ticker"] for item in [*holdings, *watchlist_items]})
+
+        quotes = await market_service.get_quotes(tickers, include_extended=False) if tickers else {}
+        for item in [*holdings, *watchlist_items]:
+            quote = quotes.get(item["ticker"]) or {}
+            item["current_price"] = _coerce_float(quote.get("price"))
+            item["daily_change_percent"] = _coerce_float(quote.get("changePercent"))
 
         return {
             "settings": {

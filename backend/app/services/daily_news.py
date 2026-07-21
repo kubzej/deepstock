@@ -390,16 +390,24 @@ class DailyNewsService:
     ) -> None:
         fetched = 0
         skipped = 0
-        tickers_with_priority: dict[str, str] = {}
-        for item in [*scope_snapshot.get("holdings", []), *scope_snapshot.get("watchlist_items", [])]:
-            ticker = item.get("ticker")
-            if ticker:
-                tickers_with_priority.setdefault(ticker, item.get("priority") or "medium")
-        for ticker, priority in tickers_with_priority.items():
+        ticker_meta: dict[str, dict[str, str]] = {}
+        for scope_type, items in (
+            ("holding", scope_snapshot.get("holdings", [])),
+            ("watchlist", scope_snapshot.get("watchlist_items", [])),
+        ):
+            for item in items:
+                ticker = item.get("ticker")
+                if ticker:
+                    ticker_meta.setdefault(ticker, {
+                        "priority": item.get("priority") or "medium",
+                        "scope_type": scope_type,
+                    })
+        for ticker, meta in ticker_meta.items():
             try:
                 candidates.extend(await edgar_client.fetch_recent_filings(
                     ticker,
-                    priority=priority,
+                    priority=meta["priority"],
+                    scope_type=meta["scope_type"],
                     window_start=window_start,
                     window_end=window_end,
                 ))

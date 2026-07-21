@@ -79,6 +79,9 @@ export interface DailyNewsSourceItem {
   url?: string | null;
   source_name?: string | null;
   published_at?: string | null;
+  match_score?: number | null;
+  sentiment_score?: number | null;
+  sentiment_label?: 'positive' | 'negative' | 'neutral' | null;
   relevance_score?: number | null;
   importance: DailyNewsImportance;
   used_in_prompt: boolean;

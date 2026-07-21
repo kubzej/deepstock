@@ -154,6 +154,7 @@ Returns:
 - source title, snippet, URL, source type/name
 - ticker/scope/priority
 - importance and relevance score
+- match_score and sentiment_score/sentiment_label (Marketaux entity-level fields, when available)
 - bounded raw provider metadata
 
 ### `list_watchlists()`
