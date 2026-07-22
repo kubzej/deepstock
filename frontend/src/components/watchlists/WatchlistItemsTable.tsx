@@ -382,7 +382,7 @@ export function WatchlistItemsTable({
                   )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                  {item.sector || item.stocks.sector || '—'}
+                  {[item.stocks.sector, item.stocks.industry].filter(Boolean).join(' · ') || '—'}
                 </TableCell>
                 <TableCell className="text-sm hidden lg:table-cell max-w-[150px]">
                   {item.notes ? (

@@ -39,6 +39,7 @@ import {
 } from '@/hooks/useWatchlists';
 import { useWatchlistTags, useSetItemTags } from '@/hooks/useWatchlistTags';
 import { useHoldings } from '@/hooks/useHoldings';
+import { useUpdateStock } from '@/hooks/useStocks';
 import { WatchlistItemCard } from './WatchlistItemCard';
 import {
   WatchlistItemsTable,
@@ -172,6 +173,7 @@ export function WatchlistsPage() {
   const updateItemMutation = useUpdateWatchlistItem();
   const deleteItemMutation = useDeleteWatchlistItem();
   const moveItemMutation = useMoveWatchlistItem();
+  const updateStockMutation = useUpdateStock();
 
   const error = watchlistsError ? (watchlistsError as Error).message : null;
 
@@ -292,8 +294,8 @@ export function WatchlistsPage() {
           return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
         }
         case 'sector':
-          aVal = a.sector ?? a.stocks.sector ?? '';
-          bVal = b.sector ?? b.stocks.sector ?? '';
+          aVal = a.stocks.sector ?? '';
+          bVal = b.stocks.sector ?? '';
           break;
       }
 
@@ -340,7 +342,9 @@ export function WatchlistsPage() {
 
     setItemSaving(true);
     try {
+      let stockId: string;
       if (editingItem) {
+        stockId = editingItem.stock_id;
         await updateItemMutation.mutateAsync({
           itemId: editingItem.id,
           watchlistId: selectedWatchlistId,
@@ -351,7 +355,6 @@ export function WatchlistsPage() {
             ? parseFloat(formData.sellTarget)
             : null,
           notes: formData.notes.trim() || null,
-          sector: formData.sector.trim() || null,
         });
         // Persist tags only when they changed
         const currentTagIds = editingItem.tags?.map((t) => t.id) ?? [];
@@ -373,8 +376,8 @@ export function WatchlistsPage() {
             ? parseFloat(formData.sellTarget)
             : undefined,
           notes: formData.notes.trim() || undefined,
-          sector: formData.sector.trim() || undefined,
         });
+        stockId = created.stock_id;
         if (formData.tagIds.length > 0 && created?.id) {
           await setItemTagsMutation.mutateAsync({
             itemId: created.id,
@@ -382,9 +385,29 @@ export function WatchlistsPage() {
           });
         }
       }
+      // Sector/industry belong to the stock record, not the watchlist item.
+      // The item itself is already saved at this point — a failure here must
+      // not look like the whole save failed, so it gets its own try/catch.
+      if (formData.sector.trim() || formData.industry.trim()) {
+        try {
+          await updateStockMutation.mutateAsync({
+            id: stockId,
+            data: {
+              sector: formData.sector.trim() || undefined,
+              industry: formData.industry.trim() || undefined,
+            },
+          });
+        } catch (stockErr) {
+          console.error('Failed to save sector/industry:', stockErr);
+          alert(
+            'Položka byla uložena do watchlistu, ale sektor/odvětví se nepodařilo uložit. Zkus to znovu přes Detail akcie.',
+          );
+        }
+      }
       queryClient.invalidateQueries({
         queryKey: ['watchlistItems', selectedWatchlistId],
       });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
       setAddItemDialogOpen(false);
     } catch (err) {
       console.error('Failed to save item:', err);

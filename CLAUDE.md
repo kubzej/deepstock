@@ -6,6 +6,7 @@ Personal portfolio tracker and stock analysis tool. Single user (owner-operated)
 
 - **Code:** English only — variable names, functions, comments, types
 - **UI text:** Czech only — labels, buttons, headings, errors, tooltips, placeholders
+  - **Exception:** sector/industry classification values (`SECTOR_CHOICES`, `INDUSTRY_TAXONOMY` in `backend/app/core/taxonomy.py` / `frontend/src/lib/taxonomy.ts`) stay in English everywhere, including `<Select>` labels — they're international financial classification terms tied 1:1 to DB values and yfinance's own vocabulary, same treatment as exchange codes (`NYSE`, `XETRA`).
 - **AI prompts:** Czech (all LLM system/user prompts in `backend/app/ai/prompts/`)
 
 ## Tech Stack

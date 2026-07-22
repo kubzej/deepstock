@@ -16,6 +16,7 @@ class WatchlistItemResponse(BaseModel):
     target_sell_price: Optional[float] = None
     notes: Optional[str] = None
     sector: Optional[str] = None
+    industry: Optional[str] = None
     added_at: Optional[str] = None
 
 
@@ -46,6 +47,7 @@ class WatchlistDetailItemResponse(BaseModel):
     target_sell_price: Optional[float] = None
     notes: Optional[str] = None
     sector: Optional[str] = None
+    industry: Optional[str] = None
     added_at: Optional[str] = None
 
 

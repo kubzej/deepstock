@@ -29,6 +29,8 @@ import {
 } from '@/lib/api';
 import { generateWatchlistTargets } from '@/lib/api/ai_watchlist_targets';
 import { formatPrice } from '@/lib/format';
+import { SectorSelect } from '@/components/shared/SectorSelect';
+import { IndustrySelect } from '@/components/shared/IndustrySelect';
 
 interface WatchlistItemFormDialogProps {
   open: boolean;
@@ -42,6 +44,7 @@ interface WatchlistItemFormDialogProps {
   onSelectedWatchlistChange?: (watchlistId: string) => void;
   initialTicker?: string;
   initialSector?: string | null;
+  initialIndustry?: string | null;
   allTags?: WatchlistTag[];
 }
 
@@ -51,6 +54,7 @@ export interface WatchlistItemFormData {
   sellTarget: string;
   notes: string;
   sector: string;
+  industry: string;
   tagIds: string[];
 }
 
@@ -66,6 +70,7 @@ export function WatchlistItemFormDialog({
   onSelectedWatchlistChange,
   initialTicker,
   initialSector,
+  initialIndustry,
   allTags = [],
 }: WatchlistItemFormDialogProps) {
   // Form state
@@ -74,6 +79,7 @@ export function WatchlistItemFormDialog({
   const [sellTarget, setSellTarget] = useState('');
   const [notes, setNotes] = useState('');
   const [sector, setSector] = useState('');
+  const [industry, setIndustry] = useState('');
   const [tagIds, setTagIds] = useState<string[]>([]);
 
   // AI suggestion state
@@ -88,7 +94,8 @@ export function WatchlistItemFormDialog({
         setBuyTarget(editingItem.target_buy_price?.toString() || '');
         setSellTarget(editingItem.target_sell_price?.toString() || '');
         setNotes(editingItem.notes || '');
-        setSector(editingItem.sector || editingItem.stocks.sector || '');
+        setSector(editingItem.stocks.sector || '');
+        setIndustry(editingItem.stocks.industry || '');
         setTagIds(editingItem.tags?.map((tag) => tag.id) || []);
       } else {
         setTicker(initialTicker?.trim().toUpperCase() || '');
@@ -96,11 +103,12 @@ export function WatchlistItemFormDialog({
         setSellTarget('');
         setNotes('');
         setSector(initialSector || '');
+        setIndustry(initialIndustry || '');
         setTagIds([]);
       }
       setAiError(null);
     }
-  }, [open, editingItem, initialSector, initialTicker]);
+  }, [open, editingItem, initialSector, initialIndustry, initialTicker]);
 
   const handleSubmit = async () => {
     await onSave({
@@ -109,6 +117,7 @@ export function WatchlistItemFormDialog({
       sellTarget,
       notes,
       sector,
+      industry,
       tagIds,
     });
   };
@@ -261,14 +270,9 @@ export function WatchlistItemFormDialog({
               />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="sector">Sektor</Label>
-            <Input
-              id="sector"
-              value={sector}
-              onChange={(e) => setSector(e.target.value)}
-              placeholder="Technology"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SectorSelect value={sector} onValueChange={setSector} />
+            <IndustrySelect value={industry} sector={sector} onValueChange={setIndustry} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Poznámky</Label>

@@ -4,6 +4,7 @@ export interface StockMetadataSuggestion {
   ticker: string;
   name: string | null;
   sector: string | null;
+  industry: string | null;
   exchange: string | null;
   currency: string | null;
   country: string | null;

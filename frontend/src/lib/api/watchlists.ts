@@ -22,7 +22,6 @@ export interface WatchlistItem {
   target_buy_price: number | null;
   target_sell_price: number | null;
   notes: string | null;
-  sector: string | null;
   added_at: string;
   updated_at: string | null;
   stocks: {
@@ -31,6 +30,7 @@ export interface WatchlistItem {
     name: string;
     currency: string;
     sector: string | null;
+    industry: string | null;
     price_scale: number;
   };
   tags?: WatchlistTag[];
@@ -249,7 +249,6 @@ export async function addWatchlistItem(
     target_buy_price?: number;
     target_sell_price?: number;
     notes?: string;
-    sector?: string;
   }
 ): Promise<WatchlistItem> {
   const authHeader = await getAuthHeader();
@@ -280,7 +279,6 @@ export async function updateWatchlistItem(
     target_buy_price?: number | null;
     target_sell_price?: number | null;
     notes?: string | null;
-    sector?: string | null;
   }
 ): Promise<WatchlistItem> {
   const authHeader = await getAuthHeader();

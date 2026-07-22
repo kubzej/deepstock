@@ -41,6 +41,7 @@ class PortfolioHoldingResponse(BaseModel):
     avg_cost: float
     currency: str
     sector: Optional[str] = None
+    industry: Optional[str] = None
     total_invested_czk: float
     current_price: Optional[float] = None
     current_value_czk: Optional[float] = None
@@ -50,6 +51,12 @@ class PortfolioHoldingResponse(BaseModel):
 
 class SectorExposureResponse(BaseModel):
     sector: str
+    value_czk: float
+    weight_pct: float
+
+
+class IndustryExposureResponse(BaseModel):
+    industry: str
     value_czk: float
     weight_pct: float
 
@@ -67,6 +74,7 @@ class PortfolioContextResponse(BaseModel):
     aggregate_snapshot: PortfolioSnapshotResponse
     holdings: list[PortfolioHoldingResponse] = Field(default_factory=list)
     sector_exposure: list[SectorExposureResponse] = Field(default_factory=list)
+    industry_exposure: list[IndustryExposureResponse] = Field(default_factory=list)
     recent_transactions: list[ActivityTransactionResponse] = Field(default_factory=list)
     open_lots_summary: OpenLotsSummaryResponse = Field(default_factory=OpenLotsSummaryResponse)
 
@@ -99,6 +107,7 @@ __all__ = [
     "PortfolioListResponse",
     "PortfolioHoldingResponse",
     "SectorExposureResponse",
+    "IndustryExposureResponse",
     "OpenLotsSummaryResponse",
     "PortfolioContextResponse",
     "PerformanceDataPointResponse",

@@ -49,6 +49,7 @@ Returns:
 - aggregate snapshot
 - holdings with portfolio identity
 - sector exposure
+- industry exposure (finer-grained than sector — e.g. distinguishes Semiconductors from Software within Technology)
 - recent mixed transactions
 - open-lot summary
 
@@ -185,6 +186,7 @@ Returns:
   - `target_sell_price`
   - `notes`
   - `sector`
+  - `industry`
   - `added_at`
 
 ### `get_stock_context(ticker)`
@@ -396,6 +398,7 @@ Valid indicators:
   "aggregate_snapshot": {},
   "holdings": [],
   "sector_exposure": [],
+  "industry_exposure": [],
   "recent_transactions": [
     {
       "asset_type": "stock",

@@ -29,14 +29,12 @@ class WatchlistItemCreate(BaseModel):
     target_buy_price: Optional[float] = None
     target_sell_price: Optional[float] = None
     notes: Optional[str] = None
-    sector: Optional[str] = None
 
 
 class WatchlistItemUpdate(BaseModel):
     target_buy_price: Optional[float] = None
     target_sell_price: Optional[float] = None
     notes: Optional[str] = None
-    sector: Optional[str] = None
 
 
 class TagCreate(BaseModel):
@@ -195,7 +193,7 @@ class WatchlistService:
     async def get_watchlist_items(self, watchlist_id: str) -> List[dict]:
         """Get all items in a watchlist with stock info and tags."""
         response = supabase.table("watchlist_items") \
-            .select("*, stocks(id, ticker, name, currency, sector, price_scale)") \
+            .select("*, stocks(id, ticker, name, currency, sector, industry, price_scale)") \
             .eq("watchlist_id", watchlist_id) \
             .order("added_at", desc=True) \
             .execute()
@@ -228,7 +226,7 @@ class WatchlistService:
     async def get_item(self, item_id: str) -> Optional[dict]:
         """Get a single item by ID."""
         response = supabase.table("watchlist_items") \
-            .select("*, stocks(id, ticker, name, currency, sector, price_scale)") \
+            .select("*, stocks(id, ticker, name, currency, sector, industry, price_scale)") \
             .eq("id", item_id) \
             .execute()
         return response.data[0] if response.data else None
@@ -266,7 +264,6 @@ class WatchlistService:
                 "target_buy_price": data.target_buy_price,
                 "target_sell_price": data.target_sell_price,
                 "notes": data.notes,
-                "sector": data.sector
             }) \
             .execute()
         

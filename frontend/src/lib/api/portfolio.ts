@@ -19,6 +19,7 @@ export interface Holding {
   avg_cost: number;
   currency: string;
   sector?: string;
+  industry?: string;
   price_scale?: number;
   total_invested_czk: number;
   current_price?: number;
@@ -291,24 +292,26 @@ export async function fetchHoldings(portfolioId: string): Promise<Holding[]> {
   
   // Transform backend response (nested stocks) to flat Holding interface
   const data = await response.json();
-  return data.map((h: { stocks: { ticker: string; name: string; currency: string; sector?: string; price_scale?: string | number }; shares: number; avg_cost_per_share: number; total_invested_czk?: number }) => ({
+  return data.map((h: { stocks: { ticker: string; name: string; currency: string; sector?: string; industry?: string; price_scale?: string | number }; shares: number; avg_cost_per_share: number; total_invested_czk?: number }) => ({
     ticker: h.stocks.ticker,
     name: h.stocks.name,
     shares: h.shares,
     avg_cost: h.avg_cost_per_share,
     currency: h.stocks.currency || 'USD',
     sector: h.stocks.sector || '',
+    industry: h.stocks.industry || '',
     price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
     total_invested_czk: requireHoldingTotalInvestedCzk(h.total_invested_czk),
   }));
 }
 
 interface AllHoldingsRaw {
-  stocks: { 
-    ticker: string; 
-    name: string; 
-    currency: string; 
-    sector?: string; 
+  stocks: {
+    ticker: string;
+    name: string;
+    currency: string;
+    sector?: string;
+    industry?: string;
     price_scale?: string | number;
   };
   shares: number;
@@ -352,6 +355,7 @@ export async function fetchAllHoldings(): Promise<Holding[]> {
     avg_cost: h.avg_cost_per_share,
     currency: h.stocks.currency || 'USD',
     sector: h.stocks.sector || '',
+    industry: h.stocks.industry || '',
     price_scale: parseFloat(String(h.stocks.price_scale)) || 1,
     total_invested_czk: requireHoldingTotalInvestedCzk(h.total_invested_czk),
     portfolio_id: h.portfolio_id,

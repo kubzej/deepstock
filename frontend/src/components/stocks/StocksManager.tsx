@@ -69,13 +69,16 @@ import {
   applyStockMetadataSuggestion,
   type StockMetadataFormFields,
 } from '@/lib/stockMetadata';
+import { SectorSelect } from '@/components/shared/SectorSelect';
+import { IndustrySelect } from '@/components/shared/IndustrySelect';
 
 type CompletenessFilter = 'complete' | 'incomplete';
 type StockStatusFilter = 'held' | 'watchlist' | 'untracked';
-type FacetKey = 'sectors' | 'exchanges' | 'currencies' | 'countries';
+type FacetKey = 'sectors' | 'industries' | 'exchanges' | 'currencies' | 'countries';
 
 interface StockFacetFilters {
   sectors: string[];
+  industries: string[];
   exchanges: string[];
   currencies: string[];
   countries: string[];
@@ -95,6 +98,7 @@ const EMPTY_FORM: StockFormData = {
   ticker: '',
   name: '',
   sector: '',
+  industry: '',
   exchange: '',
   currency: 'USD',
   country: '',
@@ -104,6 +108,7 @@ const EMPTY_FORM: StockFormData = {
 
 const EMPTY_FACET_FILTERS: StockFacetFilters = {
   sectors: [],
+  industries: [],
   exchanges: [],
   currencies: [],
   countries: [],
@@ -156,6 +161,7 @@ function getStockCompleteness(stock: Stock): {
 } {
   const missing: string[] = [];
   if (!stock.sector) missing.push('Sektor');
+  if (!stock.industry) missing.push('Odvětví');
   if (!stock.exchange) missing.push('Burza');
   return {
     isComplete: missing.length === 0,
@@ -266,6 +272,7 @@ export default function StocksManager() {
   const facetOptions = useMemo(
     () => ({
       sectors: buildFacetOptions(allStocks, (stock) => stock.sector),
+      industries: buildFacetOptions(allStocks, (stock) => stock.industry),
       exchanges: buildFacetOptions(allStocks, (stock) => stock.exchange),
       currencies: buildFacetOptions(allStocks, (stock) => stock.currency),
       countries: buildFacetOptions(allStocks, (stock) => stock.country),
@@ -328,6 +335,7 @@ export default function StocksManager() {
 
       return (
         matchesSelectedFacet(stock.sector, facetFilters.sectors) &&
+        matchesSelectedFacet(stock.industry, facetFilters.industries) &&
         matchesSelectedFacet(stock.exchange, facetFilters.exchanges) &&
         matchesSelectedFacet(stock.currency, facetFilters.currencies) &&
         matchesSelectedFacet(stock.country, facetFilters.countries)
@@ -370,6 +378,7 @@ export default function StocksManager() {
       ticker: stock.ticker,
       name: stock.name,
       sector: stock.sector || '',
+      industry: stock.industry || '',
       exchange: stock.exchange || '',
       currency: stock.currency || 'USD',
       country: stock.country || '',
@@ -411,10 +420,8 @@ export default function StocksManager() {
 
   // Handle select change
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value === '_none_' ? '' : value,
-    }));
+    const actualValue = value === '_none_' ? '' : value;
+    setFormData((prev) => ({ ...prev, [name]: actualValue }));
   };
 
   const toggleFacetFilter = (key: FacetKey, value: string) => {
@@ -490,6 +497,7 @@ export default function StocksManager() {
         ticker: formData.ticker.toUpperCase(),
         name: formData.name,
         sector: formData.sector || undefined,
+        industry: formData.industry || undefined,
         exchange: formData.exchange || undefined,
         currency: formData.currency,
         country: formData.country || undefined,
@@ -663,6 +671,12 @@ export default function StocksManager() {
                 onToggle={(value) => toggleFacetFilter('sectors', value)}
               />
               <CheckboxFilterGroup
+                title="Odvětví"
+                options={facetOptions.industries}
+                selectedValues={facetFilters.industries}
+                onToggle={(value) => toggleFacetFilter('industries', value)}
+              />
+              <CheckboxFilterGroup
                 title="Burza"
                 options={facetOptions.exchanges}
                 selectedValues={facetFilters.exchanges}
@@ -753,6 +767,7 @@ export default function StocksManager() {
                       {stock.exchange && <span><span className="opacity-50">Burza:</span> {stock.exchange}</span>}
                       {stock.country && <span><span className="opacity-50">Země:</span> {stock.country}</span>}
                       {stock.sector && <span className="truncate"><span className="opacity-50">Sektor:</span> {stock.sector}</span>}
+                      {stock.industry && <span className="truncate"><span className="opacity-50">Odvětví:</span> {stock.industry}</span>}
                     </div>
                   </div>
 
@@ -841,18 +856,21 @@ export default function StocksManager() {
               </div>
             </div>
 
-            {/* Row 2: Sector + Exchange */}
+            {/* Row 2: Sector + Industry */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sector">Sektor</Label>
-                <Input
-                  id="sector"
-                  name="sector"
-                  placeholder="Technology"
-                  value={formData.sector}
-                  onChange={handleChange}
-                />
-              </div>
+              <SectorSelect
+                value={formData.sector}
+                onValueChange={(v) => handleSelectChange('sector', v)}
+              />
+              <IndustrySelect
+                value={formData.industry}
+                sector={formData.sector}
+                onValueChange={(v) => handleSelectChange('industry', v)}
+              />
+            </div>
+
+            {/* Row 3: Exchange + Currency */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Burza</Label>
                 <Select
@@ -874,10 +892,6 @@ export default function StocksManager() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            {/* Row 3: Currency + Country */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Měna</Label>
                 <Select
@@ -896,6 +910,10 @@ export default function StocksManager() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Row 4: Country + Price Scale */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="country">Země</Label>
                 <Input
@@ -907,10 +925,6 @@ export default function StocksManager() {
                   maxLength={2}
                 />
               </div>
-            </div>
-
-            {/* Row 4: Price Scale */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price_scale">Cenový poměr</Label>
                 <Input

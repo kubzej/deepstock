@@ -14,6 +14,7 @@ class StockResponse(BaseModel):
     ticker: str
     name: str
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     currency: str = "USD"
     notes: Optional[str] = None
@@ -30,6 +31,7 @@ class StockCreateRequest(BaseModel):
     ticker: str
     name: str
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     currency: str = "USD"
     notes: Optional[str] = None
@@ -41,6 +43,7 @@ class StockUpdateRequest(BaseModel):
     ticker: Optional[str] = None
     name: Optional[str] = None
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     currency: Optional[str] = None
     notes: Optional[str] = None

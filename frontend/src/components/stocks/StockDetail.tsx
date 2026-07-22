@@ -336,6 +336,7 @@ export function StockDetail() {
   const stockName = stock.name;
   const stockCurrency = stock.currency || 'USD';
   const stockSector = stock.sector;
+  const stockIndustry = stock.industry;
   const priceScale = stock.price_scale ?? 1;
 
   // Price info from quotes
@@ -443,6 +444,11 @@ export function StockDetail() {
             <Badge variant="outline" className="font-normal">
               Sektor: {stockSector || '—'}
             </Badge>
+            {stockIndustry && (
+              <Badge variant="outline" className="font-normal">
+                Odvětví: {stockIndustry}
+              </Badge>
+            )}
             <Badge variant="outline" className="font-normal">
               Burza: {stock.exchange || '—'}
             </Badge>

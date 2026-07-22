@@ -22,6 +22,7 @@ export {
   SECTOR_COLORS,
   COUNTRY_COLORS,
   EXCHANGE_COLORS,
+  getIndustryColor,
 } from './utils';
 
 export type {

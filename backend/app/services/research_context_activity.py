@@ -237,6 +237,7 @@ def _serialize_portfolio_holding(holding: dict, quote: Optional[dict], fx_rate: 
         "avg_cost": float(holding.get("avg_cost_per_share") or 0),
         "currency": stock.get("currency") or "USD",
         "sector": stock.get("sector"),
+        "industry": stock.get("industry"),
         "total_invested_czk": invested_czk,
         "current_price": current_price,
         "current_value_czk": round(current_value_czk, 2) if current_value_czk is not None else None,
@@ -265,6 +266,31 @@ def _build_sector_exposure(holdings: list[dict]) -> list[dict]:
             "weight_pct": round(value_czk / grand_total * 100, 2),
         }
         for sector, value_czk in totals.items()
+    ]
+    exposure.sort(key=lambda item: item["value_czk"], reverse=True)
+    return exposure
+
+
+def _build_industry_exposure(holdings: list[dict]) -> list[dict]:
+    totals: dict[str, float] = {}
+    for holding in holdings:
+        industry = holding.get("industry") or "Unknown"
+        value_czk = float(holding.get("current_value_czk") or 0)
+        if value_czk <= 0:
+            continue
+        totals[industry] = totals.get(industry, 0.0) + value_czk
+
+    grand_total = sum(totals.values())
+    if grand_total <= 0:
+        return []
+
+    exposure = [
+        {
+            "industry": industry,
+            "value_czk": round(value_czk, 2),
+            "weight_pct": round(value_czk / grand_total * 100, 2),
+        }
+        for industry, value_czk in totals.items()
     ]
     exposure.sort(key=lambda item: item["value_czk"], reverse=True)
     return exposure
@@ -655,6 +681,7 @@ class ActivityPortfolioContextService:
             "aggregate_snapshot": aggregate_snapshot.model_dump(),
             "holdings": holdings,
             "sector_exposure": _build_sector_exposure(holdings),
+            "industry_exposure": _build_industry_exposure(holdings),
             "recent_transactions": recent_transactions,
             "open_lots_summary": {
                 "count": len(open_lots),

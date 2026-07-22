@@ -29,6 +29,8 @@ export {
 // Form components
 export { CurrencySelect } from './CurrencySelect';
 export { ExchangeSelect } from './ExchangeSelect';
+export { SectorSelect } from './SectorSelect';
+export { IndustrySelect } from './IndustrySelect';
 export { TickerInput } from './TickerInput';
 
 // Dialog components

@@ -11,6 +11,7 @@ class StockCreate(BaseModel):
     name: str
     currency: str = "USD"
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     country: Optional[str] = None
     price_scale: float = 1.0
@@ -21,6 +22,7 @@ class StockUpdate(BaseModel):
     name: Optional[str] = None
     currency: Optional[str] = None
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     country: Optional[str] = None
     price_scale: Optional[float] = None
@@ -121,6 +123,7 @@ class StockService:
                 "name": data.name,
                 "currency": data.currency,
                 "sector": data.sector,
+                "industry": data.industry,
                 "exchange": data.exchange,
                 "country": data.country,
                 "price_scale": data.price_scale,
@@ -148,6 +151,8 @@ class StockService:
             update_data["currency"] = data.currency
         if data.sector is not None:
             update_data["sector"] = data.sector
+        if data.industry is not None:
+            update_data["industry"] = data.industry
         if data.exchange is not None:
             update_data["exchange"] = data.exchange
         if data.country is not None:

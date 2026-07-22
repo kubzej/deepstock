@@ -160,7 +160,7 @@ class DailyNewsSettingsService:
                     watchlist_items.append({
                         "ticker": ticker.upper(),
                         "name": stock.get("name"),
-                        "sector": watch_item.get("sector") or stock.get("sector"),
+                        "sector": stock.get("sector"),
                         "watchlist_id": watchlist["id"],
                         "watchlist_name": watchlist.get("name"),
                         "target_buy_price": _coerce_float(watch_item.get("target_buy_price")),

@@ -19,7 +19,7 @@ Primary use case: conversational investing chat with personal DeepStock data in 
 | `get_daily_briefing`            | Full daily briefing markdown and metadata by report ID                                                                                               |
 | `get_daily_briefing_sources`    | Source articles, filings, and market context items behind one briefing, optionally filtered by ticker or importance                                  |
 | `list_watchlists`               | List available watchlists with names, descriptions, ordering, and item counts                                                                        |
-| `get_watchlist_items`           | Read one concrete watchlist with its stocks, buy/sell targets, notes, sector, and added date                                                        |
+| `get_watchlist_items`           | Read one concrete watchlist with its stocks, buy/sell targets, notes, sector, industry, and added date                                              |
 | `get_stock_context`             | Default first call — lean ticker summary across journal, activity, watchlist, and market; use `journal_context.reports[]` with `get_journal_report_content` and `journal_context.notes[]` with `get_journal_note_content` |
 | `get_technical_history`         | Detailed indicator history with AI-friendly typed inputs: period `1w`-`2y`, indicators as a list                                                     |
 | `get_stock_journal_archive`     | Report and note previews for a ticker journal; route `reports[].id` to `get_journal_report_content` and `notes[].id` to `get_journal_note_content` |

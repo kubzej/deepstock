@@ -274,10 +274,10 @@ export function WatchlistItemCard({
               </div>
             )}
 
-            {/* Sector */}
-            {(item.sector || item.stocks.sector) && (
+            {/* Sector / Industry */}
+            {(item.stocks.sector || item.stocks.industry) && (
               <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wide mb-2">
-                {item.sector || item.stocks.sector}
+                {[item.stocks.sector, item.stocks.industry].filter(Boolean).join(' · ')}
               </p>
             )}
 

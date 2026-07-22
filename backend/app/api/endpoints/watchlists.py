@@ -131,7 +131,7 @@ async def update_item(
     data: WatchlistItemUpdate,
     user_id: str = Depends(get_current_user_id)
 ) -> dict:
-    """Update a watchlist item (targets, notes, sector)."""
+    """Update a watchlist item (targets, notes)."""
     if not await watchlist_service.verify_item_ownership(item_id, user_id):
         raise HTTPException(status_code=404, detail="Položka nenalezena")
     result = await watchlist_service.update_item(item_id, data)

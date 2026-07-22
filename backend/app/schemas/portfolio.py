@@ -29,6 +29,7 @@ class HoldingResponse(BaseModel):
     avg_cost: float
     currency: str
     sector: Optional[str] = None
+    industry: Optional[str] = None
     price_scale: Optional[int] = None
     total_invested_czk: float
     # Enriched fields (when calculated with current prices)
