@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 from app.ai.prompts.daily_news_prompt import SYSTEM_PROMPT, build_daily_news_prompt
 from app.ai.providers.litellm_client import call_llm
 from app.core.supabase import supabase
-from app.services.daily_news_edgar import EdgarError, EdgarUnsupportedTicker, edgar_client
 from app.services.daily_news_marketaux import MarketauxError, marketaux_client
 from app.services.daily_news_scoring import (
     SourceCandidate,
@@ -173,7 +172,6 @@ class DailyNewsService:
                     warnings.append("DeepStock market context se nepodařilo načíst.")
 
             await self._collect_marketaux(scope_snapshot, window_start, window_end, candidates, warnings, source_counts)
-            await self._collect_edgar(scope_snapshot, window_start, window_end, candidates, warnings, source_counts)
 
             scored = score_candidates(candidates, window_end)
             rows = [candidate_to_db_row(candidate, user_id, report["id"]) for candidate in scored]
@@ -318,44 +316,56 @@ class DailyNewsService:
         source_counts: dict[str, Any],
     ) -> None:
         fetched = 0
-        try:
-            scope_entries = [
-                *[
-                    {
-                        "ticker": item["ticker"],
-                        "scope_type": "holding",
-                        "priority": item.get("priority") or "high",
-                    }
-                    for item in scope_snapshot.get("holdings", [])
-                ],
-                *[
-                    {
-                        "ticker": item["ticker"],
-                        "scope_type": "watchlist",
-                        "priority": item.get("priority") or "medium",
-                    }
-                    for item in scope_snapshot.get("watchlist_items", [])
-                ],
-            ]
-            unique_entries = []
-            seen_tickers: set[str] = set()
-            for entry in scope_entries:
-                ticker = entry["ticker"].upper()
-                if ticker in seen_tickers:
-                    continue
-                seen_tickers.add(ticker)
-                unique_entries.append({**entry, "ticker": ticker})
+        failed = 0
 
-            batch_size = max(1, marketaux_client.settings.marketaux_symbols_per_request)
-            for batch in _chunks(unique_entries[:80], batch_size):
+        scope_entries = [
+            *[
+                {
+                    "ticker": item["ticker"],
+                    "scope_type": "holding",
+                    "priority": item.get("priority") or "high",
+                }
+                for item in scope_snapshot.get("holdings", [])
+            ],
+            *[
+                {
+                    "ticker": item["ticker"],
+                    "scope_type": "watchlist",
+                    "priority": item.get("priority") or "medium",
+                }
+                for item in scope_snapshot.get("watchlist_items", [])
+            ],
+        ]
+        unique_entries = []
+        seen_tickers: set[str] = set()
+        for entry in scope_entries:
+            ticker = entry["ticker"].upper()
+            if ticker in seen_tickers:
+                continue
+            seen_tickers.add(ticker)
+            unique_entries.append({**entry, "ticker": ticker})
+
+        # Each item below is its own try/except (mirroring the EDGAR collection
+        # pattern) so one slow/failed ticker or query can't discard everything
+        # collected so far — a single early timeout used to wipe the whole
+        # Marketaux collection for the report (confirmed in production logs).
+        batch_size = max(1, marketaux_client.settings.marketaux_symbols_per_request)
+        for batch in _chunks(unique_entries[:80], batch_size):
+            batch_tickers = [entry["ticker"] for entry in batch]
+            try:
                 candidates.extend(await marketaux_client.fetch_for_tickers(
                     batch,
                     window_start=window_start,
                     window_end=window_end,
                 ))
                 fetched += 1
+            except MarketauxError as exc:
+                failed += 1
+                logger.warning("Marketaux ticker batch %s failed: %s", batch_tickers, exc)
+                warnings.append(f"Marketaux provider gap pro {', '.join(batch_tickers)}: {exc}")
 
-            for query in ["Federal Reserve rates", "US stock market macro"]:
+        for query in ["Federal Reserve rates", "US stock market macro"]:
+            try:
                 candidates.extend(await marketaux_client.fetch_for_query(
                     query,
                     scope_type="macro",
@@ -364,61 +374,35 @@ class DailyNewsService:
                     limit=3,
                 ))
                 fetched += 1
+            except MarketauxError as exc:
+                failed += 1
+                logger.warning("Marketaux macro query %r failed: %s", query, exc)
+                warnings.append(f"Marketaux provider gap pro makro dotaz '{query}': {exc}")
 
-            for sector in scope_snapshot.get("sectors", [])[:8]:
+        # Sector queries are broad full-text searches (easy to match something)
+        # but low-value per user feedback — kept small so they can't crowd out
+        # ticker-specific coverage in the MAX_PROMPT_ITEMS cap.
+        for sector in scope_snapshot.get("sectors", [])[:3]:
+            try:
                 candidates.extend(await marketaux_client.fetch_for_query(
                     f"{sector} sector stocks",
                     scope_type="sector",
                     window_start=window_start,
                     window_end=window_end,
-                    limit=3,
+                    limit=1,
                 ))
                 fetched += 1
-        except MarketauxError as exc:
-            logger.warning("Marketaux collection failed: %s", exc)
-            warnings.append(f"Marketaux provider gap: {exc}")
-        source_counts["marketaux_requests"] = fetched
+            except MarketauxError as exc:
+                failed += 1
+                logger.warning("Marketaux sector query %r failed: %s", sector, exc)
+                warnings.append(f"Marketaux provider gap pro sektor '{sector}': {exc}")
 
-    async def _collect_edgar(
-        self,
-        scope_snapshot: dict,
-        window_start: datetime,
-        window_end: datetime,
-        candidates: list[SourceCandidate],
-        warnings: list[str],
-        source_counts: dict[str, Any],
-    ) -> None:
-        fetched = 0
-        skipped = 0
-        ticker_meta: dict[str, dict[str, str]] = {}
-        for scope_type, items in (
-            ("holding", scope_snapshot.get("holdings", [])),
-            ("watchlist", scope_snapshot.get("watchlist_items", [])),
-        ):
-            for item in items:
-                ticker = item.get("ticker")
-                if ticker:
-                    ticker_meta.setdefault(ticker, {
-                        "priority": item.get("priority") or "medium",
-                        "scope_type": scope_type,
-                    })
-        for ticker, meta in ticker_meta.items():
-            try:
-                candidates.extend(await edgar_client.fetch_recent_filings(
-                    ticker,
-                    priority=meta["priority"],
-                    scope_type=meta["scope_type"],
-                    window_start=window_start,
-                    window_end=window_end,
-                ))
-                fetched += 1
-            except EdgarUnsupportedTicker:
-                skipped += 1
-            except EdgarError as exc:
-                logger.warning("EDGAR collection failed for %s: %s", ticker, exc)
-                warnings.append(f"EDGAR provider gap pro {ticker}: {exc}")
-        source_counts["edgar_tickers_checked"] = fetched
-        source_counts["edgar_tickers_skipped"] = skipped
+        logger.info(
+            "Marketaux collection finished: %d requests succeeded, %d failed, %d candidates collected",
+            fetched, failed, len(candidates),
+        )
+        source_counts["marketaux_requests"] = fetched
+        source_counts["marketaux_requests_failed"] = failed
 
     async def _send_notification_if_enabled(self, user_id: str, report_id: str, title: str, body: str) -> str:
         try:
