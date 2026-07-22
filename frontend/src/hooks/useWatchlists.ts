@@ -160,14 +160,12 @@ export function useAddWatchlistItem() {
       targetBuyPrice?: number;
       targetSellPrice?: number;
       notes?: string;
-      sector?: string;
     }) =>
       addWatchlistItem(data.watchlistId, {
         ticker: data.ticker,
         target_buy_price: data.targetBuyPrice,
         target_sell_price: data.targetSellPrice,
         notes: data.notes,
-        sector: data.sector,
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
@@ -193,13 +191,11 @@ export function useUpdateWatchlistItem() {
       targetBuyPrice?: number | null;
       targetSellPrice?: number | null;
       notes?: string | null;
-      sector?: string | null;
     }) =>
       updateWatchlistItem(data.itemId, {
         target_buy_price: data.targetBuyPrice,
         target_sell_price: data.targetSellPrice,
         notes: data.notes,
-        sector: data.sector,
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({

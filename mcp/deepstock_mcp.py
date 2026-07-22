@@ -232,7 +232,7 @@ async def list_portfolios() -> dict:
 async def get_portfolio_context(portfolio_id: str = "", recent_limit: int = 20) -> dict:
     """
     Get the current portfolio state: holdings, snapshot, sector exposure,
-    recent transactions, and open-lot summary.
+    industry exposure, recent transactions, and open-lot summary.
 
     Leave portfolio_id empty to aggregate across all portfolios.
     recent_limit controls how many recent mixed activity rows are included.
@@ -341,7 +341,7 @@ async def get_watchlist_items(watchlist_id: str) -> dict:
     Get the stocks and watch targets for one concrete watchlist.
 
     Returns watchlist metadata plus all items with ticker, stock name,
-    buy/sell targets, notes, sector, and added date.
+    buy/sell targets, notes, sector, industry, and added date.
 
     Use this after list_watchlists once you know which watchlist matters.
     """

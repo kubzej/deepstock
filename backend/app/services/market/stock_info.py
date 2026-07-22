@@ -7,6 +7,7 @@ import json
 import logging
 from typing import List, Optional
 from app.core.cache import CacheTTL
+from app.core.taxonomy import SECTOR_KEYS
 from app.services.market.financials import get_historical_financials
 
 logger = logging.getLogger(__name__)
@@ -189,6 +190,10 @@ SECTOR_RULES = {
         "sector_label": "komunikační",
     },
 }
+
+assert set(SECTOR_RULES.keys()) == set(SECTOR_KEYS), (
+    "SECTOR_RULES keys must match app.core.taxonomy.SECTOR_KEYS"
+)
 
 # Default rules for unknown sectors
 DEFAULT_RULES = {
@@ -979,6 +984,10 @@ SECTOR_PE_BENCHMARKS = {
     "Basic Materials": {"low": 10, "mid": 15, "high": 20},
     "Real Estate": {"low": 14, "mid": 18, "high": 24},
 }
+
+assert set(SECTOR_PE_BENCHMARKS.keys()) == set(SECTOR_KEYS), (
+    "SECTOR_PE_BENCHMARKS keys must match app.core.taxonomy.SECTOR_KEYS"
+)
 
 
 def _graham_valuation(data: dict) -> Optional[dict]:

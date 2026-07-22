@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { StockPicker } from '@/components/shared/StockPicker';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useStocks } from '@/hooks/useStocks';
 import {
@@ -457,26 +458,15 @@ export function TransactionModal({
 
           {/* Stock Select - only in create mode */}
           {!isEditMode && (
-            <div className="space-y-2">
-              <Label>Akcie *</Label>
-              <Select
-                value={formData.stockTicker}
-                onValueChange={(v) =>
-                  setFormData((prev) => ({ ...prev, stockTicker: v }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Vyberte akcii..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {stockOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <StockPicker
+              label="Akcie *"
+              value={formData.stockTicker}
+              onValueChange={(v) =>
+                setFormData((prev) => ({ ...prev, stockTicker: v }))
+              }
+              options={stockOptions}
+              placeholder="Vyberte akcii..."
+            />
           )}
 
           {/* SELL Mode Selection */}

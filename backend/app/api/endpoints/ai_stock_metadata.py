@@ -20,6 +20,7 @@ from app.ai.prompts.stock_metadata_prompt import (
 from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
+from app.core.taxonomy import ALL_INDUSTRIES, SECTOR_CHOICES, SECTOR_OVERRIDES
 from app.services.market import market_service
 from app.services.market.stock_info import StockInfoUnavailableError
 
@@ -153,6 +154,7 @@ class StockMetadataResponse(BaseModel):
     ticker: str
     name: Optional[str] = None
     sector: Optional[str] = None
+    industry: Optional[str] = None
     exchange: Optional[str] = None
     currency: Optional[str] = None
     country: Optional[str] = None
@@ -202,6 +204,27 @@ def _normalize_country(raw_country: Optional[str], exchange: Optional[str]) -> O
     if exchange:
         return EXCHANGE_COUNTRIES.get(exchange)
     return None
+
+
+def _apply_sector_override(ticker: str, sector: Optional[str], industry: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """Apply SECTOR_OVERRIDES (app/core/taxonomy.py) for tickers where yfinance's
+    raw classification is a poor fit for diversification purposes. Falls back to
+    the raw yfinance values when the ticker has no override."""
+    override = SECTOR_OVERRIDES.get(ticker.upper())
+    if override:
+        return override
+    return sector, industry
+
+
+def _check_taxonomy(ticker: str, sector: Optional[str], industry: Optional[str]) -> None:
+    """Soft validation: log when yfinance returns a sector/industry outside our
+    taxonomy (app/core/taxonomy.py) instead of silently dropping it. The value is
+    still returned/saved — this is a signal the taxonomy may need extending, not
+    a rejection gate."""
+    if sector and sector not in SECTOR_CHOICES:
+        logger.warning("Sector %r for %s is outside SECTOR_CHOICES — taxonomy may need extending", sector, ticker)
+    if industry and industry not in ALL_INDUSTRIES:
+        logger.warning("Industry %r for %s is outside INDUSTRY_TAXONOMY — taxonomy may need extending", industry, ticker)
 
 
 def _infer_price_scale(exchange: Optional[str], ticker: str) -> float:
@@ -315,21 +338,27 @@ async def generate_stock_metadata(
     if not stock_info:
         raise HTTPException(status_code=404, detail=f"Ticker {ticker} se nepodařilo najít.")
 
+    sector, industry = _apply_sector_override(ticker, stock_info.get("sector"), stock_info.get("industry"))
+    stock_info = {**stock_info, "sector": sector, "industry": industry}
+
     exchange = _normalize_exchange(stock_info.get("exchange"), ticker)
     country = _normalize_country(stock_info.get("country"), exchange)
     notes, used_ai = await _generate_ai_notes(stock_info)
     if not notes:
         notes = _fallback_notes(
             name=stock_info.get("name"),
-            sector=stock_info.get("sector"),
+            sector=sector,
             country=country,
             description=stock_info.get("description"),
         )
 
+    _check_taxonomy(ticker, sector, industry)
+
     response_data = {
         "ticker": ticker,
         "name": stock_info.get("name"),
-        "sector": stock_info.get("sector"),
+        "sector": sector,
+        "industry": industry,
         "exchange": exchange,
         "currency": _normalize_currency(stock_info.get("currency")),
         "country": country,

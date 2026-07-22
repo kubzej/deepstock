@@ -24,6 +24,7 @@ def _coerce_float(value):
 
 
 def _serialize_watchlist_item(item: dict) -> dict:
+    stock = item.get("stocks") or {}
     return {
         "id": item.get("id"),
         "watchlist_id": item.get("watchlist_id"),
@@ -31,7 +32,8 @@ def _serialize_watchlist_item(item: dict) -> dict:
         "target_buy_price": _coerce_float(item.get("target_buy_price")),
         "target_sell_price": _coerce_float(item.get("target_sell_price")),
         "notes": item.get("notes"),
-        "sector": item.get("sector"),
+        "sector": stock.get("sector"),
+        "industry": stock.get("industry"),
         "added_at": item.get("added_at"),
     }
 
@@ -55,7 +57,8 @@ def _serialize_watchlist_detail_item(item: dict) -> dict:
         "target_buy_price": _coerce_float(item.get("target_buy_price")),
         "target_sell_price": _coerce_float(item.get("target_sell_price")),
         "notes": item.get("notes"),
-        "sector": item.get("sector"),
+        "sector": stock.get("sector"),
+        "industry": stock.get("industry"),
         "added_at": item.get("added_at"),
     }
 
@@ -75,7 +78,7 @@ class WatchlistContextService:
             return {"count": 0, "items": []}
 
         item_rows = supabase.table("watchlist_items") \
-            .select("*") \
+            .select("*, stocks(sector, industry)") \
             .in_("watchlist_id", list(watchlist_names.keys())) \
             .eq("stock_id", stock["id"]) \
             .order("added_at", desc=True) \

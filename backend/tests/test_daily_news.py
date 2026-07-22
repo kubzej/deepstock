@@ -13,25 +13,28 @@ from app.core.config import Settings
 
 
 def test_daily_news_scoring_dedupes_and_marks_prompt_items():
+    # EDGAR is disconnected from the pipeline (see daily-briefing-quality plan),
+    # but score_candidates/make_dedupe_key stay source-type-agnostic — this uses
+    # a generic raw_payload key (accession_number) to exercise the dedupe path.
     window_end = datetime(2026, 7, 15, 14, 0, tzinfo=timezone.utc)
     candidates = [
         SourceCandidate(
-            title="Company files 8-K",
-            source_type="edgar",
+            title="NVDA reports material agreement",
+            source_type="marketaux",
             scope_type="holding",
             scope_priority="high",
             ticker="NVDA",
             published_at=window_end - timedelta(hours=1),
-            raw_payload={"accession_number": "abc", "form_type": "8-K", "description": "Material acquisition agreement"},
+            raw_payload={"accession_number": "abc"},
         ),
         SourceCandidate(
-            title="Company files 8-K duplicate",
-            source_type="edgar",
+            title="NVDA reports material agreement duplicate",
+            source_type="marketaux",
             scope_type="holding",
             scope_priority="high",
             ticker="NVDA",
             published_at=window_end - timedelta(hours=1),
-            raw_payload={"accession_number": "abc", "form_type": "8-K", "description": "Material acquisition agreement"},
+            raw_payload={"accession_number": "abc"},
         ),
         SourceCandidate(
             title="Generic sector note",
@@ -49,23 +52,6 @@ def test_daily_news_scoring_dedupes_and_marks_prompt_items():
     assert scored[0].importance == "high"
     assert scored[0].used_in_prompt is True
     assert scored[0].dedupe_key
-
-
-def test_edgar_filing_without_description_is_capped_below_high():
-    window_end = datetime(2026, 7, 15, 14, 0, tzinfo=timezone.utc)
-    bare_filing = SourceCandidate(
-        title="ABT filed 8-K",
-        source_type="edgar",
-        scope_type="holding",
-        scope_priority="high",
-        ticker="ABT",
-        published_at=window_end - timedelta(hours=1),
-        raw_payload={"accession_number": "xyz", "form_type": "8-K"},
-    )
-
-    scored = score_candidates([bare_filing], window_end)
-
-    assert scored[0].importance == "low"
 
 
 def test_marketaux_match_score_and_sentiment_label_feed_scoring():

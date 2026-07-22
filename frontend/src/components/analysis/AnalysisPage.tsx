@@ -29,7 +29,9 @@ import {
   SECTOR_COLORS,
   COUNTRY_COLORS,
   EXCHANGE_COLORS,
+  getIndustryColor,
 } from '@/components/analysis';
+import { INDUSTRY_TAXONOMY } from '@/lib/taxonomy';
 import type { DateRangePreset, DistributionItem } from '@/components/analysis';
 import type {
   Transaction,
@@ -242,6 +244,39 @@ export function AnalysisPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings, quotes, rates, valueMode]);
 
+  const industryDistribution = useMemo((): DistributionItem[] => {
+    const industryMap: Record<string, number> = {};
+    const industrySector: Record<string, string> = {};
+    let totalValue = 0;
+
+    holdings.forEach((h) => {
+      const value = calcValue(h);
+      const industry = h.industry || 'Other';
+
+      industryMap[industry] = (industryMap[industry] || 0) + value;
+      if (!industrySector[industry] && h.sector) {
+        industrySector[industry] = h.sector;
+      }
+      totalValue += value;
+    });
+
+    return Object.entries(industryMap)
+      .map(([label, value]) => {
+        const sector = industrySector[label];
+        return {
+          label,
+          value,
+          percent: totalValue > 0 ? (value / totalValue) * 100 : 0,
+          color:
+            label === 'Other'
+              ? SECTOR_COLORS.Other
+              : getIndustryColor(label, sector, sector ? INDUSTRY_TAXONOMY[sector] : []),
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdings, quotes, rates, valueMode]);
+
   const countryDistribution = useMemo((): DistributionItem[] => {
     const countryMap: Record<string, number> = {};
     let totalValue = 0;
@@ -336,12 +371,18 @@ export function AnalysisPage() {
           {isLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : (
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-2 gap-8">
               <DistributionList
                 title="Podle sektoru"
                 items={sectorDistribution}
                 holdings={holdingsWithValue}
                 groupBy="sector"
+              />
+              <DistributionList
+                title="Podle industry"
+                items={industryDistribution}
+                holdings={holdingsWithValue}
+                groupBy="industry"
               />
               <DistributionList
                 title="Podle země"

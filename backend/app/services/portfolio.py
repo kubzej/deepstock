@@ -248,7 +248,7 @@ class PortfolioService:
     async def get_holdings(self, portfolio_id: str) -> List[dict]:
         """Get all holdings for a portfolio with stock info."""
         response = supabase.table("holdings") \
-            .select("*, stocks(ticker, name, currency, sector, price_scale)") \
+            .select("*, stocks(ticker, name, currency, sector, industry, price_scale)") \
             .eq("portfolio_id", portfolio_id) \
             .gt("shares", 0) \
             .execute()
@@ -311,7 +311,7 @@ class PortfolioService:
         
         # Get holdings for all portfolios
         response = supabase.table("holdings") \
-            .select("*, stocks(ticker, name, currency, sector, price_scale), portfolios(name)") \
+            .select("*, stocks(ticker, name, currency, sector, industry, price_scale), portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
             .gt("shares", 0) \
             .execute()

@@ -9,7 +9,7 @@ import { formatPrice, formatPercent } from '@/lib/format';
 import type { DistributionItem } from './utils';
 import type { Holding } from '@/lib/api';
 
-type GroupByField = 'sector' | 'country' | 'exchange';
+type GroupByField = 'sector' | 'industry' | 'country' | 'exchange';
 
 interface DistributionListProps {
   title: string;
@@ -62,6 +62,9 @@ export function DistributionList({
     return holdings.filter((h) => {
       if (groupBy === 'sector') {
         return (h.sector || 'Other') === categoryLabel;
+      }
+      if (groupBy === 'industry') {
+        return (h.industry || 'Other') === categoryLabel;
       }
       if (groupBy === 'country' && stockLookup) {
         const stock = stockLookup[h.ticker];

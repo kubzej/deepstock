@@ -22,6 +22,8 @@ import { Loader2, Sparkles } from 'lucide-react';
 import { generateStockMetadata, updateStock } from '@/lib/api';
 import type { Stock } from '@/lib/api';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
+import { SectorSelect } from '@/components/shared/SectorSelect';
+import { IndustrySelect } from '@/components/shared/IndustrySelect';
 import {
   applyStockMetadataSuggestion,
   type StockMetadataFormFields,
@@ -45,6 +47,7 @@ export function StockFormDialog({
   const [formData, setFormData] = useState<StockFormData>({
     name: '',
     sector: '',
+    industry: '',
     exchange: '',
     currency: 'USD',
     country: '',
@@ -63,6 +66,7 @@ export function StockFormDialog({
       setFormData({
         name: stock.name,
         sector: stock.sector || '',
+        industry: stock.industry || '',
         exchange: stock.exchange || '',
         currency: stock.currency || 'USD',
         country: stock.country || '',
@@ -106,6 +110,7 @@ export function StockFormDialog({
       await updateStock(stock.id, {
         name: formData.name,
         sector: formData.sector || undefined,
+        industry: formData.industry || undefined,
         exchange: formData.exchange || undefined,
         currency: formData.currency,
         country: formData.country || undefined,
@@ -178,18 +183,21 @@ export function StockFormDialog({
             />
           </div>
 
-          {/* Row 2: Sector + Exchange */}
+          {/* Row 2: Sector + Industry */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sector">Sektor</Label>
-              <Input
-                id="sector"
-                name="sector"
-                placeholder="Technology"
-                value={formData.sector}
-                onChange={handleChange}
-              />
-            </div>
+            <SectorSelect
+              value={formData.sector}
+              onValueChange={(v) => handleSelectChange('sector', v)}
+            />
+            <IndustrySelect
+              value={formData.industry}
+              sector={formData.sector}
+              onValueChange={(v) => handleSelectChange('industry', v)}
+            />
+          </div>
+
+          {/* Row 3: Exchange + Currency */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Burza</Label>
               <Select
@@ -211,10 +219,6 @@ export function StockFormDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          {/* Row 3: Currency + Country */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Měna</Label>
               <Select
@@ -233,6 +237,10 @@ export function StockFormDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Row 4: Country + Price Scale */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="country">Země</Label>
               <Input
@@ -244,10 +252,6 @@ export function StockFormDialog({
                 maxLength={2}
               />
             </div>
-          </div>
-
-          {/* Row 4: Price Scale */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="price_scale">Cenový poměr</Label>
               <Input

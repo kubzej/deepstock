@@ -139,13 +139,6 @@ def score_candidates(candidates: list[SourceCandidate], window_end: datetime) ->
             age_hours = max(0.0, (window_end - candidate.published_at).total_seconds() / 3600)
             score += max(0.0, 18.0 - (age_hours * 0.75))
 
-        form_type = str(candidate.raw_payload.get("form_type") or "").upper()
-        has_filing_description = bool(candidate.raw_payload.get("description"))
-        if form_type in {"8-K", "10-Q", "10-K", "6-K"}:
-            score += 20.0 if has_filing_description else 4.0
-        elif form_type in {"S-1", "SC 13D", "SC 13G", "13D", "13G", "4"}:
-            score += 12.0 if has_filing_description else 3.0
-
         candidate.relevance_score = round(score, 2)
         if score >= 75:
             candidate.importance = "high"
@@ -155,14 +148,6 @@ def score_candidates(candidates: list[SourceCandidate], window_end: datetime) ->
             candidate.importance = "low"
         else:
             candidate.importance = "noise"
-
-        if candidate.source_type == "edgar" and form_type and not has_filing_description:
-            # A bare "TICKER filed FORM" with no primaryDocDescription carries no
-            # standalone signal — base weights (priority+scope+source) alone can
-            # already clear the "high" bar for a high-priority holding, so this
-            # has to be an explicit cap, not just a smaller bonus.
-            if candidate.importance in ("high", "medium"):
-                candidate.importance = "low"
 
         scored.append(candidate)
 
@@ -212,7 +197,6 @@ def prompt_item_dict(candidate: SourceCandidate) -> dict[str, Any]:
         "importance": candidate.importance,
         "sentiment": candidate.sentiment_label,
         "score": candidate.relevance_score,
-        "metadata": candidate.raw_payload,
     }
 
 

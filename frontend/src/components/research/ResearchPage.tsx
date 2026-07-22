@@ -36,6 +36,7 @@ import { HistoricalFinancialsSection } from '@/components/research/sections/Hist
 import { QuickJournalSheet } from '@/components/research/sections/QuickJournalSheet';
 import { QuickJournalPanel } from '@/components/research/sections/QuickJournalPanel';
 import { useJournalChannels } from '@/hooks/useJournal';
+import { useUpdateStock } from '@/hooks/useStocks';
 import {
   useAddWatchlistItem,
   useAllWatchlistItems,
@@ -206,6 +207,7 @@ export function ResearchPage() {
   const { data: allWatchlistItems = [] } = useAllWatchlistItems();
   const addWatchlistItem = useAddWatchlistItem();
   const updateWatchlistItem = useUpdateWatchlistItem();
+  const updateStockMutation = useUpdateStock();
   const deleteWatchlistItem = useDeleteWatchlistItem();
   const moveWatchlistItem = useMoveWatchlistItem();
 
@@ -370,19 +372,20 @@ export function ResearchPage() {
     setWatchlistActionPending(true);
 
     try {
+      let stockId: string;
       if (editingWatchlistItem) {
+        stockId = editingWatchlistItem.stock_id;
         await updateWatchlistItem.mutateAsync({
           itemId: editingWatchlistItem.id,
           watchlistId: editingWatchlistItem.watchlist_id,
           targetBuyPrice: formData.buyTarget ? parseFloat(formData.buyTarget) : null,
           targetSellPrice: formData.sellTarget ? parseFloat(formData.sellTarget) : null,
           notes: formData.notes.trim() || null,
-          sector: formData.sector.trim() || null,
         });
       } else {
         if (!selectedWatchlistId || !formData.ticker.trim()) return;
 
-        await addWatchlistItem.mutateAsync({
+        const created = await addWatchlistItem.mutateAsync({
           watchlistId: selectedWatchlistId,
           ticker: formData.ticker.trim().toUpperCase(),
           targetBuyPrice: formData.buyTarget
@@ -392,9 +395,26 @@ export function ResearchPage() {
             ? parseFloat(formData.sellTarget)
             : undefined,
           notes: formData.notes.trim() || undefined,
-          sector: formData.sector.trim() || undefined,
         });
+        stockId = created.stock_id;
         queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+      }
+
+      if (formData.sector.trim() || formData.industry.trim()) {
+        try {
+          await updateStockMutation.mutateAsync({
+            id: stockId,
+            data: {
+              sector: formData.sector.trim() || undefined,
+              industry: formData.industry.trim() || undefined,
+            },
+          });
+        } catch (stockErr) {
+          console.error('Failed to save sector/industry:', stockErr);
+          alert(
+            'Položka byla uložena do watchlistu, ale sektor/odvětví se nepodařilo uložit. Zkus to znovu přes Detail akcie.',
+          );
+        }
       }
 
       setWatchlistDialogOpen(false);
@@ -753,6 +773,7 @@ export function ResearchPage() {
           onSelectedWatchlistChange={setSelectedWatchlistId}
           initialTicker={editingWatchlistItem ? undefined : data?.symbol}
           initialSector={editingWatchlistItem ? undefined : data?.sector}
+          initialIndustry={editingWatchlistItem ? undefined : data?.industry}
         />
 
         <Dialog open={moveDialogOpen} onOpenChange={setMoveDialogOpen}>

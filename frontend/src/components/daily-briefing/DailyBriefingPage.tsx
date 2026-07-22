@@ -519,25 +519,23 @@ function buildCoverageRows(
   ].sort((a, b) => a.sourcesFound - b.sourcesFound || a.ticker.localeCompare(b.ticker));
 }
 
-function CoverageRowItem({ row }: { row: TickerCoverageRow }) {
+function CoverageChip({ row }: { row: TickerCoverageRow }) {
   const noCoverage = row.sourcesFound === 0;
+  const title = `${row.ticker} — ${row.name || row.sector || '—'} · ${COVERAGE_ORIGIN_LABELS[row.origin]} · priorita ${COVERAGE_PRIORITY_LABELS[row.priority]}`;
   return (
-    <UtilityListItem className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {row.ticker}
-          <Badge variant="outline" className="text-xs font-normal">
-            {COVERAGE_ORIGIN_LABELS[row.origin]}
-          </Badge>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {row.name || row.sector || '—'} · priorita {COVERAGE_PRIORITY_LABELS[row.priority]}
-        </div>
-      </div>
-      <div className={`text-xs ${noCoverage ? 'text-rose-500' : 'text-muted-foreground'}`}>
-        {noCoverage ? 'Bez zdrojů' : `${row.sourcesFound} zdrojů · ${row.usedInPrompt} v promptu`}
-      </div>
-    </UtilityListItem>
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-mono-price ${
+        noCoverage
+          ? 'border-rose-500/30 bg-rose-500/10 text-rose-500'
+          : 'border-border bg-muted/40 text-muted-foreground'
+      }`}
+    >
+      {row.ticker}
+      <span className="opacity-70">
+        {noCoverage ? '0' : `${row.sourcesFound}/${row.usedInPrompt}`}
+      </span>
+    </span>
   );
 }
 
@@ -556,14 +554,14 @@ function TickerCoverage({
     <UtilitySection title="Pokrytí tickerů">
       <p className="mb-2 text-xs text-muted-foreground">
         {missingCount > 0
-          ? `${missingCount} z ${rows.length} tickerů bez zachyceného zdroje za toto okno.`
-          : `Všech ${rows.length} sledovaných tickerů mělo alespoň jeden zdroj.`}
+          ? `${missingCount} z ${rows.length} tickerů bez zachyceného zdroje za toto okno. Formát: nalezeno/v promptu.`
+          : `Všech ${rows.length} sledovaných tickerů mělo alespoň jeden zdroj. Formát: nalezeno/v promptu.`}
       </p>
-      <UtilityList>
+      <div className="flex flex-wrap gap-1">
         {rows.map((row) => (
-          <CoverageRowItem key={`${row.origin}:${row.ticker}`} row={row} />
+          <CoverageChip key={`${row.origin}:${row.ticker}`} row={row} />
         ))}
-      </UtilityList>
+      </div>
     </UtilitySection>
   );
 }

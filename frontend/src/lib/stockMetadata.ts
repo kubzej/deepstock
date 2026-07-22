@@ -3,6 +3,7 @@ import type { StockMetadataSuggestion } from '@/lib/api';
 export interface StockMetadataFormFields {
   name: string;
   sector: string;
+  industry: string;
   exchange: string;
   currency: string;
   country: string;
@@ -18,6 +19,7 @@ export interface ApplyStockMetadataResult<T extends StockMetadataFormFields> {
 const FIELD_LABELS = {
   name: 'název',
   sector: 'sektor',
+  industry: 'odvětví',
   exchange: 'burza',
   currency: 'měna',
   country: 'země',
@@ -39,7 +41,7 @@ export function applyStockMetadataSuggestion<T extends StockMetadataFormFields>(
   const applyTextField = (
     field: keyof Pick<
       T,
-      'name' | 'sector' | 'exchange' | 'currency' | 'country' | 'notes'
+      'name' | 'sector' | 'industry' | 'exchange' | 'currency' | 'country' | 'notes'
     >,
     suggestedValue: string | null,
   ) => {
@@ -51,6 +53,7 @@ export function applyStockMetadataSuggestion<T extends StockMetadataFormFields>(
 
   applyTextField('name', suggestion.name);
   applyTextField('sector', suggestion.sector);
+  applyTextField('industry', suggestion.industry);
   applyTextField('exchange', suggestion.exchange);
   applyTextField('currency', suggestion.currency);
   applyTextField('country', suggestion.country);

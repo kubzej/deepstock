@@ -11,6 +11,7 @@ export interface Stock {
   name: string;
   currency: string;
   sector?: string;
+  industry?: string;
   exchange?: string;
   country?: string;
   price_scale?: number;
@@ -85,6 +86,7 @@ export async function createStock(data: {
   name: string;
   currency?: string;
   sector?: string;
+  industry?: string;
   exchange?: string;
   country?: string;
   price_scale?: number;
@@ -116,7 +118,7 @@ export async function createStock(data: {
 
 export async function updateStock(
   stockId: string,
-  data: { name?: string; currency?: string; sector?: string; exchange?: string; country?: string; price_scale?: number; notes?: string }
+  data: { name?: string; currency?: string; sector?: string; industry?: string; exchange?: string; country?: string; price_scale?: number; notes?: string }
 ): Promise<Stock> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/stocks/${stockId}`, {
