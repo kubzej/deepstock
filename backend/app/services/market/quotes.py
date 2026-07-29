@@ -98,7 +98,15 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         info = t.info
         
         ext_data = {}
-        
+
+        # Authoritative previous close from Yahoo's live quote endpoint. More
+        # reliable than deriving it from yf.download()'s daily bars, which can
+        # have gaps (a missing session drops out of the chart history but the
+        # quote endpoint still knows the real previous close).
+        prev_close = safe_float(info.get("regularMarketPreviousClose"))
+        if prev_close is not None:
+            ext_data["previousClose"] = prev_close
+
         # Average volume
         avg_volume = safe_int(info.get("averageDailyVolume10Day"))
         if avg_volume:
@@ -135,6 +143,20 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
     except Exception as e:
         logger.warning(f"Error fetching extended data for {ticker}: {e}")
         return None
+
+
+def _merge_ext_data(quote: dict, ext_data: dict) -> None:
+    """
+    Merge extended data into a quote, recomputing change/changePercent against
+    the authoritative previousClose when ext_data provides one (overrides the
+    value derived from yf.download()'s daily bars, which can have gaps).
+    """
+    quote.update(ext_data)
+    prev_close = ext_data.get("previousClose")
+    price = quote.get("price")
+    if prev_close and price is not None:
+        quote["change"] = safe_float(price - prev_close)
+        quote["changePercent"] = safe_float((price - prev_close) / prev_close * 100)
 
 
 async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0) -> Optional[dict]:
@@ -192,8 +214,8 @@ async def get_quotes(
         try:
             # Single batch download for all missing tickers
             df = yf.download(
-                " ".join(missing_basic), 
-                period="2d",  # Need 2 days for previous close
+                " ".join(missing_basic),
+                period="5d",  # Wider than the needed 2 days to tolerate a missing/delayed session on Yahoo's side
                 interval="1d",
                 auto_adjust=False,
                 progress=False,
@@ -242,7 +264,13 @@ async def get_quotes(
                             if prev_close is not None:
                                 change = safe_float(price - prev_close)
                                 change_percent = safe_float((price - prev_close) / prev_close * 100)
-                        
+                        else:
+                            logger.warning(
+                                "Only %d row(s) of Close data for %s in 5d window — "
+                                "no previous close, change will be 0",
+                                len(ticker_data), t,
+                            )
+
                         quote = {
                             "symbol": t,
                             "price": price,
@@ -278,7 +306,7 @@ async def get_quotes(
         if cached_ext:
             # Merge cached extended data into results
             ext_data = json.loads(cached_ext)
-            results[t].update(ext_data)
+            _merge_ext_data(results[t], ext_data)
         else:
             missing_extended.append(t)
     
@@ -294,7 +322,7 @@ async def get_quotes(
             for t in missing_extended:
                 ext_data = await _fetch_and_cache_extended_data(redis, t)
                 if ext_data:
-                    results[t].update(ext_data)
+                    _merge_ext_data(results[t], ext_data)
         else:
             # Fire-and-forget: background fetch only warms the cache for next time.
             for i, t in enumerate(missing_extended):

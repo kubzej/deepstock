@@ -83,6 +83,7 @@ yfinance hits Yahoo Finance which aggressively rate-limits. Follow these rules s
 3. **No new yfinance calls without caching:** If you add a new yfinance call, it MUST have Redis caching with an appropriate TTL.
 4. **Background fetches:** Extended data (`.info`) runs in a thread pool, fire-and-forget. See `quotes.py` pattern.
 5. **Existing cache TTLs:** Quotes 5min, extended data 1h, technical raw 1h, stock info 5min, financials 24h, price history varies.
+6. **`yf.download()` daily bars can have gaps:** Yahoo's chart/history endpoint occasionally drops a session for a given date (seen 2026-07-28, affected most US-listed tickers, not European ones — even highly liquid ones like SPY/QQQ/DIA). Don't derive `previousClose`/`change` purely from bar-to-bar diffing of `yf.download()` output with a fixed lookback window — a missing session silently shifts the "previous" row further back (or drops it entirely), producing a wrong or zeroed change. `regularMarketPreviousClose` from `.info` is more reliable for this and is already folded into the extended-data background fetch in `quotes.py` (`_merge_ext_data` overrides the batch-derived change once the `.info` fetch lands) — no extra yfinance call needed, it reuses the existing extended-data fetch.
 
 ### No Tests Required
 
