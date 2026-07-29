@@ -29,6 +29,10 @@ def get_redis_pool() -> ConnectionPool:
             settings.redis_url,
             max_connections=20,  # Max concurrent connections
             decode_responses=False,  # Keep as bytes for json.loads
+            socket_timeout=5,  # Fail fast instead of hanging on a dead connection
+            socket_connect_timeout=5,
+            health_check_interval=30,  # Detect and drop stale pooled connections
+            retry_on_timeout=True,
         )
     return _pool
 
