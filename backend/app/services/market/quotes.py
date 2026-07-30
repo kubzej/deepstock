@@ -111,24 +111,33 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         avg_volume = safe_int(info.get("averageDailyVolume10Day"))
         if avg_volume:
             ext_data["avgVolume"] = avg_volume
-        
+
+        # Yahoo's preMarketPrice/postMarketPrice fields can linger populated
+        # from the last pre/post session even once the regular session is
+        # open — only trust them while marketState confirms we're actually
+        # in that session, otherwise stale pre-market data survives into
+        # regular-hours quotes.
+        market_state = info.get("marketState")
+
         # Pre-market
-        pre_market_price = safe_float(info.get("preMarketPrice"))
-        if pre_market_price is not None:
-            ext_data["preMarketPrice"] = pre_market_price
-            pre_market_change = safe_float(info.get("preMarketChangePercent"))
-            if pre_market_change is not None:
-                # Yahoo returns percent already (e.g., 1.25 = 1.25%), no multiplication needed
-                ext_data["preMarketChangePercent"] = pre_market_change
-        
+        if market_state == "PRE":
+            pre_market_price = safe_float(info.get("preMarketPrice"))
+            if pre_market_price is not None:
+                ext_data["preMarketPrice"] = pre_market_price
+                pre_market_change = safe_float(info.get("preMarketChangePercent"))
+                if pre_market_change is not None:
+                    # Yahoo returns percent already (e.g., 1.25 = 1.25%), no multiplication needed
+                    ext_data["preMarketChangePercent"] = pre_market_change
+
         # Post-market
-        post_market_price = safe_float(info.get("postMarketPrice"))
-        if post_market_price is not None:
-            ext_data["postMarketPrice"] = post_market_price
-            post_market_change = safe_float(info.get("postMarketChangePercent"))
-            if post_market_change is not None:
-                # Yahoo returns percent already (e.g., -1.25 = -1.25%), no multiplication needed
-                ext_data["postMarketChangePercent"] = post_market_change
+        if market_state in ("POST", "POSTPOST"):
+            post_market_price = safe_float(info.get("postMarketPrice"))
+            if post_market_price is not None:
+                ext_data["postMarketPrice"] = post_market_price
+                post_market_change = safe_float(info.get("postMarketChangePercent"))
+                if post_market_change is not None:
+                    # Yahoo returns percent already (e.g., -1.25 = -1.25%), no multiplication needed
+                    ext_data["postMarketChangePercent"] = post_market_change
         
         # Earnings date — use earningsTimestampStart (the UPCOMING earnings).
         # earningsTimestamp is the LAST reported earnings, so it would surface a
@@ -147,16 +156,22 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
 
 def _merge_ext_data(quote: dict, ext_data: dict) -> None:
     """
-    Merge extended data into a quote, recomputing change/changePercent against
-    the authoritative previousClose when ext_data provides one (overrides the
-    value derived from yf.download()'s daily bars, which can have gaps).
+    Merge extended data into a quote. previousClose from ext_data (Yahoo's
+    live quote engine) is only used as a fallback when the batch download
+    didn't already have a valid one (e.g. a missing session in the 5d
+    window) — it's a different "as of" source than yf.download()'s daily
+    bars, so overriding a good Tier 1 previousClose with it produces a
+    change/changePercent inconsistent with the batch-derived price.
     """
+    ext_data = dict(ext_data)
+    ext_prev_close = ext_data.pop("previousClose", None)
     quote.update(ext_data)
-    prev_close = ext_data.get("previousClose")
+
     price = quote.get("price")
-    if prev_close and price is not None:
-        quote["change"] = safe_float(price - prev_close)
-        quote["changePercent"] = safe_float((price - prev_close) / prev_close * 100)
+    if quote.get("previousClose") is None and ext_prev_close is not None and price is not None:
+        quote["previousClose"] = ext_prev_close
+        quote["change"] = safe_float(price - ext_prev_close)
+        quote["changePercent"] = safe_float((price - ext_prev_close) / ext_prev_close * 100)
 
 
 async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0) -> Optional[dict]:
