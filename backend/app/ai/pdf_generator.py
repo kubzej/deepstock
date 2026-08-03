@@ -201,9 +201,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 REPORT_TYPE_LABELS = {
-    "briefing": "Kvartální briefing",
     "full_analysis": "Komplexní analýza",
     "technical_analysis": "Technická analýza",
+    "earnings": "Earnings report",
 }
 
 
@@ -239,7 +239,7 @@ def generate_pdf(report: dict) -> bytes:
         generated_at_fmt = generated_at
         date_fmt = generated_at[:10]
 
-    report_type = report.get("report_type", "briefing")
+    report_type = report.get("report_type", "full_analysis")
 
     html = HTML_TEMPLATE.format(
         css=PDF_CSS,

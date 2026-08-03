@@ -202,9 +202,9 @@ export function JournalEntryCard({
   // ── ai_report ─────────────────────────────────────
   if (entry.type === 'ai_report') {
     const reportTypeLabel: Record<string, string> = {
-      briefing: 'Kvartální briefing',
       full_analysis: 'Plná analýza',
       technical_analysis: 'Technická analýza',
+      earnings: 'Earnings report',
       portfolio_overview: 'AI přehled portfolia',
     };
     const label = entry.metadata.report_type

@@ -16,7 +16,7 @@ import {
 } from '@/components/shared';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 
-const REPORT_TYPES: ReportType[] = ['full_analysis', 'technical_analysis', 'briefing', 'earnings'];
+const REPORT_TYPES: ReportType[] = ['full_analysis', 'technical_analysis', 'earnings'];
 
 interface AIResearchSectionProps {
   ticker: string;
@@ -96,10 +96,6 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
                 <TabsTrigger value="technical_analysis">
                   <span className="sm:hidden">Technická</span>
                   <span className="hidden sm:inline">Technická analýza</span>
-                </TabsTrigger>
-                <TabsTrigger value="briefing">
-                  <span className="sm:hidden">Briefing</span>
-                  <span className="hidden sm:inline">Kvartální briefing</span>
                 </TabsTrigger>
                 <TabsTrigger value="earnings">
                   <span className="sm:hidden">Earnings</span>

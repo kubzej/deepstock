@@ -59,7 +59,7 @@ export interface JournalEntry {
     // note
     price_at_creation?: number;
     // ai_report
-    report_type?: 'briefing' | 'technical_analysis' | 'full_analysis' | 'portfolio_overview';
+    report_type?: 'technical_analysis' | 'full_analysis' | 'earnings' | 'portfolio_overview';
     ticker?: string;
     portfolio_id?: string;
     portfolio_name?: string;

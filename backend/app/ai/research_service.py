@@ -20,13 +20,13 @@ from app.core.redis import get_redis
 from app.core.cache import CacheTTL
 from app.ai.providers.litellm_client import call_llm
 from app.ai.search import tavily_client
-from app.ai.prompts import briefing_prompt, full_analysis_prompt, technical_prompt, earnings_prompt
+from app.ai.prompts import full_analysis_prompt, technical_prompt, earnings_prompt
 from app.services.insider import get_insider_trades
 from app.services.market import market_service
 
 logger = logging.getLogger(__name__)
 
-ReportType = Literal["briefing", "full_analysis", "technical_analysis", "earnings"]
+ReportType = Literal["full_analysis", "technical_analysis", "earnings"]
 
 
 # ─── Context builders ──────────────────────────────────────────────────────────
@@ -444,13 +444,12 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
         (f"{sector_context} geopolitics regulations commodity demand supply seasonal outlook {year}", 60),
     ]
 
-    if report_type == "full_analysis":
-        queries += [
-            (f"{short_name} competitive advantage market share moat", 180),
-            (f"{short_name} risks challenges headwinds {year}", 60),
-            (f"{short_name} business model revenue streams growth", 180),
-            (f"{short_name} capital allocation buybacks acquisitions dividends {year}", 90),
-        ]
+    queries += [
+        (f"{short_name} competitive advantage market share moat", 180),
+        (f"{short_name} risks challenges headwinds {year}", 60),
+        (f"{short_name} business model revenue streams growth", 180),
+        (f"{short_name} capital allocation buybacks acquisitions dividends {year}", 90),
+    ]
 
     return queries
 
@@ -511,7 +510,7 @@ async def generate_research_report(
     Args:
         ticker: Stock symbol (e.g. "AAPL")
         current_price: Current market price
-        report_type: "briefing" or "full_analysis"
+        report_type: "full_analysis", "technical_analysis", or "earnings"
         stock_data: Already-fetched yfinance data dict from stock_info service
         force_refresh: Skip cache and regenerate
 
@@ -654,7 +653,7 @@ async def generate_research_report(
             await _save_report_to_journal(ticker, markdown_content, report_type, model_used, user_id=user_id)
         return result
 
-    # ── Fundamental reports (briefing / full_analysis) ───────────────────────────
+    # ── Full analysis report ─────────────────────────────────────────────────────
     fundamentals_context = _format_fundamentals(stock_data)
 
     # Run web searches + insider fetch in parallel
@@ -662,7 +661,7 @@ async def generate_research_report(
     industry = stock_data.get("industry", "")
     queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry)
     search_tasks = [tavily_client.search(query, max_results=4, days=days) for query, days in queries]
-    insider_months = 6 if report_type == "full_analysis" else 3
+    insider_months = 6
     all_tasks = [*search_tasks, get_insider_trades(redis, ticker, months=insider_months)]
     all_results = await asyncio.gather(*all_tasks, return_exceptions=True)
     search_results_list = all_results[:-1]
@@ -706,32 +705,18 @@ async def generate_research_report(
             f"({missing}). V reportu uveď, že analýza těchto oblastí může být neúplná."
         )
 
-    if report_type == "briefing":
-        system = briefing_prompt.SYSTEM_PROMPT
-        user = briefing_prompt.build_user_prompt(
-            ticker=ticker,
-            company_name=company_name,
-            current_price=current_price,
-            date=prompt_date,
-            fundamentals_context=fundamentals_context,
-            search_context=search_context,
-            insider_context=insider_context,
-        )
-    else:
-        system = full_analysis_prompt.SYSTEM_PROMPT
-        user = full_analysis_prompt.build_user_prompt(
-            ticker=ticker,
-            company_name=company_name,
-            current_price=current_price,
-            date=prompt_date,
-            fundamentals_context=fundamentals_context,
-            search_context=search_context,
-            insider_context=insider_context,
-        )
+    system = full_analysis_prompt.SYSTEM_PROMPT
+    user = full_analysis_prompt.build_user_prompt(
+        ticker=ticker,
+        company_name=company_name,
+        current_price=current_price,
+        date=prompt_date,
+        fundamentals_context=fundamentals_context,
+        search_context=search_context,
+        insider_context=insider_context,
+    )
 
-    # Call LLM — full_analysis generates the most content, briefing less
-    llm_timeout = 600 if report_type == "full_analysis" else 300
-    markdown_content, model_used = await call_llm(system, user, request_timeout=llm_timeout)
+    markdown_content, model_used = await call_llm(system, user, request_timeout=600)
 
     # Append sources section from Tavily results
     source_items = []

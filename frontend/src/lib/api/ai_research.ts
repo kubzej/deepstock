@@ -3,7 +3,7 @@
  */
 import { API_URL, getAuthHeader } from './client';
 
-export type ReportType = 'briefing' | 'full_analysis' | 'technical_analysis' | 'earnings';
+export type ReportType = 'full_analysis' | 'technical_analysis' | 'earnings';
 
 export interface AIResearchReport {
   markdown: string;
@@ -87,7 +87,6 @@ export async function downloadPDF(
   const a = document.createElement('a');
   const today = new Date().toISOString().slice(0, 10);
   const labelMap: Record<ReportType, string> = {
-    briefing: 'briefing',
     full_analysis: 'analyza',
     technical_analysis: 'technicka',
     earnings: 'earnings',
