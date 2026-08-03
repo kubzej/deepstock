@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     twitter_ct0: str = ""
     proxy_url: str = ""  # optional, empty = no proxy
 
+    # MCP server (mcp/deepstock_mcp.py reads this directly via os.environ; declared
+    # here only because backend and mcp share the same .env file via docker-compose)
+    mcp_auth_token: str = ""
+
     # App
     debug: bool = False
 

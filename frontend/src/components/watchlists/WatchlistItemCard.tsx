@@ -54,6 +54,9 @@ export function WatchlistItemCard({
   const daysUntil = getDaysUntilEarnings(earnings?.earningsDate);
   const earningsBadge = formatEarningsBadge(daysUntil);
   const showBadge = shouldShowEarningsBadge(daysUntil);
+  const lastDaysUntil = getDaysUntilEarnings(earnings?.lastEarningsDate);
+  const lastEarningsBadge = formatEarningsBadge(lastDaysUntil);
+  const showLastBadge = shouldShowEarningsBadge(lastDaysUntil);
 
   const activeTarget = getWatchlistActiveTarget(item, quote);
   const atBuyTarget = activeTarget === 'buy';
@@ -132,6 +135,11 @@ export function WatchlistItemCard({
               {showBadge && earningsBadge && (
                 <span className="inline-flex items-center gap-0.5 rounded bg-info/15 px-1 py-0.5 text-[9px] font-semibold leading-none text-info">
                   {earningsBadge}
+                </span>
+              )}
+              {showLastBadge && lastEarningsBadge && (
+                <span className="inline-flex items-center gap-0.5 rounded bg-muted-foreground/10 px-1 py-0.5 text-[9px] font-semibold leading-none text-muted-foreground">
+                  Earnings {lastEarningsBadge}
                 </span>
               )}
               {showWatchlistName && watchlistName && (
@@ -271,6 +279,13 @@ export function WatchlistItemCard({
               <div className="text-xs mb-2">
                 <span className="text-muted-foreground/70 block">Earnings</span>
                 <span>{formatDateCzech(earnings.earningsDate)}</span>
+              </div>
+            )}
+
+            {earnings?.lastEarningsDate && (
+              <div className="text-xs mb-2">
+                <span className="text-muted-foreground/70 block">Poslední earnings</span>
+                <span>{formatDateCzech(earnings.lastEarningsDate)}</span>
               </div>
             )}
 

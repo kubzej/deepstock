@@ -32,7 +32,7 @@ class EarningsCalendarService:
         response = (
             supabase.table("stocks")
             .select(
-                "ticker, earnings_calendar(earnings_date, source, last_checked_at, updated_at)"
+                "ticker, earnings_calendar(earnings_date, last_earnings_date, source, last_checked_at, updated_at)"
             )
             .in_("ticker", unique_tickers)
             .execute()
@@ -46,6 +46,7 @@ class EarningsCalendarService:
             result[row["ticker"]] = {
                 "ticker": row["ticker"],
                 "earningsDate": cache.get("earnings_date") if cache else None,
+                "lastEarningsDate": cache.get("last_earnings_date") if cache else None,
                 "source": cache.get("source") if cache else None,
                 "lastCheckedAt": cache.get("last_checked_at") if cache else None,
                 "updatedAt": cache.get("updated_at") if cache else None,
@@ -57,6 +58,7 @@ class EarningsCalendarService:
                 {
                     "ticker": ticker,
                     "earningsDate": None,
+                    "lastEarningsDate": None,
                     "source": None,
                     "lastCheckedAt": None,
                     "updatedAt": None,
@@ -243,7 +245,7 @@ class EarningsCalendarService:
 
         stocks_response = (
             supabase.table("stocks")
-            .select("id, ticker, earnings_calendar(earnings_date)")
+            .select("id, ticker, earnings_calendar(earnings_date, last_earnings_date)")
             .in_("ticker", unique_tickers)
             .execute()
         )
@@ -295,6 +297,20 @@ class EarningsCalendarService:
                 "source_payload": {"ticker": ticker},
                 "last_checked_at": checked_at,
             }
+
+            # If the previously-stored earnings_date has passed (<= today) and the
+            # provider now reports a different (rolled-over) date, the old date was
+            # just superseded — capture it as last_earnings_date before it's gone.
+            # Derived from our own trusted earnings_date field (same one the
+            # earnings-alert notifications rely on), not a separate yfinance field,
+            # so it can't drift out of sync with notifications.
+            previous_earnings_date = existing_cache.get("earnings_date")
+            if (
+                previous_earnings_date
+                and previous_earnings_date != provider_earnings_date
+                and previous_earnings_date <= date.today().isoformat()
+            ):
+                payload["last_earnings_date"] = previous_earnings_date
 
             try:
                 (

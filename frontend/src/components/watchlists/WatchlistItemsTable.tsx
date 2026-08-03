@@ -214,6 +214,9 @@ export function WatchlistItemsTable({
             const daysUntil = getDaysUntilEarnings(earnings?.earningsDate);
             const earningsBadge = formatEarningsBadge(daysUntil);
             const showBadge = shouldShowEarningsBadge(daysUntil);
+            const lastDaysUntil = getDaysUntilEarnings(earnings?.lastEarningsDate);
+            const lastEarningsBadge = formatEarningsBadge(lastDaysUntil);
+            const showLastBadge = shouldShowEarningsBadge(lastDaysUntil);
 
             return (
               <TableRow
@@ -376,13 +379,29 @@ export function WatchlistItemsTable({
                       <div className="text-[10px] text-muted-foreground">
                         {formatDateCzech(earnings.earningsDate)}
                       </div>
+                      {showLastBadge && lastEarningsBadge && (
+                        <div className="text-[10px] text-muted-foreground/60">
+                          Earnings {lastEarningsBadge}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <span className="text-muted-foreground/50">—</span>
                   )}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground hidden md:table-cell">
-                  {[item.stocks.sector, item.stocks.industry].filter(Boolean).join(' · ') || '—'}
+                <TableCell className="text-sm text-muted-foreground hidden md:table-cell max-w-[140px]">
+                  {item.stocks.sector || item.stocks.industry ? (
+                    <div className="leading-tight">
+                      <div className="truncate">{item.stocks.sector || '—'}</div>
+                      {item.stocks.industry && (
+                        <div className="truncate text-[11px] text-muted-foreground/60">
+                          {item.stocks.industry}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    '—'
+                  )}
                 </TableCell>
                 <TableCell className="text-sm hidden lg:table-cell max-w-[150px]">
                   {item.notes ? (

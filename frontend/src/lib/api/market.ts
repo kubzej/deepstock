@@ -115,6 +115,7 @@ export type ChartPeriod = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y' | '2y' | '5
 export interface EarningsCalendarEntry {
   ticker: string;
   earningsDate: string | null;
+  lastEarningsDate: string | null;
   source: string | null;
   lastCheckedAt: string | null;
   updatedAt: string | null;
