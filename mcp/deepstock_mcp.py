@@ -10,7 +10,9 @@ Configuration (environment variables):
   SUPABASE_URL                   Supabase project URL
   SUPABASE_SERVICE_ROLE_KEY      Supabase service role key
   SUPABASE_JWT_SECRET            Supabase JWT secret
+  MCP_AUTH_TOKEN                 Shared secret required to call any tool (see README)
 """
+import hmac
 import json
 import os
 import time
@@ -18,7 +20,9 @@ from typing import Any, Literal
 
 import httpx
 import jwt
+import uvicorn
 from mcp.server.fastmcp import FastMCP, Image
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -26,9 +30,43 @@ API_URL = os.environ.get("DEEPSTOCK_API_URL", "http://localhost:8000")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+MCP_AUTH_TOKEN = os.environ.get("MCP_AUTH_TOKEN", "")
 PORT = int(os.environ.get("PORT", 8001))
 
 mcp = FastMCP("deepstock", host="0.0.0.0", port=PORT)
+
+
+def _extract_request_token(request: Request) -> str:
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip()
+    api_key_header = request.headers.get("x-api-key", "")
+    if api_key_header:
+        return api_key_header.strip()
+    return request.query_params.get("token", "").strip()
+
+
+class TokenAuthMiddleware(BaseHTTPMiddleware):
+    """
+    Requires a shared secret (MCP_AUTH_TOKEN) on every request except /health.
+
+    Without this, this server mints a valid DeepStock auth token for whichever
+    user it resolves and calls the backend on their behalf for anyone who can
+    reach the URL — there is no other gate. Accepts the token via an
+    `Authorization: Bearer` / `X-Api-Key` header (Claude Code, Cursor) or a
+    `?token=` query param (for clients like Claude.ai that don't expose a
+    static-header option in their custom connector UI).
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
+
+        token = _extract_request_token(request)
+        if not token or not hmac.compare_digest(token, MCP_AUTH_TOKEN):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+        return await call_next(request)
 
 PortfolioPerformancePeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
 TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
@@ -578,4 +616,13 @@ async def save_portfolio_journal_note(portfolio_id: str, content: str) -> dict:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    if not MCP_AUTH_TOKEN:
+        raise RuntimeError(
+            "MCP_AUTH_TOKEN must be set — this server has no other gate in front of it. "
+            "Generate one with `python -c \"import secrets; print(secrets.token_urlsafe(32))\"` "
+            "and set it wherever this process runs (see mcp/README.md)."
+        )
+
+    app = mcp.streamable_http_app()
+    app.add_middleware(TokenAuthMiddleware)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

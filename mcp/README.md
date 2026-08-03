@@ -55,6 +55,52 @@ Keep the tool inventory aligned in three places:
 
 ---
 
+## Authentication
+
+This server has no user login of its own: it resolves the (single) DeepStock user via the
+Supabase admin API and mints a backend token on their behalf for every request it receives.
+Without a gate in front of that, anyone who finds the URL can call any tool — including the
+write-back note tools — as you. **`MCP_AUTH_TOKEN` is required** and the server refuses to
+start without it.
+
+Generate one once:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Set it as `MCP_AUTH_TOKEN` alongside the other env vars below, then pass it on every request:
+
+- **Claude Code / Cursor (`.mcp.json`)** — send it as a header:
+
+  ```json
+  {
+    "mcpServers": {
+      "deepstock": {
+        "url": "http://localhost:8001/mcp",
+        "headers": {
+          "Authorization": "Bearer <your-token>"
+        }
+      }
+    }
+  }
+  ```
+
+- **Claude.ai custom connector** — the "Add custom connector" dialog only offers OAuth
+  client ID/secret fields here, not a static header, so pass the token as a query param on
+  the URL itself instead:
+
+  ```
+  https://<your-mcp-service>.railway.app/mcp?token=<your-token>
+  ```
+
+  Leave the OAuth fields blank. Treat this URL as a credential (don't paste it anywhere public) —
+  rotate `MCP_AUTH_TOKEN` if it ever leaks.
+
+`/health` is exempt (used by Railway's health check) and needs no token.
+
+---
+
 ## Setup: Local (Docker)
 
 The MCP server runs as a Docker container alongside the backend.
@@ -69,7 +115,10 @@ Add to `.mcp.json` in your client project (e.g. the Felix repo):
 {
   "mcpServers": {
     "deepstock": {
-      "url": "http://localhost:8001/mcp"
+      "url": "http://localhost:8001/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
     }
   }
 }
@@ -89,13 +138,17 @@ Add to `.mcp.json` in your client project:
 {
   "mcpServers": {
     "deepstock": {
-      "url": "https://<your-mcp-service>.railway.app/mcp"
+      "url": "https://<your-mcp-service>.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
     }
   }
 }
 ```
 
-For Claude.ai (web or mobile): add the URL directly in Claude.ai Project settings → MCP servers.
+For Claude.ai (web or mobile): add the URL directly in Claude.ai Project settings → MCP servers,
+with the token baked into the URL as `?token=<your-token>` (see Authentication above).
 
 ---
 
@@ -109,12 +162,17 @@ Set in Railway dashboard (remote) or `backend/.env` (local Docker — shared wit
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                                                    |
 | `SUPABASE_JWT_SECRET`       | Supabase JWT secret                                                          |
 | `DEEPSTOCK_API_URL`         | Backend URL — `http://backend:8000` (Docker) or Railway backend URL (remote) |
+| `MCP_AUTH_TOKEN`            | Shared secret required on every request (see Authentication above)          |
 
 ---
 
 ## Troubleshooting
 
 **Tools don't appear after config change** — MCP client loads at startup. Restart Claude Code / Cursor.
+
+**`MCP_AUTH_TOKEN must be set`** — the server refuses to start without it; generate one (see Authentication above).
+
+**`401 Unauthorized` calling a tool** — missing or wrong token: check the `Authorization` header or `?token=` query param matches `MCP_AUTH_TOKEN` exactly.
 
 **`SUPABASE_SERVICE_ROLE_KEY and SUPABASE_JWT_SECRET must be set`** — env vars missing.
 
