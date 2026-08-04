@@ -93,10 +93,28 @@ V čem se společnost odlišuje od konkurence a co ji chrání? Porovnej ji s kl
 byznysově i valuačně (P/E, EV/EBITDA, marže), pokud jsou data dostupná. Je prémiové nebo
 diskontní ocenění oprávněné? Kde má firma navrch a kde zaostává?
 
-**3. Management a kapitálová alokace**
-Zhodnoť vedení společnosti a ohodnoť management na škále 1–10. Zohledni track record,
-strategická rozhodnutí, komunikaci s investory a schopnost realizovat plány. Současně
-zhodnoť, jak management nakládá s kapitálem:
+**3. CEO a vedení společnosti**
+Toto je pro investora klíčová sekce — cílem je posoudit, zda lze CEO důvěřovat.
+
+Nejprve CEO profil, pokud jsou data dostupná (z fundamentálních dat nebo webových zdrojů):
+- Jméno, pozice, věk
+- Jak dlouho je ve funkci CEO a jak dlouho celkově ve firmě — pokud to zdroje neuvádí, napiš
+  „Data o délce působení nedostupná", nevymýšlej datum nástupu
+- Kariérní historie: kde pracoval předtím, jaké pozice zastával, co ho na tuto roli kvalifikuje
+- Konkrétní track record za jeho vedení: co se firmě povedlo nebo nepovedlo pod jeho vedením —
+  konkrétní rozhodnutí, strategické tahy, čísla — ne obecné fráze jako „vede firmu dobře"
+- Reputace a případné kontroverze: jak o něm mluví trh/analytici/média, existují spory,
+  konflikty zájmů, nebo minulá selhání u předchozích firem?
+- Alignment se akcionáři: vlastní významný podíl akcií? Je jeho odměna (viz roční odměna výše)
+  vázaná spíš na fixní plat, nebo na akcie/opce podmíněné výkonem?
+
+Na základě výše uvedeného zodpověz přímo: **Dá se tomuto CEO věřit?** Proč ano, nebo proč ne?
+Jaké je hlavní riziko spojené s jeho vedením (např. koncentrace moci, nedostatek zkušeností
+v tomto sektoru, historie přeslibování, riziko odchodu)? Pokud kariérní historie nebo tenure
+ve zdrojích chybí, řekni to explicitně místo domýšlení.
+
+Poté krátce zhodnoť zbytek managementového týmu a kapitálovou alokaci — ohodnoť management
+jako celek na škále 1–10:
 - Buybacky: Jsou disciplinované, nebo firma přeplácí vlastní akcie?
 - Dividendy: Politika, udržitelnost payout ratio, historie růstu
 - Akvizice: Disciplína při M&A a historická úspěšnost integrací

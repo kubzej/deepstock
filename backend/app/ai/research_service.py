@@ -40,6 +40,7 @@ def _format_fundamentals(stock_data: dict) -> str:
     def pct(v): return f"{v*100:.1f}%" if v is not None else "N/A"
     def num(v, d=2): return f"{v:,.{d}f}" if v is not None else "N/A"
     def bil(v): return f"${v/1e9:.1f}B" if v is not None else "N/A"
+    def mil(v): return f"${v/1e6:.1f}M" if v is not None else "N/A"
 
     price = stock_data.get("price")
     target_mean = stock_data.get("targetMeanPrice")
@@ -87,6 +88,24 @@ def _format_fundamentals(stock_data: dict) -> str:
     if upside is not None:
         direction = "nahoru" if upside > 0 else "dolů"
         lines.append(f"- Potenciál {direction}: {abs(upside):.1f}% od aktuální ceny")
+
+    # Add management / CEO data from yfinance companyOfficers
+    ceo = stock_data.get("ceo")
+    officers = stock_data.get("officers") or []
+    if ceo or officers:
+        lines += ["", "### Vedení společnosti (yfinance)"]
+        if ceo:
+            age_str = f", věk {ceo['age']}" if ceo.get("age") is not None else ""
+            pay_str = f", roční odměna {mil(ceo['totalPay'])}" if ceo.get("totalPay") else ""
+            lines.append(f"- **CEO: {ceo['name']}** ({ceo['title']}{age_str}{pay_str})")
+        other_officers = [o for o in officers if o is not ceo]
+        for o in other_officers[:5]:
+            age_str = f", věk {o['age']}" if o.get("age") is not None else ""
+            lines.append(f"- {o['name']} — {o['title']}{age_str}")
+        lines.append(
+            "- Pozn.: yfinance neposkytuje datum nástupu do funkce ani kariérní historii — "
+            "tyto informace hledej ve web zdrojích níže."
+        )
 
     # Add composite valuation signal if available
     if composite:
@@ -408,7 +427,14 @@ def _format_ta_context(ta: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_search_queries(ticker: str, company_name: str, report_type: ReportType, sector: str = "", industry: str = "") -> list[tuple[str, int]]:
+def _build_search_queries(
+    ticker: str,
+    company_name: str,
+    report_type: ReportType,
+    sector: str = "",
+    industry: str = "",
+    ceo_name: str = "",
+) -> list[tuple[str, int]]:
     """
     Return list of (query, days_back) tuples to search.
     Days_back limits Tavily to recent results.
@@ -433,6 +459,13 @@ def _build_search_queries(ticker: str, company_name: str, report_type: ReportTyp
         (f"{ticker} reddit investors discussion sentiment", 30),
         (f"Federal Reserve interest rates S&P 500 stock market outlook {year}", 30),
     ]
+
+    # CEO background — only when full_analysis and we know the CEO's name (from yfinance officers)
+    if report_type == "full_analysis" and ceo_name:
+        queries += [
+            (f'"{ceo_name}" {short_name} CEO career background biography previous companies', 3650),
+            (f'"{ceo_name}" {short_name} CEO track record achievements controversy criticism', 730),
+        ]
 
     queries += [
         (f"{short_name} {ticker} vs competitors peer comparison valuation {year}", 90),
@@ -659,7 +692,8 @@ async def generate_research_report(
     # Run web searches + insider fetch in parallel
     sector = stock_data.get("sector", "")
     industry = stock_data.get("industry", "")
-    queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry)
+    ceo_name = (stock_data.get("ceo") or {}).get("name", "")
+    queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry, ceo_name=ceo_name)
     search_tasks = [tavily_client.search(query, max_results=4, days=days) for query, days in queries]
     insider_months = 6
     all_tasks = [*search_tasks, get_insider_trades(redis, ticker, months=insider_months)]

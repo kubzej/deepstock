@@ -17,6 +17,29 @@ class StockInfoUnavailableError(Exception):
     """Raised when upstream market data is temporarily unavailable."""
 
 
+def _extract_officers(info: dict) -> dict:
+    """Extract company officers from yfinance .info, identifying the CEO specifically."""
+    raw_officers = info.get("companyOfficers") or []
+    current_year = pd.Timestamp.now().year
+
+    officers = []
+    ceo = None
+    for o in raw_officers:
+        name = o.get("name")
+        title = o.get("title")
+        if not name or not title:
+            continue
+        age = o.get("age")
+        if age is None and o.get("yearBorn"):
+            age = current_year - o["yearBorn"]
+        entry = {"name": name, "title": title, "age": age, "totalPay": o.get("totalPay")}
+        officers.append(entry)
+        if ceo is None and ("ceo" in title.lower() or "chief executive" in title.lower()):
+            ceo = entry
+
+    return {"officers": officers[:6], "ceo": ceo}
+
+
 def _ltm_revenue_growth_from_historical(historical: Optional[dict]) -> Optional[float]:
     """Compute LTM revenue growth from the same revenue series shown in the UI/MCP table."""
     if not historical:
@@ -2183,9 +2206,11 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
             "targetMeanPrice": info.get("targetMeanPrice"),
             "recommendationKey": info.get("recommendationKey"),
             "numberOfAnalystOpinions": info.get("numberOfAnalystOpinions"),
-            
+
             "lastUpdated": str(pd.Timestamp.now()),
         }
+
+        result.update(_extract_officers(info))
         
         # Generate insights from fundamentals + historical trends
         historical = await get_historical_financials(redis, ticker)
