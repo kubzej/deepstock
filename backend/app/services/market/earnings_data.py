@@ -96,20 +96,25 @@ def _fetch_earnings_data_sync(ticker: str) -> dict:
     return data
 
 
-async def get_earnings_data(redis, ticker: str) -> dict:
+async def get_earnings_data(redis, ticker: str, force_refresh: bool = False) -> dict:
     """
     Return structured earnings data for a ticker (cached 24h).
     Always returns the full dict shape; missing blocks are empty (never raises).
+
+    force_refresh: skip the cached read and fetch fresh from yfinance. Use this
+    right after an earnings print — the 24h cache has no earnings-triggered
+    invalidation, so a cache hit here can silently serve pre-earnings data.
     """
     ticker = ticker.upper()
     cache_key = f"earnings_data:{ticker}"
 
-    try:
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
-    except Exception as e:
-        logger.warning("Redis read failed for %s: %s", cache_key, e)
+    if not force_refresh:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception as e:
+            logger.warning("Redis read failed for %s: %s", cache_key, e)
 
     try:
         data = await asyncio.to_thread(_fetch_earnings_data_sync, ticker)

@@ -47,12 +47,20 @@ FINANCIAL_DOMAINS = [
 SEARCH_TIMEOUT = 30  # seconds per individual search query
 
 
-async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]:
+async def search(
+    query: str, max_results: int = 5, days: int = 30, include_raw_content: bool = False
+) -> list[dict]:
     """
     Search the web for the given query.
-    Returns list of {title, url, content} dicts.
+    Returns list of {title, url, content} dicts (plus raw_content when requested).
     Runs synchronous Tavily client in thread pool to avoid blocking.
     Times out after SEARCH_TIMEOUT seconds to prevent hanging requests.
+
+    include_raw_content: by default Tavily's `content` field is a short
+    AI-generated snippet — fine for news, but for something like an earnings
+    call transcript page it often only covers the opening (participant list)
+    and never reaches the actual Q&A. Set this when the query specifically
+    targets long-form content you need the substance of, not just a snippet.
     """
     def _sync_search():
         client = _get_client()
@@ -60,7 +68,7 @@ async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]
             query=query,
             max_results=max_results,
             search_depth="advanced",
-            include_raw_content=False,
+            include_raw_content=include_raw_content,
             days=days,
             include_domains=FINANCIAL_DOMAINS,
         )
@@ -70,7 +78,7 @@ async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]
                 query=query,
                 max_results=max_results,
                 search_depth="basic",
-                include_raw_content=False,
+                include_raw_content=include_raw_content,
                 days=days,
             )
         return result.get("results", [])
@@ -95,8 +103,13 @@ async def search(query: str, max_results: int = 5, days: int = 30) -> list[dict]
         return []
 
 
-def format_results(results: list[dict]) -> str:
-    """Format Tavily results into readable text block for prompt context."""
+def format_results(results: list[dict], raw_content_chars: int = 6000) -> str:
+    """Format Tavily results into readable text block for prompt context.
+
+    Prefers raw_content (full scraped page, truncated) when the search was run
+    with include_raw_content=True; falls back to the short content snippet
+    otherwise — same as before for every caller that didn't ask for raw content.
+    """
     if not results:
         return "Žádné výsledky nenalezeny."
 
@@ -104,7 +117,13 @@ def format_results(results: list[dict]) -> str:
     for i, r in enumerate(results, 1):
         title = r.get("title", "Bez názvu")
         url = r.get("url", "")
-        content = r.get("content", "").strip()
+        raw = (r.get("raw_content") or "").strip()
+        if raw:
+            content = raw[:raw_content_chars]
+            if len(raw) > raw_content_chars:
+                content += "…"
+        else:
+            content = r.get("content", "").strip()
         parts.append(f"[{i}] {title}\nURL: {url}\n{content}")
 
     return "\n\n---\n\n".join(parts)

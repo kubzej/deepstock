@@ -58,9 +58,9 @@ class MarketDataService:
         """Get historical annual financials: multiples, profitability, growth."""
         return await get_historical_financials(self.redis, ticker)
 
-    async def get_earnings_data(self, ticker: str) -> dict:
+    async def get_earnings_data(self, ticker: str, force_refresh: bool = False) -> dict:
         """Get structured earnings data: history, estimates, revisions, growth."""
-        return await get_earnings_data(self.redis, ticker)
+        return await get_earnings_data(self.redis, ticker, force_refresh=force_refresh)
 
 
 # Singleton instance using shared Redis pool

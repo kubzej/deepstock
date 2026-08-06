@@ -173,7 +173,7 @@ def _format_insider_trades(trades: list[dict], months: int = 6) -> str:
     return "\n".join(lines)
 
 
-def _format_earnings_context(ed: dict) -> str:
+def _format_earnings_context(ed: dict, last_earnings_date: Optional[str] = None) -> str:
     """Render structured earnings data (history, estimates, revisions) into AI context."""
     if not ed or not any(ed.get(k) for k in ed):
         return "Earnings data nedostupná (možná non-US ticker nebo bez pokrytí analytiky)."
@@ -191,6 +191,30 @@ def _format_earnings_context(ed: dict) -> str:
     lines: list[str] = []
 
     hist = ed.get("earningsHistory") or []
+
+    # yfinance routinely lags a fresh print by several days with nothing in the
+    # payload to flag it — the "latest" row can silently be the PRIOR quarter,
+    # not the one just reported. Check against earnings_calendar's confirmed
+    # last_earnings_date and say so explicitly instead of letting the model
+    # guess which quarter this data actually belongs to.
+    if hist and last_earnings_date:
+        try:
+            latest_quarter_end = date.fromisoformat(str(hist[-1]["quarter"])[:10])
+            reported_date = date.fromisoformat(str(last_earnings_date)[:10])
+            gap_days = (reported_date - latest_quarter_end).days
+            if gap_days > 100:  # more than ~1 fiscal quarter + normal reporting lag
+                lines.append(
+                    f"⚠ **yfinance zde zaostává za realitou.** Firma naposledy reportovala "
+                    f"{reported_date.isoformat()}, ale nejnovější záznam v yfinance historii níže je za "
+                    f"kvartál končící {latest_quarter_end.isoformat()} — tedy STARŠÍ kvartál, ne ten, co "
+                    f"právě přišel. Nepovažuj tato čísla (ani konsenzus označený „Tento kvartál\") za data "
+                    f"k právě reportovanému kvartálu. Pro právě odreportovaný kvartál se spolehni výhradně "
+                    f"na web zdroje níže; pokud tam konkrétní číslo není, napiš že není dostupné — "
+                    f"nedopočítávej ani nekombinuj ho s touto starší yfinance historií.\n"
+                )
+        except Exception:
+            pass
+
     if hist:
         lines.append("### Historie výsledků (EPS actual vs odhad)")
         for r in hist:
@@ -613,14 +637,37 @@ async def generate_research_report(
     # ── Earnings report: post-earnings deep dive (no insider) ───────────────────
     if report_type == "earnings":
         fundamentals_context = _format_fundamentals(stock_data)
-        earnings_data = await market_service.get_earnings_data(ticker)
-        earnings_context = _format_earnings_context(earnings_data)
+        # force_refresh: this report type is triggered right after a print, so a
+        # 24h-old cached yfinance snapshot is actively likely to still predate it.
+        earnings_data = await market_service.get_earnings_data(ticker, force_refresh=True)
+
+        from app.services.earnings_calendar import earnings_calendar_service
+        calendar_info = (await earnings_calendar_service.get_batch([ticker])).get(ticker) or {}
+        last_earnings_date = calendar_info.get("lastEarningsDate")
+
+        earnings_context = _format_earnings_context(earnings_data, last_earnings_date)
 
         sector = stock_data.get("sector", "")
         industry = stock_data.get("industry", "")
         queries = _build_search_queries(ticker, company_name, report_type, sector=sector, industry=industry)
-        search_tasks = [tavily_client.search(query, max_results=4, days=days) for query, days in queries]
-        gathered = await asyncio.gather(*search_tasks, _fetch_journal_notes_context(ticker, user_id), return_exceptions=True)
+        # The transcript query needs the actual call content, not a snippet —
+        # Tavily's default summary for a long transcript page often stops at
+        # the participant list. include_raw_content pulls the full scraped
+        # page for just this one query; fewer results to keep prompt size sane.
+        search_tasks = [
+            tavily_client.search(
+                query,
+                max_results=3 if "transcript" in query else 4,
+                days=days,
+                include_raw_content="transcript" in query,
+            )
+            for query, days in queries
+        ]
+        gathered = await asyncio.gather(
+            *search_tasks,
+            _fetch_journal_notes_context(ticker, user_id, max_chars=4000),
+            return_exceptions=True,
+        )
         search_results_list = list(gathered[:-1])
         journal_context = gathered[-1]
         if isinstance(journal_context, Exception):
