@@ -38,8 +38,11 @@ import { Sparkline } from '@/components/shared/Sparkline';
 import {
   getDaysUntilEarnings,
   shouldShowEarningsBadge,
+  shouldShowEarningsTime,
+  shouldShowEarningsCallTime,
   formatEarningsBadge,
   formatDateCzech,
+  formatTimePrague,
   formatPrice,
   formatPercent,
 } from '@/lib/format';
@@ -217,6 +220,12 @@ export function WatchlistItemsTable({
             const lastDaysUntil = getDaysUntilEarnings(earnings?.lastEarningsDate);
             const lastEarningsBadge = formatEarningsBadge(lastDaysUntil);
             const showLastBadge = shouldShowEarningsBadge(lastDaysUntil);
+            const showEarningsTime = shouldShowEarningsTime(daysUntil);
+            const releaseTime = showEarningsTime ? formatTimePrague(earnings?.earningsTimestamp) : null;
+            const showCallTime =
+              showEarningsTime &&
+              shouldShowEarningsCallTime(earnings?.earningsTimestamp, earnings?.earningsCallTimestamp);
+            const callTime = showCallTime ? formatTimePrague(earnings?.earningsCallTimestamp) : null;
 
             return (
               <TableRow
@@ -378,7 +387,13 @@ export function WatchlistItemsTable({
                       )}
                       <div className="text-[10px] text-muted-foreground">
                         {formatDateCzech(earnings.earningsDate)}
+                        {releaseTime && ` v ${releaseTime}`}
                       </div>
+                      {callTime && (
+                        <div className="text-[10px] text-muted-foreground/60">
+                          Call: {callTime}
+                        </div>
+                      )}
                       {showLastBadge && lastEarningsBadge && (
                         <div className="text-[10px] text-muted-foreground/60">
                           Earnings {lastEarningsBadge}

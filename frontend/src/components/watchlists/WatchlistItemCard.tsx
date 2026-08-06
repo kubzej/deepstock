@@ -13,8 +13,11 @@ import type { EarningsCalendarEntry, Quote, WatchlistItem } from '@/lib/api';
 import {
   getDaysUntilEarnings,
   shouldShowEarningsBadge,
+  shouldShowEarningsTime,
+  shouldShowEarningsCallTime,
   formatEarningsBadge,
   formatDateCzech,
+  formatTimePrague,
   formatPrice,
   formatPercent,
 } from '@/lib/format';
@@ -57,6 +60,11 @@ export function WatchlistItemCard({
   const lastDaysUntil = getDaysUntilEarnings(earnings?.lastEarningsDate);
   const lastEarningsBadge = formatEarningsBadge(lastDaysUntil);
   const showLastBadge = shouldShowEarningsBadge(lastDaysUntil);
+  const showEarningsTime = shouldShowEarningsTime(daysUntil);
+  const releaseTime = showEarningsTime ? formatTimePrague(earnings?.earningsTimestamp) : null;
+  const showCallTime =
+    showEarningsTime && shouldShowEarningsCallTime(earnings?.earningsTimestamp, earnings?.earningsCallTimestamp);
+  const callTime = showCallTime ? formatTimePrague(earnings?.earningsCallTimestamp) : null;
 
   const activeTarget = getWatchlistActiveTarget(item, quote);
   const atBuyTarget = activeTarget === 'buy';
@@ -278,7 +286,13 @@ export function WatchlistItemCard({
             {earnings?.earningsDate && (
               <div className="text-xs mb-2">
                 <span className="text-muted-foreground/70 block">Earnings</span>
-                <span>{formatDateCzech(earnings.earningsDate)}</span>
+                <span>
+                  {formatDateCzech(earnings.earningsDate)}
+                  {releaseTime && ` v ${releaseTime}`}
+                </span>
+                {callTime && (
+                  <span className="block text-muted-foreground/70">Call: {callTime}</span>
+                )}
               </div>
             )}
 

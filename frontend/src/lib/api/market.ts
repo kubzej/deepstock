@@ -116,6 +116,8 @@ export interface EarningsCalendarEntry {
   ticker: string;
   earningsDate: string | null;
   lastEarningsDate: string | null;
+  earningsTimestamp: string | null;
+  earningsCallTimestamp: string | null;
   source: string | null;
   lastCheckedAt: string | null;
   updatedAt: string | null;

@@ -17,10 +17,33 @@ from app.services.market.quotes import get_quotes
 logger = logging.getLogger(__name__)
 
 EARNINGS_DUE_STALE_AFTER = timedelta(hours=23)
+EARNINGS_DUE_STALE_AFTER_NEAR = timedelta(hours=8)
+NEAR_TERM_WINDOW_DAYS = 2
 
 
 def _sample(values: List[str], limit: int = 10) -> List[str]:
     return values[:limit]
+
+
+def _to_date_str(timestamp: str | None) -> str | None:
+    """Date-only string (UTC) derived from a stored ISO timestamp."""
+    if not timestamp:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp.replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return None
+
+
+def _is_near_term(earnings_date: str | None, today: date) -> bool:
+    """Whether a date-only string falls within the near-term refresh window."""
+    if not earnings_date:
+        return False
+    try:
+        d = date.fromisoformat(earnings_date)
+    except ValueError:
+        return False
+    return abs((d - today).days) <= NEAR_TERM_WINDOW_DAYS
 
 
 class EarningsCalendarService:
@@ -32,7 +55,8 @@ class EarningsCalendarService:
         response = (
             supabase.table("stocks")
             .select(
-                "ticker, earnings_calendar(earnings_date, last_earnings_date, source, last_checked_at, updated_at)"
+                "ticker, earnings_calendar(earnings_timestamp, earnings_call_timestamp, "
+                "last_earnings_timestamp, source, last_checked_at, updated_at)"
             )
             .in_("ticker", unique_tickers)
             .execute()
@@ -43,10 +67,14 @@ class EarningsCalendarService:
             cache = row.get("earnings_calendar")
             if isinstance(cache, list):
                 cache = cache[0] if cache else None
+            earnings_timestamp = cache.get("earnings_timestamp") if cache else None
+            last_earnings_timestamp = cache.get("last_earnings_timestamp") if cache else None
             result[row["ticker"]] = {
                 "ticker": row["ticker"],
-                "earningsDate": cache.get("earnings_date") if cache else None,
-                "lastEarningsDate": cache.get("last_earnings_date") if cache else None,
+                "earningsDate": _to_date_str(earnings_timestamp),
+                "lastEarningsDate": _to_date_str(last_earnings_timestamp),
+                "earningsTimestamp": earnings_timestamp,
+                "earningsCallTimestamp": cache.get("earnings_call_timestamp") if cache else None,
                 "source": cache.get("source") if cache else None,
                 "lastCheckedAt": cache.get("last_checked_at") if cache else None,
                 "updatedAt": cache.get("updated_at") if cache else None,
@@ -59,6 +87,8 @@ class EarningsCalendarService:
                     "ticker": ticker,
                     "earningsDate": None,
                     "lastEarningsDate": None,
+                    "earningsTimestamp": None,
+                    "earningsCallTimestamp": None,
                     "source": None,
                     "lastCheckedAt": None,
                     "updatedAt": None,
@@ -150,10 +180,11 @@ class EarningsCalendarService:
             logger.info("No watchlist tickers found for earnings due check")
             return []
 
-        cutoff = datetime.now(timezone.utc) - EARNINGS_DUE_STALE_AFTER
+        now = datetime.now(timezone.utc)
+        today = now.date()
         response = (
             supabase.table("stocks")
-            .select("ticker, earnings_calendar(earnings_date, last_checked_at)")
+            .select("ticker, earnings_calendar(earnings_timestamp, last_checked_at)")
             .in_("ticker", all_watchlist_tickers)
             .execute()
         )
@@ -169,7 +200,7 @@ class EarningsCalendarService:
             if isinstance(cache, list):
                 cache = cache[0] if cache else None
 
-            earnings_date = cache.get("earnings_date") if cache else None
+            earnings_date = _to_date_str(cache.get("earnings_timestamp") if cache else None)
             last_checked_raw = cache.get("last_checked_at") if cache else None
             if not cache:
                 due.append(ticker)
@@ -195,7 +226,15 @@ class EarningsCalendarService:
                 invalid_last_checked.append(ticker)
                 continue
 
-            if last_checked < cutoff:
+            # Near-term tickers (earnings within +-2 days) get rechecked much
+            # sooner than far-out ones, so a same-day print doesn't sit stale
+            # until tomorrow's run. Far-out tickers keep the original cadence.
+            stale_after = (
+                EARNINGS_DUE_STALE_AFTER_NEAR
+                if _is_near_term(earnings_date, today)
+                else EARNINGS_DUE_STALE_AFTER
+            )
+            if last_checked < now - stale_after:
                 due.append(ticker)
                 stale_last_checked.append(ticker)
 
@@ -229,10 +268,10 @@ class EarningsCalendarService:
         )
         redis = get_redis()
         # Earnings refresh must reflect the provider's CURRENT data, not whatever
-        # the render-path quote_ext cache happens to hold (which may be up to 1h
-        # stale, or — during a field-change deploy — populated with the old
+        # the render-path quote_ext cache happens to hold (which may be several
+        # hours stale, or — during a field-change deploy — populated with the old
         # field). Drop the extended cache for these tickers so extended_sync does
-        # a genuinely fresh .info fetch. This runs once daily off the render path.
+        # a genuinely fresh .info fetch. Runs off the render path on a cron.
         await redis.delete(*(f"quote_ext:{t}" for t in unique_tickers))
         quotes = await get_quotes(
             redis, unique_tickers, include_extended=True, extended_sync=True
@@ -245,7 +284,7 @@ class EarningsCalendarService:
 
         stocks_response = (
             supabase.table("stocks")
-            .select("id, ticker, earnings_calendar(earnings_date, last_earnings_date)")
+            .select("id, ticker, earnings_calendar(earnings_timestamp, last_earnings_timestamp)")
             .in_("ticker", unique_tickers)
             .execute()
         )
@@ -263,6 +302,7 @@ class EarningsCalendarService:
         preserved_existing_dates: List[str] = []
         still_missing_dates: List[str] = []
         checked_at = datetime.now(timezone.utc).isoformat()
+        today_str = date.today().isoformat()
         for ticker in unique_tickers:
             stock_id = stock_ids.get(ticker)
             if not stock_id:
@@ -272,14 +312,14 @@ class EarningsCalendarService:
 
             quote = quotes.get(ticker) or {}
             existing_cache = existing_cache_by_ticker.get(ticker) or {}
-            provider_earnings_date = quote.get("earningsDate")
+            provider_earnings_timestamp = quote.get("earningsTimestamp")
 
-            if not provider_earnings_date:
-                # Provider gave us no date. Leave the row untouched — keep any
-                # existing date for display but DO NOT bump last_checked_at, so
-                # the ticker stays "due" and is retried next run instead of
+            if not provider_earnings_timestamp:
+                # Provider gave us no timestamp. Leave the row untouched — keep
+                # any existing value for display but DO NOT bump last_checked_at,
+                # so the ticker stays "due" and is retried next run instead of
                 # silently masking the failed fetch as a successful refresh.
-                if existing_cache.get("earnings_date"):
+                if existing_cache.get("earnings_timestamp"):
                     preserved_existing_dates.append(ticker)
                 else:
                     still_missing_dates.append(ticker)
@@ -292,25 +332,30 @@ class EarningsCalendarService:
             provider_dates_found.append(ticker)
             payload = {
                 "stock_id": stock_id,
-                "earnings_date": provider_earnings_date,
+                "earnings_timestamp": provider_earnings_timestamp,
                 "source": "yfinance_info",
                 "source_payload": {"ticker": ticker},
                 "last_checked_at": checked_at,
             }
 
-            # If the previously-stored earnings_date has passed (<= today) and the
-            # provider now reports a different (rolled-over) date, the old date was
-            # just superseded — capture it as last_earnings_date before it's gone.
-            # Derived from our own trusted earnings_date field (same one the
-            # earnings-alert notifications rely on), not a separate yfinance field,
-            # so it can't drift out of sync with notifications.
-            previous_earnings_date = existing_cache.get("earnings_date")
+            provider_call_timestamp = quote.get("earningsCallTimestamp")
+            if provider_call_timestamp:
+                payload["earnings_call_timestamp"] = provider_call_timestamp
+
+            # If the previously-stored earnings_timestamp has passed (<= today) and
+            # the provider now reports a different (rolled-over) value, the old one
+            # was just superseded — capture it as last_earnings_timestamp before
+            # it's gone. Derived from our own trusted earnings_timestamp field
+            # (same one the earnings-alert notifications rely on), not a separate
+            # yfinance field, so it can't drift out of sync with notifications.
+            previous_earnings_timestamp = existing_cache.get("earnings_timestamp")
+            previous_earnings_date = _to_date_str(previous_earnings_timestamp)
             if (
-                previous_earnings_date
-                and previous_earnings_date != provider_earnings_date
-                and previous_earnings_date <= date.today().isoformat()
+                previous_earnings_timestamp
+                and previous_earnings_date != _to_date_str(provider_earnings_timestamp)
+                and previous_earnings_date <= today_str
             ):
-                payload["last_earnings_date"] = previous_earnings_date
+                payload["last_earnings_timestamp"] = previous_earnings_timestamp
 
             try:
                 (
@@ -356,10 +401,13 @@ class EarningsCalendarService:
 
     async def get_tickers_with_earnings_on(self, target_date: date) -> Dict[str, dict]:
         target = target_date.isoformat()
+        day_start = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+        day_end = day_start + timedelta(days=1)
         response = (
             supabase.table("stocks")
-            .select("ticker, name, earnings_calendar!inner(earnings_date)")
-            .eq("earnings_calendar.earnings_date", target)
+            .select("ticker, name, earnings_calendar!inner(earnings_timestamp)")
+            .gte("earnings_calendar.earnings_timestamp", day_start.isoformat())
+            .lt("earnings_calendar.earnings_timestamp", day_end.isoformat())
             .execute()
         )
 

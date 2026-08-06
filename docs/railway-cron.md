@@ -13,12 +13,20 @@ FastAPI web service, because it starts `uvicorn` and does not exit.
 | --- | --- | --- |
 | `price-target-alerts` | `python -m app.jobs.runner price-target-alerts` | `*/10 7-21 * * 1-5` |
 | `custom-price-alerts` | `python -m app.jobs.runner custom-price-alerts` | `*/10 7-21 * * 1-5` |
-| `earnings-alerts` | `python -m app.jobs.runner earnings-alerts` | `0 8 * * 1-5` |
+| `earnings-alerts` | `python -m app.jobs.runner earnings-alerts` | `0 7,15,23 * * 1-5` |
 | `daily-news-briefing` | `python -m app.jobs.runner daily-news-briefing` | `0 14 * * 1-5` |
 
 `daily-news-briefing` targets roughly 16:00 Prague during summer time. Railway
 cron is UTC-only, so adjust the Railway schedule manually for winter time if an
 exact 16:00 Europe/Prague delivery time matters.
+
+`earnings-alerts` runs 3x/day (07:00, 15:00, 23:00 UTC) instead of once, so a
+same-day earnings print is picked up within hours instead of up to 24h later.
+This is safe to run more often than once/day: `earnings_calendar_service`
+only re-fetches from yfinance for tickers that are actually "due" (near-term
+tickers — earnings within +-2 days — use an 8h staleness threshold; everything
+else still only refreshes once per ~23h), and the push-notification step has
+its own per-user/ticker/day Redis dedup key, so extra runs never double-notify.
 
 ## Daily News Briefing Setup
 

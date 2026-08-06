@@ -265,6 +265,55 @@ export function shouldShowEarningsBadge(daysUntil: number | null): boolean {
 }
 
 /**
+ * Whether to show a clock time (release/call) next to the earnings date.
+ * Tighter than the badge window on purpose — yfinance's call-time field is
+ * only reliable within a couple of days of the actual event; further out it
+ * returns a generic placeholder unrelated to the real time.
+ */
+const EARNINGS_TIME_WINDOW_DAYS = 2;
+
+export function shouldShowEarningsTime(daysUntil: number | null): boolean {
+  if (daysUntil === null) return false;
+  return Math.abs(daysUntil) <= EARNINGS_TIME_WINDOW_DAYS;
+}
+
+/**
+ * Whether a call timestamp actually belongs to the same earnings event as
+ * the release timestamp. yfinance leaves the call field pointing at the
+ * PREVIOUS quarter's call until the upcoming one is confirmed, so a call
+ * date far from the release date is stale data, not "call is days away" —
+ * only trust it when it falls on the release day or the day after (covers
+ * same-day calls and next-morning calls after an after-close release).
+ */
+export function shouldShowEarningsCallTime(
+  earningsTimestamp: string | null | undefined,
+  callTimestamp: string | null | undefined
+): boolean {
+  if (!earningsTimestamp || !callTimestamp) return false;
+  const release = new Date(earningsTimestamp);
+  const call = new Date(callTimestamp);
+  if (isNaN(release.getTime()) || isNaN(call.getTime())) return false;
+  const releaseDay = Date.UTC(release.getUTCFullYear(), release.getUTCMonth(), release.getUTCDate());
+  const callDay = Date.UTC(call.getUTCFullYear(), call.getUTCMonth(), call.getUTCDate());
+  const diffDays = Math.round((callDay - releaseDay) / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 && diffDays <= 1;
+}
+
+/**
+ * Format an ISO timestamp as HH:mm in Europe/Prague local time.
+ */
+export function formatTimePrague(isoString: string | null | undefined): string | null {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('cs-CZ', {
+    timeZone: 'Europe/Prague',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+/**
  * Format earnings badge label for mobile/highlights
  * Only for earnings within -7 to +14 days
  */

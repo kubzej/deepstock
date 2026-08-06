@@ -145,8 +145,19 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         # slipping by a day on local-time hosts.
         earnings_ts = info.get("earningsTimestampStart")
         if earnings_ts:
-            ext_data["earningsDate"] = datetime.fromtimestamp(earnings_ts, tz=timezone.utc).date().isoformat()
-        
+            earnings_dt = datetime.fromtimestamp(earnings_ts, tz=timezone.utc)
+            ext_data["earningsDate"] = earnings_dt.date().isoformat()
+            ext_data["earningsTimestamp"] = earnings_dt.isoformat()
+
+        # Earnings call time — only reliable close to the event (yfinance
+        # returns a generic placeholder for calls that are weeks/months out).
+        # Store it unconditionally; gate display by proximity in the frontend.
+        earnings_call_ts = info.get("earningsCallTimestampStart")
+        if earnings_call_ts:
+            ext_data["earningsCallTimestamp"] = datetime.fromtimestamp(
+                earnings_call_ts, tz=timezone.utc
+            ).isoformat()
+
         return ext_data if ext_data else None
         
     except Exception as e:
