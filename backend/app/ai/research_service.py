@@ -173,7 +173,12 @@ def _format_insider_trades(trades: list[dict], months: int = 6) -> str:
     return "\n".join(lines)
 
 
-def _format_earnings_context(ed: dict, last_earnings_date: Optional[str] = None) -> str:
+def _format_earnings_context(
+    ed: dict,
+    last_earnings_date: Optional[str] = None,
+    next_earnings_date: Optional[str] = None,
+    today: Optional[date] = None,
+) -> str:
     """Render structured earnings data (history, estimates, revisions) into AI context."""
     if not ed or not any(ed.get(k) for k in ed):
         return "Earnings data nedostupná (možná non-US ticker nebo bez pokrytí analytiky)."
@@ -191,29 +196,62 @@ def _format_earnings_context(ed: dict, last_earnings_date: Optional[str] = None)
     lines: list[str] = []
 
     hist = ed.get("earningsHistory") or []
+    today = today or date.today()
 
     # yfinance routinely lags a fresh print by several days with nothing in the
     # payload to flag it — the "latest" row can silently be the PRIOR quarter,
-    # not the one just reported. Check against earnings_calendar's confirmed
-    # last_earnings_date and say so explicitly instead of letting the model
-    # guess which quarter this data actually belongs to.
-    if hist and last_earnings_date:
+    # not the one just reported. Two independent signals catch this, because
+    # either one alone can stay silent:
+    #  1) earnings_calendar's last_earnings_date vs. the newest quarter in the
+    #     yfinance history below — but last_earnings_date itself only advances
+    #     once yfinance's *forward* earnings_timestamp has rolled over to the
+    #     next quarter (see earnings_calendar.py refresh_tickers), which can
+    #     itself lag by days.
+    #  2) that same forward earnings_timestamp (next_earnings_date) having
+    #     already passed — a cheap, direct "a print almost certainly just
+    #     happened" signal that doesn't depend on (1) having caught up yet.
+    stale_reported_date: Optional[str] = None
+    latest_quarter_end: Optional[date] = None
+    if hist:
         try:
             latest_quarter_end = date.fromisoformat(str(hist[-1]["quarter"])[:10])
+        except Exception:
+            latest_quarter_end = None
+
+    if latest_quarter_end and last_earnings_date:
+        try:
             reported_date = date.fromisoformat(str(last_earnings_date)[:10])
             gap_days = (reported_date - latest_quarter_end).days
             if gap_days > 100:  # more than ~1 fiscal quarter + normal reporting lag
-                lines.append(
-                    f"⚠ **yfinance zde zaostává za realitou.** Firma naposledy reportovala "
-                    f"{reported_date.isoformat()}, ale nejnovější záznam v yfinance historii níže je za "
-                    f"kvartál končící {latest_quarter_end.isoformat()} — tedy STARŠÍ kvartál, ne ten, co "
-                    f"právě přišel. Nepovažuj tato čísla (ani konsenzus označený „Tento kvartál\") za data "
-                    f"k právě reportovanému kvartálu. Pro právě odreportovaný kvartál se spolehni výhradně "
-                    f"na web zdroje níže; pokud tam konkrétní číslo není, napiš že není dostupné — "
-                    f"nedopočítávej ani nekombinuj ho s touto starší yfinance historií.\n"
-                )
+                stale_reported_date = reported_date.isoformat()
         except Exception:
             pass
+
+    if not stale_reported_date and next_earnings_date:
+        try:
+            scheduled_date = date.fromisoformat(str(next_earnings_date)[:10])
+            days_since_scheduled = (today - scheduled_date).days
+            if 0 <= days_since_scheduled <= 14:
+                stale_reported_date = scheduled_date.isoformat()
+        except Exception:
+            pass
+
+    if stale_reported_date:
+        lines.append(
+            f"⚠ **yfinance zde pravděpodobně zaostává za realitou.** Firma měla naposledy reportovat "
+            f"kolem {stale_reported_date}"
+            + (
+                f", ale nejnovější záznam v yfinance historii níže je za kvartál končící "
+                f"{latest_quarter_end.isoformat()}" if latest_quarter_end else ""
+            ) +
+            f" — tedy STARŠÍ kvartál, ne ten, co právě přišel. Nepovažuj tato čísla (ani konsenzus "
+            f"označený „Tento kvartál\") za data k právě reportovanému kvartálu. Pro právě odreportovaný "
+            f"kvartál se spolehni výhradně na web zdroje níže; pokud tam konkrétní číslo není, napiš že "
+            f"není dostupné — nedopočítávej ani nekombinuj ho s touto starší yfinance historií. Totéž platí "
+            f"pro jakýkoli earnings call transkript ve zdrojích níže: pokud patří k tomuto STARŠÍMU kvartálu "
+            f"(zkontroluj datum callu), NEPOUŽÍVEJ ho jako zdroj pro to, co řeklo vedení k právě "
+            f"odreportovanému kvartálu — byl by to jiný call, o jiných číslech.\n"
+        )
 
     if hist:
         lines.append("### Historie výsledků (EPS actual vs odhad)")
@@ -644,8 +682,9 @@ async def generate_research_report(
         from app.services.earnings_calendar import earnings_calendar_service
         calendar_info = (await earnings_calendar_service.get_batch([ticker])).get(ticker) or {}
         last_earnings_date = calendar_info.get("lastEarningsDate")
+        next_earnings_date = calendar_info.get("earningsDate")
 
-        earnings_context = _format_earnings_context(earnings_data, last_earnings_date)
+        earnings_context = _format_earnings_context(earnings_data, last_earnings_date, next_earnings_date)
 
         sector = stock_data.get("sector", "")
         industry = stock_data.get("industry", "")

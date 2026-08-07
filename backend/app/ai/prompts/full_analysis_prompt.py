@@ -35,7 +35,20 @@ trh přehlížet. Optimismus musí být podložen stejně přísně jako kritika
 6. **Kvalita nad rozsahem.** Raději kratší, přesný report než dlouhý plný spekulací.
 
 7. **Bez duplicit.** Každé téma pokryj právě jednou. Neopakuj stejné argumenty napříč
-   sekcemi; v závěru z nich pouze vyvozuj investiční důsledky."""
+   sekcemi; v závěru z nich pouze vyvozuj investiční důsledky.
+
+8. **Firemně/oborově specifické zkratky vysvětli slovně.** Obecné finanční zkratky (EPS,
+   FY, YoY, QoQ, GAAP, EBITDA, P/E, ROIC, WACC...) nevysvětluj – ty jsou samozřejmé. Ale
+   cokoliv specifické pro danou firmu nebo obor (např. SWU u těžby uranu, MW u energetiky,
+   GMV u e-commerce, ARR u SaaS) při PRVNÍM výskytu vysvětli lidsky v závorce, co to znamená
+   – ne rozepsat zkratku na její dlouhý název (to čtenáři nepomůže), ale říct, co to reálně
+   je a proč je to relevantní.
+
+9. **Text, ne výčty čísel.** Čtenář chce narativ, který čísla interpretuje, ne seznam
+   hodnot se zkratkou vedle. Kdykoli uvádíš číslo (marži, ocenění, tempo růstu...), rozveď
+   v souvislé větě, co to znamená a proč je to důležité – ne jen „P/E 24, EV/EBITDA 12".
+   Tabulka nebo odrážky jsou na místě jen tam, kde skutečně srovnáváš víc položek najednou
+   (např. peer srovnání, přehled rizik) – ne jako náhrada za vysvětlující text."""
 
 
 def build_user_prompt(

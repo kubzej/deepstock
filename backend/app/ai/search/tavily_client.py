@@ -117,6 +117,7 @@ def format_results(results: list[dict], raw_content_chars: int = 6000) -> str:
     for i, r in enumerate(results, 1):
         title = r.get("title", "Bez názvu")
         url = r.get("url", "")
+        published = r.get("published_date")
         raw = (r.get("raw_content") or "").strip()
         if raw:
             content = raw[:raw_content_chars]
@@ -124,6 +125,12 @@ def format_results(results: list[dict], raw_content_chars: int = 6000) -> str:
                 content += "…"
         else:
             content = r.get("content", "").strip()
-        parts.append(f"[{i}] {title}\nURL: {url}\n{content}")
+        header = f"[{i}] {title}\nURL: {url}"
+        if published:
+            # Surfaced so the model can tell apart sources describing different
+            # quarters (e.g. a stale transcript vs. a just-published recap) —
+            # Tavily doesn't guarantee this field, so it's included when present.
+            header += f"\nPublikováno: {published}"
+        parts.append(f"{header}\n{content}")
 
     return "\n\n---\n\n".join(parts)

@@ -29,20 +29,36 @@ daty a aktuálními zprávami.
 6. **Toto je ČISTĚ earnings report.** Nesnaž se pokrýt celý příběh firmy ani technickou
    analýzu – soustřeď se výhradně na právě odreportovaný kvartál a jeho důsledky.
 
-7. **Nic důležitého nezahazuj.** Pokud zdroje (zejména earnings call) zmiňují něco
+7. **Nikdy nemíchej kvartály.** Než použiješ jakýkoli zdroj (zejména earnings call transkript
+   nebo článek o výsledcích), over si, ke kterému kvartálu se vztahuje – datum callu/reportu
+   nebo zmíněné období bys měl v textu najít. Pokud je nejbohatší zdroj, který máš (např. plný
+   transkript callu), ze STARŠÍHO kvartálu než ten, co se právě odreportoval, NEPOUŽÍVEJ ho jako
+   „co řeklo vedení k tomuto reportu" – byl by to jiný call, o jiných číslech. Do reportu ho
+   NEDÁVEJ jen proto, že je bohatý – čtenář nechce číst tři měsíce starý obsah jen s cedulkou
+   „starší kontext". Jediné legitimní použití staršího kvartálu je PŘÍMÉ srovnání: co firma/vedení
+   řeklo minule vs. co se skutečně stalo/řeklo teď (např. „minule avizovaný guidance X se teď
+   potvrdil/nesplnil" nebo „riziko zmíněné na Q1 callu se v Q2 buď materializovalo, nebo ne") –
+   a i to jen tam, kde to reálně slouží pochopení PRÁVĚ odreportovaného kvartálu, ne jako obecná
+   výplň. Mimo tohle starší kvartál do reportu nepatří.
+   Pokud po vyřazení staršího kvartálu nemáš k právě odreportovanému kvartálu spolehlivá data –
+   ani čísla, ani komentář vedení – NEDOPLŇUJ mezeru starším kvartálem ani domýšlením. Napiš na
+   rovinu, co konkrétně chybí, a report podle toho zkrať. Krátký a přesný report je vždy lepší
+   než dlouhý, který kombinuje dva kvartály dohromady.
+
+8. **Nic důležitého nezahazuj.** Pokud zdroje (zejména earnings call) zmiňují něco
    materiálního, co nesedí přesně do žádné z níže popsaných sekcí (nová smlouva, změna
    ve vedení, regulatorní událost, M&A, změna kapitálové alokace...), NEIGNORUJ to jen
    proto, že to nemá vlastní škatulku. Zařaď to tam, kam významově patří nejblíž
    (typicky sekce 1 nebo 5), nebo to zmiň jako krátkou odrážku navíc.
 
-8. **Firemně/oborově specifické zkratky vysvětli slovně.** Obecné finanční zkratky (EPS,
+9. **Firemně/oborově specifické zkratky vysvětli slovně.** Obecné finanční zkratky (EPS,
    FY, YoY, QoQ, GAAP, EBITDA...) nevysvětluj – ty jsou samozřejmé. Ale cokoliv specifické
    pro danou firmu nebo obor (např. SWU u těžby uranu, MW u energetiky, GMV u e-commerce,
    ARR u SaaS) při PRVNÍM výskytu vysvětli lidsky v závorce, co to znamená – ne rozepsat
    zkratku na její dlouhý název (to čtenáři nepomůže), ale říct, co to reálně je a proč
    je to relevantní.
 
-9. **Text před tabulkami.** Kde to dává smysl, piš souvislý text, který čísla interpretuje,
+10. **Text před tabulkami.** Kde to dává smysl, piš souvislý text, který čísla interpretuje,
    místo aby ses schovával za výčty a tabulky. Tabulka je na místě jen tam, kde jde o čistě
    srovnávací data (např. historie EPS surprise), ne jako náhrada za vysvětlení."""
 
@@ -100,12 +116,14 @@ nesou informaci, a zbytek piš jako analýzu, ne jako výpis.
 
 ### Struktura:
 
-> Pokud máš ve zdrojích earnings call jako plný text (ne jen náhled/seznam účastníků), je to
-> nejbohatší zdroj v celém kontextu – netěž ho jen pro sekci 2. Segmentové vysvětlení "proč"
-> v sekci 1, framing guidance v sekci 4 a komentáře k rizikům/katalyzátorům relevantní pro tezi
-> v sekci 5 se často řeknou přímo na callu, ne v tiskové zprávě. Sekce 2 je místo pro shrnutí
-> SAMOTNÉHO callu (tón, průběh, co bylo řečeno jako celek) – obsah z něj ale pouštěj do všech
-> sekcí, kam věcně patří.
+> Pokud máš ve zdrojích earnings call jako plný text (ne jen náhled/seznam účastníků) A je to call
+> k PRÁVĚ odreportovanému kvartálu (over si datum/období, viz pravidlo 7), je to nejbohatší zdroj
+> v celém kontextu – netěž ho jen pro sekci 2. Segmentové vysvětlení "proč" v sekci 1, framing
+> guidance v sekci 4 a komentáře k rizikům/katalyzátorům relevantní pro tezi v sekci 5 se často
+> řeknou přímo na callu, ne v tiskové zprávě. Sekce 2 je místo pro shrnutí SAMOTNÉHO callu (tón,
+> průběh, co bylo řečeno jako celek) – obsah z něj ale pouštěj do všech sekcí, kam věcně patří.
+> Pokud je dostupný transkript jen ke STARŠÍMU kvartálu, tohle neplatí – viz pravidlo 7 (mimo
+> přímé srovnání minule vs. teď do reportu nepatří).
 
 **0. TL;DR**
 Hned na úvod, ještě před sekcí 1: 3–5 vět shrnujících celý report. Beat, nebo miss – a jak moc?
