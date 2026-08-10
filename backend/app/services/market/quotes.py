@@ -230,7 +230,11 @@ async def get_quotes(
     missing_basic = []
     
     for t in tickers:
-        cached = await redis.get(f"quote:{t}")
+        try:
+            cached = await redis.get(f"quote:{t}")
+        except Exception as e:
+            logger.warning(f"Redis read failed for quote:{t}, treating as cache miss: {e}")
+            cached = None
         if cached:
             results[t] = json.loads(cached)
         else:
@@ -328,7 +332,11 @@ async def get_quotes(
     for t in tickers:
         if t not in results:
             continue
-        cached_ext = await redis.get(f"quote_ext:{t}")
+        try:
+            cached_ext = await redis.get(f"quote_ext:{t}")
+        except Exception as e:
+            logger.warning(f"Redis read failed for quote_ext:{t}, treating as cache miss: {e}")
+            cached_ext = None
         if cached_ext:
             # Merge cached extended data into results
             ext_data = json.loads(cached_ext)
@@ -431,7 +439,13 @@ async def get_batch_price_history(
 
     for ticker in unique_tickers:
         cache_key = f"history:{ticker}:{period}"
-        cached = await redis.get(cache_key)
+        try:
+            cached = await redis.get(cache_key)
+        except Exception as e:
+            # Stale pooled connection (e.g. transport closed by peer) — treat
+            # as a cache miss instead of failing the whole batch request.
+            logger.warning(f"Redis read failed for {cache_key}, treating as cache miss: {e}")
+            cached = None
         if cached:
             results[ticker] = json.loads(cached)
         else:

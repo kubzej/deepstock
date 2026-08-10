@@ -272,7 +272,13 @@ class EarningsCalendarService:
         # hours stale, or — during a field-change deploy — populated with the old
         # field). Drop the extended cache for these tickers so extended_sync does
         # a genuinely fresh .info fetch. Runs off the render path on a cron.
-        await redis.delete(*(f"quote_ext:{t}" for t in unique_tickers))
+        try:
+            await redis.delete(*(f"quote_ext:{t}" for t in unique_tickers))
+        except Exception as e:
+            # Best-effort — a broken pooled connection here shouldn't abort the
+            # whole refresh run. Worst case some tickers serve a stale extended
+            # cache this round instead of a genuinely fresh .info fetch.
+            logger.warning("Redis delete failed for quote_ext keys, continuing: %s", e)
         quotes = await get_quotes(
             redis, unique_tickers, include_extended=True, extended_sync=True
         )

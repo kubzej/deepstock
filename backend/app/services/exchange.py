@@ -66,11 +66,18 @@ class ExchangeRateService:
         Never returns hardcoded fallback values.
         """
         # 1. Live Redis cache
-        cached = await self.redis.get(_LIVE_KEY)
-        if cached:
-            return json.loads(cached)
+        try:
+            cached = await self.redis.get(_LIVE_KEY)
+            if cached:
+                return json.loads(cached)
+        except Exception as exc:
+            # Stale pooled connection (e.g. transport closed by peer) — don't
+            # let a broken cache read take down the whole request, just fall
+            # through to a live CNB fetch.
+            logger.warning("Redis read failed for %s, falling back to CNB fetch: %s", _LIVE_KEY, exc)
 
         # 2. Fetch from CNB
+        rates: Dict[str, float] | None = None
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(CNB_URL)
@@ -80,16 +87,27 @@ class ExchangeRateService:
             if len(rates) < 5:
                 raise ValueError(f"CNB parse returned only {len(rates)} rates — likely malformed response")
 
-            await self.redis.set(_LIVE_KEY, json.dumps(rates), ex=CacheTTL.EXCHANGE_RATES)
-            await self.redis.set(_LKG_KEY, json.dumps(rates), ex=_LKG_TTL)
             logger.info("Exchange rates refreshed from CNB (%d currencies)", len(rates))
-            return rates
-
         except Exception as exc:
             logger.error("CNB exchange rate fetch failed: %s", exc)
+            rates = None
+
+        if rates is not None:
+            try:
+                await self.redis.set(_LIVE_KEY, json.dumps(rates), ex=CacheTTL.EXCHANGE_RATES)
+                await self.redis.set(_LKG_KEY, json.dumps(rates), ex=_LKG_TTL)
+            except Exception as exc:
+                # Best-effort cache write — a broken pooled connection here
+                # shouldn't discard rates we already fetched successfully.
+                logger.warning("Redis write failed for exchange rates cache: %s", exc)
+            return rates
 
         # 3. Last-known-good fallback
-        lkg = await self.redis.get(_LKG_KEY)
+        try:
+            lkg = await self.redis.get(_LKG_KEY)
+        except Exception as exc:
+            logger.warning("Redis read failed for %s: %s", _LKG_KEY, exc)
+            lkg = None
         if lkg:
             logger.warning("Using last-known-good exchange rates (CNB unavailable)")
             return json.loads(lkg)
