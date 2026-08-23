@@ -29,8 +29,6 @@ import {
 } from '@/lib/api';
 import { generateWatchlistTargets } from '@/lib/api/ai_watchlist_targets';
 import { formatPrice } from '@/lib/format';
-import { SectorSelect } from '@/components/shared/SectorSelect';
-import { IndustrySelect } from '@/components/shared/IndustrySelect';
 
 interface WatchlistItemFormDialogProps {
   open: boolean;
@@ -269,10 +267,6 @@ export function WatchlistItemFormDialog({
                 className="font-mono-price"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <SectorSelect value={sector} onValueChange={setSector} />
-            <IndustrySelect value={industry} sector={sector} onValueChange={setIndustry} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Poznámky</Label>
