@@ -3,7 +3,6 @@ import { API_URL, getAuthHeader } from './client';
 export type DailyBriefingPriority = 'high' | 'medium' | 'low';
 export type DailyBriefingScopeSourceType = 'portfolio' | 'watchlist';
 export type DailyNewsReportStatus = 'running' | 'succeeded' | 'degraded' | 'failed';
-export type DailyNewsTriggerType = 'scheduled' | 'manual';
 export type DailyNewsImportance = 'high' | 'medium' | 'low' | 'noise';
 
 export interface DailyBriefingSettings {
@@ -43,7 +42,7 @@ export interface DailyNewsReport {
   id: string;
   user_id: string;
   status: DailyNewsReportStatus;
-  trigger_type: DailyNewsTriggerType;
+  trigger_type: 'scheduled' | 'manual';
   window_start: string;
   window_end: string;
   started_at?: string | null;
@@ -59,12 +58,6 @@ export interface DailyNewsReport {
   notification_status?: string | null;
   created_at?: string;
   updated_at?: string;
-}
-
-export interface DailyNewsReportList {
-  reports: DailyNewsReport[];
-  limit: number;
-  offset: number;
 }
 
 export interface DailyNewsSourceItem {
@@ -142,12 +135,6 @@ export const updateDailyBriefingScope = (
     body: JSON.stringify({ items }),
   });
 
-export const fetchDailyBriefingReports = (
-  limit = 20,
-  offset = 0,
-): Promise<DailyNewsReportList> =>
-  apiFetch(`/api/daily-briefing/reports?limit=${limit}&offset=${offset}`);
-
 export const fetchDailyBriefingReport = (reportId: string): Promise<DailyNewsReport> =>
   apiFetch(`/api/daily-briefing/reports/${reportId}`);
 
@@ -155,10 +142,3 @@ export const fetchDailyBriefingSources = (
   reportId: string,
 ): Promise<{ sources: DailyNewsSourceItem[] }> =>
   apiFetch(`/api/daily-briefing/reports/${reportId}/sources`);
-
-export const generateDailyBriefing = (
-  force = false,
-): Promise<{ report_id: string; status: DailyNewsReportStatus }> =>
-  apiFetch(`/api/daily-briefing/generate${force ? '?force=true' : ''}`, {
-    method: 'POST',
-  });

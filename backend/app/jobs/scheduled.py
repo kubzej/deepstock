@@ -7,14 +7,21 @@ commands call here, while business logic stays in the existing services.
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.core.redis import get_redis
+from app.core.supabase import supabase
 from app.services.earnings_alerts import earnings_alert_service
 from app.services.earnings_calendar import earnings_calendar_service
 from app.services.price_alerts import price_alert_service
+from app.services.options import options_service
+from app.services.timeline import timeline_service
 
 logger = logging.getLogger(__name__)
+PRAGUE_TZ = ZoneInfo("Europe/Prague")
+OPTION_EXPIRY_MILESTONES = (365, 180, 90, 30, 14, 7, 1)
 
 
 async def run_price_target_alerts() -> dict[str, Any]:
@@ -68,6 +75,65 @@ async def run_earnings_alerts() -> dict[str, Any]:
         "users_checked": alert_result["users_checked"],
         "alerts_sent": alert_result["alerts_sent"],
     }
+
+
+async def run_option_expiry_events() -> dict[str, Any]:
+    """Create idempotent Timeline reminders for open option positions."""
+    today = datetime.now(PRAGUE_TZ).date()
+    users_response = supabase.table("profiles").select("id").execute()
+    created = 0
+    checked = 0
+
+    for user in users_response.data or []:
+        user_id = user["id"]
+        holdings = await options_service.get_all_holdings_for_user(user_id)
+        checked += len(holdings)
+        for holding in holdings:
+            expiration_raw = holding.get("expiration_date")
+            if not expiration_raw:
+                continue
+            expiration = date.fromisoformat(str(expiration_raw)[:10])
+            dte = (expiration - today).days
+            if dte not in OPTION_EXPIRY_MILESTONES:
+                continue
+
+            option_symbol = holding.get("option_symbol") or ""
+            portfolio_id = holding.get("portfolio_id") or ""
+            ticker = str(holding.get("symbol") or "").upper()
+            option_type = str(holding.get("option_type") or "").upper()
+            strike_price = holding.get("strike_price")
+            position = holding.get("position")
+            contracts = holding.get("contracts")
+            currency = holding.get("currency") or "USD"
+            event = await timeline_service.create_event(
+                user_id=user_id,
+                event_type="option_expiry",
+                event_date=today,
+                source_key=f"{portfolio_id}:{option_symbol}:{dte}",
+                title=f"{ticker} {option_type} {strike_price}".strip(),
+                subtitle=f"Expirace za {dte} dní",
+                metadata={
+                    "ticker": ticker,
+                    "option_symbol": option_symbol,
+                    "option_type": holding.get("option_type"),
+                    "strike_price": strike_price,
+                    "expiration_date": expiration.isoformat(),
+                    "dte": dte,
+                    "position": position,
+                    "contracts": contracts,
+                    "currency": currency,
+                    "portfolio_id": portfolio_id,
+                },
+            )
+            if event:
+                created += 1
+
+    logger.info(
+        "Option expiry Timeline job finished: holdings_checked=%d events_created=%d",
+        checked,
+        created,
+    )
+    return {"success": True, "holdings_checked": checked, "timeline_events_created": created}
 
 
 async def run_refresh_earnings_calendar() -> dict[str, Any]:

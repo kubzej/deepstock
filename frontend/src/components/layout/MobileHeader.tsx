@@ -16,7 +16,7 @@ import {
   Bell,
   Rss,
   BookOpen,
-  Newspaper,
+  CalendarRange,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +33,7 @@ import { PortfolioSelector } from '@/components/shared/PortfolioSelector';
 
 const menuItems = [
   { path: '/', icon: LayoutDashboard, label: 'Přehled', exact: true },
+  { path: '/timeline', icon: CalendarRange, label: 'Timeline' },
   { path: '/stocks', icon: Database, label: 'Akcie' },
   { path: '/opce', icon: Target, label: 'Opce' },
   { path: '/history', icon: History, label: 'Historie transakcí' },
@@ -42,7 +43,6 @@ const menuItems = [
   { path: '/alerts', icon: Bell, label: 'Alerty' },
   { path: '/feed', icon: Rss, label: 'Feeds' },
   { path: '/research', icon: Search, label: 'Průzkum akcie' },
-  { path: '/daily-briefing', icon: Newspaper, label: 'Denní briefing' },
   { path: '/journal', icon: BookOpen, label: 'Deník' },
   { path: '/settings', icon: Settings, label: 'Nastavení' },
 ];

@@ -77,12 +77,6 @@ class DailyNewsReport(BaseModel):
     updated_at: Optional[datetime] = None
 
 
-class DailyNewsReportList(BaseModel):
-    reports: list[DailyNewsReport]
-    limit: int
-    offset: int
-
-
 class DailyNewsSourceItem(BaseModel):
     id: str
     user_id: str
@@ -111,7 +105,3 @@ class DailyNewsSourceItem(BaseModel):
 class DailyNewsSourceList(BaseModel):
     sources: list[DailyNewsSourceItem]
 
-
-class GenerateDailyBriefingResponse(BaseModel):
-    report_id: str
-    status: ReportStatus

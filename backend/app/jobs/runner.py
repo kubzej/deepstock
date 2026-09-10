@@ -21,6 +21,7 @@ JOB_HANDLERS: dict[str, JobHandler] = {
     "price-target-alerts": scheduled.run_price_target_alerts,
     "custom-price-alerts": scheduled.run_custom_price_alerts,
     "earnings-alerts": scheduled.run_earnings_alerts,
+    "option-expiry-events": scheduled.run_option_expiry_events,
     "refresh-earnings-calendar": scheduled.run_refresh_earnings_calendar,
     "refresh-earnings-calendar-force": scheduled.run_refresh_earnings_calendar_force,
     "cleanup-earnings-calendar": scheduled.run_cleanup_earnings_calendar,

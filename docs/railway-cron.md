@@ -14,6 +14,7 @@ FastAPI web service, because it starts `uvicorn` and does not exit.
 | `price-target-alerts` | `python -m app.jobs.runner price-target-alerts` | `*/10 7-21 * * 1-5` |
 | `custom-price-alerts` | `python -m app.jobs.runner custom-price-alerts` | `*/10 7-21 * * 1-5` |
 | `earnings-alerts` | `python -m app.jobs.runner earnings-alerts` | `0 7,15,23 * * 1-5` |
+| `option-expiry-events` | `python -m app.jobs.runner option-expiry-events` | `0 7 * * *` |
 | `daily-news-briefing` | `python -m app.jobs.runner daily-news-briefing` | `0 14 * * 1-5` |
 
 `daily-news-briefing` targets roughly 16:00 Prague during summer time. Railway

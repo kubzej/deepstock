@@ -1,1 +1,1 @@
-export { DailyBriefingPage } from './DailyBriefingPage';
+export { DailyBriefingDetailPage } from './DailyBriefingDetailPage';

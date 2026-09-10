@@ -411,7 +411,9 @@ class EarningsCalendarService:
         day_end = day_start + timedelta(days=1)
         response = (
             supabase.table("stocks")
-            .select("ticker, name, earnings_calendar!inner(earnings_timestamp)")
+            .select(
+                "ticker, name, earnings_calendar!inner(earnings_timestamp, earnings_call_timestamp)"
+            )
             .gte("earnings_calendar.earnings_timestamp", day_start.isoformat())
             .lt("earnings_calendar.earnings_timestamp", day_end.isoformat())
             .execute()
@@ -419,10 +421,15 @@ class EarningsCalendarService:
 
         result: Dict[str, dict] = {}
         for row in response.data or []:
+            cache = row.get("earnings_calendar")
+            if isinstance(cache, list):
+                cache = cache[0] if cache else None
             result[row["ticker"]] = {
                 "ticker": row["ticker"],
                 "name": row.get("name") or row["ticker"],
                 "earningsDate": target,
+                "earningsTimestamp": cache.get("earnings_timestamp") if cache else None,
+                "earningsCallTimestamp": cache.get("earnings_call_timestamp") if cache else None,
             }
         return result
 

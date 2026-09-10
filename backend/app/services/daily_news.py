@@ -20,6 +20,7 @@ from app.services.daily_news_scoring import (
 from app.services.daily_news_settings import daily_news_settings_service
 from app.services.push import get_notification_settings, send_push_notification
 from app.services.research_context import research_context_service
+from app.services.timeline import timeline_service
 
 logger = logging.getLogger(__name__)
 
@@ -101,25 +102,10 @@ class DailyNewsService:
                 .execute()
         return len(rows)
 
-    async def start_manual_report(self, user_id: str, force: bool = False) -> dict:
-        await self.cleanup_stale_running_reports(user_id)
-        window_end = datetime.now(timezone.utc)
-        window_start = window_end - timedelta(hours=24)
-        report = await self._create_report(
-            user_id=user_id,
-            trigger_type="manual",
-            window_start=window_start,
-            window_end=window_end,
-            force=force,
-        )
-        return report
-
     async def run_for_user(
         self,
         user_id: str,
         *,
-        trigger_type: str,
-        force: bool = False,
         report_id: Optional[str] = None,
     ) -> dict:
         await self.cleanup_stale_running_reports(user_id)
@@ -134,10 +120,8 @@ class DailyNewsService:
             window_start = window_end - timedelta(hours=24)
             report = await self._create_report(
                 user_id=user_id,
-                trigger_type=trigger_type,
                 window_start=window_start,
                 window_end=window_end,
-                force=force,
             )
 
         logger.info("Daily news report %s started for user %s", report["id"], user_id)
@@ -200,10 +184,11 @@ class DailyNewsService:
                 _build_notification_body(content, summary),
             )
 
+            completed_at = datetime.now(timezone.utc)
             updated = supabase.table("daily_news_reports") \
                 .update({
                     "status": status,
-                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "completed_at": completed_at.isoformat(),
                     "title": title,
                     "summary": summary,
                     "markdown": content,
@@ -215,6 +200,18 @@ class DailyNewsService:
                 .eq("id", report["id"]) \
                 .eq("user_id", user_id) \
                 .execute()
+            await timeline_service.create_event(
+                user_id=user_id,
+                event_type="daily_briefing",
+                event_date=completed_at.astimezone(PRAGUE_TZ).date(),
+                source_key=completed_at.astimezone(PRAGUE_TZ).date().isoformat(),
+                title="Denní briefing",
+                metadata={
+                    "status": status,
+                    "report_id": report["id"],
+                },
+                briefing_report_id=report["id"],
+            )
             logger.info(
                 "Daily news report %s finished: status=%s candidates=%d prompt_items=%d",
                 report["id"],
@@ -254,7 +251,7 @@ class DailyNewsService:
             "notifications_sent": 0,
         }
         for user_id in user_ids:
-            report = await self.run_for_user(user_id, trigger_type="scheduled")
+            report = await self.run_for_user(user_id)
             result["reports_generated"] += 1
             result[report["status"]] = result.get(report["status"], 0) + 1
             if str(report.get("notification_status") or "").startswith("sent:"):
@@ -265,38 +262,35 @@ class DailyNewsService:
         self,
         *,
         user_id: str,
-        trigger_type: str,
         window_start: datetime,
         window_end: datetime,
-        force: bool,
     ) -> dict:
         running = supabase.table("daily_news_reports") \
             .select("id") \
             .eq("user_id", user_id) \
             .eq("status", "running") \
             .execute()
-        if running.data and not force:
+        if running.data:
             raise ValueError("Denní briefing se už generuje.")
 
-        if not force:
-            local_day_start, local_day_end = _local_day_bounds_utc(window_end)
-            existing = supabase.table("daily_news_reports") \
-                .select("*") \
-                .eq("user_id", user_id) \
-                .in_("status", ["succeeded", "degraded"]) \
-                .gte("window_end", local_day_start.isoformat()) \
-                .lt("window_end", local_day_end.isoformat()) \
-                .order("created_at", desc=True) \
-                .limit(1) \
-                .execute()
-            if existing.data:
-                return existing.data[0]
+        local_day_start, local_day_end = _local_day_bounds_utc(window_end)
+        existing = supabase.table("daily_news_reports") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .in_("status", ["succeeded", "degraded"]) \
+            .gte("window_end", local_day_start.isoformat()) \
+            .lt("window_end", local_day_end.isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        if existing.data:
+            return existing.data[0]
 
         created = supabase.table("daily_news_reports") \
             .insert({
                 "user_id": user_id,
                 "status": "running",
-                "trigger_type": trigger_type,
+                "trigger_type": "scheduled",
                 "window_start": window_start.isoformat(),
                 "window_end": window_end.isoformat(),
                 "started_at": datetime.now(timezone.utc).isoformat(),
@@ -413,7 +407,7 @@ class DailyNewsService:
                 user_id=user_id,
                 title="Denní briefing",
                 body=body or "Nový briefing je připravený.",
-                url=f"/daily-briefing/{report_id}",
+                url=f"/timeline/briefing/{report_id}",
                 tag="daily-news-briefing",
             )
             return f"sent:{sent}"

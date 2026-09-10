@@ -8,6 +8,7 @@ from app.core.supabase import supabase
 from app.services.earnings_calendar import earnings_calendar_service
 from app.services.push import send_push_notification
 from app.core.cache import CacheTTL
+from app.services.timeline import timeline_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class EarningsAlertService:
         Sends notification for stocks with earnings TODAY.
         """
         today_str = date.today().isoformat()
+        await self.sync_timeline_events(today_str)
         
         # Get all users with notifications AND earnings alerts enabled
         users_response = supabase.table("profiles") \
@@ -76,6 +78,83 @@ class EarningsAlertService:
         Check and send earnings alerts for a single user.
         Returns number of alerts sent.
         """
+        earnings_today = await self._get_user_earnings_today(user_id, today_str)
+        if not earnings_today:
+            logger.info("User %s has no watchlist tickers with earnings today", user_id)
+            return 0
+
+        # Check anti-spam: only notify once per ticker per day
+        alerts_to_send = []
+        for stock in earnings_today:
+            cache_key = f"earnings_alert:{user_id}:{stock['ticker']}:{today_str}"
+            already_sent = await redis.get(cache_key)
+            if not already_sent:
+                alerts_to_send.append(stock)
+                # Mark as sent (expires in 24h)
+                await redis.set(cache_key, "1", ex=CacheTTL.ALERT_SENT)
+            else:
+                logger.info(
+                    "Skipping duplicate earnings alert for user %s ticker %s on %s",
+                    user_id,
+                    stock["ticker"],
+                    today_str,
+                )
+
+        if not alerts_to_send:
+            logger.info("User %s has only already-sent earnings alerts for %s", user_id, today_str)
+            return 0
+
+        logger.info(
+            "User %s will receive %d earnings alerts today (tickers=%s)",
+            user_id,
+            len(alerts_to_send),
+            [stock["ticker"] for stock in alerts_to_send],
+        )
+
+        # Send notification(s)
+        alerts_sent = 0
+        for stock in alerts_to_send:
+            sent = await self._send_earnings_alert(user_id, stock)
+            if sent:
+                alerts_sent += 1
+            else:
+                logger.warning(
+                    "Push send returned no deliveries for earnings alert user=%s ticker=%s",
+                    user_id,
+                    stock["ticker"],
+                )
+
+        logger.info("User %s earnings alert run finished: alerts_sent=%d", user_id, alerts_sent)
+        return alerts_sent
+
+    async def sync_timeline_events(self, today_str: str) -> int:
+        """Persist today's watchlist earnings as idempotent Timeline events."""
+        users_response = supabase.table("profiles").select("id").execute()
+        created = 0
+        for user in users_response.data or []:
+            user_id = user["id"]
+            for stock in await self._get_user_earnings_today(user_id, today_str):
+                event = await timeline_service.create_event(
+                    user_id=user_id,
+                    event_type="earnings",
+                    event_date=date.fromisoformat(today_str),
+                    source_key=f"{stock['ticker']}:{today_str}",
+                    title=f"{stock['ticker']} Earnings",
+                    subtitle=None,
+                    metadata={
+                        "ticker": stock["ticker"],
+                        "name": stock["name"],
+                        "earnings_date": today_str,
+                        "earnings_timestamp": stock.get("earningsTimestamp"),
+                        "earnings_call_timestamp": stock.get("earningsCallTimestamp"),
+                    },
+                )
+                if event:
+                    created += 1
+        return created
+
+    async def _get_user_earnings_today(self, user_id: str, today_str: str) -> list[dict]:
+        """Return unique watchlist tickers with earnings on the target date."""
         # Get all watchlist items for this user
         watchlists_response = supabase.table("watchlists") \
             .select("id") \
@@ -84,7 +163,7 @@ class EarningsAlertService:
         
         if not watchlists_response.data:
             logger.info("User %s has no watchlists for earnings alerts", user_id)
-            return 0
+            return []
         
         watchlist_ids = [w["id"] for w in watchlists_response.data]
         
@@ -96,7 +175,7 @@ class EarningsAlertService:
         
         if not items_response.data:
             logger.info("User %s has no watchlist items for earnings alerts", user_id)
-            return 0
+            return []
         
         # Get unique tickers
         tickers = list(set(
@@ -107,7 +186,7 @@ class EarningsAlertService:
         
         if not tickers:
             logger.info("User %s has no resolved tickers for earnings alerts", user_id)
-            return 0
+            return []
 
         logger.info(
             "Checking earnings alerts for user %s: watchlists=%d watchlist_items=%d unique_tickers=%d",
@@ -127,7 +206,6 @@ class EarningsAlertService:
             list(sorted(earnings_today_by_ticker.keys()))[:10],
         )
 
-        # Find tickers with earnings TODAY
         earnings_today = []
         for ticker in tickers:
             if ticker in earnings_today_by_ticker:
@@ -139,56 +217,11 @@ class EarningsAlertService:
                 )
                 earnings_today.append({
                     "ticker": ticker,
-                    "name": stock_name
+                    "name": stock_name,
+                    "earningsTimestamp": earnings_today_by_ticker[ticker].get("earningsTimestamp"),
+                    "earningsCallTimestamp": earnings_today_by_ticker[ticker].get("earningsCallTimestamp"),
                 })
-        
-        if not earnings_today:
-            logger.info("User %s has no watchlist tickers with earnings today", user_id)
-            return 0
-        
-        # Check anti-spam: only notify once per ticker per day
-        alerts_to_send = []
-        for stock in earnings_today:
-            cache_key = f"earnings_alert:{user_id}:{stock['ticker']}:{today_str}"
-            already_sent = await redis.get(cache_key)
-            if not already_sent:
-                alerts_to_send.append(stock)
-                # Mark as sent (expires in 24h)
-                await redis.set(cache_key, "1", ex=CacheTTL.ALERT_SENT)
-            else:
-                logger.info(
-                    "Skipping duplicate earnings alert for user %s ticker %s on %s",
-                    user_id,
-                    stock["ticker"],
-                    today_str,
-                )
-        
-        if not alerts_to_send:
-            logger.info("User %s has only already-sent earnings alerts for %s", user_id, today_str)
-            return 0
-
-        logger.info(
-            "User %s will receive %d earnings alerts today (tickers=%s)",
-            user_id,
-            len(alerts_to_send),
-            [stock["ticker"] for stock in alerts_to_send],
-        )
-        
-        # Send notification(s)
-        alerts_sent = 0
-        for stock in alerts_to_send:
-            sent = await self._send_earnings_alert(user_id, stock)
-            if sent:
-                alerts_sent += 1
-            else:
-                logger.warning(
-                    "Push send returned no deliveries for earnings alert user=%s ticker=%s",
-                    user_id,
-                    stock["ticker"],
-                )
-        
-        logger.info("User %s earnings alert run finished: alerts_sent=%d", user_id, alerts_sent)
-        return alerts_sent
+        return earnings_today
     
     async def _send_earnings_alert(self, user_id: str, stock: dict) -> bool:
         """Send earnings notification."""

@@ -52,7 +52,7 @@ export const STALE_TIMES = {
 
   // Daily briefing - generated operational reports
   dailyBriefingSettings: 5 * 60 * 1000,
-  dailyBriefingReports: 60 * 1000,
+  timeline: 60 * 1000,
 } as const;
 
 /**
@@ -172,7 +172,9 @@ export const queryKeys = {
   // Daily briefing
   dailyBriefingSettings: () => ['dailyBriefing', 'settings'] as const,
   dailyBriefingScopeOptions: () => ['dailyBriefing', 'scopeOptions'] as const,
-  dailyBriefingReports: () => ['dailyBriefing', 'reports'] as const,
   dailyBriefingReport: (reportId: string) => ['dailyBriefing', 'report', reportId] as const,
   dailyBriefingSources: (reportId: string) => ['dailyBriefing', 'sources', reportId] as const,
+
+  // Timeline
+  timeline: () => ['timeline'] as const,
 } as const;

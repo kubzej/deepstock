@@ -36,7 +36,8 @@ import { MarketPage } from '@/components/market';
 import { AlertsPage } from '@/components/alerts';
 import { FeedPage } from '@/components/feed/FeedPage';
 import { JournalPage } from '@/components/journal/JournalPage';
-import { DailyBriefingPage } from '@/components/daily-briefing';
+import { DailyBriefingDetailPage } from '@/components/daily-briefing';
+import { TimelinePage } from '@/components/timeline';
 import { NotFoundPage } from '@/components/shared/NotFoundPage';
 
 // Root component — auth gate + providers + global modals
@@ -175,16 +176,16 @@ const journalRoute = createRoute({
   component: JournalPage,
 });
 
-const dailyBriefingRoute = createRoute({
+const timelineRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/daily-briefing',
-  component: DailyBriefingPage,
+  path: '/timeline',
+  component: TimelinePage,
 });
 
-const dailyBriefingDetailRoute = createRoute({
+const timelineBriefingDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/daily-briefing/$reportId',
-  component: DailyBriefingPage,
+  path: '/timeline/briefing/$reportId',
+  component: DailyBriefingDetailPage,
 });
 
 const settingsRoute = createRoute({
@@ -266,8 +267,8 @@ const routeTree = rootRoute.addChildren([
   feedRoute,
   researchRoute,
   journalRoute,
-  dailyBriefingRoute,
-  dailyBriefingDetailRoute,
+  timelineRoute,
+  timelineBriefingDetailRoute,
   settingsRoute,
   settingsAppearanceRoute,
   settingsPortfoliosRoute,

@@ -1,6 +1,4 @@
-import logging
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.auth import get_current_user_id
 from app.schemas.daily_news import (
@@ -9,14 +7,10 @@ from app.schemas.daily_news import (
     DailyBriefingSettings,
     DailyBriefingSettingsUpdate,
     DailyNewsReport,
-    DailyNewsReportList,
     DailyNewsSourceList,
-    GenerateDailyBriefingResponse,
 )
 from app.services.daily_news import daily_news_service
 from app.services.daily_news_settings import daily_news_settings_service
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -54,19 +48,6 @@ async def update_daily_briefing_scope(
     return await daily_news_settings_service.get_scope_options(user_id)
 
 
-@router.get("/reports", response_model=DailyNewsReportList)
-async def list_daily_news_reports(
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    user_id: str = Depends(get_current_user_id),
-):
-    return {
-        "reports": await daily_news_service.list_reports(user_id, limit=limit, offset=offset),
-        "limit": limit,
-        "offset": offset,
-    }
-
-
 @router.get("/reports/{report_id}", response_model=DailyNewsReport)
 async def get_daily_news_report(
     report_id: str,
@@ -88,25 +69,3 @@ async def get_daily_news_sources(
     except ValueError:
         raise HTTPException(status_code=404, detail="Report nenalezen")
 
-
-@router.post("/generate", response_model=GenerateDailyBriefingResponse)
-async def generate_daily_news_report(
-    background_tasks: BackgroundTasks,
-    force: bool = Query(False),
-    user_id: str = Depends(get_current_user_id),
-):
-    try:
-        report = await daily_news_service.start_manual_report(user_id, force=force)
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-
-    if report["status"] == "running":
-        background_tasks.add_task(
-            daily_news_service.run_for_user,
-            user_id,
-            trigger_type="manual",
-            force=True,
-            report_id=report["id"],
-        )
-
-    return {"report_id": report["id"], "status": report["status"]}

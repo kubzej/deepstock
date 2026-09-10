@@ -2,11 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 import {
   fetchDailyBriefingReport,
-  fetchDailyBriefingReports,
   fetchDailyBriefingScopeOptions,
   fetchDailyBriefingSettings,
   fetchDailyBriefingSources,
-  generateDailyBriefing,
   updateDailyBriefingScope,
   updateDailyBriefingSettings,
   type DailyBriefingScopeItem,
@@ -52,14 +50,6 @@ export function useUpdateDailyBriefingScope() {
   });
 }
 
-export function useDailyBriefingReports(limit = 100) {
-  return useQuery({
-    queryKey: queryKeys.dailyBriefingReports(),
-    queryFn: () => fetchDailyBriefingReports(limit),
-    staleTime: STALE_TIMES.dailyBriefingReports,
-  });
-}
-
 export function useDailyBriefingReport(reportId: string) {
   return useQuery({
     queryKey: queryKeys.dailyBriefingReport(reportId),
@@ -75,20 +65,5 @@ export function useDailyBriefingSources(reportId: string, status?: DailyNewsRepo
     queryKey: queryKeys.dailyBriefingSources(reportId),
     queryFn: () => fetchDailyBriefingSources(reportId),
     enabled: !!reportId && !!status && status !== 'running',
-  });
-}
-
-export function useGenerateDailyBriefing() {
-  const queryClient = useQueryClient();
-  return useMutation<
-    { report_id: string; status: DailyNewsReportStatus },
-    Error,
-    boolean
-  >({
-    mutationFn: (force) => generateDailyBriefing(force),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingReports() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingReport(data.report_id) });
-    },
   });
 }
