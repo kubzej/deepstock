@@ -433,9 +433,15 @@ export async function fetchAvailableLots(
 
 // ============ Transaction Endpoints ============
 
-export async function fetchTransactions(portfolioId: string, limit: number = 50): Promise<Transaction[]> {
+export async function fetchTransactions(
+  portfolioId: string,
+  limit: number = 50,
+  ticker?: string,
+): Promise<Transaction[]> {
   const authHeader = await getAuthHeader();
-  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/transactions?limit=${limit}`, {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (ticker) params.set('ticker', ticker);
+  const response = await fetch(`${API_URL}/api/portfolio/${portfolioId}/transactions?${params}`, {
     headers: {
       'Content-Type': 'application/json',
       ...authHeader,
@@ -517,9 +523,11 @@ function mapRawTransaction(
   };
 }
 
-export async function fetchAllTransactions(limit: number = 1000): Promise<Transaction[]> {
+export async function fetchAllTransactions(limit: number = 1000, ticker?: string): Promise<Transaction[]> {
   const authHeader = await getAuthHeader();
-  const response = await fetch(`${API_URL}/api/portfolio/all/transactions?limit=${limit}`, {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (ticker) params.set('ticker', ticker);
+  const response = await fetch(`${API_URL}/api/portfolio/all/transactions?${params}`, {
     headers: { 'Content-Type': 'application/json', ...authHeader },
   });
   if (!response.ok) {

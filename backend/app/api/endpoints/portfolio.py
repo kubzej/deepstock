@@ -34,12 +34,13 @@ async def get_all_transactions(
     user_id: str = Depends(get_current_user_id),
     limit: int = 100,
     cursor: Optional[str] = None,
+    ticker: Optional[str] = None,
 ):
     """
     Get transactions across all user's portfolios, newest first.
     Pass cursor (ISO datetime from previous response's next_cursor) to load older pages.
     """
-    return await portfolio_service.get_all_transactions(user_id, limit, cursor)
+    return await portfolio_service.get_all_transactions(user_id, limit, cursor, ticker)
 
 
 @router.get("/all/open-lots")
@@ -97,11 +98,16 @@ async def get_holdings(portfolio_id: str, user_id: str = Depends(get_current_use
 
 
 @router.get("/{portfolio_id}/transactions")
-async def get_transactions(portfolio_id: str, limit: int = 50, user_id: str = Depends(get_current_user_id)):
+async def get_transactions(
+    portfolio_id: str,
+    limit: int = 50,
+    ticker: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id),
+):
     """Get recent transactions for a portfolio."""
     if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
         raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
-    return await portfolio_service.get_transactions(portfolio_id, limit)
+    return await portfolio_service.get_transactions(portfolio_id, limit, stock_ticker=ticker)
 
 
 @router.post("/{portfolio_id}/transactions")

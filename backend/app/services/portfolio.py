@@ -323,7 +323,11 @@ class PortfolioService:
         return response.data
     
     async def get_all_transactions(
-        self, user_id: str, limit: int = 100, cursor: Optional[str] = None
+        self,
+        user_id: str,
+        limit: int = 100,
+        cursor: Optional[str] = None,
+        stock_ticker: Optional[str] = None,
     ) -> dict:
         """
         Get transactions across all user's portfolios.
@@ -349,6 +353,15 @@ class PortfolioService:
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares), portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
             .order("executed_at", desc=True)
+
+        if stock_ticker:
+            stock_response = supabase.table("stocks") \
+                .select("id") \
+                .eq("ticker", stock_ticker.upper()) \
+                .execute()
+            if not stock_response.data:
+                return {"data": [], "next_cursor": None, "has_more": False}
+            query = query.eq("stock_id", stock_response.data[0]["id"])
 
         if cursor:
             query = query.lt("executed_at", cursor)
@@ -418,8 +431,23 @@ class PortfolioService:
 
         return open_lots
 
-    async def get_transactions(self, portfolio_id: str, limit: int = 50, stock_id: str = None) -> List[dict]:
+    async def get_transactions(
+        self,
+        portfolio_id: str,
+        limit: int = 50,
+        stock_id: str = None,
+        stock_ticker: Optional[str] = None,
+    ) -> List[dict]:
         """Get recent transactions for a portfolio, optionally filtered by stock."""
+        if stock_ticker and not stock_id:
+            stock_response = supabase.table("stocks") \
+                .select("id") \
+                .eq("ticker", stock_ticker.upper()) \
+                .execute()
+            if not stock_response.data:
+                return []
+            stock_id = stock_response.data[0]["id"]
+
         # Include source_transaction for SELL transactions (to show lot info and P/L)
         query = supabase.table("transactions") \
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \

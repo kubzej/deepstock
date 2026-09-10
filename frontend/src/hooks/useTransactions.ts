@@ -12,14 +12,16 @@ import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
 /**
  * Hook for fetching transactions for a specific portfolio.
  */
-export function useTransactions(portfolioId: string | null, limit = 100) {
+export function useTransactions(portfolioId: string | null, limit = 100, ticker?: string) {
+  const baseQueryKey = portfolioId
+    ? queryKeys.transactions(portfolioId)
+    : queryKeys.allTransactions();
+
   return useQuery({
-    queryKey: portfolioId 
-      ? queryKeys.transactions(portfolioId) 
-      : queryKeys.allTransactions(),
+    queryKey: ticker ? [...baseQueryKey, ticker] : baseQueryKey,
     queryFn: () => portfolioId 
-      ? fetchTransactions(portfolioId, limit) 
-      : fetchAllTransactions(limit),
+      ? fetchTransactions(portfolioId, limit, ticker)
+      : fetchAllTransactions(limit, ticker),
     enabled: portfolioId !== undefined,
     staleTime: STALE_TIMES.transactions,
   });
@@ -33,12 +35,11 @@ export function useTickerTransactions(
   ticker: string,
   isAllPortfolios = false
 ) {
-  const { data: allTransactions, ...rest } = useTransactions(
-    isAllPortfolios ? null : portfolioId
+  const { data: transactions = [], ...rest } = useTransactions(
+    isAllPortfolios ? null : portfolioId,
+    100,
+    ticker,
   );
-
-  // Filter by ticker client-side
-  const transactions = allTransactions?.filter((t) => t.ticker === ticker) ?? [];
 
   return { data: transactions, ...rest };
 }
