@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.core.redis import close_redis_pool
+from app.core.supabase import close_supabase_client
 from app.jobs import scheduled
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ async def run_job(job_name: str) -> dict[str, Any]:
         return await handler()
     finally:
         await close_redis_pool()
+        close_supabase_client()
 
 
 def _build_parser() -> argparse.ArgumentParser:

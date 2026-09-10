@@ -4,12 +4,14 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
+from importlib.metadata import version
 import os
 import logging
 import yfinance as yf
 from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, ai_stock_metadata, mcp, feed, journal, daily_news, timeline
 from app.core.redis import close_redis_pool
 from app.core.rate_limit import limiter
+from app.core.supabase import close_supabase_client
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -20,10 +22,17 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events."""
     # Startup
-    logger.info("Starting DeepStock API with yfinance %s", yf.__version__)
+    logger.info(
+        "Starting DeepStock API with yfinance %s, supabase %s, httpx %s "
+        "(Supabase HTTP/2 disabled)",
+        yf.__version__,
+        version("supabase"),
+        version("httpx"),
+    )
     yield
-    # Shutdown - close Redis connection pool
+    # Shutdown - close shared connection pools
     await close_redis_pool()
+    close_supabase_client()
 
 
 app = FastAPI(title="DeepStock API", lifespan=lifespan)

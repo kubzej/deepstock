@@ -77,14 +77,14 @@ async def test_get_due_tickers_treats_null_earnings_date_as_due(monkeypatch):
                             {
                                 "ticker": "AMZN",
                                 "earnings_calendar": {
-                                    "earnings_date": None,
+                                    "earnings_timestamp": None,
                                     "last_checked_at": last_checked,
                                 },
                             },
                             {
                                 "ticker": "MSFT",
                                 "earnings_calendar": {
-                                    "earnings_date": "2026-05-14",
+                                    "earnings_timestamp": "2026-05-14T12:00:00+00:00",
                                     "last_checked_at": last_checked,
                                 },
                             },
@@ -126,14 +126,14 @@ async def test_get_due_tickers_treats_23h_old_cache_as_stale(monkeypatch):
                             {
                                 "ticker": "AAPL",
                                 "earnings_calendar": {
-                                    "earnings_date": "2026-07-23",
+                                    "earnings_timestamp": "2026-07-23T12:00:00+00:00",
                                     "last_checked_at": stale_checked,
                                 },
                             },
                             {
                                 "ticker": "MSFT",
                                 "earnings_calendar": {
-                                    "earnings_date": "2026-07-24",
+                                    "earnings_timestamp": "2026-07-24T12:00:00+00:00",
                                     "last_checked_at": fresh_checked,
                                 },
                             },
