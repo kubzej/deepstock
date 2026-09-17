@@ -201,6 +201,13 @@ Returns:
 - `watchlist_context`: matching watchlist items
 - `market_context`: market fundamentals, valuation, smart analysis, and compact technical summary
 
+`market_context.valuation` contains one `composite`, the standalone `models`
+that feed it, and `normalization` metadata describing the behavior profile
+(`secular_grower`, `cyclical`, or `stable`) and any EPS, EBITDA, FCF or growth
+adjustments. Every model states whether it was included, its confidence weight,
+formula inputs and any outlier-exclusion reason. Analyst consensus remains one
+control model and does not create a second valuation result.
+
 Important:
 
 - This is a summary payload, not a full journal dump
@@ -551,7 +558,11 @@ Valid indicators:
   "market_context": {
     "fundamentals": {},
     "historical_financials": {},
-    "valuation": {},
+    "valuation": {
+      "composite": {},
+      "models": [],
+      "normalization": {"notes": [], "details": {}}
+    },
     "smart_analysis": {},
     "technicals": {
       "summary": {}
@@ -682,6 +693,7 @@ Followed by zero or more `ImageContent` blocks (base64-encoded) for any images e
 - `journal_context.notes[]` and archive `notes[]` are previews, not full note content
 - `journal_context.reports[]` and archive `reports[]` are previews, not full report content
 - `smart_analysis.valuation_label.tone` is semantic output for AI use, not a frontend class name
+- `smart_analysis.valuation_signal` uses the single primary `market_context.valuation.composite.signal`
 - `position_summary.total_cost` is the open-position cost basis in the instrument currency
 - `*_context` tools are summary-first; `*_activity` tools are the transaction drilldowns
 - `get_portfolio_activity` and `get_ticker_activity` both support `period`, `from_date`, `to_date`, `limit`, and `cursor`

@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   Shield,
+  SlidersHorizontal,
+  CircleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -139,12 +141,9 @@ function CompositeCard({
             <UpsideBar upside={composite.upside} />
           </div>
           <span className="text-xs text-muted-foreground sm:text-right">
-            {composite.modelsUsed}{' '}
-            {composite.modelsUsed === 1
-              ? 'model'
-              : composite.modelsUsed < 5
-                ? 'modely'
-                : 'modelů'}
+            {composite.modelsAvailable && composite.modelsAvailable > composite.modelsUsed
+              ? `${composite.modelsUsed} z ${composite.modelsAvailable} modelů započteno`
+              : `${composite.modelsUsed} ${composite.modelsUsed === 1 ? 'model' : composite.modelsUsed < 5 ? 'modely' : 'modelů'}`}
           </span>
         </div>
       )}
@@ -201,7 +200,10 @@ function ModelRow({
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full rounded px-1 py-3 text-left transition-colors hover:bg-muted/20"
+        aria-expanded={expanded}
+        className={`w-full rounded-md px-2 py-3 text-left transition-colors ${
+          expanded ? 'bg-muted/35' : 'hover:bg-muted/20'
+        }`}
       >
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
           <div className="flex min-w-0 items-start justify-between gap-3 md:flex-1 md:items-center">
@@ -213,6 +215,11 @@ function ModelRow({
                 >
                   {horizonBadge.label}
                 </span>
+                {model.includedInComposite === false && (
+                  <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                    nezapočteno
+                  </span>
+                )}
               </div>
             </div>
 
@@ -252,23 +259,59 @@ function ModelRow({
       </button>
 
       {expanded && (
-        <div className="pb-2 pl-1 space-y-1.5">
+        <div className="mx-2 mb-4 space-y-3 px-1 py-3 text-xs leading-relaxed">
+          <p className="font-medium text-foreground/90">{model.description}</p>
           {model.tooltip && (
-            <p className="text-xs text-muted-foreground/80 italic">
-              {model.tooltip}
-            </p>
+            <p className="max-w-5xl text-muted-foreground">{model.tooltip}</p>
           )}
-          <p className="text-xs text-muted-foreground">{model.description}</p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
             {Object.entries(model.inputs).map(([key, val]) => {
               if (val === null || val === undefined) return null;
               return (
-                <span key={key} className="font-mono-price">
-                  {formatInputLabel(key)}: {formatInputValue(val)}
+                <span key={key} className="whitespace-nowrap">
+                  <span className="text-muted-foreground">{formatInputLabel(key)}</span>{' '}
+                  <span className="font-mono-price text-foreground/90">
+                    {formatInputValue(key, val)}
+                  </span>
                 </span>
               );
             })}
+            <span className="whitespace-nowrap">
+              <span className="text-muted-foreground">Spolehlivost</span>{' '}
+              <span className="text-foreground/90">{conf.label}</span>
+            </span>
+            {model.includedInComposite !== false && model.compositeWeight != null && (
+              <span className="whitespace-nowrap">
+                <span className="text-muted-foreground">Váha</span>{' '}
+                <span className="font-mono-price text-foreground/90">{model.compositeWeight}×</span>
+              </span>
+            )}
           </div>
+
+          {model.normalizationNotes && model.normalizationNotes.length > 0 && (
+            <div className="flex items-start gap-2 text-muted-foreground">
+              <SlidersHorizontal className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div>
+                <span className="font-medium text-foreground/90">Úprava vstupů: </span>
+                {model.normalizationNotes.join(' ')}
+              </div>
+            </div>
+          )}
+
+          {model.compositeExclusionReason && (
+            <div className="flex items-start gap-2 text-muted-foreground">
+              <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+              <div>
+                <span className="font-medium text-warning">Nezapočteno: </span>
+                {model.compositeExclusionReason}
+              </div>
+            </div>
+          )}
+
+          {model.compositeWeightReason && (
+            <p className="text-muted-foreground">{model.compositeWeightReason}</p>
+          )}
         </div>
       )}
     </div>
@@ -292,10 +335,15 @@ const INPUT_LABELS: Record<string, string> = {
   numAnalysts: 'Analytiků',
   recommendation: 'Doporučení',
   bookValue: 'Účetní hodnota',
+  bookValuePerShare: 'Účetní hodnota / akcie',
+  currentPB: 'Aktuální P/B',
+  sectorFairPB: 'Sektorové P/B',
+  sectorPBRange: 'Sektorové pásmo P/B',
   fairPB: 'Cílový P/B',
   kvalita: 'Kvalita',
   growthPct: 'Růst zisku',
   fairPE: 'Férové P/E',
+  qualityScore: 'Skóre kvality',
   actualPEG: 'Aktuální PEG',
   dividend: 'Dividenda',
   divGrowth: 'Růst dividendy',
@@ -304,16 +352,96 @@ const INPUT_LABELS: Record<string, string> = {
   fairMultiple: 'Férový násobek',
   ebitda: 'EBITDA (mld)',
   costOfEquity: 'Náklad kapitálu',
+  historicalMultiple: '5letý průměr násobku',
+  totalDebt: 'Celkový dluh',
+  totalCash: 'Hotovost',
+  sharesOutstanding: 'Počet akcií',
+  revenue: 'Tržby',
+  normalizedEps: 'Očištěné EPS',
+  reportedEps: 'Vykázané EPS',
+  historicalMedianPE: 'Medián historického P/E',
+  usedPE: 'Použité P/E',
+  normalizedFcfPerShare: 'Očištěné FCF/akcie',
+  historicalMedianPfcf: 'Medián historického P/FCF',
+  usedPfcf: 'Použité P/FCF',
+  historicalMedianPB: 'Medián historického P/B',
+  normalizedEbitdaB: 'Očištěná EBITDA (mld.)',
+  historicalMedianEvEbitda: 'Medián EV/EBITDA',
+  historicalMedianEvRevenue: 'Medián EV/tržby',
+  observations: 'Počet období',
+  sectorPeCeiling: 'Sektorový strop P/E',
+  sectorPeFloor: 'Sektorové minimum P/E',
+  riskFreeRate: 'Bezriziková sazba',
+  equityRiskPremium: 'Akciová riziková prémie',
+  growthPeriods: 'Období forward růstu',
+  annualDividend: 'Roční dividenda',
+  expectedGrowth: 'Očekávaný růst',
+  payoutRatio: 'Výplatní poměr',
+  currentMultiple: 'Aktuální násobek',
+  targetMultiple: 'Cílový násobek',
+  netDebtB: 'Čistý dluh (mld.)',
+  costOfCapital: 'Náklad kapitálu',
+  assumption: 'Předpoklad',
+  forwardEps: 'Forward EPS',
+  rawGrowth: 'Výchozí růst EPS',
+  normalizedGrowth: 'Očištěný růst EPS',
+  targetPEG: 'Cílové PEG',
+  growthPhase: 'Fáze růstu',
+  revenueB: 'Tržby (mld.)',
 };
 
 function formatInputLabel(key: string): string {
   return INPUT_LABELS[key] ?? key;
 }
 
-function formatInputValue(val: number | string | null): string {
+const PERCENT_INPUTS = new Set([
+  'growthRate',
+  'discountRate',
+  'terminalGrowth',
+  'riskFreeRate',
+  'equityRiskPremium',
+  'expectedGrowth',
+  'rawGrowth',
+  'normalizedGrowth',
+  'costOfCapital',
+  'bondYield',
+]);
+
+const MULTIPLE_INPUTS = new Set([
+  'sectorPE',
+  'fairPE',
+  'actualPEG',
+  'fairPB',
+  'currentPB',
+  'sectorFairPB',
+  'evEbitda',
+  'fairMultiple',
+  'historicalMultiple',
+  'historicalMedianPE',
+  'usedPE',
+  'historicalMedianPfcf',
+  'usedPfcf',
+  'historicalMedianPB',
+  'historicalMedianEvEbitda',
+  'historicalMedianEvRevenue',
+  'sectorPeCeiling',
+  'sectorPeFloor',
+  'currentMultiple',
+  'targetMultiple',
+  'targetPEG',
+]);
+
+const inputNumberFormatter = new Intl.NumberFormat('cs-CZ', {
+  maximumFractionDigits: 2,
+});
+
+function formatInputValue(key: string, val: number | string | null): string {
   if (val === null) return '—';
   if (typeof val === 'number') {
-    return val % 1 === 0 ? String(val) : val.toFixed(2);
+    const formatted = inputNumberFormatter.format(val);
+    if (PERCENT_INPUTS.has(key)) return `${formatted} %`;
+    if (MULTIPLE_INPUTS.has(key)) return `${formatted}×`;
+    return formatted;
   }
   // Translate common values
   const translations: Record<string, string> = {
@@ -324,6 +452,9 @@ function formatInputValue(val: number | string | null): string {
     hold: 'Držet',
     sell: 'Prodej',
     strong_sell: 'Silný prodej',
+    growth: 'Růstová fáze',
+    turnaround: 'Přechodová fáze',
+    'Zero Growth': 'Bez růstu',
   };
   return translations[val] ?? val;
 }
@@ -402,7 +533,7 @@ export function ValuationSection({ data }: { data: StockInfo }) {
         {/* Model rows */}
         {sortedModels.map((model) => (
           <ModelRow
-            key={model.method}
+            key={model.modelId ?? model.method}
             model={model}
             currency={valuation.currency}
           />

@@ -32,6 +32,7 @@ import {
 } from '@/lib/format';
 import { getMarketStatus } from '@/lib/marketHours';
 import { withStockDetailBack } from '@/lib/stockDetailNavigation';
+import { getYahooFinanceUrl } from '@/lib/utils';
 
 export interface Holding {
   ticker: string;
@@ -450,7 +451,15 @@ export function HoldingsTable({
                         </button>
                       )}
                       <div>
-                        <span className="font-bold">{holding.ticker}</span>
+                        <a
+                          href={getYahooFinanceUrl(holding.ticker)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-bold underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                        >
+                          {holding.ticker}
+                        </a>
                         {isExpandable && (
                           <span className="ml-1.5 text-xs text-muted-foreground">
                             ({holding.portfolioCount})

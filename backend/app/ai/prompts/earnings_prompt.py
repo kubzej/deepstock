@@ -71,12 +71,13 @@ def build_user_prompt(
     earnings_context: str,
     fundamentals_context: str,
     search_context: str,
+    currency: str = "USD",
     journal_context: str = "",
 ) -> str:
     return f"""Připrav hloubkový earnings rozbor pro akcii {ticker} ({company_name}) po
 posledním čtvrtletním reportu.
 
-**Aktuální cena:** {current_price} USD
+**Aktuální cena:** {current_price} {currency}
 **Datum analýzy:** {date}
 
 ---

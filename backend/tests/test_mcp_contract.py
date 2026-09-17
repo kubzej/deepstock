@@ -21,6 +21,7 @@ from app.schemas.mcp import (
     WatchlistItemsResponse,
     WatchlistListResponse,
 )
+from app.services.research_context_market import MarketContextService
 
 
 def test_daily_briefing_contracts_accept_report_and_source_payloads():
@@ -142,7 +143,26 @@ def test_stock_context_contract_accepts_summary_shape():
         "market_context": {
             "fundamentals": {"price": 115.0, "market_cap": 1000000},
             "historical_financials": {"years": []},
-            "valuation": {"composite": {"signal": "fair"}},
+            "valuation": {
+                "composite": {"signal": "fair"},
+                "models": [{
+                    "modelId": "sector_pe",
+                    "method": "P/E sektorový",
+                    "fairValue": 120,
+                    "upside": 4.3,
+                    "inputs": {"eps": 10, "fairPE": 12},
+                    "confidence": "medium",
+                    "horizon": "short",
+                    "horizonLabel": "6-18 měsíců",
+                    "includedInComposite": True,
+                    "compositeWeight": 2,
+                }],
+                "normalization": {
+                    "profile": "stable",
+                    "notes": [],
+                    "details": {"eps": {"normalized": 10}},
+                },
+            },
             "smart_analysis": {
                 "verdict": "watch",
                 "valuation_signal": "fair",
@@ -172,6 +192,24 @@ def test_stock_context_contract_accepts_summary_shape():
     assert model.ticker == "NVDA"
     assert model.journal_context.note_count == 2
     assert model.activity_context.position_summary.has_position is True
+    assert model.market_context.valuation.models[0].modelId == "sector_pe"
+    assert model.market_context.valuation.normalization.details["eps"]["normalized"] == 10
+
+
+def test_smart_analysis_keeps_composite_as_primary_signal():
+    service = MarketContextService()
+    result = service.build_smart_analysis(
+        {
+            "price": 100,
+            "insights": [],
+            "valuation": {
+                "composite": {"signal": "overvalued"},
+            },
+        }
+    )
+
+    assert result["valuation_signal"] == "overvalued"
+    assert result["valuation_label"]["text"] == "Nadhodnocená"
 
 
 def test_watchlist_contracts_accept_summary_and_item_payloads():

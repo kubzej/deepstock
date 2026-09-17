@@ -62,7 +62,7 @@ def build_user_prompt(
 ) -> str:
     return f"""Vypracuj komplexní investiční analýzu společnosti {company_name} ({ticker}).
 
-**Aktuální cena:** {current_price} USD
+**Aktuální cena:** {current_price} (měna je uvedena ve FUNDAMENTÁLNÍCH DATECH)
 **Datum analýzy:** {date}
 
 ---
@@ -105,6 +105,12 @@ Pojmenuj, zda jde o rostoucí, stagnující nebo cyklický trh, a jaká je aktu�
 V čem se společnost odlišuje od konkurence a co ji chrání? Porovnej ji s klíčovými konkurenty
 byznysově i valuačně (P/E, EV/EBITDA, marže), pokud jsou data dostupná. Je prémiové nebo
 diskontní ocenění oprávněné? Kde má firma navrch a kde zaostává?
+
+Systémový kompozit je hlavní interní výsledek. Vysvětli, z jakých samostatných metod vznikl,
+jaké očištěné vstupy použily a které metody byly kvůli extrémnímu výsledku z kompozitu
+explicitně vyřazeny. Analytický target ber jako jeden kontrolní pohled, nikoli jako důkaz
+férové hodnoty. Pokud se metody výrazně rozcházejí, popiš konkrétní příčinu ve vstupních
+datech nebo předpokladech; nevytvářej z rozptylu umělá cenová pásma.
 
 **3. CEO a vedení společnosti**
 Toto je pro investora klíčová sekce — cílem je posoudit, zda lze CEO důvěřovat.

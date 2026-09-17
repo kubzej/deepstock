@@ -9,6 +9,11 @@ from typing import List, Optional
 from app.core.cache import CacheTTL
 from app.core.taxonomy import SECTOR_KEYS
 from app.services.market.financials import get_historical_financials
+from app.services.market.valuation_engine import (
+    build_historical_models,
+    calculate_robust_composite,
+    prepare_valuation_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1028,30 +1033,17 @@ def _graham_valuation(data: dict) -> Optional[dict]:
     Ref: https://www.grahamvalue.com/article/understanding-benjamin-graham-formula-correctly
     """
     eps = data.get("eps")
-    forward_eps = data.get("forwardEps")
     price = data.get("price")
-    earnings_growth = data.get("earningsGrowth") # YoY growth (volatile)
     
     # 1. Negative or zero earnings - formula invalid
     if not eps or eps <= 0 or not price:
         return None
         
-    # 2. Determine Growth Rate (g)
-    # Ideally we want long-term expected growth.
-    # yfinance 'earningsGrowth' is usually quarterly YoY, which is too volatile for this formula.
-    # We prefer implied growth from Forward EPS vs Trailing EPS as a smoother proxy.
-    growth = None
-    
-    if forward_eps and forward_eps > eps:
-        # Implied growth for next year
-        growth_decimal = (forward_eps / eps) - 1
-        growth = growth_decimal * 100
-    elif earnings_growth is not None and earnings_growth > 0:
-        # Fallback to YoY growth if forward not available
-        growth = earnings_growth * 100
-    else:
-        # Conservative fallback for profitable companies with missing growth data
-        growth = 3.0 
+    # Growth is prepared once by valuation_engine and shared by all models.
+    normalized_growth = ((data.get("_valuationNormalization") or {}).get("growth"))
+    if normalized_growth is None:
+        return None
+    growth = normalized_growth * 100
     
     # Cap growth at 15% - Graham warned against projecting high growth rates
     # for value investing. 15% is already very optimistic for 7-10y period.
@@ -1142,8 +1134,6 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
     fcf = data.get("freeCashflow")
     shares = data.get("sharesOutstanding")
     price = data.get("price")
-    revenue_growth = data.get("revenueGrowth")
-    earnings_growth = data.get("earningsGrowth")
     beta = data.get("beta")
     
     # 2. Basic Data Validity
@@ -1153,36 +1143,10 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
     fcf_per_share = fcf / shares
     
     # 3. Growth Assumptions
-    # Growth estimate logic - needs to reflect the business reality
-    # 
-    # Problem: Companies like Amazon have low "earnings growth" (5%) but high "revenue growth" (13%)
-    # because they reinvest profits into expansion. Using earnings growth would undervalue them.
-    #
-    # Solution: For growth-oriented sectors, prefer the HIGHER of the two growth rates.
-    # For mature/value sectors, prefer earnings growth as it's more sustainable.
-    
-    growth_sectors = ["Technology", "Consumer Cyclical", "Communication Services", "Healthcare"]
-    
-    earnings_g = earnings_growth if earnings_growth and earnings_growth > 0 else None
-    revenue_g = revenue_growth if revenue_growth and revenue_growth > 0 else None
-    
-    growth = None
-    
-    if sector in growth_sectors:
-        # For growth sectors: use the higher of the two (reinvestment story)
-        if earnings_g and revenue_g:
-            growth = max(earnings_g, revenue_g)
-        else:
-            growth = earnings_g or revenue_g
-    else:
-        # For value/mature sectors: prefer earnings (more sustainable)
-        if earnings_g:
-            growth = earnings_g
-        elif revenue_g:
-            growth = revenue_g
-    
+    # The shared normalized growth input is used by every growth-sensitive model.
+    growth = (data.get("_valuationNormalization") or {}).get("growth")
     if growth is None:
-        growth = 0.05  # Default fallback assumption
+        return None
         
     # Cap overly optimistic growth rates
     # Even best companies rarely sustain >20% FCF growth for 5y + terminal
@@ -1191,14 +1155,12 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
     # Floor at 0 (simplified DCF doesn't handle shrinking firms well for this UI)
     growth = max(growth, 0)
     
-    # 4. Discount Rate (r) needs to reflect risk
-    # Standard: 10% (historical market return)
-    # Adjusted: If beta is high, increase discount rate
-    discount_rate = 0.10
-    if beta and beta > 1.2:
-        discount_rate = 0.12 # Higher risk = higher discount
-    if beta and beta < 0.8:
-        discount_rate = 0.08 # Defensive = lower discount
+    # 4. Smooth CAPM-style cost of equity instead of three abrupt buckets.
+    # Central assumptions stay explicit until a shared macro-rate source exists.
+    risk_free_rate = 0.045
+    equity_risk_premium = 0.05
+    effective_beta = beta if beta and beta > 0 else 1.0
+    discount_rate = min(max(risk_free_rate + effective_beta * equity_risk_premium, 0.08), 0.14)
         
     terminal_growth = 0.03  # Long term GDP growth proxy
     projection_years = 5
@@ -1243,7 +1205,7 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
         
     return {
         "method": "DCF (Diskontované CF)",
-        "description": f"Projekce FCF na {projection_years} let + terminální hodnota. Diskont {int(discount_rate*100)}%.",
+        "description": f"Projekce FCF na {projection_years} let + terminální hodnota. Diskont {discount_rate*100:.1f}%.",
         "tooltip": "Zlatý standard valuace. Počítá současnou hodnotu všech budoucích volných peněz, které firma vydělá. Nevhodné pro banky a pojišťovny.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
@@ -1251,6 +1213,8 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
             "fcfPerShare": round(fcf_per_share, 2),
             "growthRate": round(growth * 100, 1),
             "discountRate": round(discount_rate * 100, 1),
+            "riskFreeRate": round(risk_free_rate * 100, 1),
+            "equityRiskPremium": round(equity_risk_premium * 100, 1),
             "terminalGrowth": round(terminal_growth * 100, 1),
         },
         "confidence": confidence,
@@ -1261,7 +1225,7 @@ def _dcf_valuation(data: dict) -> Optional[dict]:
 
 def _pe_based_valuation(data: dict) -> Optional[dict]:
     """
-    Fair value based on sector P/E range applied to forward EPS.
+    Fair value based on sector P/E range applied to the shared normalized EPS.
     
     Logic:
     1. Identify Sector (Tech, Finance, Energy...).
@@ -1269,11 +1233,10 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
     3. Calculate 'Quality Score' (0.0 to 1.0) for the company based on:
        - ROE, Margins, Growth, Debt.
     4. Interpolate Fair P/E: Low + Score * (High - Low).
-    5. Fair Value = Fair P/E * Forward EPS.
+    5. Fair Value = Fair P/E * normalized EPS.
     
     Ref: https://corporatefinanceinstitute.com/resources/valuation/price-earnings-ratio/
     """
-    forward_eps = data.get("forwardEps")
     eps = data.get("eps")
     price = data.get("price")
     sector = data.get("sector")
@@ -1284,9 +1247,9 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
     if sector == "Real Estate":
         return None
         
-    # Use forward EPS if available (markets look forward), otherwise trailing
-    used_eps = forward_eps if forward_eps and forward_eps > 0 else eps
-    
+    # Use the same normalized EPS base as the other earnings-based models.
+    used_eps = eps
+
     if not used_eps or used_eps <= 0 or not price:
         return None
     
@@ -1306,7 +1269,7 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
         # Net Margin > 10% is solid, > 20% is strong moat
         scores.append(min(max(profit_margin / 0.20, 0), 1.0))
     
-    revenue_growth = data.get("revenueGrowth")
+    revenue_growth = ((data.get("_valuationNormalization") or {}).get("growth"))
     if revenue_growth is not None:
         # Growth drives P/E expansion
         scores.append(min(max(revenue_growth / 0.20, 0), 1.0))
@@ -1332,8 +1295,6 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
         return None
     
     upside = ((fair_value / price) - 1) * 100
-    eps_type = "Forward" if forward_eps and forward_eps > 0 else "Trailing"
-    
     # Confidence
     confidence = "medium"
     if len(scores) < 3: 
@@ -1341,7 +1302,7 @@ def _pe_based_valuation(data: dict) -> Optional[dict]:
     
     return {
         "method": "P/E sektorový",
-        "description": f"Férové P/E {fair_pe}× (sektor {benchmark['low']}–{benchmark['high']}, kvalita {int(quality*100)}%) × {eps_type} EPS",
+        "description": f"Normalizované EPS {used_eps:.2f} × férové P/E {fair_pe}× (sektor {benchmark['low']}–{benchmark['high']}, kvalita {int(quality*100)}%).",
         "tooltip": "Srovnává firmu s typickými násobky v jejím sektoru. 'Lepší' firmy (vyšší ROE, marže, růst) si zaslouží ocenění na horní hraně sektoru, průměrné uprostřed. Nevhodné pro REITs (používají FFO).",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
@@ -1529,7 +1490,6 @@ def _ddm_valuation(data: dict) -> Optional[dict]:
     """
     dividend = data.get("dividendRate")  # annual dividend per share
     payout_ratio = data.get("payoutRatio")
-    earnings_growth = data.get("earningsGrowth")
     beta = data.get("beta")
     sector = data.get("sector")
     price = data.get("price")
@@ -1550,11 +1510,10 @@ def _ddm_valuation(data: dict) -> Optional[dict]:
 
     # 2. Dividend Growth Estimate (g)
     # Conservative cap. Companies rarely grow dividend > 6% perpetuity.
-    if earnings_growth and earnings_growth > 0:
-        div_growth = min(earnings_growth, 0.06)
-    else:
-        # If no growth info, assume inflation-matching growth for payers
-        div_growth = 0.025 
+    normalized_growth = ((data.get("_valuationNormalization") or {}).get("growth"))
+    if normalized_growth is None:
+        return None
+    div_growth = min(normalized_growth, 0.06)
 
     # 3. Cost of Equity (r) via CAPM
     # r = RiskFree + Beta * EquityRiskPremium
@@ -1650,7 +1609,7 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
     price = data.get("price")
     sector = data.get("sector")
 
-    if not ev_ebitda or ev_ebitda <= 0 or not enterprise_value or not shares or not price:
+    if not shares or not price:
         return None
 
     # 1. Applicability Check
@@ -1678,12 +1637,26 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
     if not benchmarks:
         benchmarks = {"low": 10, "mid": 14, "high": 18}
 
-    # 2. Derive implied Metrics
-    # We back-calculate EBITDA to be consistent with the provided EV and Ratio
-    ebitda = enterprise_value / ev_ebitda
+    # 2. Use the shared reported/normalized EBITDA and balance-sheet debt.
+    ebitda = data.get("ebitda")
+    if not ebitda or ebitda <= 0:
+        return None
 
-    market_cap = price * shares
-    net_debt = enterprise_value - market_cap
+    total_debt = data.get("totalDebt")
+    total_cash = data.get("totalCash")
+    if total_debt is not None or total_cash is not None:
+        net_debt = (total_debt or 0) - (total_cash or 0)
+    elif enterprise_value:
+        market_cap = price * shares
+        net_debt = enterprise_value - market_cap
+    else:
+        return None
+
+    current_multiple = (
+        enterprise_value / ebitda
+        if enterprise_value and ebitda > 0
+        else ev_ebitda
+    )
     
     # 3. Calculate Fair Value
     # Using 'mid' benchmark as baseline fair value
@@ -1712,22 +1685,22 @@ def _ev_ebitda_valuation(data: dict) -> Optional[dict]:
     
     # If current multiple is widely outlier from sector, confidence drops
     # e.g. Sector 12x, Company 40x -> Model suggests huge downside, but maybe market knows something (high growth?)
-    if ev_ebitda > benchmarks["high"] * 2:
+    if current_multiple and current_multiple > benchmarks["high"] * 2:
         confidence = "low"
         
-    if ev_ebitda < benchmarks["low"] / 2:
+    if current_multiple and current_multiple < benchmarks["low"] / 2:
         confidence = "low"
 
     return {
         "method": "EV/EBITDA",
-        "description": f"Target EV/EBITDA {fair_multiple:.0f}x (Sektor). Odvozené EBITDA ${ebitda/1e9:.1f}B.",
+        "description": f"Očištěná EBITDA ${ebitda/1e9:.1f} mld. × sektorové EV/EBITDA {fair_multiple:.0f}× − čistý dluh.",
         "tooltip": "Oceňuje firmu jako celek (včetně dluhu) oproti jejímu provoznímu zisku (EBITDA). Ideální pro průmysl, energie a utility, protože očišťuje vliv zadlužení a daní. Nevhodné pro banky.",
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
-            "currentMultiple": round(ev_ebitda, 1),
+            "currentMultiple": round(current_multiple, 1) if current_multiple else None,
             "targetMultiple": fair_multiple,
-            "impliedEbitdaB": round(ebitda / 1e9, 2),
+            "normalizedEbitdaB": round(ebitda / 1e9, 2),
             "netDebtB": round(net_debt / 1e9, 2),
         },
         "confidence": confidence,
@@ -1827,34 +1800,22 @@ def _peg_valuation(data: dict) -> Optional[dict]:
     Basically assumes Fair PEG = 1.0.
     """
     eps = data.get("eps")
-    forward_eps = data.get("forwardEps")
     price = data.get("price")
-    
-    # Growth inputs
-    earnings_growth = data.get("earningsGrowth") # TTM growth
     
     if not eps or eps <= 0 or not price:
         return None
 
-    # 1. Determine Growth Rate (g)
-    # We prioritize forward-looking estimates implied by Forward EPS vs Current EPS
-    growth_pct = None
-    
-    if forward_eps and forward_eps > eps:
-        # Implied growth for next year
-        growth_pct = ((forward_eps / eps) - 1) * 100
-    elif earnings_growth:
-         # Fallback to TTM growth if valid
-        growth_pct = earnings_growth * 100
-        
-    if growth_pct is None:
+    # 1. Use the shared normalized EPS growth.
+    normalization = data.get("_valuationNormalization") or {}
+    normalized_growth = normalization.get("epsGrowth")
+    if normalized_growth is None:
         return None
+    growth_pct = normalized_growth * 100
 
     # 2. Applicability Filters (Lynch's Rules)
-    # Rule A: Growth must be reasonable (10% - 25% is the sweet spot)
-    # Slow growers (<5%) aren't valued by PEG.
-    # Hyper growers (>40%) are too risky for linear PEG.
-    if growth_pct < 8 or growth_pct > 40:
+    # Rule A: Growth must stay in the 8-30% applicability band.
+    # Hyper growers are capped upstream; PEG is useful only in this band.
+    if growth_pct < 8 or growth_pct > 30:
         return None
 
     # Rule B: Exclude Cyclicals and Financials
@@ -1864,8 +1825,9 @@ def _peg_valuation(data: dict) -> Optional[dict]:
         return None
 
     # 3. Valuation
-    # Fair P/E = Growth Rate (PEG = 1.0)
-    fair_pe = growth_pct
+    # Fair P/E starts at PEG 1.0 but stays inside the sector range.
+    benchmark = SECTOR_PE_BENCHMARKS.get(sector, {"low": 15, "high": 25})
+    fair_pe = min(max(growth_pct, benchmark["low"]), benchmark["high"])
     fair_value = eps * fair_pe
     
     if fair_value <= 0:
@@ -1877,15 +1839,18 @@ def _peg_valuation(data: dict) -> Optional[dict]:
     confidence = "medium"
     
     # Best confidence in the sweet spot of GARP (Growth At Reasonable Price)
-    if 15 <= growth_pct <= 25:
+    growth_periods = ((normalization.get("details") or {}).get("epsGrowth") or {}).get("periods", 0)
+    if 15 <= growth_pct <= 25 and growth_periods >= 2:
         confidence = "high"
+    elif growth_periods < 2:
+        confidence = "low"
 
     return {
         "method": "PEG Model",
-        "description": f"Férové P/E {fair_pe:.1f}x = Oček. růst {growth_pct:.1f}%",
+        "description": f"Normalizované EPS ${eps:.2f} × P/E {fair_pe:.1f}×; očekávaný růst EPS {growth_pct:.1f}%.",
         "tooltip": (
             "Peter Lynch: 'Férově oceněná růstová firma má P/E rovné tempu růstu zisků.' "
-            "(tzn. PEG = 1.0). Vhodné pro firmy rostoucí 10-25 % ročně. "
+            "(tzn. PEG = 1.0). Vhodné pro firmy s očekávaným růstem EPS 8-30 % ročně. "
             "Nevhodné pro pomalé giganty nebo cyklické sektory."
         ),
         "fairValue": round(fair_value, 2),
@@ -1893,7 +1858,10 @@ def _peg_valuation(data: dict) -> Optional[dict]:
         "inputs": {
             "eps": round(eps, 2),
             "expectedGrowth": round(growth_pct, 1),
-            "targetPEG": 1.0
+            "targetPEG": 1.0,
+            "sectorPeFloor": benchmark["low"],
+            "sectorPeCeiling": benchmark["high"],
+            "growthPeriods": growth_periods,
         },
         "confidence": confidence,
         "horizon": "medium",
@@ -1920,67 +1888,41 @@ def _forward_peg_valuation(data: dict) -> Optional[dict]:
     - Standard PEG excludes Financial Services (banks trade at low PEG naturally)
     - Forward PEG INCLUDES high-growth fintech because their growth story matters
     """
-    eps = data.get("eps")
+    normalization = data.get("_valuationNormalization") or {}
+    reported_eps = (normalization.get("details") or {}).get("eps", {}).get("reported")
+    eps = normalization.get("eps") or data.get("eps")
     forward_eps = data.get("forwardEps")
     price = data.get("price")
     sector = data.get("sector", "")
-    earnings_growth = data.get("earningsGrowth")
-    
     # 1. Must be profitable (or about to be with forward EPS)
     if not forward_eps or forward_eps <= 0:
         return None
     if not price:
         return None
     
-    # 2. Calculate implied growth rate
-    # Primary: Forward EPS vs Trailing EPS
-    # Fallback: earningsGrowth from yfinance
-    growth_pct = None
-    
+    # 2. Keep the raw forward jump for transparency, but use only the shared
+    # normalized growth for the actual valuation.
+    raw_growth_pct = None
     if eps and eps > 0 and forward_eps > eps:
-        # Implied YoY growth
-        growth_pct = ((forward_eps / eps) - 1) * 100
-    elif earnings_growth and earnings_growth > 0:
-        growth_pct = earnings_growth * 100
-    
-    if growth_pct is None or growth_pct <= 0:
+        raw_growth_pct = ((forward_eps / eps) - 1) * 100
+
+    # 3. Use the shared sustainable growth proxy.
+    shared_growth = normalization.get("epsGrowth")
+    if shared_growth is None:
         return None
-    
-    # 3. Applicability: This model is for HIGH-GROWTH companies
-    # Minimum threshold: 25% growth (otherwise standard PE models are fine)
-    if growth_pct < 25:
+    normalized_growth = shared_growth * 100
+    if normalized_growth < 8 or normalized_growth > 30:
         return None
-    
-    # 4. Normalize growth rate
-    # Problem: Early-stage growth (e.g., 160% for SOFI 2024→2025) is unsustainable.
-    # Solution: Cap growth to a "believable long-term" rate.
-    #
-    # Logic:
-    # - If growth > 60%: This is transition/turnaround. Normalize to 40-45%.
-    # - If growth 40-60%: Strong growth phase. Use as-is but cap at 50%.
-    # - If growth 25-40%: GARP sweet spot. Use as-is.
-    
-    normalized_growth = growth_pct
-    growth_phase = "stable"
-    
-    if growth_pct > 80:
-        # Extreme growth (turnaround, first profitable year)
-        # Normalize heavily - this won't sustain
-        normalized_growth = 45
-        growth_phase = "turnaround"
-    elif growth_pct > 50:
-        # High growth - moderate normalization
-        normalized_growth = min(growth_pct * 0.8, 50)
-        growth_phase = "high_growth"
-    elif growth_pct > 40:
-        # Strong growth - slight cap
-        normalized_growth = min(growth_pct, 45)
-        growth_phase = "strong"
-    # else: 25-40% - use as-is
-    
-    # 5. Calculate Fair P/E using PEG = 1.0
-    # Fair P/E = Normalized Growth Rate
-    fair_pe = normalized_growth
+    growth_phase = "turnaround" if raw_growth_pct is not None and raw_growth_pct > 80 else "growth"
+
+    # 4. PEG provides the starting point, but the resulting P/E may not exceed
+    # a sensible sector ceiling. This prevents 200% EPS rebounds from silently
+    # becoming 45-50× permanent valuation multiples.
+    benchmark = SECTOR_PE_BENCHMARKS.get(sector, {"low": 15, "high": 25})
+    sector_ceiling = benchmark["high"]
+    if sector == "Financial Services" and normalized_growth >= 25:
+        sector_ceiling = 25  # fintech premium, still far below an uncapped 45×
+    fair_pe = min(max(normalized_growth, benchmark["low"]), sector_ceiling)
     
     # 6. Calculate Fair Value
     # Use FORWARD EPS (not trailing) - markets look ahead
@@ -1991,53 +1933,36 @@ def _forward_peg_valuation(data: dict) -> Optional[dict]:
     
     upside = ((fair_value / price) - 1) * 100
     
-    # 7. Calculate future target (2-3 year horizon)
-    # If we project EPS growing at normalized rate for 2 years:
-    # Target EPS (Y+2) = Forward EPS × (1 + norm_growth)²
-    # Target Price = Target EPS × fair_pe
-    # Present Value = Target Price / (1 + discount_rate)²
+    # 5. Confidence scoring
+    growth_periods = ((normalization.get("details") or {}).get("epsGrowth") or {}).get("periods", 0)
+    confidence = "medium" if growth_periods >= 2 else "low"
     
-    discount_rate = 0.12  # 12% required return
-    years_ahead = 2
-    
-    projected_eps_y2 = forward_eps * ((1 + normalized_growth / 100) ** years_ahead)
-    target_price_y2 = projected_eps_y2 * fair_pe
-    present_value_of_target = target_price_y2 / ((1 + discount_rate) ** years_ahead)
-    
-    # 8. Confidence scoring
-    confidence = "medium"
-    
-    # Higher confidence in GARP sweet spot
-    if 30 <= normalized_growth <= 45:
-        confidence = "high" if growth_phase == "stable" else "medium"
-    
-    # Lower confidence for extreme normalization
+    if growth_periods >= 2 and 20 <= normalized_growth <= 30 and (raw_growth_pct is None or raw_growth_pct <= 60):
+        confidence = "medium"
     if growth_phase == "turnaround":
         confidence = "low"
     
-    # Sector bonus: Fintech with proven growth gets medium minimum
-    if sector == "Financial Services" and growth_pct > 40:
-        confidence = max(confidence, "medium")
-    
     return {
         "method": "Forward PEG (růstový)",
-        "description": f"Forward EPS ${forward_eps:.2f} × norm. růst {normalized_growth:.0f}% (PEG 1.0)",
+        "description": f"Forward EPS ${forward_eps:.2f} × férové P/E {fair_pe:.1f}×; udržitelný růst {normalized_growth:.1f}%.",
         "tooltip": (
             "Model pro rychle rostoucí firmy (fintech, tech v přechodu do zisku). "
-            "Používá forward EPS a normalizuje extrémní růst na udržitelnou úroveň. "
-            "PEG 1.0 = růst je férově oceněn. Zahrnuje i 2letý výhled s diskontem."
+            "Používá forward EPS, společně očištěný růst a sektorový strop P/E. "
+            "Extrémní meziroční skok zisku tak není považován za trvale udržitelný."
         ),
         "fairValue": round(fair_value, 2),
         "upside": round(upside, 1),
         "inputs": {
             "forwardEps": round(forward_eps, 2),
-            "rawGrowth": round(growth_pct, 1),
+            "reportedEps": round(reported_eps, 2) if reported_eps is not None else None,
+            "normalizedEps": round(eps, 2) if eps is not None else None,
+            "rawGrowth": round(raw_growth_pct, 1) if raw_growth_pct is not None else None,
             "normalizedGrowth": round(normalized_growth, 1),
             "fairPE": round(fair_pe, 1),
             "targetPEG": 1.0,
             "growthPhase": growth_phase,
-            "target2Y": round(target_price_y2, 2),
-            "presentValue2Y": round(present_value_of_target, 2),
+            "growthPeriods": growth_periods,
+            "sectorPeCeiling": round(sector_ceiling, 1),
         },
         "confidence": confidence,
         "horizon": "short",
@@ -2045,80 +1970,58 @@ def _forward_peg_valuation(data: dict) -> Optional[dict]:
     }
 
 
-def calculate_valuation(data: dict) -> dict:
+def calculate_valuation(data: dict, historical: Optional[dict] = None) -> dict:
     """
-    Run all applicable valuation models and return composite result.
+    Normalize shared inputs, run all applicable models and return one composite.
     """
     price = data.get("price")
     if not price:
-        return {"models": [], "composite": None}
-    
-    models = []
+        return {"models": [], "composite": None, "normalization": None, "modelErrors": []}
+
+    prepared_data, normalization = prepare_valuation_data(data, historical)
+    models: list[dict] = []
+    model_errors: list[dict] = []
+    notes_by_metric = normalization.get("notesByMetric") or {}
+    model_definitions = [
+        (_graham_valuation, "graham", ("eps", "growth")),
+        (_dcf_valuation, "dcf", ("fcfPerShare", "growth")),
+        (_pe_based_valuation, "sector_pe", ("eps", "growth")),
+        (_peg_valuation, "peg", ("eps", "epsGrowth")),
+        (_forward_peg_valuation, "forward_peg", ("epsGrowth",)),
+        (_ddm_valuation, "ddm", ("growth",)),
+        (_ev_ebitda_valuation, "sector_ev_ebitda", ("ebitda",)),
+        (_epv_valuation, "epv", ("eps",)),
+        (_analyst_target_valuation, "analyst_consensus", ()),
+        (_book_value_valuation, "sector_pb", ()),
+    ]
     
     # Run each model, collect non-None results
-    for model_fn in [
-        _graham_valuation,
-        _dcf_valuation,
-        _pe_based_valuation,
-        _peg_valuation,
-        _forward_peg_valuation,
-        _ddm_valuation,
-        _ev_ebitda_valuation,
-        _epv_valuation,
-        _analyst_target_valuation,
-        _book_value_valuation,
-    ]:
+    for model_fn, model_id, model_metrics in model_definitions:
         try:
-            result = model_fn(data)
+            result = model_fn(prepared_data)
             if result:
+                result["normalizationNotes"] = [
+                    note
+                    for metric in model_metrics
+                    for note in notes_by_metric.get(metric, [])
+                ]
+                result["modelId"] = model_id
                 models.append(result)
         except Exception as e:
-            logger.warning(f"Valuation model error: {e}")
+            logger.warning("Valuation model %s failed: %s", model_fn.__name__, e)
+            model_errors.append({"modelId": model_id, "error": str(e)})
             continue
-    
-    if not models:
-        return {"models": [], "composite": None}
-    
-    # Calculate composite fair value (weighted average)
-    # Weights: high confidence = 3, medium = 2, low = 1
-    confidence_weights = {"high": 3, "medium": 2, "low": 1}
-    total_weight = 0
-    weighted_sum = 0
-    
-    for m in models:
-        w = confidence_weights.get(m["confidence"], 1)
-        weighted_sum += m["fairValue"] * w
-        total_weight += w
-    
-    composite_value = weighted_sum / total_weight if total_weight > 0 else None
-    composite_upside = ((composite_value / price) - 1) * 100 if composite_value else None
-    
-    # Determine overall signal
-    signal = "hold"
-    if composite_upside is not None:
-        if composite_upside > 20:
-            signal = "undervalued"
-        elif composite_upside > 5:
-            signal = "slightly_undervalued"
-        elif composite_upside < -20:
-            signal = "overvalued"
-        elif composite_upside < -5:
-            signal = "slightly_overvalued"
-        else:
-            signal = "fair"
-    
-    composite = {
-        "fairValue": round(composite_value, 2) if composite_value else None,
-        "upside": round(composite_upside, 1) if composite_upside is not None else None,
-        "signal": signal,
-        "modelsUsed": len(models),
-    }
-    
+
+    models.extend(build_historical_models(prepared_data, historical, SECTOR_PE_BENCHMARKS))
+    composite = calculate_robust_composite(models, float(price))
+
     return {
         "models": models,
         "composite": composite,
         "currentPrice": price,
         "currency": data.get("currency", "USD"),
+        "normalization": normalization,
+        "modelErrors": model_errors,
     }
 
 
@@ -2187,6 +2090,9 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
             "currentRatio": info.get("currentRatio"),
             "quickRatio": info.get("quickRatio"),
             "freeCashflow": info.get("freeCashflow"),
+            "ebitda": info.get("ebitda"),
+            "totalDebt": info.get("totalDebt"),
+            "totalCash": info.get("totalCash"),
             "bookValue": info.get("bookValue"),
             "sharesOutstanding": info.get("sharesOutstanding"),
             "earningsGrowth": info.get("earningsGrowth"),
@@ -2220,7 +2126,7 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         result["insights"] = generate_insights(result, historical=historical)
         
         # Calculate fair value estimates
-        result["valuation"] = calculate_valuation(result)
+        result["valuation"] = calculate_valuation(result, historical=historical)
         
         await redis.set(cache_key, json.dumps(result), ex=CacheTTL.STOCK_INFO)
         return result

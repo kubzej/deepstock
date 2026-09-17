@@ -9,6 +9,7 @@ import {
   formatShares,
   formatVolumeRatio,
 } from '@/lib/format';
+import { getYahooFinanceUrl } from '@/lib/utils';
 
 interface PortfolioHolding {
   ticker: string;
@@ -103,7 +104,15 @@ export function StockCard({
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 items-start">
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-bold text-sm">{ticker}</span>
+              <a
+                href={getYahooFinanceUrl(ticker)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-sm underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+              >
+                {ticker}
+              </a>
               {isExpandable && (
                 <span className="text-[10px] text-muted-foreground">
                   ×{portfolioCount}

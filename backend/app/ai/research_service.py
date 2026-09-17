@@ -36,18 +36,20 @@ def _format_fundamentals(stock_data: dict) -> str:
     name = stock_data.get("name", "N/A")
     sector = stock_data.get("sector", "N/A")
     industry = stock_data.get("industry", "N/A")
+    currency = stock_data.get("currency") or "USD"
 
     def pct(v): return f"{v*100:.1f}%" if v is not None else "N/A"
     def num(v, d=2): return f"{v:,.{d}f}" if v is not None else "N/A"
-    def bil(v): return f"${v/1e9:.1f}B" if v is not None else "N/A"
-    def mil(v): return f"${v/1e6:.1f}M" if v is not None else "N/A"
+    def bil(v): return f"{currency} {v/1e9:.1f}B" if v is not None else "N/A"
+    def mil(v): return f"{currency} {v/1e6:.1f}M" if v is not None else "N/A"
 
     price = stock_data.get("price")
     target_mean = stock_data.get("targetMeanPrice")
     upside = ((target_mean - price) / price * 100) if (target_mean and price) else None
 
-    valuation = stock_data.get("valuation", {})
-    composite = valuation.get("composite", {})
+    valuation = stock_data.get("valuation") or {}
+    composite = valuation.get("composite") or {}
+    normalization = valuation.get("normalization") or {}
 
     lines = [
         f"**Společnost:** {name} ({stock_data.get('symbol')})",
@@ -55,7 +57,7 @@ def _format_fundamentals(stock_data: dict) -> str:
         f"**Burza:** {stock_data.get('exchange')} | **Měna:** {stock_data.get('currency')}",
         "",
         "### Cena a trh",
-        f"- Aktuální cena: {num(price)} USD",
+        f"- Aktuální cena: {num(price)} {currency}",
         f"- 52W High: {num(stock_data.get('fiftyTwoWeekHigh'))} | 52W Low: {num(stock_data.get('fiftyTwoWeekLow'))}",
         f"- Market Cap: {bil(stock_data.get('marketCap'))}",
         f"- Beta: {num(stock_data.get('beta'))}",
@@ -76,13 +78,13 @@ def _format_fundamentals(stock_data: dict) -> str:
         f"- Free Cash Flow: {bil(stock_data.get('freeCashflow'))}",
         "",
         "### Dividendy",
-        f"- Dividendový výnos: {pct(stock_data.get('dividendYield'))} | Roční dividenda: {num(stock_data.get('dividendRate'))} USD",
+        f"- Dividendový výnos: {pct(stock_data.get('dividendYield'))} | Roční dividenda: {num(stock_data.get('dividendRate'))} {currency}",
         f"- Payout Ratio: {pct(stock_data.get('payoutRatio'))}",
         "",
         "### Analytici (yfinance konsenzus)",
-        f"- Doporučení: {stock_data.get('recommendationKey', 'N/A').upper()}",
+        f"- Doporučení: {(stock_data.get('recommendationKey') or 'N/A').upper()}",
         f"- Počet analytiků: {stock_data.get('numberOfAnalystOpinions', 'N/A')}",
-        f"- Price target: průměr {num(target_mean)} USD | low {num(stock_data.get('targetLowPrice'))} | high {num(stock_data.get('targetHighPrice'))} USD",
+        f"- Price target: průměr {num(target_mean)} {currency} | low {num(stock_data.get('targetLowPrice'))} | high {num(stock_data.get('targetHighPrice'))} {currency}",
     ]
 
     if upside is not None:
@@ -114,9 +116,55 @@ def _format_fundamentals(stock_data: dict) -> str:
         lines += [
             "",
             "### Interní valuační modely (systémový výpočet)",
-            f"- Kompozitní fair value: {num(composite_price)} USD",
+            f"- Kompozitní fair value: {num(composite_price)} {currency}",
             f"- Signál: {signal}",
         ]
+
+    normalization_notes = normalization.get("notes") or []
+    if normalization_notes:
+        lines += ["", "### Očištění vstupů"]
+        for note in normalization_notes:
+            lines.append(f"- {note}")
+
+    model_details = valuation.get("models") or []
+    if model_details:
+        lines += ["", "### Jednotlivé interní modely"]
+        for model in model_details:
+            fair_value = model.get("fairValue")
+            upside_value = model.get("upside")
+            input_summary = ", ".join(
+                f"{key}={value}"
+                for key, value in (model.get("inputs") or {}).items()
+                if value is not None
+            )
+            adjustments = " ".join(model.get("normalizationNotes") or [])
+            composite_status = (
+                f"započteno, váha {model.get('compositeWeight', 'N/A')}×"
+                + (
+                    f" ({model['compositeWeightReason']})"
+                    if model.get("compositeWeightReason")
+                    else ""
+                )
+                if model.get("includedInComposite", True)
+                else f"nezapočteno: {model.get('compositeExclusionReason', 'modelový outlier')}"
+            )
+            lines.append(
+                f"- {model.get('method', 'N/A')}: {num(fair_value)} {currency} "
+                f"({num(upside_value, 1)}% potenciál; confidence {model.get('confidence', 'N/A')}; "
+                f"horizont {model.get('horizonLabel', model.get('horizon', 'N/A'))}; {composite_status}). "
+                f"Výpočet: {model.get('description', 'N/A')}. "
+                f"Vstupy: {input_summary or 'N/A'}."
+                + (f" Úpravy: {adjustments}" if adjustments else "")
+            )
+
+    model_errors = valuation.get("modelErrors") or []
+    if model_errors:
+        lines += ["", "### Nedostupné interní modely"]
+        for model_error in model_errors:
+            lines.append(
+                f"- {model_error.get('modelId', 'N/A')}: výpočet selhal "
+                f"({model_error.get('error', 'neznámá chyba')})."
+            )
 
     # Add key insights — insights is a list of {type, title, description}
     insights = stock_data.get("insights", [])
@@ -731,6 +779,7 @@ async def generate_research_report(
             ticker=ticker,
             company_name=company_name,
             current_price=current_price,
+            currency=stock_data.get("currency") or "USD",
             date=prompt_date,
             earnings_context=earnings_context,
             fundamentals_context=fundamentals_context,

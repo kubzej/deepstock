@@ -99,7 +99,11 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         profitability: dict[str, list] = {k: [] for k in ["gross_margin", "operating_margin", "ebitda_margin", "net_margin", "fcf_margin", "roe", "roa", "roic"]}
         growth:        dict[str, list] = {k: [] for k in ["revenue_growth", "net_income_growth", "eps_growth", "ebitda_growth", "fcf_growth", "book_value_growth"]}
         health:        dict[str, list] = {k: [] for k in ["current_ratio"]}
-        context:       dict[str, list] = {k: [] for k in ["revenue", "net_income", "free_cashflow", "market_cap", "enterprise_value", "price_at_fy"]}
+        context:       dict[str, list] = {k: [] for k in [
+            "revenue", "net_income", "free_cashflow", "eps", "ebitda", "shares",
+            "book_value_per_share", "total_debt", "cash", "market_cap",
+            "enterprise_value", "price_at_fy",
+        ]}
 
         hist = t.history(period="6y")
 
@@ -199,6 +203,12 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
             context["revenue"].append(int(revenue) if revenue else None)
             context["net_income"].append(int(net_income) if net_income else None)
             context["free_cashflow"].append(int(fcf) if fcf else None)
+            context["eps"].append(round(eps, 4) if eps else None)
+            context["ebitda"].append(int(ebitda) if ebitda else None)
+            context["shares"].append(int(shares) if shares else None)
+            context["book_value_per_share"].append(round(bvps, 4) if bvps else None)
+            context["total_debt"].append(int(total_debt) if total_debt else None)
+            context["cash"].append(int(cash) if cash else None)
             context["market_cap"].append(int(market_cap_fy) if market_cap_fy else None)
             context["enterprise_value"].append(int(ev_fy) if ev_fy else None)
             context["price_at_fy"].append(round(price_at_fy, 2) if price_at_fy else None)
@@ -266,6 +276,12 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         context["revenue"].append(int(ltm_revenue) if ltm_revenue else None)
         context["net_income"].append(int(ltm_net_income) if ltm_net_income else None)
         context["free_cashflow"].append(int(ltm_fcf) if ltm_fcf else None)
+        context["eps"].append(round(ltm_eps, 4) if ltm_eps else None)
+        context["ebitda"].append(int(ltm_ebitda) if ltm_ebitda else None)
+        context["shares"].append(int(ltm_shares) if ltm_shares else None)
+        context["book_value_per_share"].append(round(ltm_bvps, 4) if ltm_bvps else None)
+        context["total_debt"].append(int(ltm_total_debt) if ltm_total_debt else None)
+        context["cash"].append(int(info.get("totalCash")) if info.get("totalCash") else None)
         context["market_cap"].append(int(ltm_market_cap) if ltm_market_cap else None)
         context["enterprise_value"].append(int(ltm_ev) if ltm_ev else None)
         context["price_at_fy"].append(round(ltm_price, 2) if ltm_price else None)
@@ -281,7 +297,7 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         except Exception:
             pass
 
-        for fwd_offset, year_offset in ((1, 1),):
+        for fwd_offset, year_offset in ((1, 1), (2, 2)):
             period_keys = [f"+{fwd_offset}y", f"{fwd_offset}y"]
             fwd_label = f"FY {last_fy_year + year_offset}E" if last_fy_year else f"Fwd+{year_offset}"
 
@@ -330,6 +346,12 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
             context["revenue"].append(int(fwd_revenue) if fwd_revenue else None)
             context["net_income"].append(int(fwd_net_income) if fwd_net_income else None)
             context["free_cashflow"].append(None)
+            context["eps"].append(round(fwd_eps, 4) if fwd_eps else None)
+            context["ebitda"].append(None)
+            context["shares"].append(int(ltm_shares) if ltm_shares else None)
+            context["book_value_per_share"].append(None)
+            context["total_debt"].append(None)
+            context["cash"].append(None)
             context["market_cap"].append(int(ltm_market_cap) if ltm_market_cap else None)
             context["enterprise_value"].append(int(ltm_ev) if ltm_ev else None)
             context["price_at_fy"].append(round(ltm_price, 2) if ltm_price else None)

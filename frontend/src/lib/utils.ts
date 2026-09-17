@@ -5,6 +5,10 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function getYahooFinanceUrl(ticker: string): string {
+  return `https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}/`;
+}
+
 /**
  * US Stock Market hours (Eastern Time):
  * - Pre-market: 4:00 AM - 9:30 AM ET

@@ -44,6 +44,7 @@ import { InsiderTrades } from './InsiderTrades';
 import { useOptionTransactions, useOptionHoldings } from '@/hooks/useOptions';
 import type { OptionTransaction, OptionHolding } from '@/lib/api';
 import type { StockDetailBackState } from '@/lib/stockDetailNavigation';
+import { getYahooFinanceUrl } from '@/lib/utils';
 import {
   SymbolOverview,
   isTradingViewSupported,
@@ -386,7 +387,14 @@ export function StockDetail() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h1 className="text-3xl font-bold uppercase tracking-tight md:text-4xl">
-                {ticker}
+                <a
+                  href={getYahooFinanceUrl(ticker)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-dotted decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground"
+                >
+                  {ticker}
+                </a>
               </h1>
               <span className="text-base text-muted-foreground md:text-lg">
                 {stockName}

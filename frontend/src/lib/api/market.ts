@@ -257,6 +257,7 @@ export interface StockInfo {
   // Valuation (fair value estimates from backend)
   valuation?: {
     models: Array<{
+      modelId?: string;
       method: string;
       description: string;
       tooltip?: string;
@@ -266,13 +267,35 @@ export interface StockInfo {
       confidence: 'high' | 'medium' | 'low';
       horizon: 'short' | 'medium' | 'long';
       horizonLabel: string;
+      normalizationNotes?: string[];
+      includedInComposite?: boolean;
+      compositeExclusionReason?: string;
+      compositeWeight?: number;
+      compositeWeightReason?: string;
     }>;
     composite: {
       fairValue: number | null;
       upside: number | null;
       signal: 'undervalued' | 'slightly_undervalued' | 'fair' | 'slightly_overvalued' | 'overvalued' | 'hold';
       modelsUsed: number;
+      modelsAvailable?: number;
+      formula?: string;
+      totalWeight?: number;
     } | null;
+    modelErrors?: Array<{
+      modelId: string;
+      error: string;
+    }>;
+    normalization?: {
+      profile?: 'secular_grower' | 'cyclical' | 'stable';
+      eps?: number | null;
+      fcfPerShare?: number | null;
+      growth?: number | null;
+      epsGrowth?: number | null;
+      ebitda?: number | null;
+      notes: string[];
+      details: Record<string, Record<string, number | null>>;
+    };
     currentPrice: number;
     currency: string;
   };

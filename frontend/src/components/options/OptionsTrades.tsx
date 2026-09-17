@@ -6,7 +6,7 @@ import type { OptionHolding } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
-import { cn } from '@/lib/utils';
+import { cn, getYahooFinanceUrl } from '@/lib/utils';
 import { formatPercent, formatPrice } from '@/lib/format';
 import { X, Trash2, TrendingUp, MessageSquare } from 'lucide-react';
 
@@ -253,9 +253,14 @@ export function OptionsTrades({
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono-price text-lg font-semibold">
+                    <a
+                      href={getYahooFinanceUrl(h.symbol)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono-price text-lg font-semibold underline decoration-dotted decoration-muted-foreground/40 underline-offset-2 hover:decoration-foreground"
+                    >
                       {h.symbol}
-                    </span>
+                    </a>
                     <span className="text-xs text-muted-foreground uppercase tracking-wide">
                       {isShort ? 'Short' : 'Long'}{' '}
                       {h.option_type === 'call' ? 'Call' : 'Put'} ·{' '}

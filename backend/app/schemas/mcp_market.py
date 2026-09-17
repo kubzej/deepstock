@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SmartAnalysisLabelResponse(BaseModel):
@@ -21,6 +21,50 @@ class SmartAnalysisResponse(BaseModel):
     positives: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[dict[str, Any]] = Field(default_factory=list)
     infos: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class MarketValuationModelResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    modelId: Optional[str] = None
+    method: str
+    description: str = ""
+    tooltip: Optional[str] = None
+    fairValue: Optional[float] = None
+    upside: Optional[float] = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    confidence: Optional[str] = None
+    horizon: Optional[str] = None
+    horizonLabel: Optional[str] = None
+    normalizationNotes: list[str] = Field(default_factory=list)
+    includedInComposite: Optional[bool] = None
+    compositeExclusionReason: Optional[str] = None
+    compositeWeight: Optional[float] = None
+    compositeWeightReason: Optional[str] = None
+
+
+class MarketNormalizationResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    profile: Optional[str] = None
+    eps: Optional[float] = None
+    fcfPerShare: Optional[float] = None
+    growth: Optional[float] = None
+    epsGrowth: Optional[float] = None
+    ebitda: Optional[float] = None
+    notes: list[str] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class MarketValuationResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    composite: Optional[dict[str, Any]] = None
+    models: list[MarketValuationModelResponse] = Field(default_factory=list)
+    normalization: Optional[MarketNormalizationResponse] = None
+    currentPrice: Optional[float] = None
+    currency: Optional[str] = None
+    modelErrors: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class TechnicalSummaryResponse(BaseModel):
@@ -42,7 +86,7 @@ class TechnicalSummaryContainerResponse(BaseModel):
 class MarketContextResponse(BaseModel):
     fundamentals: dict[str, Any] = Field(default_factory=dict)
     historical_financials: Optional[dict[str, Any]] = None
-    valuation: Optional[dict[str, Any]] = None
+    valuation: Optional[MarketValuationResponse] = None
     smart_analysis: SmartAnalysisResponse
     technicals: TechnicalSummaryContainerResponse
 
@@ -82,6 +126,9 @@ class GlobalMarketContextResponse(BaseModel):
 __all__ = [
     "SmartAnalysisLabelResponse",
     "SmartAnalysisResponse",
+    "MarketValuationModelResponse",
+    "MarketNormalizationResponse",
+    "MarketValuationResponse",
     "TechnicalSummaryResponse",
     "TechnicalSummaryContainerResponse",
     "MarketContextResponse",
