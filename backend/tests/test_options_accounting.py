@@ -129,6 +129,223 @@ class TestOptionsAccounting:
         assert event.realized_pl == 191
         assert event.realized_pl_czk == 4480
 
+    def test_partial_stc_consumes_only_closed_long_contracts(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    "BTO",
+                    3,
+                    premium=2.0,
+                    fees=3,
+                    exchange_rate_to_czk=21,
+                ),
+                make_option_tx(
+                    "close-1",
+                    "STC",
+                    1,
+                    premium=3.0,
+                    fees=0.5,
+                    date="2025-01-10",
+                    exchange_rate_to_czk=22,
+                ),
+            ]
+        )
+
+        event = accounting.realized_events[0]
+        assert event.realized_pl == pytest.approx(98.5)
+        assert event.realized_pl_czk == pytest.approx(2368)
+        assert accounting.holding.position == "long"
+        assert accounting.holding.contracts == 2
+        assert accounting.holding.total_cost == pytest.approx(402)
+
+    def test_partial_btc_consumes_only_closed_short_contracts(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    "STO",
+                    3,
+                    premium=2.0,
+                    fees=3,
+                    exchange_rate_to_czk=21,
+                ),
+                make_option_tx(
+                    "close-1",
+                    "BTC",
+                    1,
+                    premium=1.0,
+                    fees=0.5,
+                    date="2025-01-10",
+                    exchange_rate_to_czk=22,
+                ),
+            ]
+        )
+
+        event = accounting.realized_events[0]
+        assert event.realized_pl == pytest.approx(98.5)
+        assert event.realized_pl_czk == pytest.approx(1968)
+        assert accounting.holding.position == "short"
+        assert accounting.holding.contracts == 2
+        assert accounting.holding.total_cost == pytest.approx(398)
+
+    def test_fifo_stc_uses_oldest_long_lot_and_keeps_newer_lot_open(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-old",
+                    "BTO",
+                    1,
+                    premium=2.0,
+                    fees=1,
+                    date="2025-01-01",
+                ),
+                make_option_tx(
+                    "open-new",
+                    "BTO",
+                    1,
+                    premium=4.0,
+                    fees=1,
+                    date="2025-01-02",
+                ),
+                make_option_tx(
+                    "close-1",
+                    "STC",
+                    1,
+                    premium=3.0,
+                    date="2025-01-03",
+                ),
+            ]
+        )
+
+        assert accounting.realized_events[0].realized_pl == pytest.approx(99)
+        assert accounting.holding.position == "long"
+        assert accounting.holding.contracts == 1
+        assert accounting.holding.avg_premium == pytest.approx(4.01)
+
+    def test_expiration_realizes_short_credit_net_of_fees(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    "STO",
+                    2,
+                    premium=1.5,
+                    fees=4,
+                    exchange_rate_to_czk=23,
+                ),
+                make_option_tx(
+                    "expire-1",
+                    "EXPIRATION",
+                    2,
+                    premium=None,
+                    fees=2,
+                    date="2025-01-10",
+                    exchange_rate_to_czk=24,
+                ),
+            ]
+        )
+
+        event = accounting.realized_events[0]
+        assert event.realized_pl == pytest.approx(294)
+        assert event.realized_pl_czk == pytest.approx(6760)
+        assert accounting.holding.position is None
+        assert accounting.holding.contracts == 0
+
+    def test_expiration_realizes_long_cost_as_loss_net_of_fees(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    "BTO",
+                    1,
+                    premium=1.5,
+                    fees=1,
+                    exchange_rate_to_czk=23,
+                ),
+                make_option_tx(
+                    "expire-1",
+                    "EXPIRATION",
+                    1,
+                    premium=None,
+                    fees=2,
+                    date="2025-01-10",
+                    exchange_rate_to_czk=24,
+                ),
+            ]
+        )
+
+        event = accounting.realized_events[0]
+        assert event.realized_pl == pytest.approx(-153)
+        assert event.realized_pl_czk == pytest.approx(-3521)
+        assert accounting.holding.position is None
+
+    @pytest.mark.parametrize(
+        ("open_action", "wrong_close_action", "expected_position"),
+        [("BTO", "BTC", "long"), ("STO", "STC", "short")],
+    )
+    def test_wrong_close_action_does_not_consume_open_position(
+        self, open_action, wrong_close_action, expected_position
+    ):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    open_action,
+                    1,
+                    premium=2.0,
+                    date="2025-01-01",
+                ),
+                make_option_tx(
+                    "close-1",
+                    wrong_close_action,
+                    1,
+                    premium=1.0,
+                    date="2025-01-10",
+                ),
+            ]
+        )
+
+        assert accounting.realized_events == []
+        assert accounting.holding.position == expected_position
+        assert accounting.holding.contracts == 1
+
+    @pytest.mark.parametrize(
+        ("open_action", "close_action"),
+        [("STO", "ASSIGNMENT"), ("BTO", "EXERCISE")],
+    )
+    def test_assignment_and_exercise_close_the_option_without_option_pl(
+        self, open_action, close_action
+    ):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx(
+                    "open-1",
+                    open_action,
+                    1,
+                    premium=2.0,
+                    fees=1,
+                    date="2025-01-01",
+                    exchange_rate_to_czk=23,
+                ),
+                make_option_tx(
+                    "close-1",
+                    close_action,
+                    1,
+                    premium=2.0,
+                    fees=3,
+                    date="2025-01-10",
+                    exchange_rate_to_czk=24,
+                ),
+            ]
+        )
+
+        event = accounting.realized_events[0]
+        assert event.realized_pl == pytest.approx(-3)
+        assert event.realized_pl_czk == pytest.approx(-72)
+        assert accounting.holding.position is None
+        assert accounting.holding.contracts == 0
+
     def test_assignment_only_realizes_closing_fees_and_transfers_short_credit(self):
         preview = preview_option_close(
             [
