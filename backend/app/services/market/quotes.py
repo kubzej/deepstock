@@ -167,19 +167,21 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
 
 def _merge_ext_data(quote: dict, ext_data: dict) -> None:
     """
-    Merge extended data into a quote. previousClose from ext_data (Yahoo's
-    live quote engine) is only used as a fallback when the batch download
-    didn't already have a valid one (e.g. a missing session in the 5d
-    window) — it's a different "as of" source than yf.download()'s daily
-    bars, so overriding a good Tier 1 previousClose with it produces a
-    change/changePercent inconsistent with the batch-derived price.
+    Merge extended data into a quote.
+
+    previousClose from ext_data comes from Yahoo's live quote endpoint and is
+    authoritative. The value derived from yf.download()'s daily bars can be
+    one session behind while the current session is still in progress (or if
+    Yahoo omits a row), so it must be replaced when the live value exists.
+    Recompute the change fields from the same price and previous close so the
+    quote remains internally consistent.
     """
     ext_data = dict(ext_data)
     ext_prev_close = ext_data.pop("previousClose", None)
     quote.update(ext_data)
 
     price = quote.get("price")
-    if quote.get("previousClose") is None and ext_prev_close is not None and price is not None:
+    if ext_prev_close is not None and price is not None and ext_prev_close > 0:
         quote["previousClose"] = ext_prev_close
         quote["change"] = safe_float(price - ext_prev_close)
         quote["changePercent"] = safe_float((price - ext_prev_close) / ext_prev_close * 100)

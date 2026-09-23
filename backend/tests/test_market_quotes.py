@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.services.market.quotes import _normalize_ticker_data
+from app.services.market.quotes import _merge_ext_data, _normalize_ticker_data
 
 
 def test_normalize_single_ticker_multiindex_frame() -> None:
@@ -57,3 +57,25 @@ def test_normalize_flat_frame_returns_original_columns() -> None:
 
     assert result is not None
     assert list(result.columns) == ["Close", "High", "Low", "Open", "Volume"]
+
+
+def test_merge_ext_data_prefers_authoritative_previous_close() -> None:
+    quote = {
+        "price": 3.17,
+        "previousClose": 2.91,
+        "change": 0.26,
+        "changePercent": 8.93,
+    }
+
+    _merge_ext_data(
+        quote,
+        {
+            "previousClose": 3.17,
+            "avgVolume": 92196930,
+        },
+    )
+
+    assert quote["previousClose"] == 3.17
+    assert quote["change"] == 0.0
+    assert quote["changePercent"] == 0.0
+    assert quote["avgVolume"] == 92196930
