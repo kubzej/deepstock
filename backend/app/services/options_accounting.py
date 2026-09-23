@@ -282,7 +282,8 @@ def calculate_option_accounting(transactions: list[dict]) -> OptionAccountingRes
     )
 
 
-def annotate_option_transactions(transactions: list[dict]) -> list[dict]:
+def _annotate_option_transaction_group(transactions: list[dict]) -> list[dict]:
+    """Annotate transactions that belong to one portfolio and option symbol."""
     sorted_transactions = sorted(transactions, key=_tx_sort_key)
     open_lots: list[OptionLot] = []
     enriched: list[dict] = []
@@ -361,6 +362,37 @@ def annotate_option_transactions(transactions: list[dict]) -> list[dict]:
 
     by_id = {tx["id"]: tx for tx in enriched}
     return [by_id[tx["id"]] for tx in transactions if tx.get("id") in by_id]
+
+
+def annotate_option_transactions(transactions: list[dict]) -> list[dict]:
+    """Annotate transactions without allowing lots to cross accounting boundaries.
+
+    A list returned by the API can contain transactions from multiple portfolios
+    and multiple option contracts.  Lots must never be matched across either
+    boundary, otherwise a closing transaction can inherit the cost basis of a
+    completely unrelated option.
+    """
+    grouped_transactions: dict[tuple[Any, Any], list[dict]] = {}
+    for transaction in transactions:
+        key = (
+            transaction.get("portfolio_id"),
+            transaction.get("option_symbol"),
+        )
+        grouped_transactions.setdefault(key, []).append(transaction)
+
+    annotated_by_id: dict[Any, dict] = {}
+    for group in grouped_transactions.values():
+        for transaction in _annotate_option_transaction_group(group):
+            if transaction.get("id") is not None:
+                annotated_by_id[transaction["id"]] = transaction
+
+    # Preserve the caller's order.  The accounting inside each group is still
+    # chronological because the group helper sorts before consuming lots.
+    return [
+        annotated_by_id[transaction["id"]]
+        for transaction in transactions
+        if transaction.get("id") in annotated_by_id
+    ]
 
 
 def preview_option_close(

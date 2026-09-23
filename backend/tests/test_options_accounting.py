@@ -1,5 +1,7 @@
 from typing import Optional
 
+import pytest
+
 from app.services.options_accounting import (
     annotate_option_transactions,
     calculate_option_accounting,
@@ -216,3 +218,64 @@ class TestOptionsAccounting:
         assert closing["net_cashflow_czk"] == -2600
         assert closing["realized_pl"] == 91
         assert closing["realized_pl_czk"] == 2080
+
+    def test_annotation_does_not_cross_portfolios_or_option_symbols(self):
+        annotated = annotate_option_transactions(
+            [
+                # Same portfolio, different option: must not become the AAOI lot.
+                make_option_tx(
+                    "unrelated-open",
+                    "BTO",
+                    1,
+                    premium=1.0,
+                    fees=0.0,
+                    date="2025-01-01",
+                    exchange_rate_to_czk=21.0,
+                    option_symbol="OTHER250117C00100000",
+                    portfolio_id="p1",
+                ),
+                # Same option symbol, different portfolio: must also stay isolated.
+                make_option_tx(
+                    "other-portfolio-open",
+                    "BTO",
+                    1,
+                    premium=0.5,
+                    fees=0.0,
+                    date="2025-01-02",
+                    exchange_rate_to_czk=21.0,
+                    option_symbol="AAOI261002C00110000",
+                    portfolio_id="p2",
+                ),
+                make_option_tx(
+                    "aaoi-open",
+                    "BTO",
+                    1,
+                    premium=5.9,
+                    fees=1.03,
+                    date="2025-01-03",
+                    exchange_rate_to_czk=21.2,
+                    option_symbol="AAOI261002C00110000",
+                    portfolio_id="p1",
+                ),
+                make_option_tx(
+                    "aaoi-close",
+                    "STC",
+                    1,
+                    premium=3.1,
+                    fees=0.13,
+                    date="2025-01-04",
+                    exchange_rate_to_czk=21.48,
+                    option_symbol="AAOI261002C00110000",
+                    portfolio_id="p1",
+                ),
+            ]
+        )
+
+        by_id = {transaction["id"]: transaction for transaction in annotated}
+        closing = by_id["aaoi-close"]
+
+        assert closing["realized_pl"] == pytest.approx(-281.16)
+        assert closing["realized_pl_czk"] == pytest.approx(-5873.8284)
+        assert closing["transferred_entry_per_share"] == pytest.approx(5.9103)
+        assert by_id["unrelated-open"]["realized_pl"] is None
+        assert by_id["other-portfolio-open"]["realized_pl"] is None
