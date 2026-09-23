@@ -14,28 +14,7 @@ importing modules with external dependencies (supabase, etc.)
 import pytest
 from datetime import date
 
-
-# ============================================================
-# Extracted Pure Logic Functions (matching options.py)
-# ============================================================
-
-def generate_occ_symbol(
-    ticker: str,
-    strike: float,
-    expiration_date: date,
-    option_type: str
-) -> str:
-    """
-    Generate OCC option symbol.
-    Format: [Ticker][YYMMDD][C/P][Strike × 1000 (8 digits)]
-    """
-    ticker_clean = ticker.upper().strip()
-    date_str = expiration_date.strftime("%y%m%d")
-    type_char = "C" if option_type == "call" else "P"
-    strike_int = round(strike * 1000)
-    strike_padded = str(strike_int).zfill(8)
-    return f"{ticker_clean}{date_str}{type_char}{strike_padded}"
-
+from app.services.options import generate_occ_symbol
 
 # ============================================================
 # OCC Symbol Generation Tests

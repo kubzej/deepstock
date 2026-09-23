@@ -101,6 +101,43 @@ def generate_occ_symbol(
     return f"{ticker_clean}{date_str}{type_char}{strike_padded}"
 
 
+def get_option_stock_transaction_terms(
+    *,
+    closing_action: str,
+    position: str,
+    option_type: str,
+    strike_price: float,
+    transferred_entry_per_share: float,
+) -> tuple[str, float]:
+    """Return the stock side of an option exercise or assignment.
+
+    Option premium is already included in ``transferred_entry_per_share``.
+    The sign depends on whether the linked stock transaction buys or sells
+    shares and whether the option was long or short.
+    """
+    if closing_action == "ASSIGNMENT":
+        transaction_type = "BUY" if option_type == "put" else "SELL"
+    elif closing_action == "EXERCISE":
+        transaction_type = "BUY" if option_type == "call" else "SELL"
+    else:
+        raise ValueError(f"Unsupported stock-linked option action: {closing_action}")
+
+    if transaction_type == "BUY":
+        effective_price = (
+            strike_price - transferred_entry_per_share
+            if position == "short"
+            else strike_price + transferred_entry_per_share
+        )
+    else:
+        effective_price = (
+            strike_price + transferred_entry_per_share
+            if position == "short"
+            else strike_price - transferred_entry_per_share
+        )
+
+    return transaction_type, effective_price
+
+
 # ==========================================
 # Options Service
 # ==========================================
@@ -709,27 +746,13 @@ class OptionsService:
         symbol = holding["symbol"]
         shares = contracts * 100
         
-        # Determine transaction type
-        # ASSIGNMENT: short put -> BUY, short call -> SELL
-        # EXERCISE: long call -> BUY, long put -> SELL
-        if closing_action == "ASSIGNMENT":
-            tx_type = "BUY" if option_type == "put" else "SELL"
-        else:  # EXERCISE
-            tx_type = "BUY" if option_type == "call" else "SELL"
-        
-        # Transfer fee-aware option entry economics into the linked stock price.
-        if tx_type == "BUY":
-            effective_price = (
-                strike_price - transferred_entry_per_share
-                if position == "short"
-                else strike_price + transferred_entry_per_share
-            )
-        else:
-            effective_price = (
-                strike_price + transferred_entry_per_share
-                if position == "short"
-                else strike_price - transferred_entry_per_share
-            )
+        tx_type, effective_price = get_option_stock_transaction_terms(
+            closing_action=closing_action,
+            position=position,
+            option_type=option_type,
+            strike_price=strike_price,
+            transferred_entry_per_share=transferred_entry_per_share,
+        )
         
         # For SELL transactions, we need source_transaction_id
         if tx_type == "SELL" and not source_transaction_id:

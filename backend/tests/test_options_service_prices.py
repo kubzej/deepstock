@@ -3,7 +3,36 @@ from unittest.mock import AsyncMock
 
 os.environ["DEBUG"] = "false"
 
-from app.services.options import OptionsService
+from app.services.options import OptionsService, get_option_stock_transaction_terms
+
+
+def test_assignment_and_exercise_map_to_correct_stock_terms():
+    cases = [
+        ("ASSIGNMENT", "short", "put", 50.0, 2.0, "BUY", 48.0),
+        ("ASSIGNMENT", "short", "call", 100.0, 5.0, "SELL", 105.0),
+        ("EXERCISE", "long", "call", 80.0, 3.0, "BUY", 83.0),
+        ("EXERCISE", "long", "put", 60.0, 3.0, "SELL", 57.0),
+    ]
+
+    for (
+        action,
+        position,
+        option_type,
+        strike_price,
+        transferred_entry_per_share,
+        expected_type,
+        expected_price,
+    ) in cases:
+        transaction_type, effective_price = get_option_stock_transaction_terms(
+            closing_action=action,
+            position=position,
+            option_type=option_type,
+            strike_price=strike_price,
+            transferred_entry_per_share=transferred_entry_per_share,
+        )
+
+        assert transaction_type == expected_type
+        assert effective_price == expected_price
 
 
 class _FakeUpsertQuery:
