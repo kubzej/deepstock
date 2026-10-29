@@ -27,6 +27,9 @@ SEC_BASE = "https://efts.sec.gov/LATEST"
 EDGAR_BASE = "https://www.sec.gov"
 EDGAR_DATA = "https://data.sec.gov"
 
+# Longest window the cache holds, and so the longest a caller can ask for
+INSIDER_LOOKBACK_MONTHS = 12
+
 # Cache TTLs — defined centrally in app.core.cache
 
 # Transaction type codes from Form 4
@@ -229,19 +232,31 @@ def _parse_form4_xml(xml_text: str, filing_date: str, filing_url: str) -> list[d
     return trades
 
 
+def _filed_since(months: int) -> str:
+    return (date.today() - timedelta(days=months * 30)).isoformat()
+
+
+def _within_months(trades: list[dict], months: int) -> list[dict]:
+    since = _filed_since(months)
+    return [t for t in trades if t["filing_date"] >= since]
+
+
 async def get_insider_trades(
-    r: redis.Redis, ticker: str, months: int = 12
+    r: redis.Redis, ticker: str, months: int = INSIDER_LOOKBACK_MONTHS
 ) -> list[dict]:
     """
-    Get insider trades for a given ticker (US stocks only).
+    Get insider trades filed within the last `months` (at most INSIDER_LOOKBACK_MONTHS)
+    for a given ticker (US stocks only).
 
-    Fetches from SEC EDGAR (Form 4), caches in Redis for 12 hours.
+    Fetches from SEC EDGAR (Form 4), caches the full lookback window in Redis for
+    12 hours and narrows it to `months` on the way out, so a short request never
+    shortens what a later, longer one sees.
     Returns empty list for non-US tickers (no CIK found).
     """
     cache_key = f"insider:{ticker.upper()}"
     cached = await r.get(cache_key)
     if cached:
-        return json.loads(cached)
+        return _within_months(json.loads(cached), months)
 
     # Resolve CIK — if None, this is not a US stock
     cik = await _resolve_cik(r, ticker)
@@ -258,9 +273,8 @@ async def get_insider_trades(
             await r.set(cache_key, "[]", ex=CacheTTL.INSIDER_TRADES)
             return []
 
-        # Filter to last N months
-        cutoff = (date.today() - timedelta(days=months * 30)).isoformat()
-        filings = [f for f in filings if f["filing_date"] >= cutoff]
+        since = _filed_since(INSIDER_LOOKBACK_MONTHS)
+        filings = [f for f in filings if f["filing_date"] >= since]
 
         # Fetch and parse each Form 4 XML (sequential to respect SEC rate limits)
         all_trades: list[dict] = []
@@ -311,7 +325,7 @@ async def get_insider_trades(
         logger.info(
             "Cached %d insider trades for %s", len(all_trades), ticker.upper()
         )
-        return all_trades
+        return _within_months(all_trades, months)
 
     except Exception as e:
         logger.error("Failed to fetch insider trades for %s: %s", ticker, e)

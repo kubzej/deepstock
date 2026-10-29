@@ -3,8 +3,9 @@ Stocks API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
-from app.services.stocks import stock_service, StockCreate, StockUpdate
+from app.services.stocks import stock_service
 from app.core.auth import get_current_user_id
+from app.schemas.stocks import StockCreate, StockUpdate
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 

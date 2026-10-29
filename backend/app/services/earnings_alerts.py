@@ -83,45 +83,35 @@ class EarningsAlertService:
             logger.info("User %s has no watchlist tickers with earnings today", user_id)
             return 0
 
-        # Check anti-spam: only notify once per ticker per day
-        alerts_to_send = []
+        alerts_sent = 0
         for stock in earnings_today:
-            cache_key = f"earnings_alert:{user_id}:{stock['ticker']}:{today_str}"
-            already_sent = await redis.get(cache_key)
-            if not already_sent:
-                alerts_to_send.append(stock)
-                # Mark as sent (expires in 24h)
-                await redis.set(cache_key, "1", ex=CacheTTL.ALERT_SENT)
-            else:
+            ticker = stock["ticker"]
+            # Atomic claim: only one run notifies a ticker per day, even if runs overlap
+            claim_key = f"earnings_alert:{user_id}:{ticker}:{today_str}"
+            if not await redis.set(claim_key, "1", ex=CacheTTL.ALERT_SENT, nx=True):
                 logger.info(
                     "Skipping duplicate earnings alert for user %s ticker %s on %s",
                     user_id,
-                    stock["ticker"],
+                    ticker,
                     today_str,
                 )
+                continue
 
-        if not alerts_to_send:
-            logger.info("User %s has only already-sent earnings alerts for %s", user_id, today_str)
-            return 0
+            try:
+                delivered = await self._send_earnings_alert(user_id, stock)
+            except Exception:
+                logger.exception("Earnings alert push failed for user=%s ticker=%s", user_id, ticker)
+                delivered = False
 
-        logger.info(
-            "User %s will receive %d earnings alerts today (tickers=%s)",
-            user_id,
-            len(alerts_to_send),
-            [stock["ticker"] for stock in alerts_to_send],
-        )
-
-        # Send notification(s)
-        alerts_sent = 0
-        for stock in alerts_to_send:
-            sent = await self._send_earnings_alert(user_id, stock)
-            if sent:
+            if delivered:
                 alerts_sent += 1
             else:
+                # Release the claim so a later run on the same day can retry
+                await redis.delete(claim_key)
                 logger.warning(
-                    "Push send returned no deliveries for earnings alert user=%s ticker=%s",
+                    "Earnings alert not delivered for user=%s ticker=%s; claim released",
                     user_id,
-                    stock["ticker"],
+                    ticker,
                 )
 
         logger.info("User %s earnings alert run finished: alerts_sent=%d", user_id, alerts_sent)

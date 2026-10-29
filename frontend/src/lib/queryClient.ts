@@ -30,7 +30,6 @@ export const STALE_TIMES = {
   watchlistItems: Infinity,         // Only invalidate on CRUD
   watchlistTickers: 5 * 60 * 1000,  // 5 minutes
   watchlistTags: 10 * 60 * 1000,    // 10 minutes
-  itemTags: 5 * 60 * 1000,          // 5 minutes
 
   // Portfolio snapshot - live value, tied to quotes freshness
   portfolioSnapshot: 5 * 60 * 1000, // 5 minutes
@@ -108,15 +107,25 @@ export const queryKeys = {
   batchEarnings: (tickers: string[]) =>
     ['batchEarnings', tickers.slice().sort().join(',')] as const,
 
+  // Push notifications
+  notificationSettings: () => ['notification-settings'] as const,
+
+  // AI reports (the server-side cache of the last generated report)
+  aiPortfolioReport: (portfolioId: string | undefined) =>
+    ['ai-portfolio-cache', portfolioId ?? 'all'] as const,
+  aiResearchReport: (ticker: string, reportType: string) =>
+    ['ai-research-cache', ticker, reportType] as const,
+
   // Watchlists
   watchlists: () => ['watchlists'] as const,
   watchlistItems: (watchlistId: string) => ['watchlistItems', watchlistId] as const,
+  /** Prefix shared by every watchlistItems(id): refreshes the items of all lists. */
+  anyWatchlistItems: () => ['watchlistItems'] as const,
   allWatchlistItems: () => ['allWatchlistItems'] as const,
   watchlistTickers: () => ['watchlistTickers'] as const,
 
   // Watchlist Tags
   watchlistTags: () => ['watchlistTags'] as const,
-  itemTags: (itemId: string) => ['itemTags', itemId] as const,
 
   // Exchange rates
   exchangeRates: () => ['exchangeRates'] as const,
@@ -124,9 +133,9 @@ export const queryKeys = {
   // Transactions
   transactions: (portfolioId: string) => ['transactions', portfolioId] as const,
   allTransactions: () => ['transactions', 'all'] as const,
-  transactionHistory: (limit: number) => ['transactionHistory', limit] as const,
+  transactionHistory: () => ['transactionHistory'] as const,
   infiniteTransactions: (pageSize: number) => ['infiniteTransactions', pageSize] as const,
-  optionTransactionHistory: (limit: number) => ['optionTransactionHistory', limit] as const,
+  optionTransactionHistory: () => ['optionTransactionHistory'] as const,
 
   // Options
   optionHoldings: (portfolioId?: string) => portfolioId
@@ -145,8 +154,8 @@ export const queryKeys = {
     ['portfolioSnapshot', portfolioId ?? 'all'] as const,
 
   // Performance analytics
-  stockPerformance: (portfolioId: string, period: string, customFrom?: string, customTo?: string) =>
-    ['stockPerformance', portfolioId, period, customFrom, customTo] as const,
+  stockPerformance: (portfolioId: string, from: string, to: string) =>
+    ['stockPerformance', portfolioId, from, to] as const,
   optionsPerformance: (portfolioId: string, period: string) =>
     ['optionsPerformance', portfolioId, period] as const,
 
@@ -167,7 +176,11 @@ export const queryKeys = {
   journalChannels: () => ['journalChannels'] as const,
   journalSections: () => ['journalSections'] as const,
   journalEntries: (channelId: string) => ['journalEntries', channelId] as const,
+  /** Prefix shared by every journalEntries(channelId). */
+  anyJournalEntries: () => ['journalEntries'] as const,
   journalEntriesByTicker: (ticker: string) => ['journalEntriesByTicker', ticker] as const,
+  /** Prefix shared by every journalEntriesByTicker(ticker). */
+  anyJournalEntriesByTicker: () => ['journalEntriesByTicker'] as const,
 
   // Daily briefing
   dailyBriefingSettings: () => ['dailyBriefing', 'settings'] as const,

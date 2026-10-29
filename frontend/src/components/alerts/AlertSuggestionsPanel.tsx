@@ -111,32 +111,43 @@ export function AlertSuggestionsPanel({ open, onClose, stocks }: Props) {
 
   const handleCreate = async () => {
     setIsCreating(true);
-    try {
-      const toCreate = suggestions
-        .map((s, i) => ({ suggestion: s, index: i }))
-        .filter(({ index }) => selected.has(index));
+    setError(null);
 
-      await Promise.all(
-        toCreate.map(({ suggestion: s }) => {
-          const stock = stockByTicker.get(s.ticker);
-          if (!stock) return Promise.resolve();
-          return createAlert.mutateAsync({
-            stock_id: stock.id,
-            condition_type: s.condition_type,
-            condition_value: s.price,
-            notes: s.reason,
-            is_enabled: true,
-            repeat_after_trigger: false,
-          });
+    const toCreate = suggestions
+      .map((suggestion, index) => ({ suggestion, index }))
+      .filter(({ suggestion, index }) => selected.has(index) && stockByTicker.has(suggestion.ticker));
+
+    const results = await Promise.allSettled(
+      toCreate.map(({ suggestion: s }) =>
+        createAlert.mutateAsync({
+          stock_id: stockByTicker.get(s.ticker)!.id,
+          condition_type: s.condition_type,
+          condition_value: s.price,
+          notes: s.reason,
+          is_enabled: true,
+          repeat_after_trigger: false,
         }),
-      );
+      ),
+    );
+    setIsCreating(false);
 
+    const created = new Set(
+      toCreate.filter((_, n) => results[n].status === 'fulfilled').map(({ index }) => index),
+    );
+    if (created.size === toCreate.length) {
       handleClose();
-    } catch {
-      // Error handled by mutation
-    } finally {
-      setIsCreating(false);
+      return;
     }
+
+    // Drop what was created, so that another click cannot create it twice
+    const remaining = suggestions
+      .map((suggestion, index) => ({ suggestion, index }))
+      .filter(({ index }) => !created.has(index));
+    setSuggestions(remaining.map(({ suggestion }) => suggestion));
+    setSelected(new Set(remaining.flatMap(({ index }, n) => (selected.has(index) ? [n] : []))));
+    setError(
+      `Vytvořeno ${created.size} z ${toCreate.length} alertů, zbylé se nepodařilo uložit. Zkus je vytvořit znovu.`,
+    );
   };
 
   const handleClose = () => {

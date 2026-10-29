@@ -496,3 +496,53 @@ class TestOptionsAccounting:
         assert closing["transferred_entry_per_share"] == pytest.approx(5.9103)
         assert by_id["unrelated-open"]["realized_pl"] is None
         assert by_id["other-portfolio-open"]["realized_pl"] is None
+
+
+class TestRealizedPlOfWholePositions:
+    """Open and close one position without fees: the P/L is plain premium arithmetic."""
+
+    @pytest.mark.parametrize(
+        "open_action, open_premium, close_action, close_premium, contracts, expected",
+        [
+            ("STO", 2.00, "BTC", 1.00, 1, 100),  # short closed cheaper
+            ("STO", 2.00, "BTC", 3.50, 1, -150),  # short closed dearer
+            ("STO", 2.00, "BTC", 2.00, 1, 0),  # breakeven
+            ("STO", 1.50, "BTC", 0.50, 3, 300),  # several contracts
+            ("BTO", 1.00, "STC", 2.50, 1, 150),  # long closed higher
+            ("BTO", 3.00, "STC", 1.20, 1, -180),  # long closed lower
+            ("BTO", 1.00, "STC", 1.50, 4, 200),
+            ("STO", 2.50, "EXPIRATION", None, 1, 250),  # short keeps the whole premium
+            ("BTO", 2.50, "EXPIRATION", None, 1, -250),  # long loses it
+            ("STO", 2.00, "EXPIRATION", None, 3, 600),
+            ("BTO", 2.00, "EXPIRATION", None, 3, -600),
+            ("STO", 3.00, "ASSIGNMENT", None, 1, 0),  # premium moves into the stock price
+            ("BTO", 3.00, "EXERCISE", None, 1, 0),
+        ],
+    )
+    def test_realized_pl(
+        self, open_action, open_premium, close_action, close_premium, contracts, expected
+    ):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx("open", open_action, contracts, premium=open_premium, date="2025-01-01"),
+                make_option_tx("close", close_action, contracts, premium=close_premium, date="2025-01-10"),
+            ]
+        )
+
+        assert [event.realized_pl for event in accounting.realized_events] == [expected]
+        assert accounting.holding.position is None
+
+    def test_position_closed_in_two_steps_realizes_each_step(self):
+        accounting = calculate_option_accounting(
+            [
+                make_option_tx("open", "STO", 2, premium=2.00, date="2025-01-01"),
+                make_option_tx("close-1", "BTC", 1, premium=1.00, date="2025-01-05"),
+                make_option_tx("close-2", "BTC", 1, premium=3.00, date="2025-01-10"),
+            ]
+        )
+
+        assert [(e.transaction_id, e.realized_pl) for e in accounting.realized_events] == [
+            ("close-1", 100),
+            ("close-2", -100),
+        ]
+        assert accounting.holding.contracts == 0

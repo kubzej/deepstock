@@ -5,6 +5,8 @@
  */
 import {
   parseISO,
+  startOfDay,
+  endOfDay,
   startOfYear,
   startOfMonth,
   subDays,
@@ -220,7 +222,20 @@ export function getIndustryColor(
 
 // ============ Helper Functions ============
 
+/**
+ * The selected period as whole days: `from` is the start of its first day and `to` the end of its
+ * last, so a transaction or chart point on either edge day is inside the range whatever the time.
+ */
 export function getDateRange(
+  preset: DateRangePreset,
+  customFrom?: string,
+  customTo?: string
+): { from: Date; to: Date } {
+  const { from, to } = resolveDateRange(preset, customFrom, customTo);
+  return { from: startOfDay(from), to: endOfDay(to) };
+}
+
+function resolveDateRange(
   preset: DateRangePreset,
   customFrom?: string,
   customTo?: string

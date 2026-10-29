@@ -81,6 +81,7 @@ export {
   fetchTransactions,
   fetchAllTransactions,
   fetchAllTransactionsPage,
+  fetchTransactionHistory,
   type TransactionPage,
   addTransaction,
   updateTransaction,
@@ -95,6 +96,7 @@ export {
 export {
   // Types
   type Stock,
+  type StockUpdate,
   // Functions
   fetchStocks,
   searchStocks,
@@ -129,7 +131,6 @@ export {
   createWatchlistTag,
   updateWatchlistTag,
   deleteWatchlistTag,
-  fetchItemTags,
   setItemTags,
 } from './watchlists';
 
@@ -144,14 +145,11 @@ export {
   type OptionHolding,
   type OptionStats,
   type CreateOptionTransactionInput,
-  type UpdateOptionTransactionInput,
   // Functions
   fetchOptionHoldings,
   fetchOptionTransactions,
   fetchOptionStats,
   createOptionTransaction,
-  updateOptionTransaction,
-  deleteOptionTransaction,
   deleteOptionTransactionsBySymbol,
   closeOptionPosition,
 } from './options';

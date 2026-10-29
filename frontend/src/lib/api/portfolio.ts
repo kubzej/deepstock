@@ -1,7 +1,7 @@
 /**
  * Portfolio API - Portfolio CRUD, holdings, transactions, open lots, snapshot
  */
-import { API_URL, getAuthHeader } from './client';
+import { API_URL, FULL_HISTORY_PAGE_SIZE, collectPages, getAuthHeader } from './client';
 
 // ============ Portfolio Types ============
 
@@ -540,6 +540,11 @@ export async function fetchAllTransactions(limit: number = 1000, ticker?: string
   );
 }
 
+/** Every stock transaction across all portfolios, oldest pages included. */
+export function fetchTransactionHistory(): Promise<Transaction[]> {
+  return collectPages((cursor) => fetchAllTransactionsPage(FULL_HISTORY_PAGE_SIZE, cursor));
+}
+
 export async function fetchAllTransactionsPage(
   limit: number = 100,
   cursor?: string | null,
@@ -660,6 +665,8 @@ export interface PortfolioSnapshot {
   total_pnl_percent: number;
   daily_change_czk: number;
   daily_change_percent: number;
+  /** Holdings without a live price; they are excluded from value, cost and P/L. */
+  missing_tickers: string[];
 }
 
 export async function fetchPortfolioSnapshot(portfolioId: string | null): Promise<PortfolioSnapshot> {
@@ -682,6 +689,7 @@ export async function fetchPortfolioSnapshot(portfolioId: string | null): Promis
 export interface PerformancePoint {
   date: string;
   value: number;
+  /** Cost basis of the shares held that day — the same figure as "Investováno" on the Přehled */
   invested: number;
   benchmark?: number | null;
 }
@@ -698,20 +706,18 @@ export type PerformancePeriod = '1W' | '1M' | '3M' | '6M' | 'MTD' | 'YTD' | '1Y'
 
 // ============ Performance Endpoints ============
 
+/** Stock performance from `from` to `to` (YYYY-MM-DD, both days included). */
 export async function fetchStockPerformance(
-  portfolioId?: string,
-  period: PerformancePeriod = '1Y',
-  customFrom?: string,
-  customTo?: string
+  portfolioId: string | undefined,
+  from: string,
+  to: string
 ): Promise<PerformanceResult> {
   const authHeader = await getAuthHeader();
   const endpoint = portfolioId 
     ? `${API_URL}/api/portfolio/${portfolioId}/performance/stocks`
     : `${API_URL}/api/portfolio/all/performance/stocks`;
   
-  const params = new URLSearchParams({ period });
-  if (customFrom) params.append('from_date', customFrom);
-  if (customTo) params.append('to_date', customTo);
+  const params = new URLSearchParams({ from_date: from, to_date: to });
   
   const response = await fetch(`${endpoint}?${params}`, {
     headers: {

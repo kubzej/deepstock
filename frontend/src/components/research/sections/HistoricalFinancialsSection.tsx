@@ -1,6 +1,7 @@
-import { Info } from 'lucide-react';
+import { FileSearch, Info } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState, ErrorState } from '@/components/shared';
 import {
   Popover,
   PopoverContent,
@@ -158,7 +159,7 @@ const TOOLTIPS: Record<string, TooltipDef> = {
   },
   Revenue: {
     description:
-      'Meziroční růst tržeb (YoY). Klíčový ukazatel dynamiky a expanze firmy.',
+      'Meziroční růst tržeb (YoY). U sloupce LTM jde o růst posledního čtvrtletí proti stejnému čtvrtletí loni. Klíčový ukazatel dynamiky a expanze firmy.',
     good: 'Nad 10% je solidní. Nad 20% je vysoký růst.',
     bad: 'Záporný růst značí problémy nebo zralý trh.',
   },
@@ -374,7 +375,7 @@ function SectionBlock({
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['historicalFinancials', ticker],
     queryFn: () => fetchHistoricalFinancials(ticker),
     staleTime: 1000 * 60 * 60,
@@ -391,7 +392,25 @@ export function HistoricalFinancialsSection({ ticker }: { ticker: string }) {
     );
   }
 
-  if (!data?.yields) return null;
+  if (isError) {
+    return (
+      <ErrorState
+        title="Historické fundamenty se nepodařilo načíst"
+        description={`Data pro ${ticker} se teď nepodařilo načíst.`}
+        retryAction={{ label: 'Zkusit znovu', onClick: () => refetch() }}
+      />
+    );
+  }
+
+  if (!data?.yields) {
+    return (
+      <EmptyState
+        icon={FileSearch}
+        title="Výkazy nejsou k dispozici"
+        description={`Pro ${ticker} nejsou dostupné historické finanční výkazy.`}
+      />
+    );
+  }
 
   const {
     years,

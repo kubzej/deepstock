@@ -1,10 +1,18 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.services.portfolio import portfolio_service, PortfolioCreate, PortfolioUpdate, TransactionCreate, TransactionUpdate, AvailableLot, PortfolioSnapshot
+from app.services.portfolio import portfolio_service
 from app.services.performance import get_stock_performance, get_options_performance
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from typing import List, Optional
 from datetime import datetime
+from app.schemas.portfolio import (
+    AvailableLot,
+    PortfolioCreate,
+    PortfolioSnapshot,
+    PortfolioUpdate,
+    TransactionCreate,
+    TransactionUpdate,
+)
 
 router = APIRouter()
 
@@ -38,9 +46,12 @@ async def get_all_transactions(
 ):
     """
     Get transactions across all user's portfolios, newest first.
-    Pass cursor (ISO datetime from previous response's next_cursor) to load older pages.
+    Pass the previous response's next_cursor as cursor to load older pages.
     """
-    return await portfolio_service.get_all_transactions(user_id, limit, cursor, ticker)
+    try:
+        return await portfolio_service.get_all_transactions(user_id, limit, cursor, ticker)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/all/open-lots")

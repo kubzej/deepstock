@@ -6,34 +6,20 @@ POST /api/ai/watchlist-targets — suggest buy/sell price targets for a watchlis
 import json
 import logging
 import re
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
+from app.services.stocks import stock_service
+from app.schemas.ai_watchlist import WatchlistTargetsRequest, WatchlistTargetsResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class WatchlistTargetsRequest(BaseModel):
-    ticker: str
-    avg_cost: Optional[float] = None   # User's average purchase price (if holding)
-    shares: Optional[float] = None     # Number of shares held
-
-
-class WatchlistTargetsResponse(BaseModel):
-    ticker: str
-    buy_target: Optional[float] = None
-    sell_target: Optional[float] = None
-    comment: str
-    cached: bool = False
 
 
 @router.post("/watchlist-targets", response_model=WatchlistTargetsResponse)
@@ -49,6 +35,9 @@ async def generate_watchlist_targets(
     Uses technical indicators + fundamentals.
     If avg_cost is provided (user has a holding), enforces the -20% rule:
     buy_target must be <= avg_cost * 0.80.
+
+    Targets are in the quoted unit (pence for LSE), like the quote they are compared with, while
+    avg_cost arrives in the stock's real currency; it is converted so the prompt has one scale.
 
     Results are cached per user + ticker + avg_cost for 6 hours.
     """
@@ -89,11 +78,16 @@ async def generate_watchlist_targets(
         format_stock_context,
     )
 
+    avg_cost = payload.avg_cost
+    if avg_cost:
+        stock = await stock_service.get_by_ticker(ticker)
+        avg_cost = avg_cost / float((stock or {}).get("price_scale") or 1)
+
     stock_context = format_stock_context(
         ticker=ticker,
         tech_data=tech_data,
         stock_info=stock_info,
-        avg_cost=payload.avg_cost,
+        avg_cost=avg_cost,
         shares=payload.shares,
     )
     user_prompt = build_user_prompt(stock_context)

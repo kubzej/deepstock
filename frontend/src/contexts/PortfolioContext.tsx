@@ -16,6 +16,7 @@ import {
   type OpenLot,
 } from '@/lib/api';
 import { useAuth } from './AuthContext';
+import { queryKeys } from '@/lib/queryClient';
 import { usePortfolios, useCreatePortfolio } from '@/hooks/usePortfolios';
 import { useHoldings } from '@/hooks/useHoldings';
 import { useOpenLots } from '@/hooks/useOpenLots';
@@ -298,12 +299,12 @@ export function PortfolioProvider({ children }: { children: React.ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['quotes'] }),
       queryClient.invalidateQueries({ queryKey: ['exchangeRates'] }),
       queryClient.invalidateQueries({ queryKey: ['transactions'] }),
-      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() }),
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] }),
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] }),
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] }),
       queryClient.invalidateQueries({ queryKey: ['optionStats'] }),
-      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.optionTransactionHistory() }),
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] }),
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] }),
     ]);

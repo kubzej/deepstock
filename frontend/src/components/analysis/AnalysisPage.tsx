@@ -4,7 +4,6 @@
  * Modular portfolio analysis with distribution, stock and option performance.
  */
 import { useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { format, startOfYear, parseISO, isAfter, isBefore } from 'date-fns';
 import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
@@ -37,7 +36,6 @@ import type {
   Transaction,
   OptionTransaction,
   Stock,
-  PerformancePeriod,
   PerformancePoint,
 } from '@/lib/api';
 import { AIPortfolioAdvisorSection } from '@/components/analysis/AIPortfolioAdvisorSection';
@@ -47,7 +45,6 @@ type TabType = 'overview' | 'stocks' | 'options' | 'ai';
 type ValueMode = 'current' | 'invested';
 
 export function AnalysisPage() {
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [valueMode, setValueMode] = useState<ValueMode>('current');
   const [datePreset, setDatePreset] = useState<DateRangePreset>('YTD');
@@ -56,25 +53,11 @@ export function AnalysisPage() {
   );
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'));
 
-  // Map date preset to performance period
-  // Backend supports: 1W, 1M, 3M, 6M, MTD, YTD, 1Y, ALL
-  const perfPeriod = useMemo((): PerformancePeriod => {
-    const mapping: Record<string, PerformancePeriod> = {
-      '1D': '1W',
-      '2D': '1W',
-      '1W': '1W',
-      '1M': '1M',
-      '3M': '3M',
-      '6M': '6M',
-      MTD: 'MTD',
-      YTD: 'YTD',
-      '1Y': '1Y',
-      '5Y': 'ALL',
-      ALL: 'ALL',
-      CUSTOM: 'ALL',
-    };
-    return mapping[datePreset] || '1Y';
-  }, [datePreset]);
+  // Selected period as whole days; the chart query, the transactions and the chart points all use it
+  const dateRange = useMemo(
+    () => getDateRange(datePreset, customFrom, customTo),
+    [datePreset, customFrom, customTo],
+  );
 
   // Data
   const {
@@ -86,6 +69,7 @@ export function AnalysisPage() {
     dataUpdatedAt,
     activePortfolio,
     isAllPortfolios,
+    refresh,
   } = usePortfolio();
   const portfolioId = activePortfolio?.id;
 
@@ -105,27 +89,19 @@ export function AnalysisPage() {
   const { data: stocks = [] } = useStocks();
 
   // Performance chart data - use active portfolio
-  // Pass custom dates when CUSTOM preset is selected
   const {
     data: stockPerfData,
     isLoading: stockPerfLoading,
     isFetching: perfFetching,
   } = useStockPerformance(
     portfolioId,
-    perfPeriod,
-    datePreset === 'CUSTOM' ? customFrom : undefined,
-    datePreset === 'CUSTOM' ? customTo : undefined,
+    format(dateRange.from, 'yyyy-MM-dd'),
+    format(dateRange.to, 'yyyy-MM-dd'),
   );
 
   const isLoading = portfolioLoading || stocksLoading || optionsLoading;
   const isFetching =
     portfolioFetching || stocksFetching || optionsFetching || perfFetching;
-
-  // Date range
-  const dateRange = useMemo(
-    () => getDateRange(datePreset, customFrom, customTo),
-    [datePreset, customFrom, customTo],
-  );
 
   // Filter transactions by date AND portfolio
   const filteredStockTransactions = useMemo(() => {
@@ -325,18 +301,11 @@ export function AnalysisPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdings, quotes, rates, stockMap, valueMode]);
 
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['all-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['all-option-transactions'] });
-    queryClient.invalidateQueries({ queryKey: ['holdings'] });
-    queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
-  };
-
   return (
     <PageShell width="full">
       <PageIntro
         title="Analýza"
-        onRefresh={handleRefresh}
+        onRefresh={refresh}
         isRefreshing={isFetching}
         dataUpdatedAt={dataUpdatedAt}
       />

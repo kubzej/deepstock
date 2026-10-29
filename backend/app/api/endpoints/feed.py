@@ -12,14 +12,15 @@ POST   /api/feed/lists/{list_id}/summary
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
+from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.feed_service import feed_service
+from app.schemas.feed import AddAccountRequest, FeedListCreate, FeedListUpdate, FeedSummaryResponse
 
 logger = logging.getLogger(__name__)
 
@@ -27,26 +28,6 @@ router = APIRouter()
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
-
-class FeedListCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class FeedListUpdate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class AddAccountRequest(BaseModel):
-    username: str
-
-
-class FeedSummaryResponse(BaseModel):
-    markdown: str
-    cached: bool = False
-    generated_at: str
-    model_used: str = ""
 
 
 # ── List CRUD ──────────────────────────────────────────────────────────────────
@@ -135,7 +116,9 @@ async def get_feed_summary(
 
 
 @router.post("/lists/{list_id}/summary", response_model=FeedSummaryResponse)
+@limiter.limit("10/hour")
 async def generate_feed_summary(
+    request: Request,
     list_id: str,
     force: bool = False,
     user_id: str = Depends(get_current_user_id),

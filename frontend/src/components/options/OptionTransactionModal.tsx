@@ -128,6 +128,10 @@ export function OptionTransactionModal({
   const isCloseMode = mode === 'close' && !!holding;
   const isOpenMode = mode === 'open';
 
+  // A position is closed in its own portfolio; a new one goes into the selected portfolio, which
+  // is missing while all portfolios are shown
+  const portfolioId = isCloseMode && holding ? holding.portfolio_id : portfolio?.id;
+
   // Form state
   const [ticker, setTicker] = useState('');
   const [optionType, setOptionType] = useState<OptionType>('call');
@@ -234,20 +238,20 @@ export function OptionTransactionModal({
 
   // Load available lots when needed
   useEffect(() => {
-    if (requiresLotSelection && holding && portfolio?.id) {
+    if (requiresLotSelection && holding && portfolioId) {
       loadAvailableLots();
     } else {
       setAvailableLots([]);
       setSelectedLotId(null);
     }
-  }, [requiresLotSelection, holding?.symbol, portfolio?.id]);
+  }, [requiresLotSelection, holding?.symbol, portfolioId]);
 
   const loadAvailableLots = async () => {
-    if (!holding?.symbol || !portfolio?.id) return;
+    if (!holding?.symbol || !portfolioId) return;
 
     setLotsLoading(true);
     try {
-      const lots = await fetchAvailableLots(portfolio.id, holding.symbol);
+      const lots = await fetchAvailableLots(portfolioId, holding.symbol);
       setAvailableLots(lots);
       // Auto-select first lot if available
       if (lots.length > 0) {
@@ -373,12 +377,12 @@ export function OptionTransactionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!portfolio?.id || !isValid) return;
+    if (!portfolioId || !isValid) return;
 
     try {
       if (isCloseMode && holding) {
         await closeMutation.mutateAsync({
-          portfolioId: portfolio.id,
+          portfolioId,
           optionSymbol: holding.option_symbol,
           closingAction: action,
           contracts: parseInt(contracts, 10),
@@ -393,7 +397,7 @@ export function OptionTransactionModal({
         });
       } else {
         await createMutation.mutateAsync({
-          portfolioId: portfolio.id,
+          portfolioId,
           data: {
             symbol: ticker.toUpperCase(),
             option_type: optionType,
@@ -428,7 +432,17 @@ export function OptionTransactionModal({
           <DialogTitle>{getModalTitle(mode)}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {/* noValidate: the submit button stays off until isValid; the browser's own number-step bubble must not appear */}
+        <form onSubmit={handleSubmit} noValidate className="space-y-3">
+          {!portfolioId && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Vyberte portfolio: nová pozice se ukládá do jednoho konkrétního portfolia.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -699,7 +713,9 @@ export function OptionTransactionModal({
             {/* Premium - only for STC/BTC/open modes */}
             {isPremiumRequired && (
               <div className="space-y-2">
-                <Label htmlFor="premium">Prémie za kontrakt ($)</Label>
+                <Label htmlFor="premium">
+                  Prémie za akcii ({isOpenMode ? currency : stockCurrency})
+                </Label>
                 <Input
                   id="premium"
                   type="number"
@@ -796,7 +812,7 @@ export function OptionTransactionModal({
             >
               Zrušit
             </Button>
-            <Button type="submit" disabled={!isValid || isPending}>
+            <Button type="submit" disabled={!isValid || isPending || !portfolioId}>
               {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {getSubmitLabel(mode, isPending)}
             </Button>

@@ -11,6 +11,7 @@ import {
   useDeleteStock,
 } from '@/hooks/useStocks';
 import { useHoldings } from '@/hooks/useHoldings';
+import { useRejectedField } from '@/hooks/useRejectedField';
 import { useAllWatchlistItems } from '@/hooks/useWatchlists';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -242,6 +243,7 @@ export default function StocksManager() {
 
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { reject, isRejected } = useRejectedField(dialogOpen);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -485,33 +487,39 @@ export default function StocksManager() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.ticker.trim() || !formData.name.trim()) {
-      setFormError('Ticker a název jsou povinné');
-      return;
-    }
+    if (!formData.ticker.trim()) return reject('ticker');
+    if (!formData.name.trim()) return reject('name');
 
     try {
       setFormError(null);
 
-      const payload = {
-        ticker: formData.ticker.toUpperCase(),
-        name: formData.name,
-        sector: formData.sector || undefined,
-        industry: formData.industry || undefined,
-        exchange: formData.exchange || undefined,
-        currency: formData.currency,
-        country: formData.country || undefined,
-        price_scale: formData.price_scale,
-        notes: formData.notes || undefined,
-      };
-
       if (isEditMode && selectedStock) {
+        // null clears a field the user emptied; leaving it out would keep the stored value
         await updateStockMutation.mutateAsync({
           id: selectedStock.id,
-          data: payload,
+          data: {
+            name: formData.name,
+            sector: formData.sector || null,
+            industry: formData.industry || null,
+            exchange: formData.exchange || null,
+            currency: formData.currency,
+            country: formData.country || null,
+            price_scale: formData.price_scale,
+            notes: formData.notes || null,
+          },
         });
       } else {
-        await createStockMutation.mutateAsync(payload);
+        await createStockMutation.mutateAsync({
+          ticker: formData.ticker.toUpperCase(),
+          name: formData.name,
+          sector: formData.sector || undefined,
+          industry: formData.industry || undefined,
+          exchange: formData.exchange || undefined,
+          currency: formData.currency,
+          country: formData.country || undefined,
+          price_scale: formData.price_scale,
+          notes: formData.notes || undefined,
+        });
       }
 
       setDialogOpen(false);
@@ -821,7 +829,7 @@ export default function StocksManager() {
             <DialogTitle>{dialogTitle}</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {formError && (
               <Alert variant="destructive">
                 <AlertDescription>{formError}</AlertDescription>
@@ -835,6 +843,7 @@ export default function StocksManager() {
                 <Input
                   id="ticker"
                   name="ticker"
+                  aria-invalid={isRejected('ticker', !formData.ticker.trim())}
                   placeholder="AAPL"
                   value={formData.ticker}
                   onChange={handleChange}
@@ -848,6 +857,7 @@ export default function StocksManager() {
                 <Input
                   id="name"
                   name="name"
+                  aria-invalid={isRejected('name', !formData.name.trim())}
                   placeholder="Apple Inc."
                   value={formData.name}
                   onChange={handleChange}

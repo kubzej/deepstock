@@ -9,6 +9,7 @@ from typing import List, Optional
 from app.core.cache import CacheTTL
 from app.core.taxonomy import SECTOR_KEYS
 from app.services.market.financials import get_historical_financials
+from app.services.market.yahoo import run_yahoo
 from app.services.market.valuation_engine import (
     build_historical_models,
     calculate_robust_composite,
@@ -43,32 +44,6 @@ def _extract_officers(info: dict) -> dict:
             ceo = entry
 
     return {"officers": officers[:6], "ceo": ceo}
-
-
-def _ltm_revenue_growth_from_historical(historical: Optional[dict]) -> Optional[float]:
-    """Compute LTM revenue growth from the same revenue series shown in the UI/MCP table."""
-    if not historical:
-        return None
-
-    years = historical.get("years") or []
-    revenue = (historical.get("context") or {}).get("revenue") or []
-    if "LTM" not in years:
-        return None
-
-    ltm_idx = years.index("LTM")
-    prev_idx = ltm_idx - 1
-    if prev_idx < 0 or ltm_idx >= len(revenue) or prev_idx >= len(revenue):
-        return None
-
-    current = revenue[ltm_idx]
-    previous = revenue[prev_idx]
-    if current is None or previous in (None, 0):
-        return None
-
-    try:
-        return round((float(current) - float(previous)) / abs(float(previous)), 4)
-    except (TypeError, ValueError):
-        return None
 
 
 # ============================================================
@@ -602,7 +577,7 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
         insights.append({
             "type": "warning",
             "title": "Klesající tržby",
-            "description": f"Tržby klesly o {abs(rev_growth * 100):.1f}% meziročně.",
+            "description": f"Tržby klesly o {abs(rev_growth * 100):.1f}% meziročně (poslední čtvrtletí).",
         })
     
     # Low gross margin for sector (sector-specific)
@@ -684,7 +659,7 @@ def generate_insights(data: dict, historical: Optional[dict] = None) -> List[dic
         insights.append({
             "type": "positive",
             "title": "Silný růst tržeb",
-            "description": f"Tržby rostou o {rev_growth * 100:.1f}% meziročně.",
+            "description": f"Tržby rostou o {rev_growth * 100:.1f}% meziročně (poslední čtvrtletí).",
         })
     
     # ============================================================
@@ -2025,6 +2000,10 @@ def calculate_valuation(data: dict, historical: Optional[dict] = None) -> dict:
     }
 
 
+def _fetch_info_sync(ticker: str) -> dict:
+    return yf.Ticker(ticker).info
+
+
 async def get_stock_info(redis, ticker: str) -> Optional[dict]:
     """
     Get detailed stock info including fundamentals and valuation metrics.
@@ -2036,8 +2015,7 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         return json.loads(cached)
 
     try:
-        t = yf.Ticker(ticker)
-        info = t.info
+        info = await run_yahoo(_fetch_info_sync, ticker)
         
         if not info or info.get("regularMarketPrice") is None:
             return None
@@ -2119,10 +2097,7 @@ async def get_stock_info(redis, ticker: str) -> Optional[dict]:
         result.update(_extract_officers(info))
         
         # Generate insights from fundamentals + historical trends
-        historical = await get_historical_financials(redis, ticker)
-        ltm_revenue_growth = _ltm_revenue_growth_from_historical(historical)
-        if ltm_revenue_growth is not None:
-            result["revenueGrowth"] = ltm_revenue_growth
+        historical = await get_historical_financials(redis, ticker, info)
         result["insights"] = generate_insights(result, historical=historical)
         
         # Calculate fair value estimates

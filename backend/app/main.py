@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from importlib.metadata import version
 import os
 import logging
-import yfinance as yf
 from app.api.endpoints import market, portfolio, stocks, watchlists, options, push, insider, alerts, ai_research, ai_alerts, ai_portfolio, ai_watchlist, ai_stock_metadata, mcp, feed, journal, daily_news, timeline
 from app.core.redis import close_redis_pool
 from app.core.rate_limit import limiter
@@ -25,7 +24,7 @@ async def lifespan(app: FastAPI):
     logger.info(
         "Starting DeepStock API with yfinance %s, supabase %s, httpx %s "
         "(Supabase HTTP/2 disabled)",
-        yf.__version__,
+        version("yfinance"),
         version("supabase"),
         version("httpx"),
     )

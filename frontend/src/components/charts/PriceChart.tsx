@@ -14,6 +14,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/shared';
 import { PillButton, PillGroup } from '@/components/shared/PillButton';
 import { fetchPriceHistory, type ChartPeriod } from '@/lib/api';
 import { formatCurrency, getSmartDecimals } from '@/lib/format';
@@ -81,7 +82,7 @@ export function PriceChart({
   const [selectedRange, setSelectedRange] = useState<ChartPeriod>('3mo');
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const { data: chartData = [], isLoading } = useQuery({
+  const { data: chartData = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['priceHistory', ticker, selectedRange],
     queryFn: () => fetchPriceHistory(ticker, selectedRange),
     enabled: !!ticker,
@@ -168,23 +169,6 @@ export function PriceChart({
     setActiveIndex(null);
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-[300px] w-full" />
-      </div>
-    );
-  }
-
-  if (chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-        Žádná data k zobrazení
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Price Header */}
@@ -227,71 +211,84 @@ export function PriceChart({
         ))}
       </PillGroup>
 
-      {/* Main chart */}
-      <div
-        className="w-full rounded-xl border border-border/50 bg-card/45 p-3"
-        style={{ height }}
-        onMouseLeave={handleMouseLeave}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            onMouseMove={handleMouseMove}
-            style={{ outline: 'none' }}
-          >
-            <defs>
-              <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                <stop
-                  offset="0%"
-                  stopColor={priceChange.color}
-                  stopOpacity={0.15}
-                />
-                <stop
-                  offset="100%"
-                  stopColor={priceChange.color}
-                  stopOpacity={0}
-                />
-              </linearGradient>
-            </defs>
+      {isLoading ? (
+        <Skeleton className="w-full" style={{ height }} />
+      ) : isError ? (
+        <ErrorState
+          title="Graf se nepodařilo načíst"
+          description="Cenová data se nepodařilo načíst, zkus to znovu nebo vyber jiné období."
+          retryAction={{ label: 'Zkusit znovu', onClick: () => refetch() }}
+        />
+      ) : chartData.length === 0 ? (
+        <div className="flex items-center justify-center h-[200px] text-muted-foreground">
+          Žádná data k zobrazení pro toto období
+        </div>
+      ) : (
+        <div
+          className="w-full rounded-xl border border-border/50 bg-card/45 p-3"
+          style={{ height }}
+          onMouseLeave={handleMouseLeave}
+        >
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={chartData}
+              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+              onMouseMove={handleMouseMove}
+              style={{ outline: 'none' }}
+            >
+              <defs>
+                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={priceChange.color}
+                    stopOpacity={0.15}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={priceChange.color}
+                    stopOpacity={0}
+                  />
+                </linearGradient>
+              </defs>
 
-            <CartesianGrid horizontal={false} vertical={false} />
+              <CartesianGrid horizontal={false} vertical={false} />
 
-            <XAxis
-              dataKey="date"
-              tickFormatter={(date) => formatXAxisDate(date, selectedRange)}
-              tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
-              axisLine={false}
-              tickLine={false}
-              minTickGap={50}
-            />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(date) => formatXAxisDate(date, selectedRange)}
+                tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                axisLine={false}
+                tickLine={false}
+                minTickGap={50}
+              />
 
-            <YAxis
-              domain={priceDomain}
-              tickFormatter={(value) => formatNumber(value, yAxisDecimals)}
-              tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
-              axisLine={false}
-              tickLine={false}
-              orientation="right"
-              width={50}
-            />
+              <YAxis
+                domain={priceDomain}
+                tickFormatter={(value) => formatNumber(value, yAxisDecimals)}
+                tick={{ fontSize: 10, fill: 'var(--muted-foreground)' }}
+                axisLine={false}
+                tickLine={false}
+                orientation="right"
+                width={50}
+              />
 
-            {/* Hidden tooltip for crosshair */}
-            <Tooltip content={() => null} cursor={false} />
+              {/* Hidden tooltip for crosshair */}
+              <Tooltip content={() => null} cursor={false} />
 
-            {/* Area chart */}
-            <Area
-              type="monotone"
-              dataKey="close"
-              stroke={priceChange.color}
-              strokeWidth={2}
-              fill="url(#colorPrice)"
-              isAnimationActive={false}
-              baseValue="dataMin"
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+              {/* Area chart */}
+              <Area
+                type="monotone"
+                dataKey="close"
+                stroke={priceChange.color}
+                strokeWidth={2}
+                fill="url(#colorPrice)"
+                isAnimationActive={false}
+                baseValue="dataMin"
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,9 +12,8 @@ import { formatPrice } from '@/lib/format';
 interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete: (id: string) => void;
-  onUpdate: (id: string, content: string) => void;
+  onUpdate: (id: string, content: string) => Promise<unknown>;
   isDeleting?: boolean;
-  isUpdating?: boolean;
 }
 
 function formatDate(iso: string) {
@@ -62,15 +61,46 @@ function EntrySurface({
 }
 
 
+interface EntryEditFormProps {
+  content: string;
+  onChange: (html: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  error: string | null;
+}
+
+function EntryEditForm({ content, onChange, onSave, onCancel, saving, error }: EntryEditFormProps) {
+  return (
+    <div className="space-y-2">
+      <RichTextEditor content={content} onChange={onChange} onSubmit={onSave} autoFocus />
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          Změny se nepodařilo uložit: {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" onClick={onSave} disabled={saving}>
+          {saving ? 'Ukládám...' : 'Uložit'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
+          Zrušit
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function JournalEntryCard({
   entry,
   onDelete,
   onUpdate,
   isDeleting,
-  isUpdating,
 }: JournalEntryCardProps) {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(entry.content);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [noteExpanded, setNoteExpanded] = useState(false);
   const [reportExpanded, setReportExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -80,19 +110,47 @@ export function JournalEntryCard({
     : null;
   const reportPortfolioName = entry.metadata.portfolio_name ?? portfolioName;
 
-  const handleSaveEdit = () => {
+  const startEditing = () => {
+    setEditContent(entry.content);
+    setSaveError(null);
+    setEditing(true);
+  };
+
+  // The editor closes only once the change is saved; a failure keeps the text for another try
+  const handleSaveEdit = async () => {
+    if (saving) return;
     if (editContent.trim() === entry.content.trim()) {
       setEditing(false);
       return;
     }
-    onUpdate(entry.id, editContent);
-    setEditing(false);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onUpdate(entry.id, editContent);
+      setEditing(false);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Neznámá chyba');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancelEdit = () => {
     setEditContent(entry.content);
+    setSaveError(null);
     setEditing(false);
   };
+
+  const editForm = (
+    <EntryEditForm
+      content={editContent}
+      onChange={setEditContent}
+      onSave={handleSaveEdit}
+      onCancel={handleCancelEdit}
+      saving={saving}
+      error={saveError}
+    />
+  );
 
   // ── note ──────────────────────────────────────────
   if (entry.type === 'note') {
@@ -117,8 +175,7 @@ export function JournalEntryCard({
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={(e) => {
                 e.stopPropagation();
-                setEditing(true);
-                setEditContent(entry.content);
+                startEditing();
               }}
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -139,22 +196,7 @@ export function JournalEntryCard({
         </div>
 
         {editing ? (
-          <div className="space-y-2">
-            <RichTextEditor
-              content={editContent}
-              onChange={setEditContent}
-              onSubmit={handleSaveEdit}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit} disabled={isUpdating}>
-                {isUpdating ? 'Ukládám...' : 'Uložit'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                Zrušit
-              </Button>
-            </div>
-          </div>
+          editForm
         ) : (
           <button
             type="button"
@@ -300,7 +342,7 @@ export function JournalEntryCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              onClick={() => { setEditing(true); setEditContent(entry.content); }}
+              onClick={startEditing}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -354,22 +396,7 @@ export function JournalEntryCard({
         )}
 
         {editing ? (
-          <div className="space-y-2">
-            <RichTextEditor
-              content={editContent}
-              onChange={setEditContent}
-              onSubmit={handleSaveEdit}
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSaveEdit} disabled={isUpdating}>
-                {isUpdating ? 'Ukládám...' : 'Uložit'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
-                Zrušit
-              </Button>
-            </div>
-          </div>
+          editForm
         ) : (
           entry.content && (
             <RichTextContent html={entry.content} />

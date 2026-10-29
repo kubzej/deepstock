@@ -3,30 +3,9 @@ Stocks service - global stock master data
 """
 from app.core.supabase import supabase
 from typing import List, Optional
-from pydantic import BaseModel
+from app.schemas.stocks import StockCreate, StockUpdate
 
-
-class StockCreate(BaseModel):
-    ticker: str
-    name: str
-    currency: str = "USD"
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    exchange: Optional[str] = None
-    country: Optional[str] = None
-    price_scale: float = 1.0
-    notes: Optional[str] = None
-
-
-class StockUpdate(BaseModel):
-    name: Optional[str] = None
-    currency: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    exchange: Optional[str] = None
-    country: Optional[str] = None
-    price_scale: Optional[float] = None
-    notes: Optional[str] = None
+CLEARABLE_STOCK_FIELDS = ("sector", "industry", "exchange", "country", "notes")
 
 
 class StockService:
@@ -144,23 +123,13 @@ class StockService:
     
     async def update(self, stock_id: str, data: StockUpdate) -> Optional[dict]:
         """Update stock details."""
-        update_data = {}
-        if data.name is not None:
-            update_data["name"] = data.name
-        if data.currency is not None:
-            update_data["currency"] = data.currency
-        if data.sector is not None:
-            update_data["sector"] = data.sector
-        if data.industry is not None:
-            update_data["industry"] = data.industry
-        if data.exchange is not None:
-            update_data["exchange"] = data.exchange
-        if data.country is not None:
-            update_data["country"] = data.country
-        if data.price_scale is not None:
-            update_data["price_scale"] = data.price_scale
-        if data.notes is not None:
-            update_data["notes"] = data.notes
+        # Only fields present in the request; an explicit null clears the optional ones,
+        # the required ones (name, currency, price_scale) ignore it
+        update_data = {
+            field: value
+            for field, value in data.model_dump(exclude_unset=True).items()
+            if value is not None or field in CLEARABLE_STOCK_FIELDS
+        }
         
         if not update_data:
             return await self.get_by_id(stock_id)

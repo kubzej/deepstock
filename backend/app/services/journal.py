@@ -5,55 +5,47 @@ import logging
 import re
 from datetime import datetime, date
 from typing import List, Optional
-from pydantic import BaseModel
 from app.core.supabase import supabase
 from app.core.config import get_settings
+from app.schemas.journal import (
+    ChannelCreate,
+    ChannelUpdate,
+    EntryCreate,
+    EntryUpdate,
+    SectionCreate,
+    SectionUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # ============================================
-# Pydantic schemas
-# ============================================
-
-class SectionCreate(BaseModel):
-    name: str
-    color: str = "#6b7280"
-    sort_order: int = 0
-
-
-class SectionUpdate(BaseModel):
-    name: Optional[str] = None
-    color: Optional[str] = None
-    sort_order: Optional[int] = None
-
-
-class ChannelCreate(BaseModel):
-    name: str
-    section_id: Optional[str] = None
-    sort_order: int = 0
-
-
-class ChannelUpdate(BaseModel):
-    name: Optional[str] = None
-    section_id: Optional[str] = None
-    sort_order: Optional[int] = None
-
-
-class EntryCreate(BaseModel):
-    channel_id: str
-    type: str  # note | ai_report | ext_ref
-    content: str
-    metadata: dict = {}
-
-
-class EntryUpdate(BaseModel):
-    content: str
-
-
-# ============================================
 # JournalService
 # ============================================
+
+def journal_storage_prefix() -> str:
+    return f"{get_settings().supabase_url}/storage/v1/object/public/journal/"
+
+
+def owned_image_paths(html: str, owner_id: str) -> List[str]:
+    """Storage paths of the owner's uploaded images referenced in entry HTML.
+
+    Uploads live at "<user_id>/<file>"; foreign, external or traversing
+    references are ignored.
+    """
+    if not html:
+        return []
+    storage_prefix = journal_storage_prefix()
+    owner_prefix = f"{owner_id}/"
+    paths = []
+    for src in re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html):
+        if not src.startswith(storage_prefix):
+            continue
+        path = src[len(storage_prefix):]
+        if path.startswith(owner_prefix) and "/" not in path[len(owner_prefix):] and ".." not in path:
+            paths.append(path)
+    return paths
+
 
 class JournalService:
 
@@ -334,25 +326,22 @@ class JournalService:
         return response.data[0] if response.data else None
 
     async def delete_entry(self, entry_id: str) -> bool:
-        # Fetch entry first to clean up storage images
-        entry = supabase.table("journal_entries").select("content").eq("id", entry_id).execute()
+        # Fetch entry first to clean up storage images; the owner comes from the
+        # entry's channel so only that user's files can be removed.
+        entry = supabase.table("journal_entries") \
+            .select("content, journal_channels(user_id)") \
+            .eq("id", entry_id) \
+            .execute()
         if entry.data:
-            self._delete_storage_images(entry.data[0].get("content", ""))
+            owner_id = (entry.data[0].get("journal_channels") or {}).get("user_id")
+            if owner_id:
+                self._delete_storage_images(entry.data[0].get("content", ""), owner_id)
         supabase.table("journal_entries").delete().eq("id", entry_id).execute()
         return True
 
-    def _delete_storage_images(self, html: str) -> None:
-        """Remove Supabase Storage images referenced in entry HTML."""
-        if not html:
-            return
-        settings = get_settings()
-        # Match src="..." from img tags pointing to our Supabase storage
-        storage_prefix = f"{settings.supabase_url}/storage/v1/object/public/journal/"
-        paths = []
-        for src in re.findall(r'<img[^>]+src=["\']([^"\']+)["\']', html):
-            if src.startswith(storage_prefix):
-                path = src[len(storage_prefix):]
-                paths.append(path)
+    def _delete_storage_images(self, html: str, owner_id: str) -> None:
+        """Remove the owner's Supabase Storage images referenced in entry HTML."""
+        paths = owned_image_paths(html, owner_id)
         if paths:
             try:
                 supabase.storage.from_("journal").remove(paths)
@@ -476,36 +465,6 @@ class JournalService:
         except Exception as e:
             logger.warning(f"Failed to create option journal entry ({ticker} {option_transaction_id}): {e}")
 
-    async def update_option_journal_entry(
-        self,
-        option_transaction_id: str,
-        notes: Optional[str],
-        action: str,
-        contracts: int,
-        premium: Optional[float],
-    ) -> None:
-        """Update journal entry linked to an option transaction."""
-        try:
-            existing = supabase.table("journal_entries") \
-                .select("id, metadata") \
-                .eq("linked_option_transaction_id", option_transaction_id) \
-                .execute()
-            if not existing.data:
-                return
-            entry = existing.data[0]
-            new_metadata = {
-                **entry["metadata"],
-                "action": action,
-                "contracts": contracts,
-                "premium": premium,
-            }
-            supabase.table("journal_entries") \
-                .update({"content": notes or "", "metadata": new_metadata}) \
-                .eq("id", entry["id"]) \
-                .execute()
-        except Exception as e:
-            logger.warning(f"Failed to update option journal entry ({option_transaction_id}): {e}")
-
     async def delete_transaction_journal_entry(self, transaction_id: str) -> None:
         """Delete journal entry linked to a stock transaction."""
         try:
@@ -517,18 +476,6 @@ class JournalService:
                 await self.delete_entry(existing.data[0]["id"])
         except Exception as e:
             logger.warning(f"Failed to delete transaction journal entry ({transaction_id}): {e}")
-
-    async def delete_option_journal_entry(self, option_transaction_id: str) -> None:
-        """Delete journal entry linked to an option transaction."""
-        try:
-            existing = supabase.table("journal_entries") \
-                .select("id") \
-                .eq("linked_option_transaction_id", option_transaction_id) \
-                .execute()
-            if existing.data:
-                await self.delete_entry(existing.data[0]["id"])
-        except Exception as e:
-            logger.warning(f"Failed to delete option journal entry ({option_transaction_id}): {e}")
 
 
 journal_service = JournalService()

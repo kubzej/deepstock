@@ -3,10 +3,23 @@ PDF generator — converts AI research report markdown to a styled PDF.
 
 Pipeline: markdown → HTML (Jinja2 template + CSS) → PDF (WeasyPrint)
 """
+import html as html_lib
+import logging
 import re
 import markdown2
-from weasyprint import HTML as WeasyprintHTML
+from weasyprint import HTML as WeasyprintHTML, default_url_fetcher
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+def _data_only_url_fetcher(url, *args, **kwargs):
+    """Allow only inline data: URLs; report markdown may carry raw HTML from the LLM."""
+    if url.startswith("data:"):
+        return default_url_fetcher(url, *args, **kwargs)
+    logger.warning("Blocked external resource while rendering PDF: %s", url[:200])
+    raise ValueError("External resources are not allowed in PDF reports")
+
 
 PDF_CSS = """
 * {
@@ -241,17 +254,18 @@ def generate_pdf(report: dict) -> bytes:
 
     report_type = report.get("report_type", "full_analysis")
 
+    esc = lambda value: html_lib.escape(str(value))
     html = HTML_TEMPLATE.format(
         css=PDF_CSS,
-        ticker=report.get("ticker", ""),
-        company_name=report.get("company_name", ""),
-        report_type_label=REPORT_TYPE_LABELS.get(report_type, report_type),
-        date=date_fmt,
-        current_price=report.get("current_price", ""),
-        model_used=report.get("model_used", ""),
+        ticker=esc(report.get("ticker", "")),
+        company_name=esc(report.get("company_name", "")),
+        report_type_label=esc(REPORT_TYPE_LABELS.get(report_type, report_type)),
+        date=esc(date_fmt),
+        current_price=esc(report.get("current_price", "")),
+        model_used=esc(report.get("model_used", "")),
         content_html=content_html,
-        generated_at=generated_at_fmt,
+        generated_at=esc(generated_at_fmt),
     )
 
-    pdf_bytes = WeasyprintHTML(string=html).write_pdf()
+    pdf_bytes = WeasyprintHTML(string=html, url_fetcher=_data_only_url_fetcher).write_pdf()
     return pdf_bytes

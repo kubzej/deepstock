@@ -3,6 +3,7 @@ Prompt template for AI Portfolio Advisor.
 Analyzes holdings, technical signals, and recent transactions.
 Returns a structured Markdown report in Czech.
 """
+from app.services.portfolio_accounting import holding_market_value_czk
 
 SYSTEM_PROMPT = """Jsi zkušený portfolio poradce. Analyzuješ akciové portfolio českého investora a poskytneš mu konkrétní, akční doporučení.
 
@@ -65,9 +66,16 @@ def format_portfolio_context(
     holdings: list[dict],
     quotes: dict,
     tech_data: dict[str, dict],
-    snapshot: dict | None = None,
+    snapshot: dict,
+    rates: dict[str, float],
 ) -> str:
-    """Format holdings with quotes and tech signals into a compact context string."""
+    """
+    Format holdings with quotes and tech signals into a compact context string.
+
+    Totals come from the snapshot. Sector, currency and position weights are shares of the
+    current market value, so they describe what the portfolio is now, not what was invested.
+    Positions without a live price are left out of them, as the snapshot does.
+    """
 
     def f(v, d=2):
         return f"{v:.{d}f}" if v is not None else "N/A"
@@ -77,12 +85,14 @@ def format_portfolio_context(
             return "N/A"
         return f"+{v:.1f}%" if v > 0 else f"{v:.1f}%"
 
+    def weights(value_by_key: dict[str, float], total: float) -> str:
+        ranked = sorted(value_by_key.items(), key=lambda item: item[1], reverse=True)
+        return " | ".join(f"{key}: {value / total * 100:.0f}%" for key, value in ranked)
+
     lines = []
-    total_value_czk = 0.0
-    total_cost_czk = 0.0
     sector_czk: dict[str, float] = {}
     currency_czk: dict[str, float] = {}
-    enriched_positions: list[dict] = []
+    position_czk: dict[str, float] = {}
 
     for h in holdings:
         # ticker, currency, sector, price_scale are nested inside the joined "stocks" object
@@ -92,20 +102,22 @@ def format_portfolio_context(
         avg_cost = h.get("avg_cost_per_share") or h.get("avg_cost") or 0
         currency = stock_info.get("currency") or h.get("currency", "USD")
         sector = stock_info.get("sector") or h.get("sector") or "N/A"
-        invested_czk = float(h.get("total_invested_czk") or 0)
         # price_scale converts raw yfinance price to user-facing currency unit
         # e.g. LSE stocks quote in pence → scale 0.01 → GBP
         price_scale = float(stock_info.get("price_scale") or h.get("price_scale") or 1.0)
-        total_value_czk += invested_czk
-        total_cost_czk += invested_czk
-        sector_czk[sector] = sector_czk.get(sector, 0.0) + invested_czk
-        currency_czk[currency] = currency_czk.get(currency, 0.0) + invested_czk
 
         quote = quotes.get(ticker) or {}
         raw_price = quote.get("price")
         current_price = (raw_price * price_scale) if raw_price is not None else None
         change_pct = quote.get("changePercent")
-        current_value_czk = float(h.get("current_value_czk") or 0)
+
+        value_czk = holding_market_value_czk(
+            float(shares or 0), raw_price, price_scale, float(rates.get(currency, 1.0))
+        )
+        if value_czk is not None:
+            sector_czk[sector] = sector_czk.get(sector, 0.0) + value_czk
+            currency_czk[currency] = currency_czk.get(currency, 0.0) + value_czk
+            position_czk[ticker] = position_czk.get(ticker, 0.0) + value_czk
 
         tech = tech_data.get(ticker) or {}
         rsi = tech.get("rsi14")
@@ -133,65 +145,32 @@ def format_portfolio_context(
             line += f" | SMA200: ${f(sma200)}"
 
         lines.append(line)
-        enriched_positions.append({
-            "ticker": ticker,
-            "sector": sector,
-            "currency": currency,
-            "invested_czk": invested_czk,
-            "current_value_czk": current_value_czk,
-            "unrealized_pct": unrealized_pct,
-            "trend": trend,
-            "rsi": rsi,
-        })
 
-    snapshot = snapshot or {}
-    snapshot_value = snapshot.get("total_value_czk")
-    snapshot_cost = snapshot.get("total_cost_czk")
-    snapshot_pnl = snapshot.get("total_pnl_czk")
-    snapshot_pnl_pct = snapshot.get("total_pnl_percent")
-    daily_change_czk = snapshot.get("daily_change_czk")
-    daily_change_pct = snapshot.get("daily_change_percent")
+    pnl_sign = "+" if snapshot["total_pnl_czk"] >= 0 else ""
+    day_sign = "+" if snapshot["daily_change_czk"] >= 0 else ""
+    header = (
+        f"Celkem pozic: {len(holdings)}"
+        f" | Aktuální hodnota: ~{snapshot['total_value_czk']:,.0f} CZK"
+        f" | Náklad: ~{snapshot['total_cost_czk']:,.0f} CZK"
+        f" | P/L: {pnl_sign}{snapshot['total_pnl_czk']:,.0f} CZK ({pct(snapshot['total_pnl_percent'])})"
+        f" | Dnes: {day_sign}{snapshot['daily_change_czk']:,.0f} CZK ({pct(snapshot['daily_change_percent'])})"
+    )
 
-    header = f"Celkem pozic: {len(holdings)}"
-    if snapshot_value is not None:
-        header += f" | Aktuální hodnota: ~{snapshot_value:,.0f} CZK"
-    elif total_value_czk > 0:
-        header += f" | Investováno celkem: ~{total_value_czk:,.0f} CZK"
-    if snapshot_cost is not None:
-        header += f" | Náklad: ~{snapshot_cost:,.0f} CZK"
-    elif total_cost_czk > 0:
-        header += f" | Náklad: ~{total_cost_czk:,.0f} CZK"
-    if snapshot_pnl is not None:
-        pnl_sign = "+" if snapshot_pnl >= 0 else ""
-        header += f" | P/L: {pnl_sign}{snapshot_pnl:,.0f} CZK ({pct(snapshot_pnl_pct)})"
-    if daily_change_czk is not None:
-        day_sign = "+" if daily_change_czk >= 0 else ""
-        header += f" | Dnes: {day_sign}{daily_change_czk:,.0f} CZK ({pct(daily_change_pct)})"
-
-    # Sector breakdown
-    exposure_base = snapshot_cost or total_cost_czk or total_value_czk
-    if sector_czk and exposure_base > 0:
-        sector_parts = sorted(sector_czk.items(), key=lambda x: x[1], reverse=True)
-        sector_str = " | ".join(
-            f"{s}: {v / exposure_base * 100:.0f}%" for s, v in sector_parts
+    missing_tickers = snapshot.get("missing_tickers")
+    if missing_tickers:
+        header += (
+            f"\nPozor: chybí aktuální cena pro {', '.join(missing_tickers)} — "
+            "tyto pozice nejsou v hodnotě, nákladu, P/L ani v rozložení sektorů, měn a pozic."
         )
-        header += f"\nSektory: {sector_str}"
 
-    # Currency breakdown
-    if currency_czk and exposure_base > 0:
-        currency_parts = sorted(currency_czk.items(), key=lambda x: x[1], reverse=True)
-        currency_str = " | ".join(
-            f"{c}: {v / exposure_base * 100:.0f}%" for c, v in currency_parts
+    priced_total = sum(position_czk.values())
+    if priced_total > 0:
+        top_positions = dict(sorted(position_czk.items(), key=lambda item: item[1], reverse=True)[:5])
+        header += (
+            f"\nSektory (podíl na aktuální hodnotě): {weights(sector_czk, priced_total)}"
+            f"\nMěny (podíl na aktuální hodnotě): {weights(currency_czk, priced_total)}"
+            f"\nNejvětší pozice (podíl na aktuální hodnotě): {weights(top_positions, priced_total)}"
         )
-        header += f"\nMěny: {currency_str}"
-
-    if enriched_positions and exposure_base > 0:
-        top_positions = sorted(enriched_positions, key=lambda p: p["invested_czk"], reverse=True)[:5]
-        top_str = " | ".join(
-            f"{p['ticker']}: {p['invested_czk'] / exposure_base * 100:.0f}%"
-            for p in top_positions
-        )
-        header += f"\nNejvětší pozice: {top_str}"
 
     return header + "\n\n" + "\n".join(lines)
 

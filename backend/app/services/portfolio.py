@@ -1,62 +1,38 @@
+import logging
+
+from app.core.pagination import encode_cursor, older_than_filter
 from app.core.supabase import supabase
 from app.services.stocks import stock_service
 from app.services.portfolio_accounting import (
     annotate_stock_transactions,
     calculate_stock_holding_totals,
     compute_lot_remaining_shares,
+    find_position_history_error,
+    holding_market_value_czk,
+    require_czk_rate,
 )
 from app.services.market import market_service
 from app.services.exchange import exchange_service
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Callable, List, Optional
 from datetime import datetime, timezone
+from app.schemas.portfolio import (
+    AvailableLot,
+    PortfolioCreate,
+    PortfolioSnapshot,
+    PortfolioUpdate,
+    TransactionCreate,
+    TransactionUpdate,
+)
+
+logger = logging.getLogger(__name__)
 
 
-class PortfolioCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class PortfolioUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-
-
-class TransactionCreate(BaseModel):
-    stock_ticker: str
-    stock_name: Optional[str] = None
-    type: str  # BUY or SELL
-    shares: float
-    price_per_share: float
-    currency: str = "USD"
-    exchange_rate_to_czk: Optional[float] = None
-    fees: float = 0
-    notes: Optional[str] = None
-    executed_at: datetime
-    source_transaction_id: Optional[str] = None  # For SELL: which lot to sell from
-
-
-class AvailableLot(BaseModel):
-    """A BUY lot with remaining shares available for selling."""
-    id: str
-    date: str
-    quantity: float  # Original quantity
-    remaining_shares: float  # Shares not yet sold
-    price_per_share: float
-    currency: str
-    total_amount: float
-    economic_price_per_share: float
-    remaining_cost_basis: float
-    remaining_cost_basis_czk: float
-
-
-class PortfolioSnapshot(BaseModel):
-    total_value_czk: float
-    total_cost_czk: float
-    total_pnl_czk: float
-    total_pnl_percent: float
-    daily_change_czk: float
-    daily_change_percent: float
+def _normalize_timestamp(value: str) -> str:
+    """ISO timestamp with explicit UTC offset, matching how stored rows are returned."""
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.isoformat()
 
 
 def _require_annotated_float(transaction: dict, field_name: str) -> float:
@@ -66,18 +42,97 @@ def _require_annotated_float(transaction: dict, field_name: str) -> float:
     return float(value)
 
 
-class TransactionUpdate(BaseModel):
-    """Update model for transactions - all fields optional."""
-    shares: Optional[float] = None
-    price_per_share: Optional[float] = None
-    currency: Optional[str] = None
-    exchange_rate_to_czk: Optional[float] = None
-    fees: Optional[float] = None
-    notes: Optional[str] = None
-    executed_at: Optional[datetime] = None
-
-
 class PortfolioService:
+
+    async def _recalculate_or_undo(
+        self,
+        portfolio_id: str,
+        stock_id: str,
+        undo: Callable[[], object],
+    ) -> None:
+        """Recalculate the holding after a write; if that fails, undo the write.
+
+        Keeps a transaction write and its holding recalculation all-or-nothing, so a
+        failed request leaves no stored transaction that a retry would duplicate.
+        """
+        try:
+            await self._recalculate_holding(portfolio_id, stock_id)
+        except Exception:
+            logger.exception("Holding recalculation failed for %s/%s, undoing write", portfolio_id, stock_id)
+            try:
+                undo()
+            except Exception:
+                logger.exception("Could not undo write for %s/%s; holding is stale until recalculated", portfolio_id, stock_id)
+            raise
+
+    async def create_transaction_record(self, tx_data: dict) -> dict:
+        """Validate, insert a stock transaction and recalculate its position, all-or-nothing.
+
+        Single entry point for writing the `transactions` table; other services
+        (e.g. option settlement) go through it instead of writing rows themselves, so
+        every sell is checked against the whole history of its position.
+        """
+        portfolio_id, stock_id = tx_data["portfolio_id"], tx_data["stock_id"]
+        require_czk_rate(tx_data.get("currency"), tx_data.get("exchange_rate_to_czk"))
+
+        if tx_data["type"] == "SELL":
+            position_transactions = await self._get_stock_transactions_for_position(portfolio_id, stock_id)
+            candidate = {
+                **tx_data,
+                "id": "",
+                # Same format as stored rows (date-only values would sort before them)
+                "executed_at": _normalize_timestamp(tx_data["executed_at"]),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            history_error = find_position_history_error([*position_transactions, candidate])
+            if history_error:
+                raise ValueError(history_error)
+
+        created = supabase.table("transactions").insert(tx_data).execute().data[0]
+        await self._recalculate_or_undo(
+            portfolio_id,
+            stock_id,
+            undo=lambda: supabase.table("transactions").delete().eq("id", created["id"]).execute(),
+        )
+        return created
+
+    async def discard_transaction_record(self, transaction: dict) -> None:
+        """Compensate for a transaction created earlier in an operation that then failed.
+
+        Runs while the original error is propagating, so it logs its own failures
+        instead of raising and masking that error.
+        """
+        try:
+            supabase.table("transactions").delete().eq("id", transaction["id"]).execute()
+            await self._recalculate_holding(transaction["portfolio_id"], transaction["stock_id"])
+        except Exception:
+            logger.exception(
+                "Could not discard transaction %s; remove it and recalculate the holding manually",
+                transaction.get("id"),
+            )
+
+    async def _with_annotations(self, tx: dict, portfolio_id: str, stock_id: str) -> dict:
+        """Return the stored transaction with accounting annotations.
+
+        The write is already committed at this point, so a failure here must not
+        surface as an error (the client would retry and duplicate the write).
+        """
+        try:
+            annotated = await self._annotate_transactions(
+                await self._get_stock_transactions_for_position(portfolio_id, stock_id)
+            )
+        except Exception:
+            logger.exception("Could not annotate transaction %s after write", tx.get("id"))
+            return tx
+        return next((item for item in annotated if item["id"] == tx["id"]), tx)
+
+    async def _get_transaction_row(self, portfolio_id: str, transaction_id: str) -> Optional[dict]:
+        response = supabase.table("transactions") \
+            .select("*") \
+            .eq("id", transaction_id) \
+            .eq("portfolio_id", portfolio_id) \
+            .execute()
+        return response.data[0] if response.data else None
 
     async def _get_stock_transactions_for_position(
         self,
@@ -332,13 +387,14 @@ class PortfolioService:
         """
         Get transactions across all user's portfolios.
 
-        Supports cursor-based pagination: pass cursor (ISO datetime of the
-        last seen executed_at) to fetch the next page of older transactions.
+        Supports cursor-based pagination: pass the previous page's next_cursor
+        to fetch the next page of older transactions. Rows are ordered by
+        (executed_at, id) so transactions sharing a timestamp are never skipped.
 
         Returns:
             {
                 "data": [...],
-                "next_cursor": "<ISO datetime> | None",
+                "next_cursor": "<opaque cursor> | None",
                 "has_more": bool,
             }
         """
@@ -352,7 +408,8 @@ class PortfolioService:
         query = supabase.table("transactions") \
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares), portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
-            .order("executed_at", desc=True)
+            .order("executed_at", desc=True) \
+            .order("id", desc=True)
 
         if stock_ticker:
             stock_response = supabase.table("stocks") \
@@ -364,7 +421,7 @@ class PortfolioService:
             query = query.eq("stock_id", stock_response.data[0]["id"])
 
         if cursor:
-            query = query.lt("executed_at", cursor)
+            query = query.or_(older_than_filter("executed_at", cursor))
 
         # Fetch one extra row to determine whether more pages exist
         response = query.limit(limit + 1).execute()
@@ -373,7 +430,7 @@ class PortfolioService:
         has_more = len(rows) > limit
         data = rows[:limit]
 
-        next_cursor = data[-1]["executed_at"] if (has_more and data) else None
+        next_cursor = encode_cursor(data[-1]["executed_at"], data[-1]["id"]) if (has_more and data) else None
 
         annotated = await self._annotate_transactions(data)
 
@@ -466,9 +523,8 @@ class PortfolioService:
         Add a transaction and update holdings.
         This is the core logic for portfolio management.
         
-        For SELL transactions:
-        - If source_transaction_id is provided, sell from that specific lot
-        - Otherwise, use FIFO (oldest lots first)
+        A SELL must name the lot it sells from (source_transaction_id); the lot is
+        validated against the position history before anything is stored.
         """
         # 1. Ensure stock exists in master table
         stock = await stock_service.get_or_create(data.stock_ticker, data.stock_name, user_id=user_id)
@@ -490,35 +546,11 @@ class PortfolioService:
             "source_transaction_id": data.source_transaction_id,
         }
         
-        # 3. Validate available shares for SELL
-        if data.type.upper() == "SELL":
-            holding = supabase.table("holdings") \
-                .select("shares") \
-                .eq("portfolio_id", portfolio_id) \
-                .eq("stock_id", stock["id"]) \
-                .execute()
-            available = float(holding.data[0]["shares"]) if holding.data else 0.0
-            if data.shares > available:
-                raise ValueError(
-                    f"Nedostatek akcií: k dispozici {available}, požadováno {data.shares}"
-                )
+        # 3. Validate (sells), store and recalculate the holding - all-or-nothing
+        created_tx = await self.create_transaction_record(tx_data)
 
-        tx_response = supabase.table("transactions") \
-            .insert(tx_data) \
-            .execute()
+        return await self._with_annotations(created_tx, portfolio_id, stock["id"])
 
-        # 4. Update holdings (recalculate position)
-        await self._recalculate_holding(portfolio_id, stock["id"])
-        
-        created_tx = tx_response.data[0]
-        annotated_transactions = await self._annotate_transactions(
-            await self._get_stock_transactions_for_position(portfolio_id, stock["id"])
-        )
-        return next(
-            (tx for tx in annotated_transactions if tx["id"] == created_tx["id"]),
-            created_tx,
-        )
-    
     async def get_all_open_lots(self, portfolio_id: str) -> List[dict]:
         """
         Get all open lots across all holdings in a portfolio.
@@ -653,17 +685,9 @@ class PortfolioService:
         Update a transaction. Only allows updating certain fields.
         Recalculates holding after update.
         """
-        # First get existing transaction to verify portfolio and get stock_id
-        existing = supabase.table("transactions") \
-            .select("*") \
-            .eq("id", transaction_id) \
-            .eq("portfolio_id", portfolio_id) \
-            .execute()
-        
-        if not existing.data:
+        tx = await self._get_transaction_row(portfolio_id, transaction_id)
+        if not tx:
             return None
-        
-        tx = existing.data[0]
         stock_id = tx["stock_id"]
 
         # Lot integrity guard:
@@ -686,6 +710,26 @@ class PortfolioService:
                     "Nejprve upravte nebo smažte navázané SELL transakce."
                 )
         
+        if data.shares is not None or data.executed_at is not None:
+            patched = {**tx}
+            if data.shares is not None:
+                patched["shares"] = data.shares
+            if data.executed_at is not None:
+                patched["executed_at"] = data.executed_at.isoformat()
+            position_transactions = await self._get_stock_transactions_for_position(
+                portfolio_id, stock_id
+            )
+            history_error = find_position_history_error(
+                [patched if item["id"] == transaction_id else item for item in position_transactions]
+            )
+            if history_error:
+                raise ValueError(history_error)
+
+        require_czk_rate(
+            data.currency if data.currency is not None else tx.get("currency"),
+            data.exchange_rate_to_czk if data.exchange_rate_to_czk is not None else tx.get("exchange_rate_to_czk"),
+        )
+
         # Build update dict
         update_data = {}
         if data.shares is not None:
@@ -709,46 +753,35 @@ class PortfolioService:
         if not update_data:
             return tx
         
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-        
         response = supabase.table("transactions") \
             .update(update_data) \
             .eq("id", transaction_id) \
             .execute()
-        
-        # Recalculate holding
-        await self._recalculate_holding(portfolio_id, stock_id)
-        
+
+        # Recalculate holding; restore the previous values if that fails
+        previous_values = {key: tx[key] for key in update_data if key in tx}
+        await self._recalculate_or_undo(
+            portfolio_id,
+            stock_id,
+            undo=lambda: supabase.table("transactions").update(previous_values).eq("id", transaction_id).execute(),
+        )
+
         updated_tx = response.data[0] if response.data else None
         if not updated_tx:
             return None
 
-        annotated_transactions = await self._annotate_transactions(
-            await self._get_stock_transactions_for_position(portfolio_id, stock_id)
-        )
-        return next(
-            (item for item in annotated_transactions if item["id"] == updated_tx["id"]),
-            updated_tx,
-        )
+        return await self._with_annotations(updated_tx, portfolio_id, stock_id)
 
     async def delete_transaction(self, portfolio_id: str, transaction_id: str) -> bool:
         """
         Delete a transaction. Recalculates holding after deletion.
         Warning: Deleting a BUY that has been sold from will cause issues.
         """
-        # First get existing transaction to verify portfolio and get stock_id
-        existing = supabase.table("transactions") \
-            .select("*") \
-            .eq("id", transaction_id) \
-            .eq("portfolio_id", portfolio_id) \
-            .execute()
-        
-        if not existing.data:
+        tx = await self._get_transaction_row(portfolio_id, transaction_id)
+        if not tx:
             return False
-        
-        tx = existing.data[0]
         stock_id = tx["stock_id"]
-        
+
         # Check if this BUY was already consumed by SELL transactions
         if tx["type"] == "BUY":
             sold_amount = await self._get_sold_amount_for_buy_lot(tx)
@@ -759,22 +792,28 @@ class PortfolioService:
                     "- navázané na lot nebo přes fallback alokaci. "
                     "Nejprve upravte nebo smažte navázané SELL transakce."
                 )
-        
-        # Delete transaction
+
         supabase.table("transactions") \
             .delete() \
             .eq("id", transaction_id) \
             .execute()
-        
-        # Recalculate holding
-        await self._recalculate_holding(portfolio_id, stock_id)
-        
+
+        # A retry of the delete would only report "not found", so there is nothing to
+        # undo here; one retry of the recalculation covers a transient failure.
+        try:
+            await self._recalculate_holding(portfolio_id, stock_id)
+        except Exception:
+            logger.warning("Holding recalculation failed after delete, retrying once", exc_info=True)
+            await self._recalculate_holding(portfolio_id, stock_id)
+
         return True
 
     async def get_portfolio_snapshot(self, portfolio_id: Optional[str], user_id: str) -> PortfolioSnapshot:
         """
         Compute live portfolio snapshot: total value, cost basis, P/L, and daily change in CZK.
         portfolio_id=None means all portfolios for the user.
+        A holding without a quote is excluded from value and cost (so P/L stays consistent)
+        and listed in missing_tickers.
         """
         if portfolio_id:
             holdings = await self.get_holdings(portfolio_id)
@@ -798,6 +837,7 @@ class PortfolioService:
         total_value_czk = 0.0
         total_cost_czk = 0.0
         daily_change_czk = 0.0
+        missing_tickers: set[str] = set()
 
         for holding in holdings:
             ticker = holding["stocks"]["ticker"]
@@ -808,10 +848,13 @@ class PortfolioService:
             rate = float(rates.get(currency, 1.0))
 
             quote = quotes.get(ticker, {})
-            price = float(quote.get("price") or 0)
+            value_czk = holding_market_value_czk(shares, float(quote.get("price") or 0), scale, rate)
+            if value_czk is None:
+                missing_tickers.add(ticker)
+                continue
             change = float(quote.get("change") or 0)
 
-            total_value_czk += price * scale * shares * rate
+            total_value_czk += value_czk
             total_cost_czk += total_invested_czk
             daily_change_czk += change * scale * shares * rate
 
@@ -827,6 +870,7 @@ class PortfolioService:
             total_pnl_percent=round(total_pnl_percent, 4),
             daily_change_czk=round(daily_change_czk, 2),
             daily_change_percent=round(daily_change_percent, 4),
+            missing_tickers=sorted(missing_tickers),
         )
 
 

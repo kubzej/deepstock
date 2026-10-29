@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRejectedField } from '@/hooks/useRejectedField';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +12,12 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { reject, isRejected } = useRejectedField();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return reject('email');
+    if (!password) return reject('password');
     setLoading(true);
     setError(null);
 
@@ -33,7 +37,7 @@ export function Login() {
           <p className="text-muted-foreground">Přihlaste se pro pokračování</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -47,6 +51,7 @@ export function Login() {
               <Input
                 id="email"
                 type="email"
+                aria-invalid={isRejected('email', !email.trim())}
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setEmail(e.target.value)
@@ -64,6 +69,7 @@ export function Login() {
               <Input
                 id="password"
                 type="password"
+                aria-invalid={isRejected('password', !password)}
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setPassword(e.target.value)

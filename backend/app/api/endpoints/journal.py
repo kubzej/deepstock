@@ -2,26 +2,28 @@
 Journal API endpoints - channels, sections, entries
 """
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
+import asyncio
 import ipaddress
+import socket
 import uuid
 import urllib.parse
 from app.core.supabase import supabase
 from typing import List, Optional
 import re
 import httpx
-from app.services.journal import (
-    journal_service,
-    SectionCreate,
-    SectionUpdate,
-    ChannelCreate,
-    ChannelUpdate,
-    EntryCreate,
-    EntryUpdate,
-)
+from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from starlette.requests import Request
+from app.schemas.journal import (
+    ChannelCreate,
+    ChannelUpdate,
+    EntryCreate,
+    EntryUpdate,
+    SectionCreate,
+    SectionUpdate,
+)
 
 router = APIRouter()
 
@@ -210,43 +212,117 @@ def _extract_title(html: str) -> str:
 
 TWITTER_RE = re.compile(r'https?://(?:www\.)?(?:twitter\.com|x\.com)/')
 
-# Private/internal IP ranges to block for SSRF protection
-_BLOCKED_NETWORKS = [
-    ipaddress.ip_network('127.0.0.0/8'),
-    ipaddress.ip_network('10.0.0.0/8'),
-    ipaddress.ip_network('172.16.0.0/12'),
-    ipaddress.ip_network('192.168.0.0/16'),
-    ipaddress.ip_network('169.254.0.0/16'),  # link-local / cloud metadata
-    ipaddress.ip_network('0.0.0.0/8'),
-    ipaddress.ip_network('::1/128'),
-    ipaddress.ip_network('fc00::/7'),  # IPv6 ULA
-    ipaddress.ip_network('fe80::/10'),  # IPv6 link-local
-]
+_MAX_PREVIEW_BYTES = 1_000_000
+_MAX_PREVIEW_REDIRECTS = 3
+_NAT64_NETWORK = ipaddress.ip_network('64:ff9b::/96')
 
-def _is_private_host(hostname: str) -> bool:
-    """Check if hostname resolves to a private/internal IP."""
-    import socket
+
+def _embedded_ipv4(ip):
+    """IPv4 address hidden inside an IPv6 one (mapped, 6to4, NAT64), or None."""
+    if ip.version != 6:
+        return None
+    if ip.ipv4_mapped:
+        return ip.ipv4_mapped
+    if ip.sixtofour:
+        return ip.sixtofour
+    if ip in _NAT64_NETWORK:
+        return ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return None
+
+
+def _is_public_ip(ip) -> bool:
+    embedded = _embedded_ipv4(ip)
+    if embedded is not None and not embedded.is_global:
+        return False
+    return ip.is_global and not ip.is_multicast
+
+
+async def _resolve_public_ips(hostname: str) -> list:
+    """Resolve hostname once; return its addresses only if every one is public."""
     try:
-        addr_infos = socket.getaddrinfo(hostname, None)
-        for family, _, _, _, sockaddr in addr_infos:
-            ip = ipaddress.ip_address(sockaddr[0])
-            for net in _BLOCKED_NETWORKS:
-                if ip in net:
-                    return True
-    except (socket.gaierror, ValueError):
-        return True  # Cannot resolve → block
-    return False
+        infos = await asyncio.to_thread(
+            socket.getaddrinfo, hostname, None, type=socket.SOCK_STREAM
+        )
+    except socket.gaierror:
+        raise HTTPException(status_code=400, detail="Neplatná URL adresa")
+    ips = []
+    for *_, sockaddr in infos:
+        ip = ipaddress.ip_address(sockaddr[0].split('%')[0])
+        if not _is_public_ip(ip):
+            raise HTTPException(status_code=400, detail="Přístup k interním adresám není povolen")
+        if ip not in ips:
+            ips.append(ip)
+    if not ips:
+        raise HTTPException(status_code=400, detail="Neplatná URL adresa")
+    return ips
 
-def _validate_url(url: str) -> str:
-    """Validate URL for SSRF protection. Returns normalized URL or raises."""
+
+def _parse_http_url(url: str) -> urllib.parse.ParseResult:
+    """Validate scheme and hostname of a user-supplied URL."""
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ('http', 'https'):
         raise HTTPException(status_code=400, detail="Pouze HTTP/HTTPS URL jsou povoleny")
     if not parsed.hostname:
         raise HTTPException(status_code=400, detail="Neplatná URL adresa")
-    if _is_private_host(parsed.hostname):
-        raise HTTPException(status_code=400, detail="Přístup k interním adresám není povolen")
-    return url
+    return parsed
+
+
+async def _fetch_preview_html(url: str) -> str:
+    """Fetch a page for URL preview, connecting only to validated public IPs.
+
+    The hostname is resolved once and the request goes to that exact address
+    (Host header and SNI keep the original name), so a second DNS answer cannot
+    redirect the connection. Every redirect target goes through the same path.
+    """
+    headers = {"User-Agent": "Mozilla/5.0 DeepStock/1.0"}
+    async with httpx.AsyncClient(follow_redirects=False, timeout=8) as client:
+        for _ in range(_MAX_PREVIEW_REDIRECTS + 1):
+            parsed = _parse_http_url(url)
+            hostname = parsed.hostname
+            ips = await _resolve_public_ips(hostname)
+            host_header = f"[{hostname}]" if ":" in hostname else hostname
+            if parsed.port:
+                host_header += f":{parsed.port}"
+
+            response_location = None
+            last_error = None
+            for ip in ips:
+                ip_host = f"[{ip}]" if ip.version == 6 else str(ip)
+                netloc = f"{ip_host}:{parsed.port}" if parsed.port else ip_host
+                target = parsed._replace(netloc=netloc).geturl()
+                try:
+                    async with client.stream(
+                        "GET",
+                        target,
+                        headers={**headers, "Host": host_header},
+                        extensions={"sni_hostname": hostname},
+                    ) as resp:
+                        if resp.is_redirect:
+                            response_location = resp.headers.get("location", "")
+                            break
+                        if resp.status_code != 200:
+                            raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
+                        chunks, size = [], 0
+                        async for chunk in resp.aiter_bytes():
+                            chunks.append(chunk)
+                            size += len(chunk)
+                            if size >= _MAX_PREVIEW_BYTES:
+                                break
+                        body = b"".join(chunks)[:_MAX_PREVIEW_BYTES]
+                        return body.decode(resp.encoding or "utf-8", errors="replace")
+                except httpx.RequestError as e:
+                    last_error = e
+                    continue
+            else:
+                if last_error is not None:
+                    raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
+
+            if not response_location:
+                raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
+            url = urllib.parse.urljoin(url, response_location)
+
+    raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
+
 
 @router.get("/url-preview")
 @limiter.limit("30/minute")
@@ -255,8 +331,8 @@ async def fetch_url_preview(
     url: str = Query(...),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    # Validate URL against SSRF
-    _validate_url(url)
+    # Validate scheme/host here; public-IP resolution happens per request in _fetch_preview_html
+    _parse_http_url(url)
 
     # Twitter/X — use oEmbed API
     if TWITTER_RE.match(url):
@@ -287,27 +363,7 @@ async def fetch_url_preview(
         raise HTTPException(status_code=422, detail="Nepodařilo se načíst tweet")
 
     # Generic OG fetch
-    try:
-        async with httpx.AsyncClient(follow_redirects=False, timeout=8) as client:
-            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0 DeepStock/1.0"})
-            # Follow redirects manually with SSRF check
-            redirects = 0
-            while resp.is_redirect and redirects < 3:
-                redirects += 1
-                location = resp.headers.get("location", "")
-                if location:
-                    # Resolve relative redirects
-                    location = urllib.parse.urljoin(str(resp.url), location)
-                    _validate_url(location)
-                    resp = await client.get(location, headers={"User-Agent": "Mozilla/5.0 DeepStock/1.0"})
-                else:
-                    break
-        if resp.status_code != 200:
-            raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
-        # Limit response size to 1 MB
-        html = resp.text[:1_000_000]
-    except httpx.RequestError:
-        raise HTTPException(status_code=422, detail="Nepodařilo se načíst stránku")
+    html = await _fetch_preview_html(url)
 
     title = _extract_og(html, "title") or _extract_title(html)
     description = _extract_og(html, "description")

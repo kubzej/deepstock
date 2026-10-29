@@ -16,7 +16,7 @@ from app.core.redis import get_redis
 from .quotes import get_quotes, get_price_history, get_batch_price_history
 from .options_quotes import get_option_quotes
 from .stock_info import get_stock_info, StockInfoUnavailableError
-from .technical import get_technical_indicators
+from .technical import TechnicalPeriod, get_technical_indicators
 from .financials import get_historical_financials
 from .earnings_data import get_earnings_data
 
@@ -50,7 +50,7 @@ class MarketDataService:
         """Get detailed stock info including fundamentals and insights."""
         return await get_stock_info(self.redis, ticker)
     
-    async def get_technical_indicators(self, ticker: str, period: str = "1y") -> Optional[dict]:
+    async def get_technical_indicators(self, ticker: str, period: TechnicalPeriod = "1y") -> Optional[dict]:
         """Calculate technical indicators for a stock."""
         return await get_technical_indicators(self.redis, ticker, period)
 

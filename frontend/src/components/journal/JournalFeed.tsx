@@ -3,7 +3,9 @@ import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/shared';
 import { JournalEntryCard } from './JournalEntryCard';
+import { LoadMoreFooter } from './LoadMoreFooter';
 import { RichTextEditor } from './RichTextEditor';
 import {
   useJournalEntries,
@@ -34,13 +36,28 @@ export function JournalFeed({
   const [urlPreview, setUrlPreview] = useState<UrlPreview | null>(null);
   const [isFetchingPreview, setIsFetchingPreview] = useState(false);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useJournalEntries(channel.id);
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetchNextPageError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useJournalEntries(channel.id);
   const createEntry = useCreateJournalEntry(channel.id);
   const updateEntry = useUpdateJournalEntry(channel.id);
   const deleteEntry = useDeleteJournalEntry(channel.id);
   const showForm = controlledShowForm ?? internalShowForm;
+
+  useEffect(
+    () => () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    },
+    [],
+  );
 
   const setShowForm = (next: boolean | ((current: boolean) => boolean)) => {
     const resolved = typeof next === 'function' ? next(showForm) : next;
@@ -50,17 +67,6 @@ export function JournalFeed({
     }
     setInternalShowForm(resolved);
   };
-
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage(); },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const isEmptyHtml = (html: string) => html.replace(/<[^>]*>/g, '').trim() === '';
 
@@ -200,7 +206,15 @@ export function JournalFeed({
           </div>
         )}
 
-        {!isLoading && entries.length === 0 && (
+        {isError && !data && (
+          <ErrorState
+            title="Záznamy se nepodařilo načíst"
+            description="Deník je v pořádku, jen se nepodařilo spojit se serverem."
+            retryAction={{ label: 'Zkusit znovu', onClick: () => void refetch() }}
+          />
+        )}
+
+        {!isLoading && !isError && entries.length === 0 && (
           <div className="rounded-xl border border-dashed border-border/70 px-4 py-12 text-center text-sm text-muted-foreground">
             Žádné záznamy. Přidej první.
           </div>
@@ -212,20 +226,18 @@ export function JournalFeed({
               key={entry.id}
               entry={entry}
               onDelete={(id) => deleteEntry.mutate(id)}
-              onUpdate={(id, content) => updateEntry.mutate({ id, content })}
+              onUpdate={(id, content) => updateEntry.mutateAsync({ id, content })}
               isDeleting={deleteEntry.isPending}
-              isUpdating={updateEntry.isPending}
             />
           ))}
         </div>
 
-        <div ref={loadMoreRef} className="py-2">
-          {isFetchingNextPage && (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          )}
-        </div>
+        <LoadMoreFooter
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isError={isFetchNextPageError}
+          fetchNextPage={fetchNextPage}
+        />
       </div>
     </div>
   );

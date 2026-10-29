@@ -11,17 +11,18 @@ import {
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
 
 /**
- * Hook for stock portfolio performance
+ * Hook for stock portfolio performance over an exact range
+ * @param from - First day, YYYY-MM-DD
+ * @param to - Last day, YYYY-MM-DD
  */
 export function useStockPerformance(
-  portfolioId?: string,
-  period: PerformancePeriod = '1Y',
-  customFrom?: string,
-  customTo?: string
+  portfolioId: string | undefined,
+  from: string,
+  to: string
 ) {
   return useQuery<PerformanceResult>({
-    queryKey: queryKeys.stockPerformance(portfolioId ?? 'all', period, customFrom, customTo),
-    queryFn: () => fetchStockPerformance(portfolioId, period, customFrom, customTo),
+    queryKey: queryKeys.stockPerformance(portfolioId ?? 'all', from, to),
+    queryFn: () => fetchStockPerformance(portfolioId, from, to),
     staleTime: STALE_TIMES.performance,
     gcTime: GC_TIMES.veryLong,
   });

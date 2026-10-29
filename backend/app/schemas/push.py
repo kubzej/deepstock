@@ -18,8 +18,7 @@ class NotificationSettings(BaseModel):
 
 
 class NotificationSettingsUpdate(BaseModel):
-    """Update notification preferences"""
-    notifications_enabled: Optional[bool] = None
+    """Update notification preferences (notifications_enabled follows the registered devices)"""
     alert_buy_enabled: Optional[bool] = None
     alert_sell_enabled: Optional[bool] = None
     alert_earnings_enabled: Optional[bool] = None

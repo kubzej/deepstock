@@ -8,10 +8,8 @@ import json
 import logging
 import re
 from datetime import date
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
@@ -19,27 +17,11 @@ from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.core.supabase import supabase
 from app.services.market import market_service
+from app.schemas.ai_alerts import AlertSuggestion, AlertSuggestionsRequest, AlertSuggestionsResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class AlertSuggestionsRequest(BaseModel):
-    tickers: list[str] = []
-    watchlist_id: Optional[str] = None
-
-
-class AlertSuggestion(BaseModel):
-    ticker: str
-    condition_type: str  # price_above | price_below
-    price: float
-    reason: str
-
-
-class AlertSuggestionsResponse(BaseModel):
-    suggestions: list[AlertSuggestion]
-    cached: bool = False
 
 
 @router.post("/alert-suggestions", response_model=AlertSuggestionsResponse)

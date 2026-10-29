@@ -1,7 +1,13 @@
 /**
  * Options API - Options trading endpoints
  */
-import { API_URL, getAuthHeader } from './client';
+import {
+  API_URL,
+  FULL_HISTORY_PAGE_SIZE,
+  collectPages,
+  getAuthHeader,
+  type CursorPage,
+} from './client';
 
 // ============ Options Types ============
 
@@ -74,7 +80,7 @@ export interface OptionHolding {
   // Underlying price
   underlying_price: number | null;
   underlying_price_updated_at: string | null;
-  underlying_price_source: 'portfolio' | 'watchlist' | null;
+  underlying_price_source: 'portfolio' | 'watchlist' | 'market' | null;
   moneyness: Moneyness | null;
   buffer_percent: number | null;
 }
@@ -106,17 +112,6 @@ export interface CreateOptionTransactionInput {
   notes?: string;
 }
 
-export interface UpdateOptionTransactionInput {
-  action?: OptionAction;
-  contracts?: number;
-  premium?: number;
-  currency?: string;
-  exchange_rate_to_czk?: number;
-  fees?: number;
-  date?: string;
-  notes?: string;
-}
-
 // ============ Options Endpoints ============
 
 export async function fetchOptionHoldings(portfolioId?: string): Promise<OptionHolding[]> {
@@ -140,18 +135,18 @@ export async function fetchOptionHoldings(portfolioId?: string): Promise<OptionH
   return response.json();
 }
 
-export async function fetchOptionTransactions(
-  portfolioId?: string,
-  symbol?: string,
-  optionSymbol?: string,
-  limit: number = 100
-): Promise<OptionTransaction[]> {
+async function fetchOptionTransactionsPage(
+  portfolioId: string | undefined,
+  symbol: string | undefined,
+  optionSymbol: string | undefined,
+  cursor: string | null,
+): Promise<CursorPage<OptionTransaction>> {
   const authHeader = await getAuthHeader();
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ limit: String(FULL_HISTORY_PAGE_SIZE) });
   if (portfolioId) params.append('portfolio_id', portfolioId);
   if (symbol) params.append('symbol', symbol);
   if (optionSymbol) params.append('option_symbol', optionSymbol);
-  params.append('limit', limit.toString());
+  if (cursor) params.append('cursor', cursor);
   
   const response = await fetch(`${API_URL}/api/options/transactions?${params}`, {
     headers: {
@@ -168,6 +163,17 @@ export async function fetchOptionTransactions(
   }
   
   return response.json();
+}
+
+/** Every option transaction matching the filters, oldest pages included. */
+export function fetchOptionTransactions(
+  portfolioId?: string,
+  symbol?: string,
+  optionSymbol?: string,
+): Promise<OptionTransaction[]> {
+  return collectPages((cursor) =>
+    fetchOptionTransactionsPage(portfolioId, symbol, optionSymbol, cursor),
+  );
 }
 
 export async function fetchOptionStats(portfolioId?: string): Promise<OptionStats> {
@@ -210,48 +216,6 @@ export async function createOptionTransaction(
   }
   
   return response.json();
-}
-
-export async function updateOptionTransaction(
-  transactionId: string,
-  data: UpdateOptionTransactionInput
-): Promise<OptionTransaction> {
-  const authHeader = await getAuthHeader();
-  
-  const response = await fetch(`${API_URL}/api/options/transactions/${transactionId}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-    },
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('Unauthorized');
-    if (response.status === 404) throw new Error('Transakce nenalezena');
-    throw new Error('Nepodařilo se upravit transakci');
-  }
-  
-  return response.json();
-}
-
-export async function deleteOptionTransaction(transactionId: string): Promise<void> {
-  const authHeader = await getAuthHeader();
-  
-  const response = await fetch(`${API_URL}/api/options/transactions/${transactionId}`, {
-    method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-    },
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('Unauthorized');
-    if (response.status === 404) throw new Error('Transakce nenalezena');
-    throw new Error('Nepodařilo se smazat transakci');
-  }
 }
 
 export async function deleteOptionTransactionsBySymbol(

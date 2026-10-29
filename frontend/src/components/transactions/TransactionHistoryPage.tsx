@@ -38,6 +38,7 @@ import {
   useAllOptionTransactions,
 } from '@/hooks/useTransactionHistory';
 import { formatPrice } from '@/lib/format';
+import { queryKeys } from '@/lib/queryClient';
 
 import type { Transaction, OptionTransaction } from '@/lib/api';
 
@@ -169,18 +170,20 @@ export function TransactionHistoryPage() {
         }
       }
 
-      // Type filter (buy/sell based on action)
       // Type filter
       if (typeFilter !== 'all') {
         const isSettlement =
           tx.action === 'ASSIGNMENT' ||
           tx.action === 'EXERCISE' ||
           tx.action === 'EXPIRATION';
-        if (typeFilter === 'settlement') return isSettlement;
-        if (isSettlement) return false;
-        const isBuy = tx.action === 'BTO' || tx.action === 'BTC';
-        if (typeFilter === 'buy' && !isBuy) return false;
-        if (typeFilter === 'sell' && isBuy) return false;
+        if (typeFilter === 'settlement') {
+          if (!isSettlement) return false;
+        } else {
+          if (isSettlement) return false;
+          const isBuy = tx.action === 'BTO' || tx.action === 'BTC';
+          if (typeFilter === 'buy' && !isBuy) return false;
+          if (typeFilter === 'sell' && isBuy) return false;
+        }
       }
 
       // Option type filter (call/put)
@@ -211,9 +214,15 @@ export function TransactionHistoryPage() {
     dateTo,
   ]);
 
+  // Settlement only exists for options; on the stock tab it would filter nothing out
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    if (tab === 'stocks' && typeFilter === 'settlement') setTypeFilter('all');
+  };
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
-    queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.optionTransactionHistory() });
   };
 
   // Get portfolio name by ID
@@ -253,7 +262,7 @@ export function TransactionHistoryPage() {
         dataUpdatedAt={dataUpdatedAt}
       />
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+      <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)}>
         <PageTopRail>
           <TabsList>
             <TabsTrigger value="stocks">Akcie</TabsTrigger>
@@ -285,7 +294,9 @@ export function TransactionHistoryPage() {
               <SelectItem value="all">Vše</SelectItem>
               <SelectItem value="buy">Nákup</SelectItem>
               <SelectItem value="sell">Prodej</SelectItem>
-              <SelectItem value="settlement">Vypořádání</SelectItem>
+              {activeTab === 'options' && (
+                <SelectItem value="settlement">Vypořádání</SelectItem>
+              )}
             </SelectContent>
           </Select>
 

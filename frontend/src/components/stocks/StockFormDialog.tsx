@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useRejectedField } from '@/hooks/useRejectedField';
 import {
   Select,
   SelectContent,
@@ -19,7 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Sparkles } from 'lucide-react';
-import { generateStockMetadata, updateStock } from '@/lib/api';
+import { generateStockMetadata } from '@/lib/api';
+import { useUpdateStock } from '@/hooks/useStocks';
 import type { Stock } from '@/lib/api';
 import { EXCHANGE_OPTIONS, CURRENCY_OPTIONS } from '@/lib/constants';
 import { SectorSelect } from '@/components/shared/SectorSelect';
@@ -54,8 +56,9 @@ export function StockFormDialog({
     price_scale: 1,
     notes: '',
   });
-  const [saving, setSaving] = useState(false);
+  const updateStock = useUpdateStock();
   const [error, setError] = useState<string | null>(null);
+  const { reject, isRejected } = useRejectedField(open);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiInfo, setAiInfo] = useState<string | null>(null);
@@ -102,27 +105,28 @@ export function StockFormDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!stock) return;
+    if (!formData.name.trim()) return reject('name');
 
-    setSaving(true);
     setError(null);
 
     try {
-      await updateStock(stock.id, {
-        name: formData.name,
-        sector: formData.sector || undefined,
-        industry: formData.industry || undefined,
-        exchange: formData.exchange || undefined,
-        currency: formData.currency,
-        country: formData.country || undefined,
-        price_scale: formData.price_scale,
-        notes: formData.notes || undefined,
+      await updateStock.mutateAsync({
+        id: stock.id,
+        data: {
+          name: formData.name,
+          sector: formData.sector || null,
+          industry: formData.industry || null,
+          exchange: formData.exchange || null,
+          currency: formData.currency,
+          country: formData.country || null,
+          price_scale: formData.price_scale,
+          notes: formData.notes || null,
+        },
       });
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nepodařilo se uložit');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -163,7 +167,7 @@ export function StockFormDialog({
           <DialogTitle>Upravit {stock?.ticker}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -176,6 +180,7 @@ export function StockFormDialog({
             <Input
               id="name"
               name="name"
+              aria-invalid={isRejected('name', !formData.name.trim())}
               placeholder="Apple Inc."
               value={formData.name}
               onChange={handleChange}
@@ -311,8 +316,8 @@ export function StockFormDialog({
             >
               Zrušit
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Ukládám...' : 'Uložit změny'}
+            <Button type="submit" disabled={updateStock.isPending}>
+              {updateStock.isPending ? 'Ukládám...' : 'Uložit změny'}
             </Button>
           </DialogFooter>
         </form>

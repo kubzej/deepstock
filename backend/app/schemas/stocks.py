@@ -1,50 +1,26 @@
-"""
-Stock Response Schemas
-
-Pydantic models for stock-related API responses.
-"""
-from pydantic import BaseModel
+"""API request and response models for stocks."""
 from typing import Optional
-from datetime import datetime
+from pydantic import BaseModel
 
 
-class StockResponse(BaseModel):
-    """Stock entity (master data) response."""
-    id: str
+class StockCreate(BaseModel):
     ticker: str
     name: str
+    currency: str = "USD"
     sector: Optional[str] = None
     industry: Optional[str] = None
     exchange: Optional[str] = None
-    currency: str = "USD"
+    country: Optional[str] = None
+    price_scale: float = 1.0
     notes: Optional[str] = None
-    price_scale: int = 2
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
-class StockCreateRequest(BaseModel):
-    """Request body for creating a stock."""
-    ticker: str
-    name: str
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    exchange: Optional[str] = None
-    currency: str = "USD"
-    notes: Optional[str] = None
-    price_scale: int = 2
-
-
-class StockUpdateRequest(BaseModel):
-    """Request body for updating a stock."""
-    ticker: Optional[str] = None
+class StockUpdate(BaseModel):
     name: Optional[str] = None
+    currency: Optional[str] = None
     sector: Optional[str] = None
     industry: Optional[str] = None
     exchange: Optional[str] = None
-    currency: Optional[str] = None
+    country: Optional[str] = None
+    price_scale: Optional[float] = None
     notes: Optional[str] = None
-    price_scale: Optional[int] = None

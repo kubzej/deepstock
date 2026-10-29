@@ -77,7 +77,7 @@ class DailyNewsSettingsService:
         }
 
     async def replace_scope_items(self, user_id: str, items: list[dict]) -> list[dict]:
-        rows = []
+        rows: dict[tuple[str, str], dict] = {}
         for item in items:
             source_type = item["source_type"]
             source_id = item["source_id"]
@@ -90,21 +90,31 @@ class DailyNewsSettingsService:
             else:
                 raise ValueError("Neplatný typ zdroje")
 
-            rows.append({
+            rows[(source_type, source_id)] = {
                 "user_id": user_id,
                 "source_type": source_type,
                 "source_id": source_id,
                 "enabled": bool(item.get("enabled", True)),
                 "priority": item.get("priority") or "medium",
-            })
+            }
 
-        supabase.table("daily_news_briefing_scope_items") \
-            .delete() \
-            .eq("user_id", user_id) \
-            .execute()
-
+        # Write the new selection before dropping what it replaces: a failure leaves the
+        # old scope intact (or the new one plus leftovers), never an empty scope.
         if rows:
-            supabase.table("daily_news_briefing_scope_items").insert(rows).execute()
+            supabase.table("daily_news_briefing_scope_items") \
+                .upsert(list(rows.values()), on_conflict="user_id,source_type,source_id") \
+                .execute()
+
+        stale_ids = [
+            row["id"]
+            for row in await self.get_scope_items(user_id)
+            if (row["source_type"], row["source_id"]) not in rows
+        ]
+        if stale_ids:
+            supabase.table("daily_news_briefing_scope_items") \
+                .delete() \
+                .in_("id", stale_ids) \
+                .execute()
         return await self.get_scope_items(user_id)
 
     async def resolve_scope(self, user_id: str) -> dict[str, Any]:

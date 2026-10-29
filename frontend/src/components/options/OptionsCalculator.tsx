@@ -1099,8 +1099,8 @@ export function OptionsCalculator() {
                     <MetricCard
                       label="Max. profit"
                       value={formatPrice(callCalc.maxProfit, 'USD', 0)}
-                      subtext="prémium + upside"
-                      sentiment="positive"
+                      subtext="prémium + (strike − cena), akcie za aktuální cenu"
+                      sentiment={callCalc.maxProfit >= 0 ? 'positive' : 'negative'}
                     />
                   )}
                 </div>

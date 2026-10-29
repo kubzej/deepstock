@@ -1,0 +1,5 @@
+# Direct dependencies of the MCP server. requirements.txt is generated from this file (make lock).
+mcp>=1.27.0,<2.0.0
+httpx>=0.28.1
+PyJWT>=2.12.1
+uvicorn>=0.44.0

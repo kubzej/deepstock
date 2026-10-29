@@ -116,10 +116,19 @@ export async function createStock(data: {
   return response.json();
 }
 
-export async function updateStock(
-  stockId: string,
-  data: { name?: string; currency?: string; sector?: string; industry?: string; exchange?: string; country?: string; price_scale?: number; notes?: string }
-): Promise<Stock> {
+/** Fields left out stay unchanged; null clears an optional field (name, currency and price_scale cannot be cleared). */
+export interface StockUpdate {
+  name?: string;
+  currency?: string;
+  sector?: string | null;
+  industry?: string | null;
+  exchange?: string | null;
+  country?: string | null;
+  price_scale?: number;
+  notes?: string | null;
+}
+
+export async function updateStock(stockId: string, data: StockUpdate): Promise<Stock> {
   const authHeader = await getAuthHeader();
   const response = await fetch(`${API_URL}/api/stocks/${stockId}`, {
     method: 'PUT',

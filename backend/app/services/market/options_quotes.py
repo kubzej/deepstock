@@ -4,12 +4,11 @@ Option quote fetching logic
 import yfinance as yf
 import pandas as pd
 import json
-import asyncio
 import logging
 import math
 from typing import List, Dict, Optional
-from concurrent.futures import ThreadPoolExecutor
 from app.core.cache import CacheTTL
+from app.services.market.yahoo import run_yahoo
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ def safe_int(value) -> Optional[int]:
         return None
 
 
-def _fetch_option_quotes_batch(occ_symbols: List[str]) -> Dict[str, Optional[dict]]:
+def _fetch_option_quotes_batch(occ_symbols: tuple) -> Dict[str, Optional[dict]]:
     """
     Fetch multiple option quotes using yf.Tickers batch object.
     This shares the HTTP session across all tickers for better performance.
@@ -114,7 +113,7 @@ async def get_option_quotes(redis, occ_symbols: List[str]) -> Dict[str, dict]:
     Uses cache first, then batch fetches missing via yf.Tickers (shared session).
     
     Optimization: Uses yf.Tickers batch object which shares HTTP session,
-    plus ThreadPoolExecutor for non-blocking async execution.
+    fetched in a worker thread so the event loop stays free.
     """
     results = {}
     missing = []
@@ -129,15 +128,7 @@ async def get_option_quotes(redis, occ_symbols: List[str]) -> Dict[str, dict]:
 
     # 2. Batch fetch missing from Yahoo using shared session
     if missing:
-        loop = asyncio.get_event_loop()
-        
-        # Run batch fetch in thread pool (non-blocking)
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            fetched = await loop.run_in_executor(
-                executor, 
-                _fetch_option_quotes_batch, 
-                missing
-            )
+        fetched = await run_yahoo(_fetch_option_quotes_batch, tuple(missing))
         
         # Process results and cache
         for occ, quote in fetched.items():

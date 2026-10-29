@@ -78,10 +78,10 @@ Alethea depends on this contract too. If tool names, tool purpose, response shap
 
 yfinance hits Yahoo Finance which aggressively rate-limits. Follow these rules strictly:
 
-1. **Batch downloads:** Use `yf.download(tickers, ...)` for multiple tickers (1 HTTP request). Never loop `yf.Ticker(t).info` for a list.
+1. **Batch downloads:** Use `yf.download(tickers, ...)` for multiple tickers (one call, but yfinance still fetches each ticker separately, in up to 2x CPU threads of its own). Never loop `yf.Ticker(t).info` for a list.
 2. **Redis cache everything:** Every yfinance call must check Redis first. TTLs are defined in `backend/app/core/cache.py` (`CacheTTL` class).
 3. **No new yfinance calls without caching:** If you add a new yfinance call, it MUST have Redis caching with an appropriate TTL.
-4. **Background fetches:** Extended data (`.info`) runs in a thread pool, fire-and-forget. See `quotes.py` pattern.
+4. **One gateway for blocking calls:** every yfinance call made from async code goes through `backend/app/services/market/yahoo.py` — `run_yahoo` (one call at a time, for anything a request waits on) or `run_yahoo_background` (4 workers, fire-and-forget extended data, see `quotes.py`). Overlapping identical calls share one execution. Never use `yf.` inside an `async def` or create your own thread pool: `backend/tests/test_yahoo_access.py` fails on it.
 5. **Existing cache TTLs:** Quotes 5min, extended data 1h, technical raw 1h, stock info 5min, financials 24h, price history varies.
 6. **`yf.download()` daily bars can have gaps:** Yahoo's chart/history endpoint occasionally drops a session for a given date (seen 2026-07-28, affected most US-listed tickers, not European ones — even highly liquid ones like SPY/QQQ/DIA). Don't derive `previousClose`/`change` purely from bar-to-bar diffing of `yf.download()` output with a fixed lookback window — a missing session silently shifts the "previous" row further back (or drops it entirely), producing a wrong or zeroed change. `regularMarketPreviousClose` from `.info` is more reliable for this and is already folded into the extended-data background fetch in `quotes.py` (`_merge_ext_data` overrides the batch-derived change once the `.info` fetch lands) — no extra yfinance call needed, it reuses the existing extended-data fetch.
 

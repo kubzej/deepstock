@@ -8,7 +8,6 @@ to work without lxml.
 
 Cached in Redis (24h) and fetched off the event loop via a worker thread.
 """
-import asyncio
 import json
 import logging
 import math
@@ -16,8 +15,10 @@ from typing import Optional
 
 import pandas as pd
 import yfinance as yf
+from yfinance.exceptions import YFRateLimitError
 
 from app.core.cache import CacheTTL
+from app.services.market.yahoo import run_yahoo
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,9 @@ def _fetch_earnings_data_sync(ticker: str) -> dict:
     for key, fn in accessors.items():
         try:
             data[key] = fn()
+        except YFRateLimitError:
+            # Not "this block does not exist": let the caller know, so nothing gets cached
+            raise
         except Exception as e:
             logger.debug("%s unavailable for %s: %s", key, ticker, e)
     return data
@@ -117,10 +121,11 @@ async def get_earnings_data(redis, ticker: str, force_refresh: bool = False) -> 
             logger.warning("Redis read failed for %s: %s", cache_key, e)
 
     try:
-        data = await asyncio.to_thread(_fetch_earnings_data_sync, ticker)
+        data = await run_yahoo(_fetch_earnings_data_sync, ticker)
     except Exception as e:
+        # A failed fetch (Yahoo rate limit, outage) must not be pinned for 24 hours
         logger.warning("Earnings data fetch failed for %s: %s", ticker, e)
-        data = {k: (v.copy() if isinstance(v, list) else dict(v)) for k, v in _EMPTY.items()}
+        return {k: (v.copy() if isinstance(v, list) else dict(v)) for k, v in _EMPTY.items()}
 
     try:
         await redis.set(cache_key, json.dumps(data), ex=CacheTTL.EARNINGS_DATA)

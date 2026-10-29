@@ -655,21 +655,26 @@ class PriceAlertService:
                     logger.info(f"Alert {alert.get('id')}: is_triggered={trigger_info.is_triggered}")
                     
                     if trigger_info.is_triggered:
+                        # Record the trigger only once the push was delivered; otherwise the
+                        # alert stays pending and the next run evaluates and sends it again.
+                        try:
+                            delivered = await self._send_custom_alert_notification(
+                                alert, current_price, trigger_info.current_value
+                            )
+                        except Exception as push_error:
+                            logger.error(f"Push notification failed for alert {alert.get('id')}: {push_error}")
+                            delivered = False
+
+                        if not delivered:
+                            logger.warning(f"Alert {alert.get('id')} not delivered, keeping it pending")
+                            continue
+
                         # Mark as triggered (including group if applicable)
                         await self.mark_alert_triggered(
                             alert["id"], 
                             group_id=alert.get("group_id"),
                             user_id=alert.get("user_id")
                         )
-                        
-                        # Send push notification (don't fail if push fails)
-                        try:
-                            await self._send_custom_alert_notification(
-                                alert, current_price, trigger_info.current_value
-                            )
-                        except Exception as push_error:
-                            logger.error(f"Push notification failed for alert {alert.get('id')}: {push_error}")
-                        
                         alerts_triggered += 1
                         
                         # If repeat_after_trigger, reset immediately (entire group if applicable)

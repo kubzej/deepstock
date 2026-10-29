@@ -33,10 +33,12 @@ export function useUpdateDailyBriefingSettings() {
   return useMutation({
     mutationFn: (settings: Pick<DailyBriefingSettings, 'enabled' | 'include_market_context'>) =>
       updateDailyBriefingSettings(settings),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingSettings() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingScopeOptions() });
-    },
+    // Returned so the mutation stays pending until the refetch has landed
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingSettings() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingScopeOptions() }),
+      ]),
   });
 }
 
@@ -44,9 +46,8 @@ export function useUpdateDailyBriefingScope() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (items: DailyBriefingScopeItem[]) => updateDailyBriefingScope(items),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingScopeOptions() });
-    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.dailyBriefingScopeOptions() }),
   });
 }
 

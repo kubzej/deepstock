@@ -1,0 +1,6 @@
+# Runtime plus test tooling. requirements-dev.txt is generated from this file (make lock)
+# and installed by CI; the production image installs requirements.txt only.
+-r requirements.in
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0

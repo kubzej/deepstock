@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, TrendingUp } from 'lucide-react';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { DataFreshnessIndicator } from '@/components/shared/DataFreshnessIndicator';
+import { DataQualityIndicator } from '@/components/shared/DataQualityIndicator';
 import { EmptyState, ErrorState, PageHero, PageShell } from '@/components/shared';
 import { formatCurrency, formatPercent, toCZK } from '@/lib/format';
 import { usePortfolioSnapshot } from '@/hooks/usePortfolioSnapshot';
@@ -51,14 +52,16 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
   }, [holdings]);
 
   const snapshotPortfolioId = isAllPortfolios ? null : (portfolio?.id ?? undefined);
-  const { data: snapshot } = usePortfolioSnapshot(snapshotPortfolioId);
-
-  const totalValueCzk = snapshot?.total_value_czk ?? 0;
-  const totalCostCzk = snapshot?.total_cost_czk ?? 0;
-  const totalPnLCzk = snapshot?.total_pnl_czk ?? 0;
-  const totalPnLPercent = snapshot?.total_pnl_percent ?? 0;
-  const dailyChangeCzk = snapshot?.daily_change_czk ?? 0;
-  const dailyChangePercent = snapshot?.daily_change_percent ?? 0;
+  const {
+    data: snapshot,
+    isError: snapshotHasError,
+    refetch: refetchSnapshot,
+  } = usePortfolioSnapshot(snapshotPortfolioId);
+  const snapshotLoading = !snapshot && !snapshotHasError;
+  const snapshotFailed = !snapshot && snapshotHasError;
+  // A refresh failed but the last good snapshot is still shown
+  const snapshotStale = !!snapshot && snapshotHasError;
+  const totalValueCzk = snapshot?.total_value_czk;
 
   // Calculate extended hours (pre-market / after-hours) change
   const extendedHoursData = useMemo(() => {
@@ -109,10 +112,12 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
       }
     });
 
-    const preMarketChangePercent =
-      totalValueCzk > 0 ? (preMarketChangeCzk / totalValueCzk) * 100 : 0;
-    const postMarketChangePercent =
-      totalValueCzk > 0 ? (postMarketChangeCzk / totalValueCzk) * 100 : 0;
+    const preMarketChangePercent = totalValueCzk
+      ? (preMarketChangeCzk / totalValueCzk) * 100
+      : null;
+    const postMarketChangePercent = totalValueCzk
+      ? (postMarketChangeCzk / totalValueCzk) * 100
+      : null;
 
     return {
       preMarketChangeCzk,
@@ -200,12 +205,20 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
             : (portfolio?.name ?? 'Portfolio')
         }
         title={
-          <h1 className="text-4xl md:text-5xl font-bold font-mono-price">
-            {formatCurrency(totalValueCzk)}
-          </h1>
+          snapshotLoading ? (
+            <Skeleton className="h-12 w-64" />
+          ) : (
+            <h1 className="text-4xl md:text-5xl font-bold font-mono-price">
+              {snapshot ? formatCurrency(snapshot.total_value_czk) : '—'}
+            </h1>
+          )
         }
         actions={
           <>
+            <DataQualityIndicator
+              missingTickers={snapshot?.missing_tickers}
+              snapshotStale={snapshotStale}
+            />
             <DataFreshnessIndicator
               dataUpdatedAt={dataUpdatedAt}
               isFetching={isFetching}
@@ -225,27 +238,54 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
           </>
         }
       >
+        {snapshotFailed && (
+          <ErrorState
+            title="Souhrn portfolia se nepodařilo načíst"
+            description="Hodnota, denní změna a P/L nejsou k dispozici."
+            retryAction={{
+              label: 'Zkusit znovu',
+              onClick: () => {
+                void refetchSnapshot();
+              },
+            }}
+            className="max-w-xl"
+          />
+        )}
         <div className="flex flex-wrap gap-x-8 gap-y-3">
+          {snapshotLoading && (
+            <>
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </>
+          )}
+
           {/* Daily Change */}
-          <div>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-              Dnes
-            </span>
-            <span
-              className={`text-lg font-mono-price font-semibold ${
-                dailyChangeCzk >= 0 ? 'text-positive' : 'text-negative'
-              }`}
-            >
-              {formatCurrency(dailyChangeCzk)}
-            </span>
-            <span
-              className={`text-sm font-mono-price ml-1.5 ${
-                dailyChangeCzk >= 0 ? 'text-positive/70' : 'text-negative/70'
-              }`}
-            >
-              {formatPercent(dailyChangePercent, 1, true)}
-            </span>
-          </div>
+          {snapshot && (
+            <div>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
+                Dnes
+              </span>
+              <span
+                className={`text-lg font-mono-price font-semibold ${
+                  snapshot.daily_change_czk >= 0
+                    ? 'text-positive'
+                    : 'text-negative'
+                }`}
+              >
+                {formatCurrency(snapshot.daily_change_czk)}
+              </span>
+              <span
+                className={`text-sm font-mono-price ml-1.5 ${
+                  snapshot.daily_change_czk >= 0
+                    ? 'text-positive/70'
+                    : 'text-negative/70'
+                }`}
+              >
+                {formatPercent(snapshot.daily_change_percent, 1, true)}
+              </span>
+            </div>
+          )}
 
           {/* Pre-market Change - show only if data available */}
           {extendedHoursData.hasPreMarket && (
@@ -256,13 +296,15 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               <span className="text-lg font-mono-price font-semibold text-warning">
                 {formatCurrency(extendedHoursData.preMarketChangeCzk)}
               </span>
-              <span className="text-sm font-mono-price ml-1.5 text-warning/70">
-                {formatPercent(
-                  extendedHoursData.preMarketChangePercent,
-                  1,
-                  true,
-                )}
-              </span>
+              {extendedHoursData.preMarketChangePercent !== null && (
+                <span className="text-sm font-mono-price ml-1.5 text-warning/70">
+                  {formatPercent(
+                    extendedHoursData.preMarketChangePercent,
+                    1,
+                    true,
+                  )}
+                </span>
+              )}
             </div>
           )}
 
@@ -275,46 +317,56 @@ export function Dashboard({ onAddTransaction }: DashboardProps) {
               <span className="text-lg font-mono-price font-semibold text-info">
                 {formatCurrency(extendedHoursData.postMarketChangeCzk)}
               </span>
-              <span className="text-sm font-mono-price ml-1.5 text-info/70">
-                {formatPercent(
-                  extendedHoursData.postMarketChangePercent,
-                  1,
-                  true,
-                )}
-              </span>
+              {extendedHoursData.postMarketChangePercent !== null && (
+                <span className="text-sm font-mono-price ml-1.5 text-info/70">
+                  {formatPercent(
+                    extendedHoursData.postMarketChangePercent,
+                    1,
+                    true,
+                  )}
+                </span>
+              )}
             </div>
           )}
 
           {/* Unrealized P/L across open holdings */}
-          <div>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-              Nerealizovaný P/L
-            </span>
-            <span
-              className={`text-lg font-mono-price font-semibold ${
-                totalPnLCzk >= 0 ? 'text-positive' : 'text-negative'
-              }`}
-            >
-              {formatCurrency(totalPnLCzk)}
-            </span>
-            <span
-              className={`text-sm font-mono-price ml-1.5 ${
-                totalPnLCzk >= 0 ? 'text-positive/70' : 'text-negative/70'
-              }`}
-            >
-              {formatPercent(totalPnLPercent, 1, true)}
-            </span>
-          </div>
+          {snapshot && (
+            <div>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
+                Nerealizovaný P/L
+              </span>
+              <span
+                className={`text-lg font-mono-price font-semibold ${
+                  snapshot.total_pnl_czk >= 0
+                    ? 'text-positive'
+                    : 'text-negative'
+                }`}
+              >
+                {formatCurrency(snapshot.total_pnl_czk)}
+              </span>
+              <span
+                className={`text-sm font-mono-price ml-1.5 ${
+                  snapshot.total_pnl_czk >= 0
+                    ? 'text-positive/70'
+                    : 'text-negative/70'
+                }`}
+              >
+                {formatPercent(snapshot.total_pnl_percent, 1, true)}
+              </span>
+            </div>
+          )}
 
           {/* Invested */}
-          <div>
-            <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
-              Investováno
-            </span>
-            <span className="text-lg font-mono-price font-semibold">
-              {formatCurrency(totalCostCzk)}
-            </span>
-          </div>
+          {snapshot && (
+            <div>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wide block">
+                Investováno
+              </span>
+              <span className="text-lg font-mono-price font-semibold">
+                {formatCurrency(snapshot.total_cost_czk)}
+              </span>
+            </div>
+          )}
 
           {/* Positions */}
           <div>

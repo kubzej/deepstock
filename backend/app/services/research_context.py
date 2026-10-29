@@ -3,17 +3,16 @@ Thin facade over the split MCP research-context domain services.
 """
 from __future__ import annotations
 
-from typing import Iterable, Literal, Optional
+from typing import Iterable, Optional
 
 from app.services.research_context_activity import ActivityFilterError
 from app.services.research_context_activity import _resolve_activity_window
 from app.services.research_context_activity import activity_portfolio_context_service
 from app.services.research_context_journal import journal_context_service
+from app.services.market.technical import TechnicalPeriod
 from app.services.research_context_market import market_context_service
 from app.services.research_context_market import VALID_TECHNICAL_INDICATORS
 from app.services.research_context_watchlist import watchlist_context_service
-
-TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 
 
 class ResearchContextService:

@@ -4,47 +4,15 @@ Watchlist service - CRUD operations for watchlists and items
 from app.core.supabase import supabase
 from app.services.stocks import stock_service
 from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
-
-
-# ============================================
-# Pydantic Models
-# ============================================
-
-class WatchlistCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class WatchlistUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-
-
-class WatchlistItemCreate(BaseModel):
-    stock_id: Optional[str] = None  # If provided, use this
-    ticker: Optional[str] = None     # If stock_id not provided, lookup/create by ticker
-    stock_name: Optional[str] = None # For auto-creating stock
-    target_buy_price: Optional[float] = None
-    target_sell_price: Optional[float] = None
-    notes: Optional[str] = None
-
-
-class WatchlistItemUpdate(BaseModel):
-    target_buy_price: Optional[float] = None
-    target_sell_price: Optional[float] = None
-    notes: Optional[str] = None
-
-
-class TagCreate(BaseModel):
-    name: str
-    color: Optional[str] = None
-
-
-class TagUpdate(BaseModel):
-    name: Optional[str] = None
-    color: Optional[str] = None
+from app.schemas.watchlist import (
+    TagCreate,
+    TagUpdate,
+    WatchlistCreate,
+    WatchlistItemCreate,
+    WatchlistItemUpdate,
+    WatchlistUpdate,
+)
 
 
 # ============================================
@@ -272,17 +240,12 @@ class WatchlistService:
     
     async def update_item(self, item_id: str, data: WatchlistItemUpdate) -> Optional[dict]:
         """Update a watchlist item."""
-        # Get only the fields that were explicitly set in the request
-        # This allows setting fields to null (to clear them)
-        update_data = data.model_dump(exclude_unset=False)
-        
-        # Filter out None values only if we want to keep existing values
-        # But we want to allow clearing values, so we include all fields
-        # that are in the request body
-        
+        # Only fields present in the request; an explicit null clears the value
+        update_data = data.model_dump(exclude_unset=True)
+
         if not update_data:
             return await self.get_item(item_id)
-        
+
         response = supabase.table("watchlist_items") \
             .update(update_data) \
             .eq("id", item_id) \

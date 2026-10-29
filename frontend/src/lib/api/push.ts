@@ -11,6 +11,9 @@ export interface NotificationSettings {
   alert_daily_news_enabled: boolean;
 }
 
+/** What the user edits; notifications_enabled follows the registered devices on the server. */
+export type NotificationPreferences = Omit<NotificationSettings, 'notifications_enabled'>;
+
 export interface VapidKey {
   publicKey: string;
 }
@@ -65,7 +68,7 @@ export async function fetchNotificationSettings(): Promise<NotificationSettings>
  * Update notification settings
  */
 export async function updateNotificationSettings(
-  settings: Partial<NotificationSettings>
+  settings: Partial<NotificationPreferences>
 ): Promise<NotificationSettings> {
   const headers = await getAuthHeader();
   const res = await fetch(`${API_URL}/api/push/settings`, {

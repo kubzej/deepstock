@@ -3,29 +3,21 @@ import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from app.services.market import market_service
 from app.services.market.stock_info import StockInfoUnavailableError
+from app.services.market.technical import TechnicalPeriod
 from app.services.exchange import exchange_service
 from app.services.earnings_calendar import earnings_calendar_service
 from app.core.auth import get_current_user_id
 from app.core.redis import get_redis
 from app.core.cache import CacheTTL
-from pydantic import BaseModel
-from typing import List
+from app.schemas.market import (
+    BatchEarningsRequest,
+    BatchHistoryRequest,
+    OptionSymbolsRequest,
+    TickerRequest,
+)
 
 router = APIRouter()
 
-class TickerRequest(BaseModel):
-    tickers: List[str]
-    include_extended: bool = True
-
-class BatchHistoryRequest(BaseModel):
-    tickers: List[str]
-    period: str = "1mo"
-
-class BatchEarningsRequest(BaseModel):
-    tickers: List[str]
-
-class OptionSymbolsRequest(BaseModel):
-    symbols: List[str]
 
 @router.post("/batch-quotes")
 async def get_quotes(payload: TickerRequest, user_id: str = Depends(get_current_user_id)):
@@ -153,7 +145,7 @@ async def get_fear_greed(user_id: str = Depends(get_current_user_id)):
 
 
 @router.get("/technical/{ticker}")
-async def get_technical_indicators(ticker: str, period: str = "1y", user_id: str = Depends(get_current_user_id)):
+async def get_technical_indicators(ticker: str, period: TechnicalPeriod = "1y", user_id: str = Depends(get_current_user_id)):
     """
     Get technical analysis indicators for a stock.
     

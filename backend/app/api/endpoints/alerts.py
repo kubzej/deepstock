@@ -3,7 +3,6 @@ Price Alerts API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
-from pydantic import BaseModel
 from app.services.price_alerts import price_alert_service
 from app.schemas.price_alerts import (
     PriceAlertCreate,
@@ -12,13 +11,10 @@ from app.schemas.price_alerts import (
     PriceAlertResetRequest,
 )
 from app.core.auth import get_current_user_id
+from app.schemas.price_alerts import BulkDeleteRequest
 
 
 router = APIRouter()
-
-
-class BulkDeleteRequest(BaseModel):
-    ids: List[str]
 
 
 @router.get("/")
