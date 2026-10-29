@@ -1,125 +1,53 @@
-"""
-Portfolio Response Schemas
-
-Pydantic models for portfolio-related API responses.
-These ensure consistent API contracts between backend and frontend.
-"""
-from pydantic import BaseModel, Field
-from typing import Optional, List
+"""API request and response models for portfolio."""
 from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field, field_validator
 
 
-class PortfolioResponse(BaseModel):
-    """Portfolio entity response."""
-    id: str
-    user_id: str
+class PortfolioCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
-class HoldingResponse(BaseModel):
-    """Portfolio holding (aggregated position in a stock)."""
-    ticker: str
-    name: str
-    shares: float
-    avg_cost: float
-    currency: str
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    price_scale: Optional[int] = None
-    total_invested_czk: float
-    # Enriched fields (when calculated with current prices)
-    current_price: Optional[float] = None
-    current_value: Optional[float] = None
-    unrealized_pnl: Optional[float] = None
-    unrealized_pnl_pct: Optional[float] = None
-    # For "All portfolios" view
-    portfolio_id: Optional[str] = None
-    portfolio_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+class PortfolioUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
-class SourceTransactionResponse(BaseModel):
-    """Source lot info for SELL transactions."""
-    id: str
-    executed_at: datetime
-    price_per_share: float
-    currency: str
-    shares: float
-    
-    class Config:
-        from_attributes = True
-
-
-class StockEmbeddedResponse(BaseModel):
-    """Embedded stock info in transaction response."""
-    ticker: str
-    name: str
-    
-    class Config:
-        from_attributes = True
-
-
-class TransactionResponse(BaseModel):
-    """Transaction (BUY or SELL) response with embedded stock info."""
-    id: str
-    portfolio_id: str
-    stock_id: str
-    type: str  # 'BUY' or 'SELL'
-    shares: float
-    price_per_share: float
-    total_amount: float
-    total_amount_czk: float
-    currency: str
-    exchange_rate_to_czk: Optional[float] = None
-    fees: Optional[float] = None
-    executed_at: datetime
+class TransactionCreate(BaseModel):
+    stock_ticker: str
+    stock_name: Optional[str] = None
+    type: str  # BUY or SELL
+    shares: float = Field(gt=0)
+    price_per_share: float = Field(gt=0)
+    currency: str = "USD"
+    exchange_rate_to_czk: Optional[float] = Field(default=None, gt=0)
+    fees: float = Field(default=0, ge=0)
     notes: Optional[str] = None
-    source_transaction_id: Optional[str] = None
-    # Embedded relations
-    stocks: StockEmbeddedResponse
-    source_transaction: Optional[SourceTransactionResponse] = None
-    # For "All portfolios" view
-    portfolio_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+    executed_at: datetime
+    source_transaction_id: Optional[str] = None  # For SELL: which lot to sell from
+
+    @field_validator("type")
+    @classmethod
+    def _type_is_buy_or_sell(cls, value: str) -> str:
+        if value.upper() not in ("BUY", "SELL"):
+            raise ValueError("type must be BUY or SELL")
+        return value
 
 
-class OpenLotResponse(BaseModel):
-    """
-    Open lot - a BUY transaction with remaining shares.
-    Used for tax lot tracking and P/L calculations.
-    """
-    id: str
-    ticker: str
-    stock_name: str
-    date: str  # Formatted date string
-    shares: float  # Remaining shares
-    buy_price: float = Field(alias="buyPrice")
-    economic_buy_price: float = Field(alias="economicBuyPrice")
-    currency: str
-    price_scale: Optional[int] = None
-    remaining_cost_basis: float = Field(alias="remainingCostBasis")
-    remaining_cost_basis_czk: float = Field(alias="remainingCostBasisCzk")
-    portfolio_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+class TransactionUpdate(BaseModel):
+    """Update model for transactions - all fields optional."""
+    shares: Optional[float] = Field(default=None, gt=0)
+    price_per_share: Optional[float] = Field(default=None, gt=0)
+    currency: Optional[str] = None
+    exchange_rate_to_czk: Optional[float] = Field(default=None, gt=0)
+    fees: Optional[float] = Field(default=None, ge=0)
+    notes: Optional[str] = None
+    executed_at: Optional[datetime] = None
 
 
-class AvailableLotResponse(BaseModel):
-    """
-    Available lot for selling - BUY with remaining shares.
-    Used in lot picker when creating SELL transactions.
-    """
+class AvailableLot(BaseModel):
+    """A BUY lot with remaining shares available for selling."""
     id: str
     date: str
     quantity: float  # Original quantity
@@ -130,16 +58,14 @@ class AvailableLotResponse(BaseModel):
     economic_price_per_share: float
     remaining_cost_basis: float
     remaining_cost_basis_czk: float
-    
-    class Config:
-        from_attributes = True
 
 
-class StockLotsResponse(BaseModel):
-    """All open lots for a specific stock ticker."""
-    ticker: str
-    stock_name: str
-    lots: List[AvailableLotResponse]
-    
-    class Config:
-        from_attributes = True
+class PortfolioSnapshot(BaseModel):
+    total_value_czk: float
+    total_cost_czk: float
+    total_pnl_czk: float
+    total_pnl_percent: float
+    daily_change_czk: float
+    daily_change_percent: float
+    # Holdings without a live quote are left out of value, cost and P/L alike.
+    missing_tickers: list[str] = Field(default_factory=list)

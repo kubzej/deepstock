@@ -15,9 +15,9 @@ interface PortfolioHolding {
   ticker: string;
   portfolioName?: string;
   shares: number;
-  currentValueCzk: number;
-  plCzk: number;
-  plPercent: number;
+  currentValueCzk: number | null;
+  plCzk: number | null;
+  plPercent: number | null;
 }
 
 interface StockCardProps {
@@ -27,9 +27,9 @@ interface StockCardProps {
   quote: Quote | null;
   shares?: number;
   avgCost?: number;
-  valueCzk?: number;
+  valueCzk?: number | null;
   investedCzk?: number;
-  weight?: number;
+  weight?: number | null;
   targetPrice?: number;
   portfolioCount?: number;
   portfolioHoldings?: PortfolioHolding[];
@@ -56,9 +56,11 @@ export function StockCard({
   const [expanded, setExpanded] = useState(false);
 
   const isDayPositive = quote && quote.changePercent >= 0;
-  const plCzk = valueCzk && investedCzk ? valueCzk - investedCzk : 0;
-  const plPercent = investedCzk ? (plCzk / investedCzk) * 100 : 0;
-  const isPositive = plCzk >= 0;
+  // null while the position has no price: it is not a loss of everything
+  const plCzk = valueCzk === null ? null : valueCzk && investedCzk ? valueCzk - investedCzk : 0;
+  const plPercent = plCzk === null ? null : investedCzk ? (plCzk / investedCzk) * 100 : 0;
+  const plTone = (pl: number | null, positive: string, negative: string) =>
+    pl === null ? 'text-muted-foreground' : pl >= 0 ? positive : negative;
   const isExpandable = portfolioCount && portfolioCount > 1;
   const hasPortfolioBreakdown =
     portfolioHoldings && portfolioHoldings.length > 1;
@@ -126,12 +128,12 @@ export function StockCard({
 
           <div className="min-w-[140px] flex items-baseline justify-end gap-1.5 text-right">
             <span
-              className={`font-mono-price text-sm font-medium ${isPositive ? 'text-positive' : 'text-negative'}`}
+              className={`font-mono-price text-sm font-medium ${plTone(plCzk, 'text-positive', 'text-negative')}`}
             >
               {formatCurrency(plCzk)}
             </span>
             <span
-              className={`text-[10px] font-mono-price ${isPositive ? 'text-positive/60' : 'text-negative/60'}`}
+              className={`text-[10px] font-mono-price ${plTone(plCzk, 'text-positive/60', 'text-negative/60')}`}
             >
               {formatPercent(plPercent, 1, true)}
             </span>
@@ -270,12 +272,12 @@ export function StockCard({
                       </div>
                       <div className="flex items-baseline gap-1.5">
                         <span
-                          className={`font-mono-price ${sub.plCzk >= 0 ? 'text-positive' : 'text-negative'}`}
+                          className={`font-mono-price ${plTone(sub.plCzk, 'text-positive', 'text-negative')}`}
                         >
                           {formatCurrency(sub.plCzk)}
                         </span>
                         <span
-                          className={`font-mono-price text-[10px] ${sub.plCzk >= 0 ? 'text-positive/60' : 'text-negative/60'}`}
+                          className={`font-mono-price text-[10px] ${plTone(sub.plCzk, 'text-positive/60', 'text-negative/60')}`}
                         >
                           {formatPercent(sub.plPercent, 1, true)}
                         </span>

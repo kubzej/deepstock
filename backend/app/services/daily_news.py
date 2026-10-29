@@ -102,27 +102,15 @@ class DailyNewsService:
                 .execute()
         return len(rows)
 
-    async def run_for_user(
-        self,
-        user_id: str,
-        *,
-        report_id: Optional[str] = None,
-    ) -> dict:
+    async def run_for_user(self, user_id: str) -> dict:
         await self.cleanup_stale_running_reports(user_id)
-        if report_id:
-            report = await self.get_report(report_id, user_id)
-            if not report:
-                raise ValueError("Report not found")
-            window_start = _parse_dt(report["window_start"])
-            window_end = _parse_dt(report["window_end"])
-        else:
-            window_end = datetime.now(timezone.utc)
-            window_start = window_end - timedelta(hours=24)
-            report = await self._create_report(
-                user_id=user_id,
-                window_start=window_start,
-                window_end=window_end,
-            )
+        window_end = datetime.now(timezone.utc)
+        window_start = window_end - timedelta(hours=24)
+        report = await self._create_report(
+            user_id=user_id,
+            window_start=window_start,
+            window_end=window_end,
+        )
 
         logger.info("Daily news report %s started for user %s", report["id"], user_id)
         warnings: list[str] = []
@@ -249,14 +237,32 @@ class DailyNewsService:
             "degraded": 0,
             "failed": 0,
             "notifications_sent": 0,
+            "already_generated": 0,
         }
         for user_id in user_ids:
+            if await self._get_report_for_local_day(user_id, datetime.now(timezone.utc)):
+                result["already_generated"] += 1
+                continue
             report = await self.run_for_user(user_id)
             result["reports_generated"] += 1
             result[report["status"]] = result.get(report["status"], 0) + 1
             if str(report.get("notification_status") or "").startswith("sent:"):
                 result["notifications_sent"] += 1
         return result
+
+    async def _get_report_for_local_day(self, user_id: str, moment: datetime) -> Optional[dict]:
+        """The finished report for the Prague day containing `moment`, if any."""
+        local_day_start, local_day_end = _local_day_bounds_utc(moment)
+        response = supabase.table("daily_news_reports") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .in_("status", ["succeeded", "degraded"]) \
+            .gte("window_end", local_day_start.isoformat()) \
+            .lt("window_end", local_day_end.isoformat()) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        return response.data[0] if response.data else None
 
     async def _create_report(
         self,
@@ -272,19 +278,6 @@ class DailyNewsService:
             .execute()
         if running.data:
             raise ValueError("Denní briefing se už generuje.")
-
-        local_day_start, local_day_end = _local_day_bounds_utc(window_end)
-        existing = supabase.table("daily_news_reports") \
-            .select("*") \
-            .eq("user_id", user_id) \
-            .in_("status", ["succeeded", "degraded"]) \
-            .gte("window_end", local_day_start.isoformat()) \
-            .lt("window_end", local_day_end.isoformat()) \
-            .order("created_at", desc=True) \
-            .limit(1) \
-            .execute()
-        if existing.data:
-            return existing.data[0]
 
         created = supabase.table("daily_news_reports") \
             .insert({
@@ -414,12 +407,6 @@ class DailyNewsService:
         except Exception as exc:
             logger.warning("Daily news push failed: %s", exc, exc_info=True)
             return f"failed:{str(exc)[:200]}"
-
-
-def _parse_dt(value: Any) -> datetime:
-    if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
 
 
 def _local_day_bounds_utc(value: datetime) -> tuple[datetime, datetime]:

@@ -6,8 +6,11 @@ import {
   updateStock,
   deleteStock,
   type Stock,
+  type StockUpdate,
 } from '@/lib/api';
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+import { invalidateJournal } from './useJournal';
+import { invalidateWatchlistItems } from './useWatchlists';
 
 /**
  * Hook for fetching all stocks (master data).
@@ -45,6 +48,8 @@ export function useCreateStock() {
     mutationFn: (data: Omit<Stock, 'id' | 'created_at'>) => createStock(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
+      // The server opens a journal channel for every new stock
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
     },
   });
 }
@@ -56,7 +61,7 @@ export function useUpdateStock() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Stock> }) =>
+    mutationFn: ({ id, data }: { id: string; data: StockUpdate }) =>
       updateStock(id, data),
     onSuccess: (updatedStock) => {
       // Update in list cache
@@ -68,6 +73,8 @@ export function useUpdateStock() {
         queryKeys.stock(updatedStock.ticker),
         updatedStock
       );
+      // Watchlist items embed the stock's sector, industry and name
+      invalidateWatchlistItems(queryClient);
     },
   });
 }
@@ -92,9 +99,11 @@ export function useDeleteStock() {
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
       queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
+      // The stock's journal channel and its entries are deleted with it
+      invalidateJournal(queryClient);
     },
   });
 }

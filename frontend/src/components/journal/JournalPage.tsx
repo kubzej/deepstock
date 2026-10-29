@@ -3,6 +3,7 @@ import { BookOpen, ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-rea
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { ErrorState } from '@/components/shared';
 import {
   PageBackButton,
   PageIntro,
@@ -177,8 +178,25 @@ export function JournalPage() {
   const [mobileShowForm, setMobileShowForm] = useState(false);
   const [search, setSearch] = useState('');
 
-  const { data: channels = [], isLoading: channelsLoading } = useJournalChannels();
-  const { data: sections = [] } = useJournalSections();
+  const channelsQuery = useJournalChannels();
+  const sectionsQuery = useJournalSections();
+  const channels = channelsQuery.data ?? [];
+  const sections = sectionsQuery.data ?? [];
+  const channelsLoading = channelsQuery.isLoading;
+  // Without both lists the sidebar would look like an empty journal
+  const listsFailed =
+    (channelsQuery.isError && !channelsQuery.data) || (sectionsQuery.isError && !sectionsQuery.data);
+  const retryLists = () => {
+    void channelsQuery.refetch();
+    void sectionsQuery.refetch();
+  };
+  const listsError = (
+    <ErrorState
+      title="Deník se nepodařilo načíst"
+      description="Seznam kanálů je nedostupný, záznamy jsou v pořádku."
+      retryAction={{ label: 'Zkusit znovu', onClick: retryLists }}
+    />
+  );
   const stockChannelCount = channels.filter((channel) => channel.type === 'stock').length;
   const showStockSearch = stockChannelCount > 4;
 
@@ -264,6 +282,8 @@ export function JournalPage() {
               <div className="space-y-1 px-4 pt-4">
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
+            ) : listsFailed ? (
+              <div className="px-4 pt-4">{listsError}</div>
             ) : (
               <div className="px-4 pt-4">
                 <SidebarContent
@@ -319,6 +339,8 @@ export function JournalPage() {
               <div className="space-y-1">
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-11 w-full rounded-md" />)}
               </div>
+            ) : listsFailed ? (
+              listsError
             ) : (
               <div className="space-y-3">
                 <div className="px-2">
@@ -341,7 +363,7 @@ export function JournalPage() {
           {/* Feed — scrolls independently */}
           <main className="flex-1 min-w-0 flex flex-col overflow-hidden pb-4">
             {activeChannel ? (
-              <JournalFeed channel={activeChannel} />
+              <JournalFeed key={activeChannel.id} channel={activeChannel} />
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground">
                 <BookOpen className="mb-4 h-10 w-10 opacity-25" />

@@ -17,6 +17,7 @@ async def test_run_daily_news_briefing_calls_service(monkeypatch):
             "degraded": 0,
             "failed": 0,
             "notifications_sent": 1,
+            "already_generated": 0,
         }
 
     monkeypatch.setattr(scheduled, "_run_daily_news_enabled_users", run_enabled_users)
@@ -31,6 +32,7 @@ async def test_run_daily_news_briefing_calls_service(monkeypatch):
         "degraded": 0,
         "failed": 0,
         "notifications_sent": 1,
+        "already_generated": 0,
     }
 
 

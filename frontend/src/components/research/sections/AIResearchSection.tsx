@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { generateReport, getCachedReport, downloadPDF, type AIResearchReport, type ReportType } from '@/lib/api/ai_research';
 import { queryKeys } from '@/lib/queryClient';
+import { invalidateJournal } from '@/hooks/useJournal';
 import {
   EmptyState,
   ErrorState,
@@ -23,28 +24,33 @@ interface AIResearchSectionProps {
   currentPrice: number | null | undefined;
 }
 
-export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionProps) {
+export function AIResearchSection(props: AIResearchSectionProps) {
+  // Keyed by ticker so loading and error state never carry over to another stock
+  return <AIResearchReports key={props.ticker} {...props} />;
+}
+
+function AIResearchReports({ ticker, currentPrice }: AIResearchSectionProps) {
   const queryClient = useQueryClient();
   const [activeReportType, setActiveReportType] = useState<ReportType>('full_analysis');
-  const [generated, setGenerated] = useState<Partial<Record<ReportType, AIResearchReport>>>({});
   const [loading, setLoading] = useState<ReportType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
+  // A generated report is written into these queries, so it belongs to the ticker it was made for
   const cachedQueries = useQueries({
     queries: REPORT_TYPES.map((type) => ({
-      queryKey: ['ai-research-cache', ticker, type],
+      queryKey: queryKeys.aiResearchReport(ticker, type),
       queryFn: () => getCachedReport(ticker, type),
       retry: false,
       staleTime: Infinity,
     })),
   });
 
-  const cached = Object.fromEntries(
+  const reports = Object.fromEntries(
     REPORT_TYPES.map((type, i) => [type, cachedQueries[i].data ?? null])
   ) as Partial<Record<ReportType, AIResearchReport>>;
 
-  const currentReport = generated[activeReportType] ?? cached[activeReportType] ?? null;
+  const currentReport = reports[activeReportType] ?? null;
 
   async function handleGenerate(forceRefresh = false) {
     if (!currentPrice) return;
@@ -54,14 +60,9 @@ export function AIResearchSection({ ticker, currentPrice }: AIResearchSectionPro
     try {
       const period = '3mo';
       const report = await generateReport(ticker, currentPrice, activeReportType, forceRefresh, period);
-      setGenerated((prev) => ({ ...prev, [activeReportType]: report }));
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() }),
-        queryClient.invalidateQueries({ queryKey: ['journalEntries'] }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.journalEntriesByTicker(ticker),
-        }),
-      ]);
+      queryClient.setQueryData(queryKeys.aiResearchReport(ticker, activeReportType), report);
+      // The server saves the report as a journal entry
+      invalidateJournal(queryClient);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {

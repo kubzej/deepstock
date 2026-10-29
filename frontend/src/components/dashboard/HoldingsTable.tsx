@@ -46,14 +46,29 @@ export interface Holding {
   portfolioName?: string;
 }
 
+function sumOrNull(values: (number | null)[]): number | null {
+  let total = 0;
+  for (const value of values) {
+    if (value === null) return null;
+    total += value;
+  }
+  return total;
+}
+
+function plColorClass(pl: number | null): string {
+  if (pl === null) return 'text-muted-foreground';
+  return pl >= 0 ? 'text-positive' : 'text-negative';
+}
+
 interface EnrichedHolding extends Holding {
   quote?: Quote;
-  currentPrice: number;
-  currentValueCzk: number;
+  // null while the quote is missing: a position is not worth 0 just because Yahoo returned nothing
+  currentPrice: number | null;
+  currentValueCzk: number | null;
   investedCzk: number;
-  plCzk: number;
-  plPercent: number;
-  weight: number;
+  plCzk: number | null;
+  plPercent: number | null;
+  weight: number | null;
   volumeRatio: number;
 }
 
@@ -157,16 +172,24 @@ export function HoldingsTable({
     return holdings.map((h) => {
       const quote = quotes[h.ticker];
       const scale = h.priceScale ?? 1;
-      const currentPrice = quote?.price ?? 0;
+      const currentPrice = quote?.price ?? null;
       // For LSE stocks, price is in pence - multiply by scale to get actual value
-      const currentValue = currentPrice * scale * h.shares;
-      const currentValueCzk = toCZK(currentValue, h.currency, rates);
+      const currentValueCzk =
+        currentPrice === null
+          ? null
+          : toCZK(currentPrice * scale * h.shares, h.currency, rates);
 
       const investedCzk = h.totalInvestedCzk;
 
-      const plCzk = currentValueCzk - investedCzk;
-      const plPercent = investedCzk > 0 ? (plCzk / investedCzk) * 100 : 0;
-      const weight = totalValue > 0 ? (currentValueCzk / totalValue) * 100 : 0;
+      const plCzk = currentValueCzk === null ? null : currentValueCzk - investedCzk;
+      const plPercent =
+        plCzk === null ? null : investedCzk > 0 ? (plCzk / investedCzk) * 100 : 0;
+      const weight =
+        currentValueCzk === null
+          ? null
+          : totalValue > 0
+            ? (currentValueCzk / totalValue) * 100
+            : 0;
       const volumeRatio =
         quote?.volume && quote?.avgVolume ? quote.volume / quote.avgVolume : 0;
 
@@ -224,15 +247,11 @@ export function HoldingsTable({
           (sum, h) => sum + h.investedCzk,
           0,
         );
-        const totalValueCzk = tickerHoldings.reduce(
-          (sum, h) => sum + h.currentValueCzk,
-          0,
+        const totalValueCzk = sumOrNull(
+          tickerHoldings.map((h) => h.currentValueCzk),
         );
-        const totalPlCzk = tickerHoldings.reduce((sum, h) => sum + h.plCzk, 0);
-        const totalWeight = tickerHoldings.reduce(
-          (sum, h) => sum + h.weight,
-          0,
-        );
+        const totalPlCzk = sumOrNull(tickerHoldings.map((h) => h.plCzk));
+        const totalWeight = sumOrNull(tickerHoldings.map((h) => h.weight));
 
         // Weighted average cost (convert back from CZK to original currency)
         const scale = first.priceScale ?? 1;
@@ -244,7 +263,11 @@ export function HoldingsTable({
         const avgCost =
           totalShares > 0 ? totalInvestedOriginal / totalShares / scale : 0;
         const plPercent =
-          totalInvestedCzk > 0 ? (totalPlCzk / totalInvestedCzk) * 100 : 0;
+          totalPlCzk === null
+            ? null
+            : totalInvestedCzk > 0
+              ? (totalPlCzk / totalInvestedCzk) * 100
+              : 0;
 
         result.push({
           ...first,
@@ -268,8 +291,8 @@ export function HoldingsTable({
   // Sort the holdings
   const sortedHoldings = useMemo(() => {
     return [...aggregatedHoldings].sort((a, b) => {
-      let aVal: number | string = 0;
-      let bVal: number | string = 0;
+      let aVal: number | string | null = 0;
+      let bVal: number | string | null = 0;
 
       switch (sortKey) {
         case 'ticker':
@@ -316,6 +339,11 @@ export function HoldingsTable({
           aVal = a.weight;
           bVal = b.weight;
           break;
+      }
+
+      // Rows without a value stay at the bottom in either direction
+      if (aVal === null || bVal === null) {
+        return aVal === bVal ? 0 : aVal === null ? 1 : -1;
       }
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -412,7 +440,6 @@ export function HoldingsTable({
             {sortedHoldings.flatMap((holding) => {
               const isExpandable = holding.portfolioCount > 1;
               const isExpanded = expandedTickers.has(holding.ticker);
-              const isPositive = holding.plCzk >= 0;
               const isDayPositive = (holding.quote?.changePercent ?? 0) >= 0;
               const sparkline = sparklineByTicker[holding.ticker];
 
@@ -559,7 +586,7 @@ export function HoldingsTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div
-                      className={isPositive ? 'text-positive' : 'text-negative'}
+                      className={plColorClass(holding.plCzk)}
                     >
                       <span className="font-mono-price font-medium">
                         {formatPercent(holding.plPercent, 1, true)}
@@ -578,7 +605,6 @@ export function HoldingsTable({
               // Add sub-rows for expanded holdings
               if (isExpanded && holding.portfolioHoldings.length > 0) {
                 for (const subHolding of holding.portfolioHoldings) {
-                  const subIsPositive = subHolding.plCzk >= 0;
                   rows.push(
                     <TableRow
                       key={`${subHolding.ticker}-${subHolding.portfolioName}`}
@@ -625,9 +651,7 @@ export function HoldingsTable({
                       </TableCell>
                       <TableCell className="text-right">
                         <div
-                          className={
-                            subIsPositive ? 'text-positive' : 'text-negative'
-                          }
+                          className={plColorClass(subHolding.plCzk)}
                         >
                           <span className="font-mono-price font-medium">
                             {formatPercent(subHolding.plPercent, 1, true)}

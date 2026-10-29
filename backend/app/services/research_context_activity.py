@@ -7,11 +7,13 @@ import asyncio
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Optional
 
+from app.core.pagination import decode_cursor, encode_cursor, older_than_filter
 from app.core.supabase import supabase
 from app.services.exchange import exchange_service
 from app.services.market import market_service
 from app.services.options import options_service
 from app.services.performance import get_options_performance, get_stock_performance
+from app.services.portfolio_accounting import holding_market_value_czk
 from app.services.portfolio import portfolio_service
 from app.services.stocks import stock_service
 
@@ -94,8 +96,42 @@ def _serialize_option_activity_transaction(transaction: dict) -> dict:
     }
 
 
+def _activity_instant(value: Optional[str]) -> datetime:
+    """UTC moment of an activity row; option rows carry only a date, which means midnight UTC."""
+    if not value:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _activity_sort_key(transaction: dict) -> tuple[datetime, str]:
+    # Stock and option ids are UUIDs, so (moment, id) is one total order across both kinds
+    return _activity_instant(transaction.get("executed_at")), transaction.get("id") or ""
+
+
 def _sort_activity_transactions_desc(transactions: list[dict]) -> list[dict]:
-    return sorted(transactions, key=lambda item: item.get("executed_at") or "", reverse=True)
+    return sorted(transactions, key=_activity_sort_key, reverse=True)
+
+
+def _activity_cursor(transaction: dict) -> str:
+    moment, row_id = _activity_sort_key(transaction)
+    return encode_cursor(moment.isoformat(), row_id)
+
+
+def _option_older_than_filter(cursor: str) -> str:
+    """Rows of option_transactions that come after `cursor` in (moment desc, id desc) order.
+
+    Options are dated by day (DATE column, midnight UTC as a moment), so the filter compares days.
+    """
+    sort_value, row_id = decode_cursor(cursor)
+    moment = _activity_instant(sort_value)
+    day = moment.date().isoformat()
+    if moment.time() == time.min:
+        return f'date.lt."{day}",and(date.eq."{day}",id.lt."{row_id}")'
+    # Cursor is later in the day than any option on that day, so the whole day is still older
+    return f'date.lte."{day}"'
 
 
 def _parse_activity_date(value: str, field_name: str) -> date:
@@ -105,21 +141,6 @@ def _parse_activity_date(value: str, field_name: str) -> date:
         raise ActivityFilterError(
             f"Invalid {field_name} '{value}'. Expected YYYY-MM-DD format."
         ) from exc
-
-
-def _parse_activity_cursor(value: str) -> datetime:
-    normalized = value.strip()
-    if not normalized:
-        raise ActivityFilterError("Cursor cannot be empty.")
-    try:
-        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise ActivityFilterError(
-            f"Invalid cursor '{value}'. Expected ISO datetime format."
-        ) from exc
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
 
 
 def _activity_period_start(period: str, today: date) -> Optional[date]:
@@ -176,18 +197,17 @@ def _resolve_activity_window(
     )
     upper_bound_dt = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=timezone.utc)
 
-    cursor_value = None
     if cursor:
-        cursor_dt = _parse_activity_cursor(cursor)
-        cursor_value = cursor_dt.isoformat()
-        if cursor_dt < upper_bound_dt:
-            upper_bound_dt = cursor_dt
+        try:
+            decode_cursor(cursor)
+        except ValueError as exc:
+            raise ActivityFilterError(f"Invalid cursor '{cursor}'. Use next_cursor from the previous response.") from exc
 
     return {
         "period": resolved_period,
         "from_date": start_date.isoformat() if start_date else None,
         "to_date": end_date.isoformat(),
-        "cursor": cursor_value,
+        "cursor": cursor or None,
         "lower_bound": lower_bound,
         "upper_bound": upper_bound_dt.isoformat(),
     }
@@ -222,7 +242,7 @@ def _serialize_portfolio_holding(holding: dict, quote: Optional[dict], fx_rate: 
     shares = float(holding.get("shares") or 0)
     price_scale = float(stock.get("price_scale") or 1)
     current_price = _coerce_float((quote or {}).get("price"))
-    current_value_czk = current_price * price_scale * shares * fx_rate if current_price is not None else None
+    current_value_czk = holding_market_value_czk(shares, current_price, price_scale, fx_rate)
     invested_czk = float(holding.get("total_invested_czk") or 0)
     unrealized_pnl_czk = current_value_czk - invested_czk if current_value_czk is not None else None
     unrealized_pnl_pct = (
@@ -356,7 +376,8 @@ class ActivityPortfolioContextService:
             if matching_holdings:
                 total_shares = sum(float(holding.get("shares") or 0) for holding in matching_holdings)
                 total_cost = sum(float(holding.get("total_cost") or 0) for holding in matching_holdings)
-                market_value = total_shares * stock_price if stock_price is not None else None
+                price_scale = float(stock.get("price_scale") or 1)
+                market_value = total_shares * stock_price * price_scale if stock_price is not None else None
                 unrealized_pnl = market_value - total_cost if market_value is not None else None
                 currency = (matching_holdings[0].get("stocks") or {}).get("currency")
                 position_summary = {
@@ -422,6 +443,7 @@ class ActivityPortfolioContextService:
         limit: int,
         lower_bound: Optional[str],
         upper_bound: Optional[str],
+        cursor: Optional[str] = None,
     ) -> list[dict]:
         if not portfolio_ids:
             return []
@@ -430,6 +452,7 @@ class ActivityPortfolioContextService:
             .select("*, stocks(ticker, name), source_transaction:source_transaction_id(id, executed_at, price_per_share, currency, shares)") \
             .in_("portfolio_id", portfolio_ids) \
             .order("executed_at", desc=True) \
+            .order("id", desc=True) \
             .limit(limit + 1)
 
         if stock_id:
@@ -438,6 +461,8 @@ class ActivityPortfolioContextService:
             query = query.gte("executed_at", lower_bound)
         if upper_bound:
             query = query.lt("executed_at", upper_bound)
+        if cursor:
+            query = query.or_(older_than_filter("executed_at", cursor))
 
         response = query.execute()
         annotated = await portfolio_service._annotate_transactions(response.data or [])
@@ -452,6 +477,7 @@ class ActivityPortfolioContextService:
         limit: int,
         lower_bound: Optional[str],
         upper_bound: Optional[str],
+        cursor: Optional[str] = None,
     ) -> list[dict]:
         if not portfolio_ids:
             return []
@@ -460,6 +486,7 @@ class ActivityPortfolioContextService:
             .select("*, portfolios(name)") \
             .in_("portfolio_id", portfolio_ids) \
             .order("date", desc=True) \
+            .order("id", desc=True) \
             .limit(limit + 1)
 
         if symbol:
@@ -468,6 +495,8 @@ class ActivityPortfolioContextService:
             query = query.gte("date", lower_bound)
         if upper_bound:
             query = query.lt("date", upper_bound)
+        if cursor:
+            query = query.or_(_option_older_than_filter(cursor))
 
         response = query.execute()
         rows = []
@@ -504,6 +533,7 @@ class ActivityPortfolioContextService:
                 limit=limit,
                 lower_bound=window["lower_bound"],
                 upper_bound=window["upper_bound"],
+                cursor=window["cursor"],
             ),
             self.fetch_option_activity_rows(
                 portfolio_ids=portfolio_ids,
@@ -511,6 +541,7 @@ class ActivityPortfolioContextService:
                 limit=limit,
                 lower_bound=window["lower_bound"],
                 upper_bound=window["upper_bound"],
+                cursor=window["cursor"],
             ),
         )
 
@@ -520,7 +551,7 @@ class ActivityPortfolioContextService:
         )
         has_more = len(mixed_transactions) > limit
         transactions = mixed_transactions[:limit]
-        next_cursor = transactions[-1].get("executed_at") if has_more and transactions else None
+        next_cursor = _activity_cursor(transactions[-1]) if has_more and transactions else None
 
         return {
             "scope": scope,

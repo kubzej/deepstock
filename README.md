@@ -19,7 +19,11 @@ Core investing, accounting, and portfolio logic lives in the backend. The fronte
 ## Running
 
 ```bash
-# Backend + Redis
+# Once: create the env files and fill them in (the comments inside explain each value)
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+
+# Backend + Redis + MCP server
 docker compose up -d
 
 # Frontend

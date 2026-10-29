@@ -6,10 +6,116 @@ import yfinance as yf
 import pandas as pd
 import json
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, Literal, Optional
 from app.core.cache import CacheTTL
+from app.services.market.yahoo import run_yahoo
 
 logger = logging.getLogger(__name__)
+
+TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
+
+# Calendar days each period covers. The raw history is one row per trading day,
+# so periods must be cut by date, never by row count.
+TECHNICAL_PERIOD_DAYS: Dict[str, int] = {
+    "1w": 7,
+    "1mo": 30,
+    "3mo": 90,
+    "6mo": 180,
+    "1y": 365,
+    "2y": 730,
+}
+
+
+def _slice_to_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Rows within the period's calendar span, ending on the latest row."""
+    cutoff = df['date'].iloc[-1] - pd.Timedelta(days=TECHNICAL_PERIOD_DAYS[period])
+    return df[df['date'] >= cutoff].copy()
+
+
+def _wilder_average(values: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Wilder's smoothing, the standard average behind RSI, ATR and ADX:
+    each new value weighs 1/window and the previous average the rest.
+    Rows before the first full window stay empty.
+    """
+    return values.ewm(alpha=1 / window, adjust=False, min_periods=window).mean()
+
+
+def _calculate_rsi(close: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Wilder RSI. No losses so far is 100, no movement at all is 50.
+    """
+    delta = close.diff()
+    gain = _wilder_average(delta.where(delta > 0, 0), window)
+    loss = _wilder_average(-delta.where(delta < 0, 0), window)
+    rs = gain / loss.replace(0, float('nan'))
+    rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.mask((loss == 0) & (gain > 0), 100.0)
+    return rsi.mask((loss == 0) & (gain == 0), 50.0)
+
+
+def _add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Add every indicator column to a daily OHLCV frame, in place."""
+    # SMA (Simple Moving Average)
+    df['sma50'] = df['close'].rolling(window=50).mean()
+    df['sma200'] = df['close'].rolling(window=200).mean()
+
+    # RSI (Relative Strength Index)
+    df['rsi14'] = _calculate_rsi(df['close'])
+
+    # MACD (Moving Average Convergence Divergence)
+    ema12 = df['close'].ewm(span=12, adjust=False).mean()
+    ema26 = df['close'].ewm(span=26, adjust=False).mean()
+    df['macd'] = ema12 - ema26
+    df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
+    df['macd_histogram'] = df['macd'] - df['macd_signal']
+
+    # Bollinger Bands
+    df['bb_middle'] = df['close'].rolling(window=20).mean()
+    bb_std = df['close'].rolling(window=20).std(ddof=0)
+    df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
+    df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
+
+    # Stochastic Oscillator
+    low14 = df['low'].rolling(window=14).min()
+    high14 = df['high'].rolling(window=14).max()
+    df['stoch_k'] = 100 * ((df['close'] - low14) / (high14 - low14))
+    df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
+
+    # ATR (Average True Range)
+    tr1 = df['high'] - df['low']
+    tr2 = (df['high'] - df['close'].shift()).abs()
+    tr3 = (df['low'] - df['close'].shift()).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    df['atr14'] = _wilder_average(tr)
+    df['atr_percent'] = (df['atr14'] / df['close']) * 100
+
+    # OBV (On-Balance Volume)
+    direction = np.sign(df['close'].diff()).fillna(0)
+    df['obv'] = (direction * df['volume']).cumsum()
+    df['obv_sma'] = df['obv'].rolling(window=20).mean()
+
+    # ADX (Average Directional Index)
+    plus_dm = df['high'].diff()
+    minus_dm = df['low'].shift() - df['low']
+    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0)
+    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0)
+
+    plus_di = 100 * (_wilder_average(plus_dm) / df['atr14'])
+    minus_di = 100 * (_wilder_average(minus_dm) / df['atr14'])
+    dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
+    df['adx'] = _wilder_average(dx)
+    df['plus_di'] = plus_di
+    df['minus_di'] = minus_di
+
+    # Volume analysis
+    df['volume_sma20'] = df['volume'].rolling(window=20).mean()
+
+    return df
+
+
+def _fetch_history_sync(ticker: str) -> pd.DataFrame:
+    return yf.Ticker(ticker).history(period="2y", interval="1d", auto_adjust=False)
 
 
 async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.DataFrame]:
@@ -19,7 +125,7 @@ async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.Dat
     
     Returns DataFrame with all indicator columns, or None if not available.
     """
-    cache_key = f"raw_technical:{ticker}"
+    cache_key = f"raw_technical:v2:{ticker}"
     cached = await redis.get(cache_key)
     
     if cached:
@@ -31,9 +137,8 @@ async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.Dat
         return df
     
     try:
-        t = yf.Ticker(ticker)
         # Get 2 years of history (need ~250 days for SMA200)
-        hist = t.history(period="2y", interval="1d")
+        hist = await run_yahoo(_fetch_history_sync, ticker)
         
         if hist.empty or len(hist) < 50:
             return None
@@ -46,70 +151,8 @@ async def get_raw_history_with_indicators(redis, ticker: str) -> Optional[pd.Dat
         if 'date' not in df.columns and 'datetime' not in df.columns:
             df = df.rename(columns={df.columns[0]: 'date'})
         
-        # ============================================================
-        # CALCULATE ALL INDICATORS
-        # ============================================================
-        
-        # SMA (Simple Moving Average)
-        df['sma50'] = df['close'].rolling(window=50).mean()
-        df['sma200'] = df['close'].rolling(window=200).mean()
-        
-        # RSI (Relative Strength Index)
-        delta = df['close'].diff()
-        gain = delta.where(delta > 0, 0).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss.replace(0, float('nan'))
-        df['rsi14'] = 100 - (100 / (1 + rs))
-        
-        # MACD (Moving Average Convergence Divergence)
-        ema12 = df['close'].ewm(span=12, adjust=False).mean()
-        ema26 = df['close'].ewm(span=26, adjust=False).mean()
-        df['macd'] = ema12 - ema26
-        df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
-        df['macd_histogram'] = df['macd'] - df['macd_signal']
-        
-        # Bollinger Bands
-        df['bb_middle'] = df['close'].rolling(window=20).mean()
-        bb_std = df['close'].rolling(window=20).std()
-        df['bb_upper'] = df['bb_middle'] + (bb_std * 2)
-        df['bb_lower'] = df['bb_middle'] - (bb_std * 2)
-        
-        # Stochastic Oscillator
-        low14 = df['low'].rolling(window=14).min()
-        high14 = df['high'].rolling(window=14).max()
-        df['stoch_k'] = 100 * ((df['close'] - low14) / (high14 - low14))
-        df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
-        
-        # ATR (Average True Range)
-        tr1 = df['high'] - df['low']
-        tr2 = (df['high'] - df['close'].shift()).abs()
-        tr3 = (df['low'] - df['close'].shift()).abs()
-        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        df['atr14'] = tr.rolling(window=14).mean()
-        df['atr_percent'] = (df['atr14'] / df['close']) * 100
-        
-        # OBV (On-Balance Volume)
-        direction = np.sign(df['close'].diff()).fillna(0)
-        df['obv'] = (direction * df['volume']).cumsum()
-        df['obv_sma'] = df['obv'].rolling(window=20).mean()
-        
-        # ADX (Average Directional Index)
-        plus_dm = df['high'].diff()
-        minus_dm = df['low'].shift() - df['low']
-        plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0)
-        minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0)
-        
-        atr14_for_adx = tr.rolling(window=14).mean()
-        plus_di = 100 * (plus_dm.rolling(window=14).mean() / atr14_for_adx)
-        minus_di = 100 * (minus_dm.rolling(window=14).mean() / atr14_for_adx)
-        dx = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di))
-        df['adx'] = dx.rolling(window=14).mean()
-        df['plus_di'] = plus_di
-        df['minus_di'] = minus_di
-        
-        # Volume analysis
-        df['volume_sma20'] = df['volume'].rolling(window=20).mean()
-        
+        df = _add_indicators(df)
+
         # ============================================================
         # CACHE RAW DATA (1 hour TTL)
         # ============================================================
@@ -295,15 +338,19 @@ def generate_technical_signals(current: dict, df: pd.DataFrame) -> dict:
     return signals
 
 
-async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Optional[dict]:
+async def get_technical_indicators(redis, ticker: str, period: TechnicalPeriod = "1y") -> Optional[dict]:
     """
     Calculate technical indicators for a stock.
     Returns current values and historical data for charts.
-    
+
+    Indicator values and signals describe the latest row of the full 2y history,
+    so they are the same for every period. The period only windows what is
+    plotted: the history series, Fibonacci levels and period high/low.
+
     Uses 2-layer caching:
     - L1: Raw 2y history with indicators (1 hour TTL) - saves yfinance calls
     - L2: Filtered result per period (5 min TTL) - fast response
-    
+
     Indicators:
     - SMA (50, 200)
     - RSI (14)
@@ -314,6 +361,11 @@ async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Op
     - OBV
     - ADX (14)
     """
+    if period not in TECHNICAL_PERIOD_DAYS:
+        raise ValueError(
+            f"Unsupported technical period '{period}'. Expected one of: {', '.join(TECHNICAL_PERIOD_DAYS)}"
+        )
+
     # L2 Cache: Check for pre-computed result for this period
     cache_key = f"technical:{ticker}:{period}"
     cached = await redis.get(cache_key)
@@ -327,28 +379,15 @@ async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Op
         if df is None or len(df) < 50:
             return None
         
-        # ============================================================
-        # FILTER DATA BY PERIOD
-        # ============================================================
-        
-        period_days = {
-            "1w": 7,
-            "1mo": 30,
-            "3mo": 90,
-            "6mo": 180,
-            "1y": 365,
-            "2y": 730,
-        }
-        days = period_days.get(period, 365)
-        df_filtered = df.tail(days).copy()
-        
+        df_filtered = _slice_to_period(df, period)
+
         # ============================================================
         # GET CURRENT VALUES
         # ============================================================
-        
-        last = df_filtered.iloc[-1]
+
+        last = df.iloc[-1]
         current_price = float(last['close']) if pd.notna(last['close']) else None
-        
+
         def safe_float(val):
             return round(float(val), 4) if pd.notna(val) else None
         
@@ -416,7 +455,7 @@ async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Op
         # GENERATE SIGNALS
         # ============================================================
         
-        signals = generate_technical_signals(current, df_filtered)
+        signals = generate_technical_signals(current, df)
         current.update(signals)
         
         # ============================================================
@@ -577,6 +616,7 @@ async def get_technical_indicators(redis, ticker: str, period: str = "1y") -> Op
         
         result = {
             **current,
+            "period": period,
             "priceHistory": price_history,
             "macdHistory": macd_history,
             "bollingerHistory": bollinger_history,

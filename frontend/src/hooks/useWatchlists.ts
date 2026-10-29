@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   fetchWatchlists,
   fetchWatchlistItems,
@@ -15,6 +15,27 @@ import {
   type Watchlist,
 } from '@/lib/api';
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+
+/**
+ * Refresh everything that shows watchlist items. The per-list items and the cross-list view are
+ * copies of the same rows (with their tags, stock details and list name), so they go stale together.
+ * Pass the lists that changed, or none when the change can touch any list.
+ */
+export function invalidateWatchlistItems(queryClient: QueryClient, ...watchlistIds: string[]) {
+  if (watchlistIds.length === 0) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.anyWatchlistItems() });
+  }
+  for (const watchlistId of watchlistIds) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.watchlistItems(watchlistId) });
+  }
+  queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
+}
+
+/** Refresh the list summaries (counts) and the ticker list, which follow from what the lists contain. */
+function invalidateWatchlistSummaries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
+}
 
 /**
  * Fetch all user watchlists.
@@ -64,6 +85,8 @@ export function useWatchlistItems(watchlistId: string | null) {
     enabled: !!watchlistId,
     staleTime: STALE_TIMES.watchlistItems,
     gcTime: GC_TIMES.medium,
+    // Another list is another subject: never show the previous list's items while it loads
+    placeholderData: undefined,
   });
 }
 
@@ -93,6 +116,8 @@ export function useUpdateWatchlist() {
       updateWatchlist(data.id, { name: data.name, description: data.description }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+      // The cross-list view carries each item's list name
+      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
     },
   });
 }
@@ -105,8 +130,10 @@ export function useDeleteWatchlist() {
   
   return useMutation({
     mutationFn: (id: string) => deleteWatchlist(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: queryKeys.watchlistItems(id) });
+      invalidateWatchlistSummaries(queryClient);
+      invalidateWatchlistItems(queryClient);
     },
   });
 }
@@ -168,12 +195,11 @@ export function useAddWatchlistItem() {
         notes: data.notes,
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.watchlistItems(variables.watchlistId),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
+      invalidateWatchlistItems(queryClient, variables.watchlistId);
+      invalidateWatchlistSummaries(queryClient);
+      // Adding an unknown ticker creates the stock, and with it a journal channel, on the server
+      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
     },
   });
 }
@@ -198,9 +224,7 @@ export function useUpdateWatchlistItem() {
         notes: data.notes,
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.watchlistItems(variables.watchlistId),
-      });
+      invalidateWatchlistItems(queryClient, variables.watchlistId);
     },
   });
 }
@@ -215,12 +239,8 @@ export function useDeleteWatchlistItem() {
     mutationFn: (data: { itemId: string; watchlistId: string }) =>
       deleteWatchlistItem(data.itemId),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.watchlistItems(variables.watchlistId),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
+      invalidateWatchlistItems(queryClient, variables.watchlistId);
+      invalidateWatchlistSummaries(queryClient);
     },
   });
 }
@@ -238,15 +258,8 @@ export function useMoveWatchlistItem() {
       toWatchlistId: string;
     }) => moveWatchlistItem(data.itemId, data.toWatchlistId),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.watchlistItems(variables.fromWatchlistId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.watchlistItems(variables.toWatchlistId),
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlists() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTickers() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.allWatchlistItems() });
+      invalidateWatchlistItems(queryClient, variables.fromWatchlistId, variables.toWatchlistId);
+      invalidateWatchlistSummaries(queryClient);
     },
   });
 }

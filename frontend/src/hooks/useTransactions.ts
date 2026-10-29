@@ -8,6 +8,7 @@ import {
 } from '@/lib/api';
 import type { Transaction, TransactionUpdateData } from '@/lib/api';
 import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
+import { invalidateJournal } from './useJournal';
 
 /**
  * Hook for fetching transactions for a specific portfolio.
@@ -58,9 +59,11 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
       queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
+      // The server keeps a journal entry for every transaction
+      invalidateJournal(queryClient);
     },
   });
 }
@@ -84,9 +87,11 @@ export function useAddTransaction() {
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
       queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
+      // The server keeps a journal entry for every transaction
+      invalidateJournal(queryClient);
     },
   });
 }
@@ -112,9 +117,11 @@ export function useUpdateTransaction() {
       queryClient.invalidateQueries({ queryKey: ['holdings'] });
       queryClient.invalidateQueries({ queryKey: ['openLots'] });
       queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
-      queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
+      // The server keeps a journal entry for every transaction
+      invalidateJournal(queryClient);
     },
   });
 }

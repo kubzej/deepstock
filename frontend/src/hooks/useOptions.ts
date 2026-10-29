@@ -3,12 +3,12 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
+import { invalidateJournal } from './useJournal';
 import {
   fetchOptionHoldings,
   fetchOptionTransactions,
   fetchOptionStats,
   createOptionTransaction,
-  deleteOptionTransaction,
   deleteOptionTransactionsBySymbol,
   closeOptionPosition,
   type OptionHolding,
@@ -87,26 +87,10 @@ export function useCreateOptionTransaction() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
-      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.optionTransactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
-    },
-  });
-}
-
-/**
- * Delete an option transaction
- */
-export function useDeleteOptionTransaction() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (transactionId: string) => deleteOptionTransaction(transactionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
-      queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
-      queryClient.invalidateQueries({ queryKey: ['optionStats'] });
-      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
-      queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
+      // The server keeps a journal entry for every option trade
+      invalidateJournal(queryClient);
     },
   });
 }
@@ -124,7 +108,7 @@ export function useDeleteOptionTransactionsBySymbol() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
-      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.optionTransactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
     },
   });
@@ -176,8 +160,10 @@ export function useCloseOptionPosition() {
       queryClient.invalidateQueries({ queryKey: ['optionHoldings'] });
       queryClient.invalidateQueries({ queryKey: ['optionTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['optionStats'] });
-      queryClient.invalidateQueries({ queryKey: ['optionTransactionHistory'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.optionTransactionHistory() });
       queryClient.invalidateQueries({ queryKey: ['optionsPerformance'] });
+      // The server keeps a journal entry for every option trade
+      invalidateJournal(queryClient);
       // Also invalidate stock data for ASSIGNMENT/EXERCISE as they create stock transactions
       if (variables.closingAction === 'ASSIGNMENT' || variables.closingAction === 'EXERCISE') {
         queryClient.invalidateQueries({ queryKey: ['holdings'] });
@@ -185,7 +171,7 @@ export function useCloseOptionPosition() {
         queryClient.invalidateQueries({ queryKey: ['openLots'] });
         queryClient.invalidateQueries({ queryKey: ['portfolioSnapshot'] });
         queryClient.invalidateQueries({ queryKey: ['quotes'] });
-        queryClient.invalidateQueries({ queryKey: ['transactionHistory'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.transactionHistory() });
         queryClient.invalidateQueries({ queryKey: ['infiniteTransactions'] });
         queryClient.invalidateQueries({ queryKey: ['stockPerformance'] });
       }

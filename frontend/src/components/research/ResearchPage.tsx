@@ -200,6 +200,8 @@ export function ResearchPage() {
       enabled: !!activeTicker,
       staleTime: 5 * 60 * 1000,
       retry: false,
+      // Another ticker is another subject: never show the previous stock while it loads
+      placeholderData: undefined,
     });
 
   const { data: channels = [] } = useJournalChannels();

@@ -1,8 +1,10 @@
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/shared';
 import { RichTextEditor } from '@/components/journal/RichTextEditor';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
+import { LoadMoreFooter } from '@/components/journal/LoadMoreFooter';
 import {
   useJournalEntries,
   useCreateJournalEntry,
@@ -30,7 +32,16 @@ export function QuickJournalWorkspace({
   onResetDraft,
   autoFocus = false,
 }: QuickJournalWorkspaceProps) {
-  const { data, isLoading } = useJournalEntries(channel.id);
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetchNextPageError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useJournalEntries(channel.id);
   const createEntry = useCreateJournalEntry(channel.id);
   const updateEntry = useUpdateJournalEntry(channel.id);
   const deleteEntry = useDeleteJournalEntry(channel.id);
@@ -89,6 +100,12 @@ export function QuickJournalWorkspace({
               </div>
             ))}
           </div>
+        ) : isError && !data ? (
+          <ErrorState
+            title="Záznamy se nepodařilo načíst"
+            description="Nepodařilo se spojit se serverem."
+            retryAction={{ label: 'Zkusit znovu', onClick: () => void refetch() }}
+          />
         ) : entries.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground/40">
             Zatím žádné záznamy.
@@ -99,12 +116,17 @@ export function QuickJournalWorkspace({
               key={entry.id}
               entry={entry}
               onDelete={(id) => deleteEntry.mutate(id)}
-              onUpdate={(id, content) => updateEntry.mutate({ id, content })}
+              onUpdate={(id, content) => updateEntry.mutateAsync({ id, content })}
               isDeleting={deleteEntry.isPending}
-              isUpdating={updateEntry.isPending}
             />
           ))
         )}
+        <LoadMoreFooter
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+          isError={isFetchNextPageError}
+          fetchNextPage={fetchNextPage}
+        />
       </div>
     </div>
   );

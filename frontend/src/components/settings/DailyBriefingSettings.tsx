@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ErrorState } from '@/components/shared';
 import {
   PageBackButton,
   PageIntro,
@@ -32,6 +33,7 @@ import type {
   DailyBriefingPriority,
   DailyBriefingScopeItem,
   DailyBriefingScopeOption,
+  DailyBriefingScopeOptions,
 } from '@/lib/api/daily_briefing';
 
 type DraftItem = {
@@ -57,14 +59,30 @@ function buildScopeItems(
     .filter((item) => item.enabled);
 }
 
+function draftFromScope(scopeOptions: DailyBriefingScopeOptions): Record<string, DraftItem> {
+  const draft: Record<string, DraftItem> = {};
+  for (const option of [...scopeOptions.portfolios, ...scopeOptions.watchlists]) {
+    draft[keyFor(option)] = { enabled: false, priority: 'medium' };
+  }
+  for (const item of scopeOptions.selected_items) {
+    draft[`${item.source_type}:${item.source_id}`] = {
+      enabled: item.enabled,
+      priority: item.priority,
+    };
+  }
+  return draft;
+}
+
 function SourceRow({
   option,
   draft,
   onChange,
+  disabled,
 }: {
   option: DailyBriefingScopeOption;
   draft: DraftItem;
   onChange: (draft: DraftItem) => void;
+  disabled: boolean;
 }) {
   const Icon = option.source_type === 'portfolio' ? Briefcase : Star;
   return (
@@ -86,7 +104,7 @@ function SourceRow({
           onValueChange={(value) =>
             onChange({ ...draft, priority: value as DailyBriefingPriority })
           }
-          disabled={!draft.enabled}
+          disabled={disabled || !draft.enabled}
         >
           <SelectTrigger className="h-9 w-28">
             <SelectValue />
@@ -100,6 +118,7 @@ function SourceRow({
         <Switch
           checked={draft.enabled}
           onCheckedChange={(enabled) => onChange({ ...draft, enabled })}
+          disabled={disabled}
         />
       </div>
     </UtilityListItem>
@@ -130,29 +149,36 @@ export function DailyBriefingSettings() {
   }, [settings]);
 
   useEffect(() => {
-    if (!scopeOptions) return;
-    const next: Record<string, DraftItem> = {};
-    for (const option of [...scopeOptions.portfolios, ...scopeOptions.watchlists]) {
-      next[keyFor(option)] = { enabled: false, priority: 'medium' };
-    }
-    for (const item of scopeOptions.selected_items) {
-      next[`${item.source_type}:${item.source_id}`] = {
-        enabled: item.enabled,
-        priority: item.priority,
-      };
-    }
-    setDraft(next);
+    if (scopeOptions) setDraft(draftFromScope(scopeOptions));
   }, [scopeOptions]);
+
+  // Writes replace the whole setting, so only one may be in flight, and a failed one must
+  // not leave the controls showing a value the server never stored
+  const saving = updateSettings.isPending || updateScope.isPending;
+  const saveFailed = updateSettings.isError || updateScope.isError;
+
+  const restoreSettings = () => {
+    if (!settings) return;
+    setEnabled(settings.enabled);
+    setIncludeMarketContext(settings.include_market_context);
+  };
+
+  const restoreScope = () => {
+    if (scopeOptions) setDraft(draftFromScope(scopeOptions));
+  };
 
   const updateSetting = (next: {
     enabled?: boolean;
     include_market_context?: boolean;
   }) => {
-    updateSettings.mutate({
-      enabled: next.enabled ?? enabled,
-      include_market_context:
-        next.include_market_context ?? includeMarketContext,
-    });
+    updateSettings.mutate(
+      {
+        enabled: next.enabled ?? enabled,
+        include_market_context:
+          next.include_market_context ?? includeMarketContext,
+      },
+      { onError: restoreSettings },
+    );
   };
 
   const handleEnabledChange = (nextEnabled: boolean) => {
@@ -171,7 +197,7 @@ export function DailyBriefingSettings() {
   ) => {
     const nextDraft = { ...draft, [keyFor(option)]: nextItem };
     setDraft(nextDraft);
-    updateScope.mutate(buildScopeItems(allOptions, nextDraft));
+    updateScope.mutate(buildScopeItems(allOptions, nextDraft), { onError: restoreScope });
   };
 
   return (
@@ -180,6 +206,13 @@ export function DailyBriefingSettings() {
         title="Denní briefing"
         leading={<PageBackButton onClick={onBack} />}
       />
+
+      {saveFailed && (
+        <ErrorState
+          title="Nastavení se nepodařilo uložit"
+          description="Změna se neuložila, zobrazené je poslední uložené nastavení."
+        />
+      )}
 
       <UtilitySection title="Generování">
         <UtilityPanel className="space-y-4">
@@ -193,7 +226,7 @@ export function DailyBriefingSettings() {
             <Switch
               checked={enabled}
               onCheckedChange={handleEnabledChange}
-              disabled={settingsLoading}
+              disabled={settingsLoading || saving}
             />
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -206,7 +239,7 @@ export function DailyBriefingSettings() {
             <Switch
               checked={includeMarketContext}
               onCheckedChange={handleMarketContextChange}
-              disabled={settingsLoading}
+              disabled={settingsLoading || saving}
             />
           </div>
         </UtilityPanel>
@@ -223,6 +256,7 @@ export function DailyBriefingSettings() {
                 option={option}
                 draft={draft[keyFor(option)] ?? { enabled: false, priority: 'medium' }}
                 onChange={(next) => handleScopeChange(option, next)}
+                disabled={saving}
               />
             ))}
           </UtilityList>
@@ -240,6 +274,7 @@ export function DailyBriefingSettings() {
                 option={option}
                 draft={draft[keyFor(option)] ?? { enabled: false, priority: 'medium' }}
                 onChange={(next) => handleScopeChange(option, next)}
+                disabled={saving}
               />
             ))}
           </UtilityList>

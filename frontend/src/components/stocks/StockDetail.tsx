@@ -347,33 +347,30 @@ export function StockDetail() {
 
   // Position metrics (only if holding exists)
   const hasPosition = !!holding && holding.shares > 0;
-  const position = hasPosition
-    ? {
-        shares: holding.shares,
-        avgCost: holding.avg_cost,
-        totalCost: holding.avg_cost * holding.shares,
-        totalValue: currentPrice * holding.shares,
-        unrealizedPnL:
-          currentPrice * holding.shares - holding.avg_cost * holding.shares,
-        unrealizedPnLPercent:
-          holding.avg_cost > 0
-            ? ((currentPrice - holding.avg_cost) / holding.avg_cost) * 100
-            : 0,
-      }
-    : null;
 
-  // CZK conversions for position
-  const positionCzk = position
+  // CZK conversions for position; value and P/L stay null while the quote is missing
+  const positionCzk = hasPosition
     ? (() => {
-        const totalCost = holding!.total_invested_czk;
-        const totalValue = toCZK(position.totalValue, stockCurrency, rates);
+        const totalCost = holding.total_invested_czk;
+        const totalValue = quote
+          ? toCZK(currentPrice * holding.shares, stockCurrency, rates)
+          : null;
         return {
+          shares: holding.shares,
+          avgCost: holding.avg_cost,
           totalCost,
           totalValue,
-          unrealizedPnL: totalValue - totalCost,
+          unrealizedPnL: totalValue === null ? null : totalValue - totalCost,
         };
       })()
     : null;
+
+  const pnlClass =
+    positionCzk?.unrealizedPnL == null
+      ? 'text-muted-foreground'
+      : positionCzk.unrealizedPnL >= 0
+        ? 'text-positive'
+        : 'text-negative';
 
   return (
     <div className="pb-24 md:pb-6 space-y-6">
@@ -471,14 +468,14 @@ export function StockDetail() {
           </>
         }
       >
-        {position && positionCzk ? (
+        {positionCzk ? (
           <div className="grid grid-cols-2 max-w-5xl gap-x-6 gap-y-5 xl:grid-cols-5">
             <div className="space-y-1">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 Počet akcií
               </p>
               <p className="text-lg font-mono-price font-semibold">
-                {position.shares}
+                {positionCzk.shares}
               </p>
             </div>
             <div className="space-y-1">
@@ -486,7 +483,7 @@ export function StockDetail() {
                 Průměrná cena
               </p>
               <p className="text-lg font-mono-price font-semibold">
-                {formatPrice(position.avgCost, stockCurrency)}
+                {formatPrice(positionCzk.avgCost, stockCurrency)}
               </p>
             </div>
             <div className="space-y-1">
@@ -510,25 +507,19 @@ export function StockDetail() {
                 Nerealizovaný P/L
               </p>
               <p
-                className={`text-lg font-mono-price font-semibold ${
-                  positionCzk.unrealizedPnL >= 0
-                    ? 'text-positive'
-                    : 'text-negative'
-                }`}
+                className={`text-lg font-mono-price font-semibold ${pnlClass}`}
               >
                 {formatCurrency(positionCzk.unrealizedPnL)}
               </p>
               <p
-                className={`text-[11px] font-mono-price ${
-                  positionCzk.unrealizedPnL >= 0
-                    ? 'text-positive/70'
-                    : 'text-negative/70'
-                }`}
+                className={`text-[11px] font-mono-price opacity-70 ${pnlClass}`}
               >
                 {formatPercent(
-                  positionCzk.totalCost > 0
-                    ? (positionCzk.unrealizedPnL / positionCzk.totalCost) * 100
-                    : 0,
+                  positionCzk.unrealizedPnL === null
+                    ? null
+                    : positionCzk.totalCost > 0
+                      ? (positionCzk.unrealizedPnL / positionCzk.totalCost) * 100
+                      : 0,
                   2,
                   true,
                 )}

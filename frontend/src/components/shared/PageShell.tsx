@@ -3,6 +3,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DataFreshnessIndicator } from './DataFreshnessIndicator';
+import { DataQualityIndicator } from './DataQualityIndicator';
 
 export type PageWidth = 'narrow' | 'default' | 'wide' | 'full';
 export type PageGap = 'sm' | 'md' | 'lg';
@@ -90,11 +91,14 @@ function PageActionBar({
       {actions}
 
       {dataUpdatedAt !== undefined && (
-        <DataFreshnessIndicator
-          dataUpdatedAt={dataUpdatedAt}
-          isFetching={isRefreshing}
-          className="hidden sm:inline"
-        />
+        <>
+          <DataQualityIndicator />
+          <DataFreshnessIndicator
+            dataUpdatedAt={dataUpdatedAt}
+            isFetching={isRefreshing}
+            className="hidden sm:inline"
+          />
+        </>
       )}
 
       {onRefresh && (

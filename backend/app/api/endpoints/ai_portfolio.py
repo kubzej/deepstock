@@ -10,32 +10,21 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
 from app.core.rate_limit import limiter
 from app.core.redis import get_redis
+from app.services.exchange import exchange_service
 from app.services.market import market_service
 from app.services.options import options_service
 from app.services.portfolio import portfolio_service
 from app.ai.search import tavily_client
+from app.schemas.ai_portfolio import PortfolioAdvisorRequest, PortfolioAdvisorResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class PortfolioAdvisorRequest(BaseModel):
-    portfolio_id: Optional[str] = None
-    force_refresh: bool = False
-
-
-class PortfolioAdvisorResponse(BaseModel):
-    markdown: str
-    cached: bool = False
-    generated_at: str
-    model_used: str = ""
 
 
 async def _save_portfolio_report_to_journal(
@@ -182,7 +171,10 @@ async def generate_portfolio_advisor(
         format_options_context,
     )
 
-    portfolio_context = format_portfolio_context(holdings, quotes, tech_data, snapshot=portfolio_snapshot.model_dump())
+    rates = await exchange_service.get_rates()
+    portfolio_context = format_portfolio_context(
+        holdings, quotes, tech_data, portfolio_snapshot.model_dump(), rates
+    )
     transactions_context = format_transactions_context(transactions or [])
     options_context = format_options_context(option_holdings or [])
     macro_context = tavily_client.format_results(macro_results) if macro_results else ""

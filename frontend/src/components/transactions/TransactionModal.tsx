@@ -21,6 +21,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { StockPicker } from '@/components/shared/StockPicker';
 import { usePortfolio } from '@/contexts/PortfolioContext';
 import { useStocks } from '@/hooks/useStocks';
+import { useRejectedField } from '@/hooks/useRejectedField';
 import {
   updateTransaction,
   fetchAvailableLots,
@@ -83,6 +84,7 @@ export function TransactionModal({
   const { data: stocks = [] } = useStocks();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { reject, isRejected } = useRejectedField(open);
   const [formData, setFormData] = useState<TransactionFormData>(EMPTY_FORM);
 
   // SELL-specific state
@@ -157,6 +159,10 @@ export function TransactionModal({
         formData.stockTicker,
       );
       setAvailableLots(lots);
+      if (sellMode === 'entire' && !isEditMode) {
+        const total = lots.reduce((sum, lot) => sum + lot.remaining_shares, 0);
+        setFormData((prev) => ({ ...prev, shares: total }));
+      }
     } catch (err) {
       console.error('Failed to load available lots:', err);
     } finally {
@@ -175,7 +181,10 @@ export function TransactionModal({
 
   // Calculate totals
   const totalAmount = formData.shares * formData.pricePerShare;
-  const totalWithFees = totalAmount + formData.fees;
+  const totalWithFees =
+    formData.type === 'SELL'
+      ? totalAmount - formData.fees
+      : totalAmount + formData.fees;
   const totalInCzk = formData.exchangeRateToCzk
     ? totalWithFees * formData.exchangeRateToCzk
     : null;
@@ -259,13 +268,17 @@ export function TransactionModal({
       return;
     }
 
-    if (formData.shares <= 0) {
-      setError('Zadejte počet akcií');
-      return;
-    }
-
-    if (formData.pricePerShare <= 0) {
-      setError('Zadejte cenu za akcii');
+    const missingField = !formData.date
+      ? 'date'
+      : formData.shares <= 0
+        ? 'shares'
+        : formData.pricePerShare <= 0
+          ? 'price'
+          : !formData.exchangeRateToCzk || formData.exchangeRateToCzk <= 0
+            ? 'exchangeRate'
+            : null;
+    if (missingField) {
+      reject(missingField);
       return;
     }
 
@@ -390,6 +403,10 @@ export function TransactionModal({
     );
 
     if (!response.ok) {
+      if (response.status === 400) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail || 'Nepodařilo se přidat transakci');
+      }
       throw new Error('Nepodařilo se přidat transakci');
     }
 
@@ -407,7 +424,8 @@ export function TransactionModal({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* noValidate: the checks in handleSubmit mark the field, not the browser's own bubble */}
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -564,6 +582,7 @@ export function TransactionModal({
               <Input
                 type="date"
                 id="date"
+                aria-invalid={isRejected('date', !formData.date)}
                 value={formData.date}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, date: e.target.value }))
@@ -584,6 +603,7 @@ export function TransactionModal({
               <Input
                 type="number"
                 id="shares"
+                aria-invalid={isRejected('shares', formData.shares <= 0)}
                 value={formData.shares || ''}
                 onChange={handleNumberChange('shares')}
                 onBlur={() => {
@@ -622,6 +642,7 @@ export function TransactionModal({
               <Input
                 type="number"
                 id="price"
+                aria-invalid={isRejected('price', formData.pricePerShare <= 0)}
                 value={formData.pricePerShare || ''}
                 onChange={handleNumberChange('pricePerShare')}
                 placeholder="0.00"
@@ -659,6 +680,7 @@ export function TransactionModal({
               <Input
                 type="number"
                 id="exchangeRate"
+                aria-invalid={isRejected('exchangeRate', !formData.exchangeRateToCzk || formData.exchangeRateToCzk <= 0)}
                 value={formData.exchangeRateToCzk || ''}
                 onChange={handleExchangeRateChange}
                 placeholder="např. 23.50"
@@ -701,7 +723,7 @@ export function TransactionModal({
               <span className="font-mono-price">
                 {formatPrice(totalAmount, formData.currency)}
                 {formData.fees > 0 &&
-                  ` + ${formatPrice(formData.fees, formData.currency)} poplatky`}
+                  ` ${formData.type === 'SELL' ? '−' : '+'} ${formatPrice(formData.fees, formData.currency)} poplatky`}
               </span>
             </div>
             <div className="flex justify-between text-sm">

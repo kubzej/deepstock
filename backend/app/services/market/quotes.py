@@ -11,15 +11,12 @@ import json
 import logging
 import math
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Union
 from datetime import datetime, timezone
 from app.core.cache import CacheTTL
+from app.services.market.yahoo import run_yahoo, run_yahoo_background
 
 logger = logging.getLogger(__name__)
-
-# Thread pool for background .info fetches (avoid blocking)
-_executor = ThreadPoolExecutor(max_workers=4)
 
 
 def _normalize_ticker_data(df: pd.DataFrame, ticker: str) -> Optional[pd.DataFrame]:
@@ -165,6 +162,17 @@ def _fetch_extended_data_sync(ticker: str) -> Optional[dict]:
         return None
 
 
+def _download_quotes_sync(tickers: tuple) -> pd.DataFrame:
+    return yf.download(
+        " ".join(tickers),
+        period="5d",  # Wider than the needed 2 days to tolerate a missing/delayed session on Yahoo's side
+        interval="1d",
+        auto_adjust=False,
+        progress=False,
+        threads=True
+    )
+
+
 def _merge_ext_data(quote: dict, ext_data: dict) -> None:
     """
     Merge extended data into a quote.
@@ -196,8 +204,7 @@ async def _fetch_and_cache_extended_data(redis, ticker: str, delay: float = 0) -
     try:
         if delay > 0:
             await asyncio.sleep(delay)
-        loop = asyncio.get_event_loop()
-        ext_data = await loop.run_in_executor(_executor, _fetch_extended_data_sync, ticker)
+        ext_data = await run_yahoo_background(_fetch_extended_data_sync, ticker)
 
         if ext_data:
             await redis.set(f"quote_ext:{ticker}", json.dumps(ext_data), ex=CacheTTL.QUOTE_EXTENDED)
@@ -245,14 +252,7 @@ async def get_quotes(
     if missing_basic:
         try:
             # Single batch download for all missing tickers
-            df = yf.download(
-                " ".join(missing_basic),
-                period="5d",  # Wider than the needed 2 days to tolerate a missing/delayed session on Yahoo's side
-                interval="1d",
-                auto_adjust=False,
-                progress=False,
-                threads=True
-            )
+            df = await run_yahoo(_download_quotes_sync, tuple(missing_basic))
             
             if df.empty:
                 logger.warning(
@@ -376,6 +376,17 @@ def _history_interval_and_ttl(period: str) -> tuple[str, int]:
     return ("1wk", CacheTTL.PRICE_HISTORY_LONG)
 
 
+def _download_history_sync(tickers: tuple, period: str, interval: str) -> pd.DataFrame:
+    return yf.download(
+        " ".join(tickers),
+        period=period,
+        interval=interval,
+        auto_adjust=False,
+        progress=False,
+        threads=True,
+    )
+
+
 def _serialize_history_frame(hist: pd.DataFrame) -> List[dict]:
     if hist is None or hist.empty:
         return []
@@ -396,31 +407,20 @@ def _serialize_history_frame(hist: pd.DataFrame) -> List[dict]:
     return result
 
 
+def _history_cache_key(ticker: str, period: str) -> str:
+    # v2: v1 entries mix adjusted and unadjusted prices depending on which endpoint filled them
+    return f"history:v2:{ticker}:{period}"
+
+
 async def get_price_history(redis, ticker: str, period: str = "1mo") -> List[dict]:
     """
     Get historical price data for charting.
     Periods: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max
+
+    Single-ticker view of the batch fetch, so both endpoints share one code path and one cache.
     """
-    cache_key = f"history:{ticker}:{period}"
-    cached = await redis.get(cache_key)
-    if cached:
-        return json.loads(cached)
-
-    try:
-        t = yf.Ticker(ticker)
-        interval, ttl = _history_interval_and_ttl(period)
-        hist = t.history(period=period, interval=interval)
-
-        if hist.empty:
-            return []
-
-        result = _serialize_history_frame(hist)
-        await redis.set(cache_key, json.dumps(result), ex=ttl)
-        return result
-
-    except Exception as e:
-        logger.error(f"Error fetching history for {ticker}: {e}")
-        return []
+    ticker = ticker.upper()
+    return (await get_batch_price_history(redis, [ticker], period)).get(ticker, [])
 
 
 async def get_batch_price_history(
@@ -440,7 +440,7 @@ async def get_batch_price_history(
     missing: List[str] = []
 
     for ticker in unique_tickers:
-        cache_key = f"history:{ticker}:{period}"
+        cache_key = _history_cache_key(ticker, period)
         try:
             cached = await redis.get(cache_key)
         except Exception as e:
@@ -458,14 +458,7 @@ async def get_batch_price_history(
 
     try:
         interval, ttl = _history_interval_and_ttl(period)
-        df = yf.download(
-            " ".join(missing),
-            period=period,
-            interval=interval,
-            auto_adjust=False,
-            progress=False,
-            threads=True,
-        )
+        df = await run_yahoo(_download_history_sync, tuple(missing), period, interval)
 
         if df.empty:
             logger.warning(
@@ -483,11 +476,13 @@ async def get_batch_price_history(
                     ticker_data = ticker_data.dropna(subset=["Close"])
                     serialized = _serialize_history_frame(ticker_data)
                     results[ticker] = serialized
-                    await redis.set(
-                        f"history:{ticker}:{period}",
-                        json.dumps(serialized),
-                        ex=ttl,
-                    )
+                    # An empty frame is usually a Yahoo hiccup: do not pin it for hours
+                    if serialized:
+                        await redis.set(
+                            _history_cache_key(ticker, period),
+                            json.dumps(serialized),
+                            ex=ttl,
+                        )
                 except Exception as e:
                     logger.warning(f"Error processing history for {ticker}: {e}")
                     results[ticker] = []

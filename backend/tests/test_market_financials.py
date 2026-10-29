@@ -1,30 +1,32 @@
-from app.services.market.stock_info import _ltm_revenue_growth_from_historical
+"""Revenue growth is the figure Yahoo reports (latest quarter vs the same quarter a year earlier), everywhere."""
+import pytest
+
+from app.services.market import financials, stock_info
+from tests.fake_redis import FakeRedis
+from tests.fake_yahoo import FakeYahoo, INFO
 
 
-def test_ltm_revenue_growth_uses_displayed_historical_revenue_series() -> None:
-    historical = {
-        "years": ["FY 2022", "FY 2023", "FY 2024", "FY 2025", "LTM", "FY 2026E", "5Y Avg"],
-        "context": {
-            "revenue": [
-                59037000,
-                75509000,
-                187192000,
-                501023000,
-                757073984,
-                2947013620,
-                None,
-            ],
-        },
-    }
-
-    assert _ltm_revenue_growth_from_historical(historical) == 0.5111
+@pytest.fixture
+def yahoo(monkeypatch):
+    return FakeYahoo().install(monkeypatch)
 
 
-def test_ltm_revenue_growth_returns_none_when_ltm_or_previous_revenue_is_missing() -> None:
-    assert _ltm_revenue_growth_from_historical({"years": ["FY 2025"], "context": {"revenue": [501023000]}}) is None
-    assert (
-        _ltm_revenue_growth_from_historical(
-            {"years": ["FY 2025", "LTM"], "context": {"revenue": [0, 757073984]}}
-        )
-        is None
-    )
+async def test_stock_info_reports_the_yahoo_revenue_growth(yahoo):
+    result = await stock_info.get_stock_info(FakeRedis(), "AAPL")
+
+    assert result["revenueGrowth"] == INFO["revenueGrowth"]
+
+
+async def test_historical_ltm_column_reports_the_yahoo_revenue_growth(yahoo):
+    result = await financials.get_historical_financials(FakeRedis(), "AAPL")
+
+    ltm = result["years"].index("LTM")
+    assert result["growth"]["revenue_growth"][ltm] == INFO["revenueGrowth"]
+
+
+async def test_historical_ltm_growth_is_empty_when_yahoo_reports_none(yahoo, monkeypatch):
+    monkeypatch.setitem(INFO, "revenueGrowth", None)
+
+    result = await financials.get_historical_financials(FakeRedis(), "AAPL")
+
+    assert result["growth"]["revenue_growth"][result["years"].index("LTM")] is None

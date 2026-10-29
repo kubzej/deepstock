@@ -12,20 +12,22 @@
 // Days to Expiration
 // ==========================================
 
+// Calendar day as a UTC midnight, so two days are always a whole number of days apart:
+// local midnights are 23 or 25 hours apart across a change to or from summer time.
+function calendarDay(value: Date | string): number {
+  if (typeof value === 'string') {
+    const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+    return Date.UTC(year, month - 1, day);
+  }
+  return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
 /**
  * Calculate days until expiration
  */
 export function calculateDTE(expirationDate: Date | string): number {
-  const expDate =
-    typeof expirationDate === 'string'
-      ? new Date(expirationDate)
-      : expirationDate;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  expDate.setHours(0, 0, 0, 0);
-
-  const diffTime = expDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = calendarDay(expirationDate) - calendarDay(new Date());
+  return Math.round(diffDays / (1000 * 60 * 60 * 24));
 }
 
 // ==========================================
@@ -203,9 +205,10 @@ export function calculateSellCall(
   const bufferPercent = calculateBuffer(stockPrice, strike, 'call');
   const totalPremium = premium * contracts * 100;
 
-  // Max profit = premium + upside to strike (if strike > current price)
-  const upside = Math.max(0, strike - stockPrice) * contracts * 100;
-  const maxProfit = totalPremium + upside;
+  // Max profit = premium + (strike - price), assuming the shares were bought at the current
+  // price. A strike below the price makes the second term negative: the shares are called away
+  // for less than they cost, which can turn the whole trade into a loss.
+  const maxProfit = totalPremium + (strike - stockPrice) * contracts * 100;
 
   return {
     stockPrice,

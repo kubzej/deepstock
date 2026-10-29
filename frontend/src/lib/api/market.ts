@@ -26,7 +26,7 @@ export interface ExchangeRates {
 
 // Empty rates — never use hardcoded fallback values.
 // When rates are unavailable the backend returns 503 and the query errors out.
-// Components check ratesError from PortfolioContext and show a warning banner.
+// DataQualityIndicator reads ratesError from PortfolioContext and shows a warning icon.
 export const DEFAULT_RATES: ExchangeRates = {};
 
 export interface OptionQuote {

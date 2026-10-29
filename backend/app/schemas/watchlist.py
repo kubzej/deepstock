@@ -1,119 +1,50 @@
-"""
-Watchlist Response Schemas
-
-Pydantic models for watchlist-related API responses.
-"""
+"""API request and response models for watchlist."""
+from typing import List, Optional
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
 
 
-class WatchlistTagResponse(BaseModel):
-    """Watchlist tag for categorizing items."""
-    id: str
-    name: str
-    color: str
-    
-    class Config:
-        from_attributes = True
-
-
-class WatchlistItemResponse(BaseModel):
-    """Item in a watchlist (a stock to watch)."""
-    id: str
-    watchlist_id: str
-    stock_id: str
-    ticker: str
-    stock_name: str
-    target_price: Optional[float] = None
-    alert_enabled: bool = False
-    notes: Optional[str] = None
-    position: int = 0
-    created_at: datetime
-    updated_at: datetime
-    # Tags attached to this item
-    tags: List[WatchlistTagResponse] = []
-    
-    class Config:
-        from_attributes = True
-
-
-class WatchlistResponse(BaseModel):
-    """Watchlist entity response."""
-    id: str
-    user_id: str
+class WatchlistCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    position: int = 0
-    color: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    # Item count (for list views)
-    item_count: Optional[int] = None
-    
-    class Config:
-        from_attributes = True
 
 
-class WatchlistWithItemsResponse(BaseModel):
-    """Watchlist with all its items."""
-    id: str
-    user_id: str
-    name: str
-    description: Optional[str] = None
-    position: int = 0
-    color: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-    items: List[WatchlistItemResponse] = []
-    
-    class Config:
-        from_attributes = True
-
-
-class WatchlistCreateRequest(BaseModel):
-    """Request body for creating a watchlist."""
-    name: str
-    description: Optional[str] = None
-    color: Optional[str] = None
-
-
-class WatchlistUpdateRequest(BaseModel):
-    """Request body for updating a watchlist."""
+class WatchlistUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    color: Optional[str] = None
-    position: Optional[int] = None
 
 
-class WatchlistItemCreateRequest(BaseModel):
-    """Request body for adding item to watchlist."""
-    stock_id: str
-    target_price: Optional[float] = None
-    alert_enabled: bool = False
+class WatchlistItemCreate(BaseModel):
+    stock_id: Optional[str] = None  # If provided, use this
+    ticker: Optional[str] = None     # If stock_id not provided, lookup/create by ticker
+    stock_name: Optional[str] = None # For auto-creating stock
+    target_buy_price: Optional[float] = None
+    target_sell_price: Optional[float] = None
     notes: Optional[str] = None
 
 
-class WatchlistItemUpdateRequest(BaseModel):
-    """Request body for updating watchlist item."""
-    target_price: Optional[float] = None
-    alert_enabled: Optional[bool] = None
+class WatchlistItemUpdate(BaseModel):
+    target_buy_price: Optional[float] = None
+    target_sell_price: Optional[float] = None
     notes: Optional[str] = None
-    position: Optional[int] = None
 
 
-class TagCreateRequest(BaseModel):
-    """Request body for creating a tag."""
+class TagCreate(BaseModel):
     name: str
-    color: str = "#3b82f6"  # Default blue
+    color: Optional[str] = None
 
 
-class TagUpdateRequest(BaseModel):
-    """Request body for updating a tag."""
+class TagUpdate(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
+
+
+class ReorderRequest(BaseModel):
+    watchlist_ids: List[str]
+
+
+class MoveItemRequest(BaseModel):
+    target_watchlist_id: str
 
 
 class SetItemTagsRequest(BaseModel):
-    """Request body for setting tags on an item."""
     tag_ids: List[str]

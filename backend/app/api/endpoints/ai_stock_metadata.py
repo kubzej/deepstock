@@ -9,7 +9,6 @@ import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from starlette.requests import Request
 
 from app.ai.prompts.stock_metadata_prompt import (
@@ -23,6 +22,7 @@ from app.core.redis import get_redis
 from app.core.taxonomy import ALL_INDUSTRIES, SECTOR_CHOICES, SECTOR_OVERRIDES
 from app.services.market import market_service
 from app.services.market.stock_info import StockInfoUnavailableError
+from app.schemas.ai_stock_metadata import StockMetadataRequest, StockMetadataResponse
 
 logger = logging.getLogger(__name__)
 
@@ -144,24 +144,6 @@ EXCHANGE_COUNTRIES = {
     "PSE-PRA": "CZ",
     "EURONEXT-PARIS": "FR",
 }
-
-
-class StockMetadataRequest(BaseModel):
-    ticker: str
-
-
-class StockMetadataResponse(BaseModel):
-    ticker: str
-    name: Optional[str] = None
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    exchange: Optional[str] = None
-    currency: Optional[str] = None
-    country: Optional[str] = None
-    price_scale: Optional[float] = None
-    notes: Optional[str] = None
-    cached: bool = False
-    used_ai: bool = False
 
 
 def _normalize_ticker(raw_ticker: str) -> str:

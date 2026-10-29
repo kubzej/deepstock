@@ -4,7 +4,7 @@ Price Alert Schemas
 Pydantic models for price alert API endpoints.
 """
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import List, Literal, Optional
 from datetime import datetime
 
 
@@ -61,13 +61,5 @@ class PriceAlertResetRequest(BaseModel):
     pass
 
 
-class PriceAlertTriggerInfo(BaseModel):
-    """Info about an alert that was triggered (for notifications)."""
-    alert_id: str
-    user_id: str
-    ticker: str
-    stock_name: str
-    condition_type: str
-    condition_value: float
-    current_price: float
-    triggered_at: datetime
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]

@@ -11,6 +11,8 @@ import pandas as pd
 import yfinance as yf
 from typing import Optional
 
+from app.services.market.yahoo import run_yahoo
+
 logger = logging.getLogger(__name__)
 
 CACHE_TTL = 86400  # 24 hours
@@ -70,7 +72,38 @@ def _get_fwd(df, period_keys: list[str], col_name: str) -> Optional[float]:
     return None
 
 
-async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
+def _fetch_statements_sync(ticker: str, read_info: bool) -> Optional[tuple]:
+    """
+    Every blocking yfinance read for one ticker (statements load lazily on attribute
+    access), in the order the analysis needs them. Returns None without touching the
+    price history or estimates when the ticker has no income statement. The info is left
+    out (None) when the caller already has it: reading it costs requests of its own.
+    """
+    t = yf.Ticker(ticker)
+    info = (t.info or {}) if read_info else None
+
+    income = t.income_stmt
+    balance = t.balance_sheet
+    cashflow = t.cashflow
+
+    if income is None or income.empty:
+        return None
+
+    hist = t.history(period="6y")
+
+    earnings_est = None
+    revenue_est = None
+    try:
+        earnings_est = t.earnings_estimate
+        revenue_est = t.revenue_estimate
+    except Exception:
+        pass
+
+    return info, income, balance, cashflow, hist, earnings_est, revenue_est
+
+
+async def get_historical_financials(redis, ticker: str, info: Optional[dict] = None) -> Optional[dict]:
+    """`info` is the ticker's Yahoo info when the caller has just read it; otherwise it is read here."""
     cache_key = f"historical_financials:{ticker}"
 
     cached = await redis.get(cache_key)
@@ -78,15 +111,12 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         return json.loads(cached)
 
     try:
-        t = yf.Ticker(ticker)
-        info = t.info or {}
-
-        income = t.income_stmt if hasattr(t, "income_stmt") else t.financials
-        balance = t.balance_sheet
-        cashflow = t.cashflow
-
-        if income is None or income.empty:
+        fetched = await run_yahoo(_fetch_statements_sync, ticker, info is None)
+        if fetched is None:
             return None
+        fetched_info, income, balance, cashflow, hist, earnings_est, revenue_est = fetched
+        if info is None:
+            info = fetched_info
 
         # Fallback shares from info (used only when income stmt doesn't have diluted shares)
         shares_fallback = info.get("sharesOutstanding")
@@ -104,8 +134,6 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
             "book_value_per_share", "total_debt", "cash", "market_cap",
             "enterprise_value", "price_at_fy",
         ]}
-
-        hist = t.history(period="6y")
 
         prev: dict[str, Optional[float]] = {
             "revenue": None, "net_income": None, "eps": None,
@@ -264,7 +292,7 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
         profitability["roa"].append(_pct(info.get("returnOnAssets")))
         profitability["roic"].append(_pct((ltm_net_income / ltm_invested_cap) if (ltm_net_income and ltm_invested_cap and ltm_invested_cap > 0) else None))
 
-        growth["revenue_growth"].append(_pct(_growth(ltm_revenue, prev["revenue"])))
+        growth["revenue_growth"].append(_pct(info.get("revenueGrowth")))
         growth["net_income_growth"].append(_pct(info.get("earningsGrowth")))
         growth["eps_growth"].append(_pct(_growth(ltm_eps, prev["eps"])))
         growth["ebitda_growth"].append(_pct(_growth(ltm_ebitda, prev["ebitda"])))
@@ -288,14 +316,6 @@ async def get_historical_financials(redis, ticker: str) -> Optional[dict]:
 
         # ── Forward Estimates columns (+1y and +2y analyst consensus) ────
         last_fy_year = cols[-1].year if cols else None
-
-        earnings_est = None
-        revenue_est  = None
-        try:
-            earnings_est = t.earnings_estimate
-            revenue_est  = t.revenue_estimate
-        except Exception:
-            pass
 
         for fwd_offset, year_offset in ((1, 1), (2, 2)):
             period_keys = [f"+{fwd_offset}y", f"{fwd_offset}y"]

@@ -2,7 +2,9 @@
 Options Trading Service for DeepStock.
 Handles CRUD operations for option transactions and holdings.
 """
+import json
 import logging
+from app.core.pagination import encode_cursor, older_than_filter
 from app.core.redis import get_redis
 from app.core.supabase import supabase
 from app.services.market.options_quotes import get_option_quotes
@@ -11,61 +13,12 @@ from app.services.options_accounting import (
     calculate_option_accounting,
     preview_option_close,
 )
-from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
+from app.services.portfolio_accounting import require_czk_rate
+from typing import List, Optional
 from datetime import date, datetime, timezone
+from app.schemas.options import OptionAction, OptionTransactionCreate, OptionType
 
 logger = logging.getLogger(__name__)
-
-
-# ==========================================
-# Pydantic Schemas
-# ==========================================
-
-OptionType = Literal["call", "put"]
-OptionAction = Literal["BTO", "STC", "STO", "BTC", "EXPIRATION", "ASSIGNMENT", "EXERCISE"]
-
-
-class OptionTransactionCreate(BaseModel):
-    """Create a new option transaction."""
-    symbol: str = Field(..., description="Underlying ticker (e.g., AAPL)")
-    option_type: OptionType
-    strike_price: float
-    expiration_date: date
-    action: OptionAction
-    contracts: int = Field(..., gt=0)
-    premium: Optional[float] = None  # Per share, can be None for EXPIRATION
-    currency: str = "USD"
-    exchange_rate_to_czk: Optional[float] = None
-    fees: float = 0
-    date: date
-    notes: Optional[str] = None
-
-
-class OptionTransactionUpdate(BaseModel):
-    """Update an existing option transaction."""
-    action: Optional[OptionAction] = None
-    contracts: Optional[int] = Field(None, gt=0)
-    premium: Optional[float] = None
-    currency: Optional[str] = None
-    exchange_rate_to_czk: Optional[float] = None
-    fees: Optional[float] = None
-    date: Optional[date] = None
-    notes: Optional[str] = None
-
-
-class OptionPriceUpdate(BaseModel):
-    """Update option price and Greeks."""
-    price: Optional[float] = None
-    bid: Optional[float] = None
-    ask: Optional[float] = None
-    volume: Optional[int] = None
-    open_interest: Optional[int] = None
-    implied_volatility: Optional[float] = None
-    delta: Optional[float] = None
-    gamma: Optional[float] = None
-    theta: Optional[float] = None
-    vega: Optional[float] = None
 
 
 # ==========================================
@@ -211,22 +164,69 @@ class OptionsService:
 
         return enriched_holdings
     
+    async def _overlay_underlying_quotes(self, holdings: List[dict]) -> List[dict]:
+        """Fill underlying price, moneyness and buffer from already-cached quotes.
+
+        Reads the Redis quote cache only (never triggers a provider fetch); a
+        ticker without a cached quote keeps the NULLs from the view.
+        """
+        redis = get_redis()
+        prices: dict[str, float] = {}
+        for symbol in {h["symbol"] for h in holdings if h.get("symbol")}:
+            try:
+                cached = await redis.get(f"quote:{symbol}")
+                price = json.loads(cached).get("price") if cached else None
+            except Exception as e:
+                logger.warning(f"Could not read cached quote for {symbol}: {e}")
+                continue
+            if price:
+                prices[symbol] = float(price)
+
+        for holding in holdings:
+            price = prices.get(holding.get("symbol"))
+            strike = holding.get("strike_price")
+            if price is None or strike is None:
+                continue
+            strike = float(strike)
+            is_call = holding.get("option_type") == "call"
+            if price == strike:
+                moneyness = "ATM"
+            elif (price > strike) == is_call:
+                moneyness = "ITM"
+            else:
+                moneyness = "OTM"
+            distance = (strike - price) if is_call else (price - strike)
+            holding["underlying_price"] = price
+            holding["underlying_price_source"] = "market"
+            holding["moneyness"] = moneyness
+            holding["buffer_percent"] = round(distance / price * 100, 2)
+
+        return holdings
+
     # ==========================================
     # Transactions CRUD
     # ==========================================
     
-    async def get_transactions(
-        self, 
+    async def get_transactions_page(
+        self,
         user_id: str,
         portfolio_id: Optional[str] = None,
         symbol: Optional[str] = None,
         option_symbol: Optional[str] = None,
-        limit: int = 100
-    ) -> List[dict]:
+        limit: int = 100,
+        cursor: Optional[str] = None,
+    ) -> dict:
         """
-        Get option transactions for a user.
+        Get one page of option transactions for a user, newest first.
         Optionally filter by portfolio_id, underlying symbol, or OCC option_symbol.
+
+        Pass the previous page's next_cursor as cursor to load older rows. Rows are ordered by
+        (date, id) so transactions sharing a date are never skipped.
+
+        Returns {"data": [...], "next_cursor": "<opaque cursor> | None", "has_more": bool}.
         """
+        empty_page = {"data": [], "next_cursor": None, "has_more": False}
+
         # First get user's portfolio IDs
         portfolios_response = supabase.table("portfolios") \
             .select("id") \
@@ -236,18 +236,18 @@ class OptionsService:
         user_portfolio_ids = [p["id"] for p in portfolios_response.data]
         
         if not user_portfolio_ids:
-            return []
+            return empty_page
         
         query = supabase.table("option_transactions") \
             .select("*, portfolios(name)") \
             .in_("portfolio_id", user_portfolio_ids) \
             .order("date", desc=True) \
-            .limit(limit)
+            .order("id", desc=True)
         
         if portfolio_id:
             # Additional filter if specific portfolio requested
             if portfolio_id not in user_portfolio_ids:
-                return []  # User doesn't own this portfolio
+                return empty_page  # User doesn't own this portfolio
             query = query.eq("portfolio_id", portfolio_id)
         
         if symbol:
@@ -255,31 +255,42 @@ class OptionsService:
         
         if option_symbol:
             query = query.eq("option_symbol", option_symbol)
-        
-        response = query.execute()
+
+        if cursor:
+            query = query.or_(older_than_filter("date", cursor))
+
+        # Fetch one extra row to determine whether more pages exist
+        response = query.limit(limit + 1).execute()
+
+        rows = response.data or []
+        has_more = len(rows) > limit
+        page = rows[:limit]
+        next_cursor = encode_cursor(page[-1]["date"], page[-1]["id"]) if (has_more and page) else None
         
         # Add portfolio_name to each transaction
         result = []
-        for tx in response.data:
+        for tx in page:
             tx["portfolio_name"] = tx.get("portfolios", {}).get("name", "") if tx.get("portfolios") else ""
             del tx["portfolios"]  # Remove nested object
             result.append(tx)
         
-        return await self._annotate_transactions(result)
-    
-    async def get_transaction_by_id(self, transaction_id: str) -> Optional[dict]:
-        """Get a single transaction by ID."""
-        response = supabase.table("option_transactions") \
-            .select("*") \
-            .eq("id", transaction_id) \
-            .single() \
-            .execute()
-        transaction = response.data
-        if not transaction:
-            return None
+        return {
+            "data": await self._annotate_transactions(result),
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+        }
 
-        annotated = await self._annotate_transactions([transaction])
-        return annotated[0] if annotated else transaction
+    async def get_transactions(
+        self,
+        user_id: str,
+        portfolio_id: Optional[str] = None,
+        symbol: Optional[str] = None,
+        option_symbol: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[dict]:
+        """The newest `limit` option transactions (first page only), for callers that want a bounded list."""
+        page = await self.get_transactions_page(user_id, portfolio_id, symbol, option_symbol, limit)
+        return page["data"]
     
     async def create_transaction(
         self, 
@@ -290,6 +301,8 @@ class OptionsService:
         Create a new option transaction.
         Automatically generates OCC symbol.
         """
+        require_czk_rate(data.currency, data.exchange_rate_to_czk)
+
         # Generate OCC symbol
         option_symbol = generate_occ_symbol(
             data.symbol,
@@ -322,57 +335,6 @@ class OptionsService:
         created_tx = response.data[0]
         annotated = await self._annotate_transactions([created_tx])
         return annotated[0] if annotated else created_tx
-    
-    async def update_transaction(
-        self, 
-        transaction_id: str, 
-        data: OptionTransactionUpdate
-    ) -> Optional[dict]:
-        """Update an existing option transaction."""
-        # Build update dict with only provided fields
-        update_data = {}
-        
-        if data.action is not None:
-            update_data["action"] = data.action
-        if data.contracts is not None:
-            update_data["contracts"] = data.contracts
-        if data.premium is not None:
-            update_data["premium"] = data.premium
-        if data.currency is not None:
-            update_data["currency"] = data.currency
-        if data.exchange_rate_to_czk is not None:
-            update_data["exchange_rate_to_czk"] = data.exchange_rate_to_czk
-        if data.fees is not None:
-            update_data["fees"] = data.fees
-        if data.date is not None:
-            update_data["date"] = data.date.isoformat()
-        if data.notes is not None:
-            update_data["notes"] = data.notes
-        
-        if not update_data:
-            # Nothing to update
-            return await self.get_transaction_by_id(transaction_id)
-        
-        response = supabase.table("option_transactions") \
-            .update(update_data) \
-            .eq("id", transaction_id) \
-            .execute()
-
-        updated_tx = response.data[0] if response.data else None
-        if not updated_tx:
-            return None
-
-        annotated = await self._annotate_transactions([updated_tx])
-        return annotated[0] if annotated else updated_tx
-    
-    async def delete_transaction(self, transaction_id: str) -> bool:
-        """Delete an option transaction."""
-        response = supabase.table("option_transactions") \
-            .delete() \
-            .eq("id", transaction_id) \
-            .execute()
-        
-        return len(response.data) > 0
     
     async def delete_transactions_by_symbol(
         self, 
@@ -421,7 +383,8 @@ class OptionsService:
             [portfolio_id] if portfolio_id else [],
             option_symbols=option_symbols,
         )
-        return self._overlay_holding_economics(holdings, transactions)
+        holdings = self._overlay_holding_economics(holdings, transactions)
+        return await self._overlay_underlying_quotes(holdings)
     
     async def get_all_holdings_for_user(self, user_id: str) -> List[dict]:
         """
@@ -455,7 +418,8 @@ class OptionsService:
             portfolio_ids,
             option_symbols=option_symbols,
         )
-        return self._overlay_holding_economics(holdings, transactions)
+        holdings = self._overlay_holding_economics(holdings, transactions)
+        return await self._overlay_underlying_quotes(holdings)
     
     # ==========================================
     # Option Prices
@@ -515,44 +479,6 @@ class OptionsService:
         
         return results
     
-    async def upsert_price(
-        self, 
-        option_symbol: str, 
-        data: OptionPriceUpdate
-    ) -> dict:
-        """Update or insert option price and Greeks."""
-        upsert_data = {
-            "option_symbol": option_symbol,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        
-        if data.price is not None:
-            upsert_data["price"] = data.price
-        if data.bid is not None:
-            upsert_data["bid"] = data.bid
-        if data.ask is not None:
-            upsert_data["ask"] = data.ask
-        if data.volume is not None:
-            upsert_data["volume"] = data.volume
-        if data.open_interest is not None:
-            upsert_data["open_interest"] = data.open_interest
-        if data.implied_volatility is not None:
-            upsert_data["implied_volatility"] = data.implied_volatility
-        if data.delta is not None:
-            upsert_data["delta"] = data.delta
-        if data.gamma is not None:
-            upsert_data["gamma"] = data.gamma
-        if data.theta is not None:
-            upsert_data["theta"] = data.theta
-        if data.vega is not None:
-            upsert_data["vega"] = data.vega
-        
-        response = supabase.table("option_prices") \
-            .upsert(upsert_data, on_conflict="option_symbol") \
-            .execute()
-        
-        return response.data[0]
-    
     # ==========================================
     # Statistics
     # ==========================================
@@ -610,6 +536,9 @@ class OptionsService:
         - Long CALL -> EXERCISE: BUY shares at strike
         - Long PUT -> EXERCISE: SELL shares at strike (requires source_transaction_id)
         """
+        if closing_action in ("BTC", "STC") and premium is None:
+            raise ValueError(f"Pro {closing_action} je nutné zadat prémii")
+
         # Get current holding
         holdings = await self.get_holdings(portfolio_id, symbol=None)
         holding = next(
@@ -660,65 +589,75 @@ class OptionsService:
 
         # Currency comes from the holding (view exposes it from the opening transaction)
         option_currency = holding.get("currency") or "USD"
+        if closing_action != "EXPIRATION":  # an expiry moves no money, so it needs no rate
+            require_czk_rate(option_currency, exchange_rate_to_czk)
 
-        # Determine if we need a stock transaction
-        linked_stock_tx_id = None
+        # Closing an option by ASSIGNMENT/EXERCISE also writes a stock transaction. The two
+        # writes are all-or-nothing: if the option side fails, the stock side is taken back.
         linked_stock_tx = None
+        try:
+            if closing_action in ["ASSIGNMENT", "EXERCISE"]:
+                linked_stock_tx = await self._create_stock_transaction_for_option_close(
+                    portfolio_id=portfolio_id,
+                    holding=holding,
+                    closing_action=closing_action,
+                    contracts=contracts,
+                    close_date=close_date,
+                    exchange_rate_to_czk=exchange_rate_to_czk,
+                    source_transaction_id=source_transaction_id,
+                    notes=notes,
+                    transferred_entry_per_share=preview.transferred_entry_per_share,
+                    user_id=user_id,
+                )
 
-        if closing_action in ["ASSIGNMENT", "EXERCISE"]:
-            linked_stock_tx = await self._create_stock_transaction_for_option_close(
-                portfolio_id=portfolio_id,
-                holding=holding,
-                closing_action=closing_action,
-                contracts=contracts,
-                close_date=close_date,
-                exchange_rate_to_czk=exchange_rate_to_czk,
-                source_transaction_id=source_transaction_id,
-                notes=notes,
-                transferred_entry_per_share=preview.transferred_entry_per_share,
-                user_id=user_id,
+            option_symbol_value = generate_occ_symbol(
+                holding["symbol"],
+                float(holding["strike_price"]),
+                date.fromisoformat(holding["expiration_date"]),
+                holding["option_type"]
             )
-            linked_stock_tx_id = linked_stock_tx["id"]
-        
-        # Create option closing transaction
-        option_symbol_value = generate_occ_symbol(
-            holding["symbol"],
-            float(holding["strike_price"]),
-            date.fromisoformat(holding["expiration_date"]),
-            holding["option_type"]
-        )
-        
-        insert_data = {
-            "portfolio_id": portfolio_id,
-            "symbol": holding["symbol"].upper(),
-            "option_symbol": option_symbol_value,
-            "option_type": holding["option_type"],
-            "strike_price": float(holding["strike_price"]),
-            "expiration_date": holding["expiration_date"],
-            "action": closing_action,
-            "contracts": contracts,
-            "premium": closing_premium if closing_action in ["BTC", "STC"] else avg_premium,
-            "currency": option_currency,
-            "exchange_rate_to_czk": exchange_rate_to_czk,
-            "fees": fees,
-            "date": close_date.isoformat(),
-            "notes": notes,
-            "linked_stock_tx_id": linked_stock_tx_id,
-        }
-        
-        response = supabase.table("option_transactions") \
-            .insert(insert_data) \
-            .execute()
-        
+
+            insert_data = {
+                "portfolio_id": portfolio_id,
+                "symbol": holding["symbol"].upper(),
+                "option_symbol": option_symbol_value,
+                "option_type": holding["option_type"],
+                "strike_price": float(holding["strike_price"]),
+                "expiration_date": holding["expiration_date"],
+                "action": closing_action,
+                "contracts": contracts,
+                "premium": closing_premium if closing_action in ["BTC", "STC"] else avg_premium,
+                "currency": option_currency,
+                "exchange_rate_to_czk": exchange_rate_to_czk,
+                "fees": fees,
+                "date": close_date.isoformat(),
+                "notes": notes,
+                "linked_stock_tx_id": linked_stock_tx["id"] if linked_stock_tx else None,
+            }
+
+            response = supabase.table("option_transactions") \
+                .insert(insert_data) \
+                .execute()
+        except Exception:
+            if linked_stock_tx:
+                from app.services.portfolio import portfolio_service
+                await portfolio_service.discard_transaction_record(linked_stock_tx)
+            raise
+
         logger.info(
             f"Closed option position {option_symbol_value} with {closing_action}: "
             f"realized P/L = ${realized_pl:.2f}"
         )
 
         created_tx = response.data[0]
-        annotated = await self._annotate_transactions([created_tx])
+        # Both writes are committed; a failure while annotating must not look like a failed close
+        try:
+            annotated = await self._annotate_transactions([created_tx])
+        except Exception:
+            logger.exception("Could not annotate option transaction %s after close", created_tx.get("id"))
+            annotated = []
         return (annotated[0] if annotated else created_tx), linked_stock_tx
-    
+
     async def _create_stock_transaction_for_option_close(
         self,
         portfolio_id: str,
@@ -798,21 +737,16 @@ class OptionsService:
             "source_transaction_id": source_transaction_id if tx_type == "SELL" else None,
         }
         
-        response = supabase.table("transactions") \
-            .insert(tx_data) \
-            .execute()
-        
+        from app.services.portfolio import portfolio_service
+        created = await portfolio_service.create_transaction_record(tx_data)
+
         logger.info(
             f"Created stock {tx_type} for option {closing_action}: "
             f"{shares} {symbol} @ ${effective_price} "
             f"(strike: ${strike_price}, transferred: ${transferred_entry_per_share})"
         )
-        
-        # Recalculate holding to update shares/avg_cost
-        from app.services.portfolio import portfolio_service
-        await portfolio_service._recalculate_holding(portfolio_id, stock["id"])
-        
-        return response.data[0]
+
+        return created
 
 
 # Singleton instance

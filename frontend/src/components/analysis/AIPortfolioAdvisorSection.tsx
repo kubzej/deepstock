@@ -7,37 +7,53 @@ import { Bot, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortfolio } from '@/contexts/PortfolioContext';
-import { generatePortfolioAdvisor, getCachedPortfolioAdvisor, type PortfolioAdvisorResponse } from '@/lib/api/ai_portfolio';
+import { generatePortfolioAdvisor, getCachedPortfolioAdvisor } from '@/lib/api/ai_portfolio';
+import { queryKeys } from '@/lib/queryClient';
+import { invalidateJournal } from '@/hooks/useJournal';
 import { ReportMeta, MarkdownReport } from '@/components/shared/AIReportComponents';
 
 export function AIPortfolioAdvisorSection() {
-  const queryClient = useQueryClient();
   const { activePortfolio } = usePortfolio();
   const portfolioId = activePortfolio?.id;
 
-  const [generated, setGenerated] = useState<PortfolioAdvisorResponse | null>(null);
+  // Keyed by portfolio so loading and error state never carry over to another one
+  return (
+    <PortfolioAdvisorReport
+      key={portfolioId ?? 'all'}
+      portfolioId={portfolioId}
+      portfolioName={activePortfolio?.name}
+    />
+  );
+}
+
+interface PortfolioAdvisorReportProps {
+  portfolioId: string | undefined;
+  portfolioName: string | undefined;
+}
+
+function PortfolioAdvisorReport({ portfolioId, portfolioName }: PortfolioAdvisorReportProps) {
+  const queryClient = useQueryClient();
+  const reportKey = queryKeys.aiPortfolioReport(portfolioId);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { data: cached } = useQuery({
-    queryKey: ['ai-portfolio-cache', portfolioId ?? 'all'],
+  // A generated report is written into this query, so it belongs to the portfolio it was made for
+  const { data: report = null } = useQuery({
+    queryKey: reportKey,
     queryFn: () => getCachedPortfolioAdvisor(portfolioId),
     retry: false,
     staleTime: Infinity,
   });
-
-  const report = generated ?? cached ?? null;
 
   async function handleGenerate(force = false) {
     setLoading(true);
     setError(null);
     try {
       const result = await generatePortfolioAdvisor(portfolioId, force);
-      setGenerated(result);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['journalChannels'] }),
-        queryClient.invalidateQueries({ queryKey: ['journalEntries'] }),
-      ]);
+      queryClient.setQueryData(reportKey, result);
+      // The server saves the report as a journal entry
+      invalidateJournal(queryClient);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Neznámá chyba');
     } finally {
@@ -90,8 +106,8 @@ export function AIPortfolioAdvisorSection() {
             <p className="text-sm">
               Získej souhrn portfolia a konkrétní doporučení na základě holdingů,
               technických signálů a nedávných transakcí.
-              {activePortfolio && (
-                <> Analyzuje portfolio <strong>{activePortfolio.name}</strong>.</>
+              {portfolioName && (
+                <> Analyzuje portfolio <strong>{portfolioName}</strong>.</>
               )}
             </p>
           </div>

@@ -17,6 +17,10 @@ class PortfolioSnapshotResponse(BaseModel):
     total_pnl_percent: float
     daily_change_czk: float
     daily_change_percent: float
+    missing_tickers: list[str] = Field(
+        default_factory=list,
+        description="Tickers without a live price. They are excluded from value, cost and P/L, so the totals cover only the priced holdings.",
+    )
 
 
 class PortfolioSummaryResponse(BaseModel):
@@ -82,7 +86,9 @@ class PortfolioContextResponse(BaseModel):
 class PerformanceDataPointResponse(BaseModel):
     date: str
     value: float
-    invested: float
+    invested: float = Field(
+        description="Stock series: cost basis of the shares held that day (the dashboard's Investováno)."
+    )
     benchmark: Optional[float] = None
 
 

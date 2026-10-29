@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 
 from app.core.redis import get_redis
 from app.core.supabase import supabase
-from app.services.journal import EntryCreate, journal_service
+from app.services.journal import journal_service, journal_storage_prefix, owned_image_paths
+from app.schemas.journal import EntryCreate
 
 
 def _iso_now() -> str:
@@ -245,7 +246,10 @@ class JournalContextService:
             "type": row.get("type") or "note",
             "content": _html_to_plain_text(raw_content),
             "content_format": "plain_text",
-            "image_urls": _extract_image_urls(raw_content),
+            "image_urls": [
+                f"{journal_storage_prefix()}{path}"
+                for path in owned_image_paths(raw_content, user_id)
+            ],
             "metadata": row.get("metadata") or {},
         }
 

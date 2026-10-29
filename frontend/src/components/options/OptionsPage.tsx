@@ -23,6 +23,7 @@ import { PageIntro, PageShell, PageTopRail } from '@/components/shared/PageShell
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { AlertCircle } from 'lucide-react';
 import { OptionsTrades } from './OptionsTrades';
 import { OptionsCalculator } from './OptionsCalculator';
@@ -51,6 +52,7 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
   const [holdingToDelete, setHoldingToDelete] = useState<OptionHolding | null>(
     null,
   );
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { portfolio, isAllPortfolios } = usePortfolio();
@@ -129,15 +131,17 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
   }, []);
 
   const confirmDelete = async () => {
-    if (holdingToDelete && portfolioId) {
+    if (holdingToDelete) {
+      setDeleteError(null);
       try {
+        // The position knows its own portfolio, so this also works across all portfolios
         await deleteBySymbolMutation.mutateAsync({
-          portfolioId,
+          portfolioId: holdingToDelete.portfolio_id,
           optionSymbol: holdingToDelete.option_symbol,
         });
         handleRefresh();
       } catch (err) {
-        console.error('Failed to delete position:', err);
+        setDeleteError(err instanceof Error ? err.message : 'Neznámá chyba');
       }
     }
     setDeleteDialogOpen(false);
@@ -159,6 +163,18 @@ export function OptionsPage({ onAddOption }: OptionsPageProps) {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             Nepodařilo se načíst opce: {error.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {deleteError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span>Smazání pozice se nepodařilo: {deleteError}</span>
+            <Button size="sm" variant="ghost" onClick={() => setDeleteError(null)}>
+              Zavřít
+            </Button>
           </AlertDescription>
         </Alert>
       )}

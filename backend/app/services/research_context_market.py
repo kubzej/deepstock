@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Iterable, Optional
 
 import httpx
 
@@ -15,11 +15,10 @@ from app.core.cache import CacheTTL
 from app.core.redis import get_redis
 from app.services.exchange import exchange_service
 from app.services.market import market_service
+from app.services.market.technical import TECHNICAL_PERIOD_DAYS, TechnicalPeriod
 
 logger = logging.getLogger(__name__)
 
-TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
-VALID_TECHNICAL_PERIODS: set[str] = {"1w", "1mo", "3mo", "6mo", "1y", "2y"}
 VALID_TECHNICAL_INDICATORS: set[str] = {
     "price",
     "rsi",
@@ -174,14 +173,12 @@ def _get_technical_note(stock_info: dict) -> Optional[str]:
 
 
 def _slice_history(items: list[dict], max_points: int = 30) -> list[dict]:
+    """Evenly spaced sample of at most max_points rows, always keeping the first and the latest."""
     if len(items) <= max_points:
         return items
 
-    step = max(1, len(items) // max_points)
-    sliced = items[::step]
-    if sliced and sliced[-1] != items[-1]:
-        sliced.append(items[-1])
-    return sliced[:max_points]
+    last = len(items) - 1
+    return [items[round(i * last / (max_points - 1))] for i in range(max_points)]
 
 
 def _pick_technical_history(technical_data: dict, indicators: Optional[set[str]] = None) -> dict:
@@ -264,7 +261,7 @@ class MarketContextService:
             "enterprise_to_revenue": stock_info.get("enterpriseToRevenue"),
             "enterprise_to_ebitda": stock_info.get("enterpriseToEbitda"),
             "revenue": stock_info.get("revenue"),
-            "revenue_growth": stock_info.get("revenueGrowth"),
+            "revenue_growth_latest_quarter_yoy": stock_info.get("revenueGrowth"),
             "gross_margin": stock_info.get("grossMargin"),
             "operating_margin": stock_info.get("operatingMargin"),
             "profit_margin": stock_info.get("profitMargin"),
@@ -379,9 +376,9 @@ class MarketContextService:
     ) -> dict:
         del user_id
         normalized_ticker = ticker.upper()
-        if period not in VALID_TECHNICAL_PERIODS:
+        if period not in TECHNICAL_PERIOD_DAYS:
             raise ValueError(
-                f"Unsupported technical period '{period}'. Expected one of: {', '.join(sorted(VALID_TECHNICAL_PERIODS))}"
+                f"Unsupported technical period '{period}'. Expected one of: {', '.join(TECHNICAL_PERIOD_DAYS)}"
             )
         selected = {item.strip() for item in indicators or [] if item.strip()} or None
         if selected:

@@ -293,6 +293,11 @@ async def get_portfolio_performance(
     Returns stock and options performance for the requested period.
     Leave portfolio_id empty to aggregate across all portfolios.
 
+    Stock points: `value` is the market value of the shares held that day and
+    `invested` is their cost basis (the dashboard's "Investováno"); `total_return`
+    is the change of value minus money put in during the period, so it includes
+    realized profit.
+
     period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
     """
     return await _api_get(
@@ -418,7 +423,10 @@ async def get_technical_history(
     Use for follow-up questions about momentum, trend, or price action
     when the compact technicals in get_stock_context aren't enough.
 
-    period: 1w | 1mo | 3mo | 6mo | 1y | 2y
+    period: 1w | 1mo | 3mo | 6mo | 1y | 2y, a calendar span ending on the
+            latest trading day. Each series has at most 30 evenly spaced points
+            including the first and the latest; summary signals describe the
+            latest day whatever the period.
     indicators: optional list from: price, rsi, macd, bollinger, volume,
                 stochastic, atr, obv, adx, fibonacci
     """
@@ -486,7 +494,7 @@ async def get_ticker_activity(
     period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
     from_date/to_date: optional custom range in YYYY-MM-DD format; overrides period
     limit: page size for returned transactions
-    cursor: ISO datetime from previous response's next_cursor
+    cursor: next_cursor from the previous response (opaque, pass it back unchanged)
     """
     return await _api_get(
         _ticker_path("/api/mcp/ticker-activity", ticker),
@@ -518,7 +526,7 @@ async def get_portfolio_activity(
     period: 1W | 1M | 3M | 6M | MTD | YTD | 1Y | ALL
     from_date/to_date: optional custom range in YYYY-MM-DD format; overrides period
     limit: page size for returned transactions
-    cursor: ISO datetime from previous response's next_cursor
+    cursor: next_cursor from the previous response (opaque, pass it back unchanged)
     """
     return await _api_get(
         "/api/mcp/portfolio-activity",

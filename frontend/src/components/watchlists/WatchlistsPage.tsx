@@ -404,10 +404,6 @@ export function WatchlistsPage() {
           );
         }
       }
-      queryClient.invalidateQueries({
-        queryKey: ['watchlistItems', selectedWatchlistId],
-      });
-      queryClient.invalidateQueries({ queryKey: queryKeys.stocks() });
       setAddItemDialogOpen(false);
     } catch (err) {
       console.error('Failed to save item:', err);

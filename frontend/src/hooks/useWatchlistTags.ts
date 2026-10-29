@@ -4,10 +4,10 @@ import {
   createWatchlistTag,
   updateWatchlistTag,
   deleteWatchlistTag,
-  fetchItemTags,
   setItemTags,
 } from '@/lib/api';
 import { queryKeys, STALE_TIMES } from '@/lib/queryClient';
+import { invalidateWatchlistItems } from './useWatchlists';
 
 /**
  * Fetch all watchlist tags for the user
@@ -17,18 +17,6 @@ export function useWatchlistTags() {
     queryKey: queryKeys.watchlistTags(),
     queryFn: fetchWatchlistTags,
     staleTime: STALE_TIMES.watchlistTags,
-  });
-}
-
-/**
- * Fetch tags for a specific watchlist item
- */
-export function useItemTags(itemId: string | null) {
-  return useQuery({
-    queryKey: queryKeys.itemTags(itemId || ''),
-    queryFn: () => fetchItemTags(itemId!),
-    enabled: !!itemId,
-    staleTime: STALE_TIMES.itemTags,
   });
 }
 
@@ -57,8 +45,8 @@ export function useUpdateWatchlistTag() {
       updateWatchlistTag(tagId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTags() });
-      // Also invalidate all item tags as they include tag info
-      queryClient.invalidateQueries({ queryKey: queryKeys.itemTags('') });
+      // Items carry their tags (name, color), so every list shows the change
+      invalidateWatchlistItems(queryClient);
     },
   });
 }
@@ -73,7 +61,7 @@ export function useDeleteWatchlistTag() {
     mutationFn: (tagId: string) => deleteWatchlistTag(tagId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlistTags() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.itemTags('') });
+      invalidateWatchlistItems(queryClient);
     },
   });
 }
@@ -87,8 +75,9 @@ export function useSetItemTags() {
   return useMutation({
     mutationFn: ({ itemId, tagIds }: { itemId: string; tagIds: string[] }) => 
       setItemTags(itemId, tagIds),
-    onSuccess: (_data, { itemId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.itemTags(itemId) });
+    onSuccess: () => {
+      // The tags are stored on the item, which may sit in any list
+      invalidateWatchlistItems(queryClient);
     },
   });
 }

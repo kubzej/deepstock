@@ -34,6 +34,7 @@ from app.schemas.mcp import (
     WatchlistListResponse,
 )
 from app.services.market.stock_info import StockInfoUnavailableError
+from app.services.market.technical import TechnicalPeriod
 from app.services.research_context import (
     ActivityFilterError,
     VALID_TECHNICAL_INDICATORS,
@@ -46,7 +47,6 @@ router = APIRouter()
 
 PortfolioPerformancePeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
 ActivityPeriod = Literal["1W", "1M", "3M", "6M", "MTD", "YTD", "1Y", "ALL"]
-TechnicalPeriod = Literal["1w", "1mo", "3mo", "6mo", "1y", "2y"]
 
 
 @router.get("/portfolios", response_model=PortfolioListResponse)

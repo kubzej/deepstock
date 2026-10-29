@@ -23,6 +23,7 @@ from app.ai.search import tavily_client
 from app.ai.prompts import full_analysis_prompt, technical_prompt, earnings_prompt
 from app.services.insider import get_insider_trades
 from app.services.market import market_service
+from app.services.market.technical import TechnicalPeriod
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ def _format_fundamentals(stock_data: dict) -> str:
         f"- PEG: {num(stock_data.get('pegRatio'))} | EV/EBITDA: {num(stock_data.get('enterpriseToEbitda'))}",
         "",
         "### Fundamenty",
-        f"- Tržby: {bil(stock_data.get('revenue'))} | Růst tržeb: {pct(stock_data.get('revenueGrowth'))}",
+        f"- Tržby: {bil(stock_data.get('revenue'))} | Růst tržeb (poslední čtvrtletí meziročně): {pct(stock_data.get('revenueGrowth'))}",
         f"- Hrubá marže: {pct(stock_data.get('grossMargin'))} | Provozní marže: {pct(stock_data.get('operatingMargin'))}",
         f"- Čistá marže: {pct(stock_data.get('profitMargin'))}",
         f"- EPS (TTM): {num(stock_data.get('eps'))} | Forward EPS: {num(stock_data.get('forwardEps'))}",
@@ -629,11 +630,21 @@ async def _save_report_to_journal(
 
 # ─── Cache key ────────────────────────────────────────────────────────────────
 
-def build_cache_key(ticker: str, report_type: str, period: str = "3mo") -> str:
-    """Single source of truth for AI research cache keys."""
+def build_cache_key(
+    ticker: str,
+    report_type: str,
+    period: TechnicalPeriod = "3mo",
+    user_id: Optional[str] = None,
+) -> str:
+    """Single source of truth for AI research cache keys.
+
+    Earnings reports embed the user's private journal notes in the prompt,
+    so they are cached per user; other report types stay shared.
+    """
     today = date.today().isoformat()
     period_suffix = f":{period}" if report_type == "technical_analysis" else ""
-    return f"ai_research:{ticker}:{report_type}:{today}{period_suffix}"
+    user_segment = f":{user_id}" if report_type == "earnings" and user_id else ""
+    return f"ai_research:{ticker}:{report_type}{user_segment}:{today}{period_suffix}"
 
 
 # ─── Main service ──────────────────────────────────────────────────────────────
@@ -644,7 +655,7 @@ async def generate_research_report(
     report_type: ReportType,
     stock_data: dict,
     force_refresh: bool = False,
-    period: str = "3mo",
+    period: TechnicalPeriod = "3mo",
     user_id: Optional[str] = None,
 ) -> dict:
     """
@@ -659,7 +670,7 @@ async def generate_research_report(
 
     Returns dict with keys: markdown, ticker, report_type, generated_at, model_used, cached
     """
-    cache_key = build_cache_key(ticker, report_type, period)
+    cache_key = build_cache_key(ticker, report_type, period, user_id)
 
     redis = get_redis()
 

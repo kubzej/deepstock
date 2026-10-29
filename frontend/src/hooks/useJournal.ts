@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   fetchJournalChannels,
   fetchJournalSections,
@@ -18,6 +18,25 @@ import {
   type JournalChannel,
 } from '@/lib/api/journal';
 import { queryKeys, STALE_TIMES, GC_TIMES } from '@/lib/queryClient';
+
+/**
+ * Entries are cached per channel and per ticker, so a change to an entry refreshes both.
+ * Pass the channel that changed, or none when it can be any (the server wrote the entry).
+ */
+export function invalidateJournalEntries(queryClient: QueryClient, channelId?: string): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: channelId ? queryKeys.journalEntries(channelId) : queryKeys.anyJournalEntries(),
+    }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.anyJournalEntriesByTicker() }),
+  ]);
+}
+
+/** Refresh the whole journal: every entry list and the channel list (counts, new channels). */
+export function invalidateJournal(queryClient: QueryClient) {
+  invalidateJournalEntries(queryClient);
+  queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
+}
 
 // ============================================
 // Channels
@@ -90,9 +109,8 @@ export function useCreateJournalEntry(channelId: string) {
   return useMutation({
     mutationFn: (data: EntryCreateData) => createJournalEntry(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries(channelId) });
+      invalidateJournalEntries(queryClient, channelId);
       queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
-      queryClient.invalidateQueries({ queryKey: ['journalEntriesByTicker'] });
     },
   });
 }
@@ -102,9 +120,8 @@ export function useUpdateJournalEntry(channelId: string) {
   return useMutation({
     mutationFn: ({ id, content }: { id: string; content: string }) =>
       updateJournalEntry(id, content),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries(channelId) });
-    },
+    // Returned so the editor stays open until the list shows the new text
+    onSuccess: () => invalidateJournalEntries(queryClient, channelId),
   });
 }
 
@@ -113,9 +130,8 @@ export function useDeleteJournalEntry(channelId: string) {
   return useMutation({
     mutationFn: (id: string) => deleteJournalEntry(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.journalEntries(channelId) });
+      invalidateJournalEntries(queryClient, channelId);
       queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
-      queryClient.invalidateQueries({ queryKey: ['journalEntriesByTicker'] });
     },
   });
 }

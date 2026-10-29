@@ -6,46 +6,148 @@ daily positions from transactions and fetching historical prices.
 """
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Literal
-from pydantic import BaseModel
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from typing import List, Dict, Optional
 
 from app.core.supabase import supabase
 from app.core.redis import get_redis
 from app.services.exchange import exchange_service
 from app.services.options_accounting import calculate_option_accounting
+from app.services.portfolio_accounting import (
+    HoldingCalculation,
+    calculate_stock_holding_history,
+    transaction_net_cashflow_czk,
+)
 from app.core.cache import CacheTTL
+from app.services.market.yahoo import run_yahoo
+from app.schemas.performance import PerformancePoint, PerformanceResult
 
 logger = logging.getLogger(__name__)
 
-# Period definitions
-PERIODS = {
+# Periods that are a fixed number of days back; MTD, YTD and ALL are resolved by _period_start_date
+_PERIOD_DAYS = {
     "1W": 7,
     "1M": 30,
     "3M": 90,
     "6M": 180,
-    "MTD": None,  # Special handling - month to date
-    "YTD": None,  # Special handling - year to date
     "1Y": 365,
-    "ALL": None,  # Use first transaction date
 }
 
 
-class PerformancePoint(BaseModel):
+def _period_start_date(period: str, today: date, first_tx_date: date) -> date:
+    """First day shown for a named period; an unknown period falls back to one year."""
+    if period == "YTD":
+        return today.replace(month=1, day=1)
+    if period == "MTD":
+        return today.replace(day=1)
+    if period == "ALL":
+        return first_tx_date
+    return today - timedelta(days=_PERIOD_DAYS.get(period, 365))
+
+
+def _download_closes_sync(tickers: tuple, start: date, end: date) -> pd.DataFrame:
+    # Unadjusted, like every other price in the app (adjusted closes would understate the past)
+    return yf.download(list(tickers), start=start, end=end, progress=False, auto_adjust=False)
+
+
+@dataclass(frozen=True)
+class StockSeriesPoint:
     date: str
-    value: float
-    invested: float
-    benchmark: Optional[float] = None
+    value_czk: float  # market value of the shares held
+    cost_basis_czk: float  # cost of the shares held (FIFO / chosen lots), as on the Přehled
+    net_cashflow_czk: float  # cumulative cash moved: negative = money put in, positive = taken out
 
 
-class PerformanceResult(BaseModel):
-    data: List[PerformancePoint]
-    total_return: float
-    total_return_pct: float
-    benchmark_return_pct: Optional[float] = None
+def _build_stock_series(
+    transactions: List[dict],
+    close_prices: pd.DataFrame,
+    ticker_info: Dict[str, dict],
+    rates: Dict[str, float],
+    display_start_date: date,
+) -> List[StockSeriesPoint]:
+    """Daily market value, cost basis and cumulative cashflow (CZK) over the trading days in `close_prices`.
+
+    Each (portfolio, stock) position is accounted separately with the same lot logic as
+    the holdings table, so the cost basis on any day is what the Přehled would have shown.
+    Every transaction dated on or before a trading day is applied by that day, so a trade
+    on a weekend or holiday takes effect on the next trading day. Days before the first
+    transaction are skipped. Pure function: no network, cache or database access.
+    """
+    by_position: Dict[tuple, List[dict]] = {}
+    for tx in sorted(
+        transactions,
+        key=lambda item: (item["executed_at"], item.get("created_at") or "", item.get("id") or ""),
+    ):
+        by_position.setdefault((tx["portfolio_id"], tx["stock_id"]), []).append(tx)
+
+    # One event per transaction: the position's state right after it, and the cash it moved
+    events = []
+    for position_key, position_transactions in by_position.items():
+        history = calculate_stock_holding_history(position_transactions)
+        for tx, holding in zip(position_transactions, history):
+            day = pd.to_datetime(tx["executed_at"]).date().isoformat()
+            events.append((day, position_key, tx["stocks"]["ticker"], holding, transaction_net_cashflow_czk(tx)))
+    events.sort(key=lambda event: event[0])  # stable: keeps each position's own order
+
+    holdings: Dict[tuple, HoldingCalculation] = {}  # position -> its state after the latest applied transaction
+    tickers: Dict[tuple, str] = {}
+    net_cashflow_czk = 0.0
+    applied = 0
+    series: List[StockSeriesPoint] = []
+
+    for trading_day in close_prices.index.tolist():
+        date_str = trading_day.date().isoformat()
+
+        # Apply every transaction not yet applied up to and including this day
+        while applied < len(events) and events[applied][0] <= date_str:
+            _, position_key, ticker, holding, cashflow = events[applied]
+            holdings[position_key] = holding
+            tickers[position_key] = ticker
+            net_cashflow_czk += cashflow
+            applied += 1
+
+        if applied == 0 or trading_day.date() < display_start_date:
+            continue
+
+        shares_by_ticker: Dict[str, float] = {}
+        for position_key, holding in holdings.items():
+            shares_by_ticker[tickers[position_key]] = shares_by_ticker.get(tickers[position_key], 0.0) + holding.shares
+
+        value_czk = 0.0
+        for ticker, shares in shares_by_ticker.items():
+            if shares > 0 and ticker in close_prices.columns:
+                price = close_prices.loc[trading_day, ticker]
+                if pd.notna(price):
+                    # Apply price scale for LSE stocks
+                    info = ticker_info.get(ticker, {})
+                    scale = info.get("price_scale", 1) or 1
+                    rate = rates.get(info.get("currency", "USD"), 23.5)
+                    value_czk += shares * float(price) * scale * rate
+
+        series.append(StockSeriesPoint(
+            date=date_str,
+            value_czk=value_czk,
+            cost_basis_czk=sum(holding.total_invested_czk for holding in holdings.values()),
+            net_cashflow_czk=net_cashflow_czk,
+        ))
+
+    return series
+
+
+def _period_return(first: StockSeriesPoint, last: StockSeriesPoint) -> tuple[float, float]:
+    """Return (amount in CZK, percent of starting value) between two points of the series.
+
+    Return = change of value minus the money put in during the period, so realized
+    profit counts as well as unrealized profit.
+    """
+    money_put_in = -(last.net_cashflow_czk - first.net_cashflow_czk)
+    total_return = last.value_czk - first.value_czk - money_put_in
+    # Percentage is based on the starting portfolio value (close to time-weighted return)
+    total_return_pct = (total_return / first.value_czk * 100) if first.value_czk > 0 else 0.0
+    return total_return, total_return_pct
 
 
 async def get_stock_performance(
@@ -71,7 +173,7 @@ async def get_stock_performance(
     redis = get_redis()
     
     # Cache key - include custom dates
-    cache_key = f"perf:stock:{user_id}:{portfolio_id or 'all'}:{period}:{from_date or ''}:{to_date or ''}"
+    cache_key = f"perf:stock:v2:{user_id}:{portfolio_id or 'all'}:{period}:{from_date or ''}:{to_date or ''}"
     
     logger.info(f"[PERF] Request: portfolio_id={portfolio_id}, period={period}, from={from_date}, to={to_date}")
     
@@ -122,15 +224,8 @@ async def get_stock_performance(
     # Custom date range takes priority
     if from_date:
         display_start_date = datetime.strptime(from_date, "%Y-%m-%d").date()
-    elif period == "YTD":
-        display_start_date = datetime(today.year, 1, 1).date()
-    elif period == "MTD":
-        display_start_date = datetime(today.year, today.month, 1).date()
-    elif period == "ALL":
-        display_start_date = first_tx_date
     else:
-        days = PERIODS.get(period, 365)
-        display_start_date = today - timedelta(days=days)
+        display_start_date = _period_start_date(period, today, first_tx_date)
     
     # Custom end date
     end_date = datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else today
@@ -148,11 +243,8 @@ async def get_stock_performance(
     # 4. Fetch historical prices (single batch call)
     # Fetch from first transaction to have complete position history
     try:
-        hist_data = yf.download(
-            tickers,
-            start=fetch_start_date,
-            end=end_date + timedelta(days=1),
-            progress=False
+        hist_data = await run_yahoo(
+            _download_closes_sync, tuple(tickers), fetch_start_date, end_date + timedelta(days=1)
         )
         
         if hist_data.empty:
@@ -202,91 +294,32 @@ async def get_stock_performance(
     # 5. Get exchange rates for CZK conversion
     rates = await exchange_service.get_rates()
     
-    # 6. Build daily positions from transactions
-    positions: Dict[str, float] = {}  # ticker -> shares
-    invested_total_czk = 0.0
-    tx_by_date: Dict[str, List[dict]] = {}
+    # 6. Build the daily series from transactions and prices
+    series = _build_stock_series(
+        transactions=transactions,
+        close_prices=close_prices,
+        ticker_info=ticker_info,
+        rates=rates,
+        display_start_date=display_start_date,
+    )
 
-    for tx in transactions:
-        tx_date = pd.to_datetime(tx["executed_at"]).date().isoformat()
-        if tx_date not in tx_by_date:
-            tx_by_date[tx_date] = []
-        tx_by_date[tx_date].append(tx)
-
-    # 7. Calculate daily portfolio value
-    result_data = []
-    dates = close_prices.index.tolist()
-
-    for date in dates:
-        date_str = date.date().isoformat()
-
-        # Apply any transactions on this date
-        if date_str in tx_by_date:
-            for tx in tx_by_date[date_str]:
-                ticker = tx["stocks"]["ticker"]
-                shares = float(tx["shares"])
-                tx_rate = float(tx.get("exchange_rate_to_czk") or rates.get(tx.get("currency", "USD"), 23.5))
-
-                if tx["type"] == "BUY":
-                    # Invested = gross amount + fees (fee-inclusive cashflow)
-                    gross_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
-                    fees_czk = float(tx.get("fees") or 0) * tx_rate
-                    invested_total_czk += gross_czk + fees_czk
-                    positions[ticker] = positions.get(ticker, 0) + shares
-
-                else:  # SELL
-                    # Invested decreases by proceeds received (cashflow semantics)
-                    proceeds_czk = float(tx["total_amount_czk"]) if tx.get("total_amount_czk") else float(tx["total_amount"]) * tx_rate
-                    invested_total_czk -= proceeds_czk
-                    positions[ticker] = positions.get(ticker, 0) - shares
-        
-        # Calculate portfolio value in CZK
-        portfolio_value_czk = 0.0
-        for ticker, shares in positions.items():
-            if shares > 0 and ticker in close_prices.columns:
-                price = close_prices.loc[date, ticker]
-                if pd.notna(price):
-                    # Apply price scale for LSE stocks
-                    info = ticker_info.get(ticker, {})
-                    scale = info.get("price_scale", 1) or 1
-                    currency = info.get("currency", "USD")
-                    rate = rates.get(currency, 23.5)
-                    
-                    value_in_currency = shares * float(price) * scale
-                    portfolio_value_czk += value_in_currency * rate
-        
-        # Only add to output if in display range
-        current_date = date.date()
-        if current_date >= display_start_date and (portfolio_value_czk > 0 or invested_total_czk > 0):
-            result_data.append(PerformancePoint(
-                date=date_str,
-                value=round(portfolio_value_czk, 2),
-                invested=round(max(invested_total_czk, 0), 2),
-                benchmark=None
-            ))
-    
-    # 8. Calculate returns
-    if len(result_data) >= 2:
-        start_value = result_data[0].value  # Portfolio VALUE at start of period
-        end_value = result_data[-1].value
-        start_invested = result_data[0].invested
-        end_invested = result_data[-1].invested
-        
-        # Net new money added during the period
-        net_investment = end_invested - start_invested
-        
-        # Total return = value change minus new money added
-        # This shows actual investment performance
-        total_return = end_value - start_value - net_investment
-        
-        # Percentage return based on starting portfolio value
-        # This is closer to TWR (time-weighted return)
-        total_return_pct = (total_return / start_value * 100) if start_value > 0 else 0
-        
+    # 7. Calculate returns
+    if len(series) >= 2:
+        total_return, total_return_pct = _period_return(series[0], series[-1])
     else:
         total_return = 0
         total_return_pct = 0
-    
+
+    result_data = [
+        PerformancePoint(
+            date=point.date,
+            value=round(point.value_czk, 2),
+            invested=round(point.cost_basis_czk, 2) + 0.0,  # + 0.0 turns -0.0 into 0.0
+            benchmark=None,
+        )
+        for point in series
+    ]
+
     result = PerformanceResult(
         data=result_data,
         total_return=round(total_return, 2),
@@ -352,15 +385,7 @@ async def get_options_performance(
     first_tx_date = pd.to_datetime(transactions[0]["date"]).date()
     today = datetime.now().date()
     
-    if period == "YTD":
-        start_date = datetime(today.year, 1, 1).date()
-    elif period == "ALL":
-        start_date = first_tx_date
-    else:
-        days = PERIODS.get(period, 365)
-        start_date = today - timedelta(days=days)
-    
-    start_date = max(start_date, first_tx_date)
+    start_date = max(_period_start_date(period, today, first_tx_date), first_tx_date)
     
     daily_pnl: Dict[str, float] = {}
     grouped_transactions: Dict[tuple[str, str], List[dict]] = {}
@@ -387,13 +412,13 @@ async def get_options_performance(
     # Generate all dates in range
     date_range = pd.date_range(start=start_date, end=today, freq='D')
     
-    for date in date_range:
-        date_str = date.date().isoformat()
+    for day in date_range:
+        date_str = day.date().isoformat()
         if date_str in daily_pnl:
             cumulative_pnl += daily_pnl[date_str]
         
         # Only add points where something happened or at key intervals
-        if date_str in daily_pnl or date == date_range[0] or date == date_range[-1]:
+        if date_str in daily_pnl or day == date_range[0] or day == date_range[-1]:
             result_data.append(PerformancePoint(
                 date=date_str,
                 value=round(cumulative_pnl, 2),

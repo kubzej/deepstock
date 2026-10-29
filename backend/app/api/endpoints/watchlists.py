@@ -3,17 +3,19 @@ Watchlist API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
-from app.services.watchlist import (
-    watchlist_service,
-    WatchlistCreate,
-    WatchlistUpdate,
-    WatchlistItemCreate,
-    WatchlistItemUpdate,
+from app.services.watchlist import watchlist_service
+from app.core.auth import get_current_user_id
+from app.schemas.watchlist import (
+    MoveItemRequest,
+    ReorderRequest,
+    SetItemTagsRequest,
     TagCreate,
     TagUpdate,
+    WatchlistCreate,
+    WatchlistItemCreate,
+    WatchlistItemUpdate,
+    WatchlistUpdate,
 )
-from app.core.auth import get_current_user_id
-from pydantic import BaseModel
 
 
 router = APIRouter()
@@ -79,10 +81,6 @@ async def delete_watchlist(
     if not success:
         raise HTTPException(status_code=404, detail="Watchlist nenalezen")
     return {"success": True}
-
-
-class ReorderRequest(BaseModel):
-    watchlist_ids: List[str]
 
 
 @router.post("/reorder")
@@ -152,10 +150,6 @@ async def delete_item(
     if not success:
         raise HTTPException(status_code=404, detail="Položka nenalezena")
     return {"success": True}
-
-
-class MoveItemRequest(BaseModel):
-    target_watchlist_id: str
 
 
 @router.post("/items/{item_id}/move")
@@ -240,10 +234,6 @@ async def get_item_tags(
     if not await watchlist_service.verify_item_ownership(item_id, user_id):
         raise HTTPException(status_code=404, detail="Položka nenalezena")
     return await watchlist_service.get_item_tags(item_id)
-
-
-class SetItemTagsRequest(BaseModel):
-    tag_ids: List[str]
 
 
 @router.put("/items/{item_id}/tags")

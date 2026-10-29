@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { EmptyState, LoadingState } from '@/components/shared';
+import { EmptyState, ErrorState, LoadingState } from '@/components/shared';
 import { JournalEntryCard } from '@/components/journal/JournalEntryCard';
 import { RichTextEditor } from '@/components/journal/RichTextEditor';
+import { LoadMoreFooter } from '@/components/journal/LoadMoreFooter';
 import {
   useJournalChannels,
   useJournalEntries,
@@ -17,36 +18,33 @@ interface StockJournalTabProps {
 }
 
 export function StockJournalTab({ ticker }: StockJournalTabProps) {
-  const { data: channels = [], isLoading: channelsLoading } = useJournalChannels();
-  const channel = channels.find((c) => c.ticker === ticker);
+  const {
+    data: channels,
+    isLoading: channelsLoading,
+    isError: channelsFailed,
+    refetch: refetchChannels,
+  } = useJournalChannels();
+  const channel = channels?.find((c) => c.ticker === ticker);
   const channelId = channel?.id ?? null;
 
   const [showForm, setShowForm] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [editorKey, setEditorKey] = useState(0);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useJournalEntries(channelId);
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetchNextPageError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useJournalEntries(channelId);
 
   const createEntry = useCreateJournalEntry(channelId ?? '');
   const updateEntry = useUpdateJournalEntry(channelId ?? '');
   const deleteEntry = useDeleteJournalEntry(channelId ?? '');
-
-  useEffect(() => {
-    const el = loadMoreRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const isEmptyHtml = (html: string) => html.replace(/<[^>]*>/g, '').trim() === '';
 
@@ -148,7 +146,23 @@ export function StockJournalTab({ ticker }: StockJournalTabProps) {
         />
       )}
 
-      {!isLoading && entries.length === 0 && (
+      {!channels && channelsFailed && (
+        <ErrorState
+          title="Poznámky se nepodařilo načíst"
+          description="Nepodařilo se načíst deník. Poznámky u akcie jsou v pořádku."
+          retryAction={{ label: 'Zkusit znovu', onClick: () => void refetchChannels() }}
+        />
+      )}
+
+      {isError && !data && (
+        <ErrorState
+          title="Poznámky se nepodařilo načíst"
+          description="Nepodařilo se spojit se serverem. Poznámky u akcie jsou v pořádku."
+          retryAction={{ label: 'Zkusit znovu', onClick: () => void refetch() }}
+        />
+      )}
+
+      {!isLoading && !isError && !channelsFailed && entries.length === 0 && (
         <EmptyState
           icon={Plus}
           title="Žádné poznámky"
@@ -163,21 +177,18 @@ export function StockJournalTab({ ticker }: StockJournalTabProps) {
             key={entry.id}
             entry={entry}
             onDelete={(id) => deleteEntry.mutate(id)}
-            onUpdate={(id, content) => updateEntry.mutate({ id, content })}
+            onUpdate={(id, content) => updateEntry.mutateAsync({ id, content })}
             isDeleting={deleteEntry.isPending}
-            isUpdating={updateEntry.isPending}
           />
         ))}
       </div>
 
-      {/* Infinite scroll trigger */}
-      <div ref={loadMoreRef} className="py-2">
-        {isFetchingNextPage && (
-          <div className="flex justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
-      </div>
+      <LoadMoreFooter
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        isError={isFetchNextPageError}
+        fetchNextPage={fetchNextPage}
+      />
     </div>
   );
 }

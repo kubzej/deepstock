@@ -33,6 +33,8 @@ export function useCreatePortfolio() {
         queryKeys.portfolios(),
         (old) => old ? [...old, newPortfolio] : [newPortfolio]
       );
+      // The server opens a journal channel for every new portfolio
+      queryClient.invalidateQueries({ queryKey: queryKeys.journalChannels() });
     },
   });
 }

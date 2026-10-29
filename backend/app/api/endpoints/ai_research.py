@@ -11,7 +11,6 @@ from datetime import date
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
-from pydantic import BaseModel
 from starlette.requests import Request
 
 from app.core.auth import get_current_user_id
@@ -19,29 +18,24 @@ from app.core.rate_limit import limiter
 from app.core.redis import get_redis
 from app.services.market import market_service
 from app.services.market.stock_info import StockInfoUnavailableError
+from app.services.market.technical import TechnicalPeriod
 from app.ai.research_service import build_cache_key
+from app.schemas.ai_research import GenerateReportRequest
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-class GenerateReportRequest(BaseModel):
-    current_price: float
-    report_type: Literal["full_analysis", "technical_analysis", "earnings"] = "full_analysis"
-    force_refresh: bool = False
-    period: str = "3mo"  # used only for technical_analysis
-
-
 @router.get("/research/{ticker}")
 async def get_cached_research_report(
     ticker: str,
     report_type: Literal["full_analysis", "technical_analysis", "earnings"] = "full_analysis",
-    period: str = "3mo",
+    period: TechnicalPeriod = "3mo",
     user_id: str = Depends(get_current_user_id),
 ):
     ticker = ticker.upper()
-    cache_key = build_cache_key(ticker, report_type, period)
+    cache_key = build_cache_key(ticker, report_type, period, user_id)
     redis = get_redis()
     cached = await redis.get(cache_key)
     if not cached:
@@ -104,11 +98,13 @@ async def generate_report(request: Request, ticker: str, payload: GenerateReport
 
 
 @router.get("/research/{ticker}/pdf")
+@limiter.limit("10/hour")
 async def download_pdf(
+    request: Request,
     ticker: str,
     report_type: Literal["full_analysis", "technical_analysis", "earnings"] = "full_analysis",
     current_price: Optional[float] = None,
-    period: str = "3mo",
+    period: TechnicalPeriod = "3mo",
     user_id: str = Depends(get_current_user_id),
 ):
     """
@@ -119,7 +115,7 @@ async def download_pdf(
     """
     ticker = ticker.upper()
     today = date.today().isoformat()
-    cache_key = build_cache_key(ticker, report_type, period)
+    cache_key = build_cache_key(ticker, report_type, period, user_id)
 
     redis = get_redis()
     cached = await redis.get(cache_key)

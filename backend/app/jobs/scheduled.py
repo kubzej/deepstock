@@ -189,7 +189,7 @@ async def run_daily_news_briefing() -> dict[str, Any]:
     logger.info(
         (
             "Job daily-news-briefing finished: users_checked=%d reports_generated=%d "
-            "succeeded=%d degraded=%d failed=%d notifications_sent=%d"
+            "succeeded=%d degraded=%d failed=%d notifications_sent=%d already_generated=%d"
         ),
         result["users_checked"],
         result["reports_generated"],
@@ -197,5 +197,6 @@ async def run_daily_news_briefing() -> dict[str, Any]:
         result["degraded"],
         result["failed"],
         result["notifications_sent"],
+        result["already_generated"],
     )
     return {"success": True, **result}

@@ -364,6 +364,12 @@ Valid periods:
 
 - `1w`, `1mo`, `3mo`, `6mo`, `1y`, `2y`
 
+Period semantics:
+
+- `period` is a calendar span ending on the latest trading day (`1y` = the last 365 calendar days, about 250 trading days)
+- the summary and the signals describe the latest day and are identical for every period; the period only windows the history series (and the Fibonacci levels and period high/low derived from it)
+- each history series holds at most 30 evenly spaced points, always including the first and the latest row of the period
+
 Valid indicators:
 
 - `price`, `rsi`, `macd`, `bollinger`, `volume`, `stochastic`, `atr`, `obv`, `adx`, `fibonacci`
@@ -387,12 +393,15 @@ Valid indicators:
         "total_pnl_czk": 10000,
         "total_pnl_percent": 11.11,
         "daily_change_czk": 500,
-        "daily_change_percent": 0.5
+        "daily_change_percent": 0.5,
+        "missing_tickers": []
       }
     }
   ]
 }
 ```
+
+`missing_tickers` lists holdings without a live price. They are excluded from value, cost and P/L, so the totals cover only the priced holdings.
 
 ## `get_portfolio_context`
 

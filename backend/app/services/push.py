@@ -8,6 +8,17 @@ from app.core.supabase import supabase
 logger = logging.getLogger(__name__)
 
 
+def _sync_notifications_enabled(user_id: str) -> None:
+    """
+    The account-wide flag the alert jobs filter on is true exactly while the user has a device
+    registered, so removing one of several devices never silences the others.
+    """
+    has_device = bool(
+        supabase.table("push_subscriptions").select("id").eq("user_id", user_id).limit(1).execute().data
+    )
+    supabase.table("profiles").update({"notifications_enabled": has_device}).eq("id", user_id).execute()
+
+
 def send_push_notification(
     user_id: str,
     title: str,
@@ -78,6 +89,8 @@ def send_push_notification(
     for sub_id in failed_endpoints:
         supabase.table("push_subscriptions").delete().eq("id", sub_id).execute()
         logger.info(f"Removed invalid subscription {sub_id}")
+    if failed_endpoints:
+        _sync_notifications_enabled(user_id)
     
     return successful
 
@@ -103,13 +116,15 @@ def subscribe_user(user_id: str, endpoint: str, p256dh: str, auth: str) -> bool:
     else:
         # Insert new
         supabase.table("push_subscriptions").insert(data).execute()
-    
+
+    _sync_notifications_enabled(user_id)
     return True
 
 
 def unsubscribe_user(user_id: str, endpoint: str) -> bool:
     """Remove a push subscription"""
     supabase.table("push_subscriptions").delete().eq("user_id", user_id).eq("endpoint", endpoint).execute()
+    _sync_notifications_enabled(user_id)
     return True
 
 

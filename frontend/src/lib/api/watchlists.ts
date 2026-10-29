@@ -101,28 +101,15 @@ export async function fetchAllWatchlistItems(): Promise<WatchlistItemWithSource[
   
   if (watchlists.length === 0) return [];
   
-  // Fetch items from all watchlists in parallel
-  const authHeader = await getAuthHeader();
-  const itemPromises = watchlists.map(async (wl) => {
-    const response = await fetch(`${API_URL}/api/watchlists/${wl.id}/items`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeader,
-      },
-    });
-    
-    if (!response.ok) return [];
-    
-    const items: WatchlistItem[] = await response.json();
-    // Add watchlist source info to each item
-    return items.map((item) => ({
-      ...item,
-      watchlist_name: wl.name,
-    }));
-  });
-  
-  const allItemsArrays = await Promise.all(itemPromises);
-  return allItemsArrays.flat();
+  // Fetch items from all watchlists in parallel; one failing list fails the whole view,
+  // otherwise its items would silently be missing from a result that is cached as complete
+  const itemsPerWatchlist = await Promise.all(
+    watchlists.map(async (wl) => {
+      const items = await fetchWatchlistItems(wl.id);
+      return items.map((item) => ({ ...item, watchlist_name: wl.name }));
+    }),
+  );
+  return itemsPerWatchlist.flat();
 }
 
 export async function fetchWatchlist(watchlistId: string): Promise<Watchlist> {
@@ -426,23 +413,6 @@ export async function deleteWatchlistTag(tagId: string): Promise<void> {
     if (response.status === 404) throw new Error('Tag nenalezen');
     throw new Error('Nepodařilo se smazat tag');
   }
-}
-
-export async function fetchItemTags(itemId: string): Promise<WatchlistTag[]> {
-  const authHeader = await getAuthHeader();
-  const response = await fetch(`${API_URL}/api/watchlists/items/${itemId}/tags`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeader,
-    },
-  });
-  
-  if (!response.ok) {
-    if (response.status === 401) throw new Error('Unauthorized');
-    throw new Error('Nepodařilo se načíst tagy položky');
-  }
-  
-  return response.json();
 }
 
 export async function setItemTags(itemId: string, tagIds: string[]): Promise<WatchlistTag[]> {

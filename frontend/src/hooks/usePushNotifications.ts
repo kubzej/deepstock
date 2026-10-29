@@ -8,8 +8,9 @@ import {
   updateNotificationSettings,
   sendTestNotification,
   urlBase64ToUint8Array,
-  type NotificationSettings
+  type NotificationPreferences
 } from '@/lib/api/push';
+import { queryKeys } from '@/lib/queryClient';
 
 /**
  * Hook for managing push notifications
@@ -58,7 +59,7 @@ export function usePushNotifications() {
     data: settings, 
     isLoading: settingsLoading 
   } = useQuery({
-    queryKey: ['notification-settings'],
+    queryKey: queryKeys.notificationSettings(),
     queryFn: fetchNotificationSettings,
     staleTime: 5 * 60 * 1000
   });
@@ -67,7 +68,7 @@ export function usePushNotifications() {
   const updateSettingsMutation = useMutation({
     mutationFn: updateNotificationSettings,
     onSuccess: (data) => {
-      queryClient.setQueryData(['notification-settings'], data);
+      queryClient.setQueryData(queryKeys.notificationSettings(), data);
     }
   });
 
@@ -101,16 +102,16 @@ export function usePushNotifications() {
       // Register with backend
       await subscribeToPush(sub);
       setSubscription(sub);
-      
-      // Enable notifications in settings
-      await updateSettingsMutation.mutateAsync({ notifications_enabled: true });
-      
+
+      // The server switches the account's notifications on with its first device
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notificationSettings() });
+
       return true;
     } catch (e) {
       console.error('Subscribe failed:', e);
       return false;
     }
-  }, [isSupported, vapidData, updateSettingsMutation]);
+  }, [isSupported, vapidData, queryClient]);
 
   // Unsubscribe from push notifications
   const unsubscribe = useCallback(async (): Promise<boolean> => {
@@ -123,20 +124,20 @@ export function usePushNotifications() {
       // Unsubscribe from browser
       await subscription.unsubscribe();
       setSubscription(null);
-      
-      // Disable notifications in settings
-      await updateSettingsMutation.mutateAsync({ notifications_enabled: false });
-      
+
+      // Only this device is removed; the server turns notifications off once no device is left
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notificationSettings() });
+
       return true;
     } catch (e) {
       console.error('Unsubscribe failed:', e);
       return false;
     }
-  }, [subscription, updateSettingsMutation]);
+  }, [subscription, queryClient]);
 
   // Toggle a specific setting
   const toggleSetting = useCallback(async (
-    key: keyof NotificationSettings,
+    key: keyof NotificationPreferences,
     value: boolean | number
   ) => {
     await updateSettingsMutation.mutateAsync({ [key]: value });

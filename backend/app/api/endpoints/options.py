@@ -2,19 +2,14 @@
 Options API Endpoints for DeepStock.
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
-from app.services.options import (
-    options_service,
-    OptionTransactionCreate,
-    OptionTransactionUpdate,
-    OptionPriceUpdate,
-    OptionAction,
-)
+from app.services.options import options_service
 from app.services.portfolio import portfolio_service
 from app.services.journal import journal_service
 from app.core.auth import get_current_user_id
 from app.core.redis import get_redis
-from typing import Optional, List
+from typing import Optional
 from datetime import date, datetime, timedelta
+from app.schemas.options import OptionAction, OptionTransactionCreate
 
 router = APIRouter()
 
@@ -84,24 +79,20 @@ async def get_option_transactions(
     symbol: Optional[str] = Query(None),
     option_symbol: Optional[str] = Query(None),
     limit: int = Query(100, le=500),
+    cursor: Optional[str] = Query(None),
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Get option transactions for authenticated user.
+    Get option transactions for authenticated user, newest first.
     Optionally filter by portfolio_id, underlying symbol, or OCC option_symbol.
+    Pass the previous response's next_cursor as cursor to load older pages.
     """
-    return await options_service.get_transactions(user_id, portfolio_id, symbol, option_symbol, limit)
-
-
-@router.get("/transactions/{transaction_id}")
-async def get_option_transaction(transaction_id: str, user_id: str = Depends(get_current_user_id)):
-    """Get a single option transaction by ID."""
-    tx = await options_service.get_transaction_by_id(transaction_id)
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    return tx
+    try:
+        return await options_service.get_transactions_page(
+            user_id, portfolio_id, symbol, option_symbol, limit, cursor
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/transactions/{portfolio_id}")
@@ -111,20 +102,21 @@ async def create_option_transaction(
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Create a new option transaction.
+    Open an option position.
 
     Actions:
     - BTO: Buy to Open (create long position)
-    - STC: Sell to Close (close long position)
     - STO: Sell to Open (create short position)
-    - BTC: Buy to Close (close short position)
-    - EXPIRATION: Option expired worthless
-    - ASSIGNMENT: Short option was assigned
-    - EXERCISE: Long option was exercised
+
+    Closing actions go through POST /{portfolio_id}/close, which checks the open
+    position and settles the stock side of assignment/exercise.
     """
     if not await portfolio_service.verify_portfolio_ownership(portfolio_id, user_id):
         raise HTTPException(status_code=404, detail="Portfolio nenalezeno")
-    tx = await options_service.create_transaction(portfolio_id, data)
+    try:
+        tx = await options_service.create_transaction(portfolio_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     created_at = datetime.fromisoformat(tx["created_at"]) if isinstance(tx["created_at"], str) else tx["created_at"]
     await journal_service.create_option_journal_entry(
         ticker=data.symbol,
@@ -142,49 +134,6 @@ async def create_option_transaction(
         created_at=created_at,
     )
     return tx
-
-
-@router.put("/transactions/{transaction_id}")
-async def update_option_transaction(
-    transaction_id: str,
-    data: OptionTransactionUpdate,
-    user_id: str = Depends(get_current_user_id)
-):
-    """Update an existing option transaction."""
-    tx = await options_service.get_transaction_by_id(transaction_id)
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    result = await options_service.update_transaction(transaction_id, data)
-    if not result:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    await journal_service.update_option_journal_entry(
-        option_transaction_id=transaction_id,
-        notes=result.get("notes"),
-        action=result["action"],
-        contracts=result["contracts"],
-        premium=result.get("premium"),
-    )
-    return result
-
-
-@router.delete("/transactions/{transaction_id}")
-async def delete_option_transaction(
-    transaction_id: str,
-    user_id: str = Depends(get_current_user_id)
-):
-    """Delete an option transaction."""
-    tx = await options_service.get_transaction_by_id(transaction_id)
-    if not tx:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    if not await portfolio_service.verify_portfolio_ownership(tx["portfolio_id"], user_id):
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    success = await options_service.delete_transaction(transaction_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Transakce nenalezena")
-    await journal_service.delete_option_journal_entry(transaction_id)
-    return {"success": True}
 
 
 @router.delete("/transactions/by-symbol/{option_symbol}")
@@ -347,53 +296,3 @@ async def refresh_option_prices(
         "failed": len(option_symbols) - len(results),
     }
 
-
-@router.post("/prices/{option_symbol}")
-async def update_option_price(
-    option_symbol: str,
-    data: OptionPriceUpdate,
-    user_id: str = Depends(get_current_user_id)
-):
-    """
-    Update or insert option price and Greeks.
-    Typically called by a background job fetching from yfinance.
-    """
-    return await options_service.upsert_price(option_symbol, data)
-
-
-# ==========================================
-# Batch Price Update (for background jobs)
-# ==========================================
-
-class BatchPriceUpdate(OptionPriceUpdate):
-    option_symbol: str
-
-
-@router.post("/prices/batch")
-async def batch_update_prices(
-    prices: List[BatchPriceUpdate],
-    user_id: str = Depends(get_current_user_id)
-):
-    """
-    Batch update option prices and Greeks.
-    Used by background jobs to update multiple options at once.
-    """
-    results = []
-    for price_data in prices:
-        option_symbol = price_data.option_symbol
-        update_data = OptionPriceUpdate(
-            price=price_data.price,
-            bid=price_data.bid,
-            ask=price_data.ask,
-            volume=price_data.volume,
-            open_interest=price_data.open_interest,
-            implied_volatility=price_data.implied_volatility,
-            delta=price_data.delta,
-            gamma=price_data.gamma,
-            theta=price_data.theta,
-            vega=price_data.vega,
-        )
-        result = await options_service.upsert_price(option_symbol, update_data)
-        results.append(result)
-    
-    return {"updated": len(results), "results": results}
